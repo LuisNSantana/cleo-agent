@@ -6,7 +6,7 @@ import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import { getCleoPrompt } from "@/lib/prompts"
 import { useModel } from "@/lib/model-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
@@ -85,8 +85,9 @@ export function MultiChat() {
   }
 
   const modelChats = useMultiChat(allModelsToMaintain)
+  // Generate system prompt with fallback to default Cleo prompt
   const systemPrompt = useMemo(
-    () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
+    () => user?.system_prompt || getCleoPrompt('multi-chat-model', 'default'),
     [user?.system_prompt]
   )
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])

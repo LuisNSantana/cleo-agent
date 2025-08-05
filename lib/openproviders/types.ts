@@ -92,6 +92,7 @@ export type AnthropicModel =
   | "claude-3-haiku-20240307"
 
 export type XaiModel =
+  | "grok-4"
   | "grok-3"
   | "grok-3-latest"
   | "grok-3-fast"

@@ -1,21 +1,21 @@
-# Zola
+# Cleo
 
-[zola.chat](https://zola.chat)
+[cleo.chat](https://cleo.chat)
 
-**Zola** is the open-source chat interface for all your models.
+**Cleo is an emotionally intelligent AI assistant created by Huminary Labs.**
 
-![zola cover](./public/cover_zola.jpg)
+![cleo cover](./public/cover_cleo.jpg)
 
 ## Features
 
-- Multi-model support: OpenAI, Mistral, Claude, Gemini, Ollama (local models)
-- Bring your own API key (BYOK) support via OpenRouter
+- **Multi-model support**: Powered by Grok-4, Llama 4 Maverick, and more, Gemini, Ollama (local models)
+- **Emotionally Intelligent**: Designed to understand and respond with empathy
 - File uploads
 - Clean, responsive UI with light/dark themes
 - Built with Tailwind CSS, shadcn/ui, and prompt-kit
 - Open-source and self-hostable
-- Customizable: user system prompt, multiple layout options
-- Local AI with Ollama: Run models locally with automatic model detection
+- **Daily Task Assistant**: Specialized in making your life easier
+- Local AI with **Huminary Labs Technology**: Built with cutting-edge AI research
 - Full MCP support (wip)
 
 ## Quick Start
@@ -23,8 +23,8 @@
 ### Option 1: With OpenAI (Cloud)
 
 ```bash
-git clone https://github.com/ibelick/zola.git
-cd zola
+git clone https://github.com/ibelick/cleo.git
+cd cleo
 npm install
 echo "OPENAI_API_KEY=your-key" > .env.local
 npm run dev
@@ -37,14 +37,14 @@ npm run dev
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull llama3.2  # or any model you prefer
 
-# Clone and run Zola
-git clone https://github.com/ibelick/zola.git
-cd zola
+# Clone and run Cleo
+git clone https://github.com/ibelick/cleo.git
+cd cleo
 npm install
 npm run dev
 ```
 
-Zola will automatically detect your local Ollama models!
+Cleo will automatically detect your local Ollama models!
 
 ### Option 3: Docker with Ollama
 

@@ -26,9 +26,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Zola",
+  title: "Cleo - AI Assistant by Huminary Labs",
   description:
-    "Zola is the open-source interface for AI chat. Multi-model, BYOK-ready, and fully self-hostable. Use Claude, OpenAI, Gemini, local models, and more, all in one place.",
+    "Cleo is an emotionally intelligent AI assistant created by Huminary Labs. Experience the power of advanced language models like Grok-4 and Llama in a warm, empathetic interface designed to make your daily life easier and more fulfilling.",
 }
 
 export default async function RootLayout({

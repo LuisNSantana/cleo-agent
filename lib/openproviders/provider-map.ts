@@ -99,6 +99,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "claude-3-haiku-20240307": "anthropic",
 
   // XAI
+  "grok-4": "xai",
   "grok-3": "xai",
   "grok-3-latest": "xai",
   "grok-3-fast": "xai",

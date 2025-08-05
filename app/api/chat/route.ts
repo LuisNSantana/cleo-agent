@@ -2,20 +2,20 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
-import { Attachment } from "@ai-sdk/ui-utils"
-import { Message as MessageAISDK, streamText, ToolSet } from "ai"
+import { streamText } from "ai"
+import type { CoreMessage } from "ai"
 import {
   incrementMessageCount,
   logUserMessage,
   storeAssistantMessage,
   validateAndTrackUsage,
 } from "./api"
-import { createErrorResponse, extractErrorMessage } from "./utils"
+import { createErrorResponse } from "./utils"
 
 export const maxDuration = 60
 
 type ChatRequest = {
-  messages: MessageAISDK[]
+  messages: CoreMessage[]
   chatId: string
   userId: string
   model: string
@@ -63,8 +63,8 @@ export async function POST(req: Request) {
         supabase,
         userId,
         chatId,
-        content: userMessage.content,
-        attachments: userMessage.experimental_attachments as Attachment[],
+        content: typeof userMessage.content === 'string' ? userMessage.content : JSON.stringify(userMessage.content),
+        attachments: [],
         model,
         isAuthenticated,
         message_group_id,
@@ -77,6 +77,9 @@ export async function POST(req: Request) {
     if (!modelConfig || !modelConfig.apiSdk) {
       throw new Error(`Model ${model} not found`)
     }
+
+    // Log model information for debugging
+    console.log(`[CLEO-API] Processing request with model: ${model} (${modelConfig.name})`)
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
@@ -93,8 +96,7 @@ export async function POST(req: Request) {
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: effectiveSystemPrompt,
       messages: messages,
-      tools: {} as ToolSet,
-      maxSteps: 10,
+      tools: {},
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
         // Don't set streamError anymore - let the AI SDK handle it through the stream
@@ -114,14 +116,7 @@ export async function POST(req: Request) {
       },
     })
 
-    return result.toDataStreamResponse({
-      sendReasoning: true,
-      sendSources: true,
-      getErrorMessage: (error: unknown) => {
-        console.error("Error forwarded to client:", error)
-        return extractErrorMessage(error)
-      },
-    })
+    return result.toTextStreamResponse()
   } catch (err: unknown) {
     console.error("Error in /api/chat:", err)
     const error = err as {

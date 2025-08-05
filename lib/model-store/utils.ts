@@ -15,24 +15,30 @@ export function filterAndSortModels(
   searchQuery: string,
   isModelHidden: (modelId: string) => boolean
 ): ModelConfig[] {
-  return models
-    .filter((model) => !isModelHidden(model.id))
+  const availableModels = models.filter((model) => !isModelHidden(model.id))
+  
+  // Check if any favorite models actually exist in the available models
+  const validFavorites = favoriteModels?.filter(fav => 
+    availableModels.some(model => model.id === fav)
+  ) || []
+  
+  return availableModels
     .filter((model) => {
-      // If user has favorite models, only show favorites
-      if (favoriteModels && favoriteModels.length > 0) {
-        return favoriteModels.includes(model.id)
+      // If user has valid favorite models, only show those
+      if (validFavorites.length > 0) {
+        return validFavorites.includes(model.id)
       }
-      // If no favorites, show all models
+      // If no valid favorites, show all models
       return true
     })
     .filter((model) =>
       model.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // If user has favorite models, maintain their order
-      if (favoriteModels && favoriteModels.length > 0) {
-        const aIndex = favoriteModels.indexOf(a.id)
-        const bIndex = favoriteModels.indexOf(b.id)
+      // If user has valid favorite models, maintain their order
+      if (validFavorites.length > 0) {
+        const aIndex = validFavorites.indexOf(a.id)
+        const bIndex = validFavorites.indexOf(b.id)
         return aIndex - bIndex
       }
 

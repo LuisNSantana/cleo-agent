@@ -94,16 +94,17 @@ export function Chat() {
   const {
     messages,
     input,
-    status,
-    stop,
-    hasSentFirstMessageRef,
+    handleInputChange,
     isSubmitting,
-    enableSearch,
-    setEnableSearch,
+    stop,
+    status,
+    conversationStatus,
+    hasSentFirstMessageRef,
     submit,
     handleSuggestion,
     handleReload,
-    handleInputChange,
+    enableSearch,
+    setEnableSearch,
   } = useChatCore({
     initialMessages,
     draftValue,
@@ -126,12 +127,12 @@ export function Chat() {
   const conversationProps = useMemo(
     () => ({
       messages,
-      status,
+      status: conversationStatus,
       onDelete: handleDelete,
       onEdit: handleEdit,
       onReload: handleReload,
     }),
-    [messages, status, handleDelete, handleEdit, handleReload]
+    [messages, conversationStatus, handleDelete, handleEdit, handleReload]
   )
 
   // Memoize the chat input props
@@ -151,7 +152,7 @@ export function Chat() {
       selectedModel,
       isUserAuthenticated: isAuthenticated,
       stop,
-      status,
+      status: conversationStatus,
       setEnableSearch,
       enableSearch,
     }),
@@ -171,7 +172,7 @@ export function Chat() {
       selectedModel,
       isAuthenticated,
       stop,
-      status,
+      conversationStatus,
       setEnableSearch,
       enableSearch,
     ]

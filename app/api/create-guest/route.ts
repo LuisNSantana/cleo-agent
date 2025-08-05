@@ -1,4 +1,5 @@
 import { createGuestServerClient } from "@/lib/supabase/server-guest"
+import { MODEL_DEFAULT } from "@/lib/config"
 
 export async function POST(request: Request) {
   try {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
           message_count: 0,
           premium: false,
           created_at: new Date().toISOString(),
+          favorite_models: [MODEL_DEFAULT, "grok-4"],
         })
         .select("*")
         .single()
