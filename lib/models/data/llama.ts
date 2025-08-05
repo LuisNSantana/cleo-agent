@@ -16,10 +16,10 @@ const llamaModels: ModelConfig[] = [
     modelFamily: "Llama 4",
     baseProviderId: "meta",
     description:
-      "Latest Llama 4 Maverick model with enhanced reasoning and performance capabilities for agent tasks.",
-    tags: ["maverick", "latest", "reasoning", "agent", "performance"],
+      "Latest Llama 4 Maverick model with enhanced reasoning, performance, and vision capabilities for multimodal agent tasks.",
+    tags: ["maverick", "latest", "reasoning", "agent", "performance", "vision", "multimodal"],
     contextWindow: 200000,
-    vision: false,
+    vision: true,
     tools: true,
     audio: false,
     reasoning: true,

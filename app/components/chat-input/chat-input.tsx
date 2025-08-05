@@ -15,6 +15,8 @@ import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
 import { FileList } from "./file-list"
+import { ImageSuggestions } from "./image-suggestions"
+import { isImageFile } from "@/lib/image-utils"
 
 type ChatInputProps = {
   value: string
@@ -158,6 +160,10 @@ export function ChatInput({
           onValueChange={onValueChange}
         >
           <FileList files={files} onFileRemove={onFileRemove} />
+          <ImageSuggestions 
+            hasImages={files.some(isImageFile)} 
+            onSuggestion={onSuggestion} 
+          />
           <PromptInputTextarea
             placeholder="Ask Cleo"
             onKeyDown={handleKeyDown}

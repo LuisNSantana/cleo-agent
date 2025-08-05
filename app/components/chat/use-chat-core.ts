@@ -3,6 +3,7 @@ import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { toast } from "@/components/ui/toast"
 import { Attachment } from "@/lib/file-handling"
 import { API_ROUTE_CHAT } from "@/lib/routes"
+import { isImageFile } from "@/lib/image-utils"
 import type { UserProfile } from "@/lib/user/types"
 import type { UIMessage } from "@ai-sdk/react"
 import { useSearchParams } from "next/navigation"
@@ -10,8 +11,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getOrCreateGuestUserId } from '@/lib/api'
 
 // Extended message type with content property
-type ChatMessage = UIMessage & {
+export interface ChatMessage extends UIMessage {
   content: string
+  experimental_attachments?: Array<{ name: string; contentType: string; url: string }>
 }
 
 type UseChatCoreProps = {
@@ -70,7 +72,7 @@ export function useChatCore({
     const currentModelName = sanitizeModelName(selectedModel || 'unknown-model')
     
     // Log model information for debugging
-    console.log(`[CLEO] Active model: ${currentModelName}`)
+
     
     // Return Cleo's modular prompt with current model info
     return getCleoPrompt(currentModelName, 'default')
@@ -115,7 +117,7 @@ export function useChatCore({
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Custom sendMessage function
-  const sendMessage = useCallback(async ({ text }: { text: string; experimental_attachments?: unknown[] }) => {
+  const sendMessage = useCallback(async ({ text, files }: { text: string; files?: FileList; experimental_attachments?: unknown[] }) => {
     // For guest users, get or create a proper guest user ID
     let effectiveUserId: string | null = user?.id || null
     if (!effectiveUserId) {
@@ -138,13 +140,54 @@ export function useChatCore({
     setStatus('in_progress')
     setError(null)
     
+    // Process files if any (following AI SDK v5 pattern)
+    const parts: Array<{ type: 'text' | 'file'; text?: string; mediaType?: string; url?: string; name?: string }> = [
+      { type: 'text', text }
+    ]
+    
+    if (files && files.length > 0) {
+      // Convert files to data URLs (like AI SDK v5 does automatically)
+      const fileDataUrls = await Promise.all(
+        Array.from(files).map((file) => 
+          new Promise<{ type: 'file'; mediaType: string; url: string; name: string }>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const result = {
+                type: 'file' as const,
+                mediaType: file.type,
+                url: reader.result as string,
+                name: file.name
+              }
+              resolve(result)
+            }
+            reader.onerror = (error) => {
+              reject(error)
+            }
+            reader.readAsDataURL(file)
+          })
+        )
+      )
+      
+      parts.push(...fileDataUrls)
+    }
+    
+    // Create attachments for display (convert file parts to attachment format)
+    const attachments = parts
+      .filter(part => part.type === 'file')
+      .map(part => ({
+        name: part.name || 'file',
+        contentType: part.mediaType || 'application/octet-stream',
+        url: part.url || ''
+      }))
+    
     // Add user message immediately
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: text,
+      content: parts.length > 1 ? parts : text, // Use multimodal content if files, otherwise text
       createdAt: new Date(),
-      parts: [{ type: 'text', text }],
+      parts: parts,
+      experimental_attachments: attachments.length > 0 ? attachments : undefined,
     } as ChatMessage
     
     setMessages(prev => [...prev, userMessage])
@@ -381,27 +424,40 @@ export function useChatCore({
     if (!input.trim() || isSubmitting) return
     
     const messageText = input.trim() // Guardar el texto antes de limpiar
+    const currentFiles = [...files] // Guardar archivos antes de limpiar
     setInput("") // Limpiar input inmediatamente
     setFiles([]) // Limpiar archivos inmediatamente
     clearDraft() // Limpiar draft inmediatamente
     setIsSubmitting(true)
     
     try {
-      // Handle file uploads and attachments
-      let attachments: Attachment[] = []
-      if (files.length > 0 && user?.id && chatId) {
+      // Handle file uploads to Supabase for documents (if needed)
+      let supabaseAttachments: Attachment[] = []
+      const documentFiles = currentFiles.filter(file => !isImageFile(file))
+      if (documentFiles.length > 0 && user?.id && chatId) {
         const uploadedAttachments = await handleFileUploads(user.id, chatId)
         if (uploadedAttachments) {
-          attachments = uploadedAttachments
+          supabaseAttachments = uploadedAttachments
         }
       }
+      
+      // Create FileList with ALL files (images AND documents) for AI analysis
+      let allFilesList: FileList | undefined = undefined
+      if (currentFiles.length > 0) {
+        const dt = new DataTransfer()
+        currentFiles.forEach((file) => {
+          dt.items.add(file)
+        })
+        allFilesList = dt.files
+      }
 
-      // Send message using AI SDK v5 sendMessage
+      // Send message using AI SDK v5 sendMessage with ALL files
       await sendMessage({
         text: messageText,
-        // Add attachments if any
-        ...(attachments.length > 0 && {
-          experimental_attachments: attachments.map(att => ({
+        ...(allFilesList && { files: allFilesList }),
+        // Add Supabase attachments for UI display if any
+        ...(supabaseAttachments.length > 0 && {
+          experimental_attachments: supabaseAttachments.map(att => ({
             name: att.name,
             contentType: att.contentType,
             url: att.url,

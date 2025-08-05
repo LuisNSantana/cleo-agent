@@ -16,20 +16,23 @@ import {
 } from "@/components/prompt-kit/message"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
-import { Check, Copy, Trash } from "@phosphor-icons/react"
+
+import { Check, Copy, Trash, File, FileText, FilePdf } from "@phosphor-icons/react"
 import Image from "next/image"
 import { useRef, useState } from "react"
 
-const getTextFromDataUrl = (dataUrl: string) => {
-  const base64 = dataUrl.split(",")[1]
-  return base64
+
+
+type Attachment = {
+  name: string
+  contentType: string
+  url: string
 }
 
 export type MessageUserProps = {
   hasScrollAnchor?: boolean
-  attachments?: MessageType["experimental_attachments"]
-  children: string
+  attachments?: Attachment[]
+  children: string | Array<{ type: string; text?: string; mediaType?: string; url?: string }>
   copied: boolean
   copyToClipboard: () => void
   onEdit: (id: string, newText: string) => void
@@ -51,13 +54,36 @@ export function MessageUser({
   id,
   className,
 }: MessageUserProps) {
-  const [editInput, setEditInput] = useState(children)
   const [isEditing, setIsEditing] = useState(false)
+
+  // Extract text content from multimodal or string content
+  const getTextContent = (content: typeof children): string => {
+    if (typeof content === 'string') {
+      return content
+    }
+    // For multimodal content, extract text parts
+    return content
+      .filter(part => part.type === 'text')
+      .map(part => part.text || '')
+      .join(' ')
+  }
+
+  // Extract image parts from multimodal content
+  const getImageParts = (content: typeof children) => {
+    if (typeof content === 'string') {
+      return []
+    }
+    return content.filter(part => part.type === 'file' && part.mediaType?.startsWith('image/'))
+  }
+
+  const textContent = getTextContent(children)
+  const imageParts = getImageParts(children)
+  const [editInput, setEditInput] = useState(textContent)
   const contentRef = useRef<HTMLDivElement>(null)
 
   const handleEditCancel = () => {
     setIsEditing(false)
-    setEditInput(children)
+    setEditInput(textContent)
   }
 
   const handleSave = () => {
@@ -80,7 +106,7 @@ export function MessageUser({
         className
       )}
     >
-      {attachments?.map((attachment, index) => (
+      {attachments?.map((attachment: Attachment, index: number) => (
         <div
           className="flex flex-row gap-2"
           key={`${attachment.name}-${index}`}
@@ -115,11 +141,26 @@ export function MessageUser({
                 <MorphingDialogClose className="text-primary" />
               </MorphingDialogContainer>
             </MorphingDialog>
-          ) : attachment.contentType?.startsWith("text") ? (
-            <div className="text-primary mb-3 h-24 w-40 overflow-hidden rounded-md border p-2 text-xs">
-              {getTextFromDataUrl(attachment.url)}
+          ) : (
+            // Display document with appropriate icon and name
+            <div className="mb-3 flex h-16 w-40 items-center gap-2 rounded-md border p-2 text-xs">
+              <div className="flex-shrink-0">
+                {attachment.contentType?.includes('pdf') ? (
+                  <FilePdf className="size-6 text-red-500" />
+                ) : attachment.contentType?.startsWith('text') ? (
+                  <FileText className="size-6 text-blue-500" />
+                ) : (
+                  <File className="size-6 text-gray-500" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{attachment.name}</div>
+                <div className="text-muted-foreground text-xs">
+                  {attachment.contentType?.split('/')[1]?.toUpperCase() || 'FILE'}
+                </div>
+              </div>
             </div>
-          ) : null}
+          )}
         </div>
       ))}
       {isEditing ? (
@@ -154,27 +195,67 @@ export function MessageUser({
           </div>
         </div>
       ) : (
-        <MessageContent
-          className="bg-accent relative max-w-[70%] rounded-3xl px-5 py-2.5"
-          markdown={true}
-          ref={contentRef}
-          components={{
-            code: ({ children }) => <>{children}</>,
-            pre: ({ children }) => <>{children}</>,
-            h1: ({ children }) => <p>{children}</p>,
-            h2: ({ children }) => <p>{children}</p>,
-            h3: ({ children }) => <p>{children}</p>,
-            h4: ({ children }) => <p>{children}</p>,
-            h5: ({ children }) => <p>{children}</p>,
-            h6: ({ children }) => <p>{children}</p>,
-            p: ({ children }) => <p>{children}</p>,
-            li: ({ children }) => <p>- {children}</p>,
-            ul: ({ children }) => <>{children}</>,
-            ol: ({ children }) => <>{children}</>,
-          }}
-        >
-          {children}
-        </MessageContent>
+        <div className="flex flex-col gap-2">
+          {/* Render images from multimodal content */}
+          {imageParts.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {imageParts.map((imagePart, index) => (
+                <MorphingDialog
+                  key={index}
+                  transition={{
+                    type: "spring",
+                    stiffness: 280,
+                    damping: 18,
+                    mass: 0.3,
+                  }}
+                >
+                  <MorphingDialogTrigger className="z-10">
+                    <Image
+                      className="mb-1 w-40 rounded-md"
+                      src={imagePart.url || ''}
+                      alt={`Image ${index + 1}`}
+                      width={160}
+                      height={120}
+                    />
+                  </MorphingDialogTrigger>
+                  <MorphingDialogContainer>
+                    <MorphingDialogContent className="relative rounded-lg">
+                      <MorphingDialogImage
+                        src={imagePart.url || ''}
+                        alt={`Image ${index + 1}`}
+                        className="max-h-[90vh] max-w-[90vw] object-contain"
+                      />
+                    </MorphingDialogContent>
+                    <MorphingDialogClose className="text-primary" />
+                  </MorphingDialogContainer>
+                </MorphingDialog>
+              ))}
+            </div>
+          )}
+          
+          {/* Render text content */}
+          <MessageContent
+            className="bg-accent relative max-w-[70%] rounded-3xl px-5 py-2.5"
+            markdown={true}
+            ref={contentRef}
+            components={{
+              code: ({ children }) => <>{children}</>,
+              pre: ({ children }) => <>{children}</>,
+              h1: ({ children }) => <p>{children}</p>,
+              h2: ({ children }) => <p>{children}</p>,
+              h3: ({ children }) => <p>{children}</p>,
+              h4: ({ children }) => <p>{children}</p>,
+              h5: ({ children }) => <p>{children}</p>,
+              h6: ({ children }) => <p>{children}</p>,
+              p: ({ children }) => <p>{children}</p>,
+              li: ({ children }) => <p>- {children}</p>,
+              ul: ({ children }) => <>{children}</>,
+              ol: ({ children }) => <>{children}</>,
+            }}
+          >
+            {textContent}
+          </MessageContent>
+        </div>
       )}
       <MessageActions className="flex gap-0 opacity-0 transition-opacity duration-0 group-hover:opacity-100">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">

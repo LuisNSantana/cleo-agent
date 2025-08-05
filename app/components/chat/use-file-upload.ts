@@ -39,7 +39,7 @@ export const useFileUpload = () => {
     return files.map((file) => ({
       name: file.name,
       contentType: file.type,
-      url: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+      url: URL.createObjectURL(file), // Create URL for all file types
     }))
   }
 

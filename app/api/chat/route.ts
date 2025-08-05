@@ -79,10 +79,105 @@ export async function POST(req: Request) {
       throw new Error(`Model ${model} not found`)
     }
 
-    // Log model information for debugging
-    console.log(`[CLEO-API] Processing request with model: ${model} (${modelConfig.name})`)
+
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
+
+    // Convert multimodal messages to correct format for the model
+    const convertedMessages = messages.map(msg => {
+      // Only process user messages with multimodal content
+      if (msg.role === 'user' && Array.isArray(msg.content)) {
+        const convertedContent = msg.content
+          .filter((part: any) => part && (part.type === 'text' || part.type === 'file')) // Filter out invalid parts
+          .map((part: any) => {
+            // Convert image file parts to standard AI SDK v5 image format
+            if (part.type === 'file' && part.mediaType?.startsWith('image/') && part.url) {
+              return {
+                type: 'image' as const,
+                image: part.url // Already a data URL from frontend
+              }
+            }
+            // Convert document file parts to text with actual content
+            if (part.type === 'file' && !part.mediaType?.startsWith('image/') && part.url) {
+              const fileName = part.name || 'document'
+              let fileType = part.mediaType || 'unknown'
+              
+              // Normalize MIME type based on file extension if generic
+              if (fileType === 'application/octet-stream' || fileType === 'unknown') {
+                const extension = fileName.toLowerCase().split('.').pop()
+                const extensionToMime: { [key: string]: string } = {
+                  'md': 'text/markdown',
+                  'txt': 'text/plain',
+                  'csv': 'text/csv',
+                  'json': 'application/json',
+                  'pdf': 'application/pdf',
+                  'doc': 'application/msword',
+                  'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                }
+                if (extension && extensionToMime[extension]) {
+                  fileType = extensionToMime[extension]
+                }
+              }
+              
+              // Extract content from data URL
+              let documentContent = ''
+              try {
+                if (part.url.startsWith('data:')) {
+                  const base64Data = part.url.split(',')[1]
+                  if (base64Data) {
+                    // For text-based files, decode as text
+                    if (fileType.startsWith('text/') || fileType.includes('markdown') || fileType.includes('json') || fileType.includes('csv')) {
+                      documentContent = atob(base64Data)
+                    } else {
+                      // For binary files like PDFs, indicate that content extraction is needed
+                      documentContent = `[Binary file: ${fileName}. Content extraction would require specialized processing.]`
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error(`Error decoding document content for ${fileName}:`, error)
+                documentContent = `[Error reading document content for ${fileName}]`
+              }
+              
+              const finalText = `[DOCUMENT: ${fileName} (${fileType})]\n\nContent:\n${documentContent}`
+              
+              return {
+                type: 'text' as const,
+                text: finalText
+              }
+            }
+            // Ensure text parts have the correct structure
+            if (part.type === 'text' && (part.text || part.content)) {
+              return {
+                type: 'text' as const,
+                text: part.text || part.content || ''
+              }
+            }
+            // Return a default text part for invalid content
+            return {
+              type: 'text' as const,
+              text: ''
+            }
+          })
+          .filter((part: any) => part.text !== '' || part.type === 'image') // Remove empty text parts
+        
+        // If no valid content, convert to simple text message
+        if (convertedContent.length === 0) {
+          return { ...msg, content: typeof msg.content === 'string' ? msg.content : '' }
+        }
+        
+        return { ...msg, content: convertedContent }
+      }
+      
+      // For non-user messages or simple string content, return as-is
+      return msg
+    })
+
+    // Log conversion summary
+    const convertedMultimodal = convertedMessages.filter(msg => Array.isArray(msg.content))
+    if (convertedMultimodal.length > 0) {
+
+    }
 
     let apiKey: string | undefined
     if (isAuthenticated && userId) {
@@ -96,7 +191,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: effectiveSystemPrompt,
-      messages: messages,
+      messages: convertedMessages,
       tools: tools,
       stopWhen: stepCountIs(5), // Allow multi-step tool calls
       onError: (err: unknown) => {
