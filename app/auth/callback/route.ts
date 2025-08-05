@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       created_at: new Date().toISOString(),
       message_count: 0,
       premium: false,
-      favorite_models: [MODEL_DEFAULT, "grok-4"],
+      favorite_models: [MODEL_DEFAULT, "grok-4", "gpt-oss-120b"],
     })
 
     if (insertError && insertError.code !== "23505") {

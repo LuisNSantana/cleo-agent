@@ -1,14 +1,16 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { grokModels } from "./data/grok"
 import { llamaModels } from "./data/llama"
+import { gptOssModels } from "./data/gpt-oss"
 import { ModelConfig } from "./types"
 
 /**
  * Cleo Agent Models
  * 
- * This application offers two powerful AI models for the Cleo agent:
+ * This application offers three powerful AI models for the Cleo agent:
  * - Grok-4: Advanced reasoning, vision, and function calling capabilities
  * - Llama: Open-source alternative with strong performance
+ * - GPT-OSS 120B: OpenAI's flagship open source model with MoE architecture
  * 
  * Users can choose between these models to compare responses and
  * select their preferred AI for document analysis, calendar management,
@@ -17,12 +19,17 @@ import { ModelConfig } from "./types"
 const STATIC_MODELS: ModelConfig[] = [
   ...grokModels, // Cleo Agent (Grok-4)
   ...llamaModels, // Llama models for comparison
+  ...gptOssModels, // GPT-OSS 120B for advanced reasoning
 ]
+
+// Debug: Log available models
+console.log('🔍 Available models:', STATIC_MODELS.map(m => ({ id: m.id, name: m.name, provider: m.provider })))
+console.log('🔍 FREE_MODELS_IDS:', FREE_MODELS_IDS)
 
 /**
  * Get all available models for Cleo Agent
  * 
- * Returns both Grok and Llama models, allowing users to choose
+ * Returns Grok, Llama, and GPT-OSS models, allowing users to choose
  * their preferred AI model for the Cleo agent experience.
  */
 export async function getAllModels(): Promise<ModelConfig[]> {
@@ -34,9 +41,13 @@ export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
 
   const freeModels = models
     .filter(
-      (model) =>
-        FREE_MODELS_IDS.includes(model.id) || 
-        model.providerId === "meta" // Llama models are typically free
+      (model) => {
+        const isInFreeList = FREE_MODELS_IDS.includes(model.id)
+        const isMetaProvider = model.providerId === "meta"
+        const shouldInclude = isInFreeList || isMetaProvider
+        console.log(`🔍 Model ${model.id}: inFreeList=${isInFreeList}, isMeta=${isMetaProvider}, shouldInclude=${shouldInclude}`)
+        return shouldInclude
+      }
     )
     .map((model) => ({
       ...model,

@@ -21,12 +21,13 @@ export const NON_AUTH_ALLOWED_MODELS = [
   "llama-3-1-8b-groq",
 ]
 
-// Modelos gratuitos para usuarios autenticados (Llama + Grok)
+// Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS)
 export const FREE_MODELS_IDS = [
   "llama-4-maverick",
   "llama-3-3-70b-groq",
   "llama-3-1-8b-groq",
   "grok-4",
+  "gpt-oss-120b",
 ]
 
 export const MODEL_DEFAULT = "llama-4-maverick"
