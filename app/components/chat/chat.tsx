@@ -1,6 +1,7 @@
 "use client"
 
 import { ChatInput } from "@/app/components/chat-input/chat-input"
+import { CleoMascot } from "@/app/components/cleo-mascot"
 import { Conversation } from "@/app/components/chat/conversation"
 import { useModel } from "@/app/components/chat/use-model"
 import { useChatDraft } from "@/app/hooks/use-chat-draft"
@@ -218,7 +219,8 @@ export function Chat() {
               },
             }}
           >
-            <h1 className="mb-6 text-3xl font-medium tracking-tight">
+            <CleoMascot />
+            <h1 className="mb-6 mt-4 text-3xl font-medium tracking-tight">
               What&apos;s on your mind?
             </h1>
           </motion.div>

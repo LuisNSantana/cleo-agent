@@ -178,13 +178,13 @@ export function useChatCore({
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No response body')
 
-      let assistantMessage = ''
+      let buffer = ''
       const assistantMessageObj: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: '',
         createdAt: new Date(),
-        parts: [{ type: 'text', text: '' }],
+        parts: [],
       } as ChatMessage
 
       setMessages(prev => [...prev, assistantMessageObj])
@@ -194,21 +194,126 @@ export function useChatCore({
         if (done) break
 
         const chunk = new TextDecoder().decode(value)
-        assistantMessage += chunk
-        assistantMessageObj.content = assistantMessage
-        assistantMessageObj.parts = [{ type: 'text', text: assistantMessage }]
+        buffer += chunk
         
-        setMessages(prev => {
-          const newMessages = [...prev]
-          newMessages[newMessages.length - 1] = { ...assistantMessageObj }
-          return newMessages
-        })
+        // Parse streaming data line by line
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          // Skip SSE terminator line
+          if (line.trim() === 'data: [DONE]') {
+            continue
+          }
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              // Handle different types of streaming data
+              switch (data.type) {
+                case 'tool-input-start': {
+                  // Add tool invocation part in partial-call state
+                  assistantMessageObj.parts.push({
+                    type: 'tool-invocation',
+                    toolInvocation: {
+                      state: 'partial-call',
+                      toolName: data.toolName,
+                      toolCallId: data.toolCallId,
+                      args: {},
+                    },
+                  } as any)
+                  break
+                }
+                  
+                case 'tool-input-available': {
+                  // Update tool invocation with full arguments (call state)
+                  const toolPart = assistantMessageObj.parts.find(
+                    (p: any) =>
+                      p.type === 'tool-invocation' &&
+                      p.toolInvocation?.toolCallId === data.toolCallId
+                  ) as any
+                  if (toolPart) {
+                    toolPart.toolInvocation.state = 'call'
+                    toolPart.toolInvocation.args = data.input
+                  }
+                  break
+                }
+                  
+                case 'tool-output-available': {
+                  // Update tool invocation with result (completed state)
+                  const toolPart = assistantMessageObj.parts.find(
+                    (p: any) =>
+                      p.type === 'tool-invocation' &&
+                      p.toolInvocation?.toolCallId === data.toolCallId
+                  ) as any
+                  if (toolPart) {
+                    toolPart.toolInvocation.state = 'result'
+                    toolPart.toolInvocation.result = data.output
+                  }
+                  break
+                }
+                  
+                case 'text-start':
+                  // Start text part
+                  assistantMessageObj.parts.push({
+                    type: 'text',
+                    text: '',
+                  })
+                  break
+                  
+                case 'text-delta':
+                  // Update text part
+                  const textPart = assistantMessageObj.parts.findLast(
+                    p => p.type === 'text'
+                  )
+                  if (textPart && textPart.type === 'text') {
+                    textPart.text += data.delta
+                    // Update content for backward compatibility
+                    assistantMessageObj.content = assistantMessageObj.parts
+                      .filter(p => p.type === 'text')
+                      .map(p => p.type === 'text' ? p.text : '')
+                      .join('')
+                  }
+                  break
+              }
+              
+              // Update the message in state
+              setMessages(prev => {
+                const newMessages = [...prev]
+                newMessages[newMessages.length - 1] = { ...assistantMessageObj }
+                return newMessages
+              })
+              
+            } catch {
+              // If JSON parsing fails, treat as plain text (fallback)
+              const textPart = assistantMessageObj.parts.findLast(
+                p => p.type === 'text'
+              )
+              if (textPart && textPart.type === 'text') {
+                textPart.text += line.slice(6)
+                assistantMessageObj.content += line.slice(6)
+              } else {
+                assistantMessageObj.parts.push({
+                  type: 'text',
+                  text: line.slice(6),
+                })
+                assistantMessageObj.content += line.slice(6)
+              }
+              
+              setMessages(prev => {
+                const newMessages = [...prev]
+                newMessages[newMessages.length - 1] = { ...assistantMessageObj }
+                return newMessages
+              })
+            }
+          }
+        }
       }
 
       // Cache final assistant message
       cacheAndAddMessage({ 
         ...assistantMessageObj, 
-        parts: [{ type: 'text', text: assistantMessage }]
+        parts: assistantMessageObj.parts
       } as UIMessage)
       setStatus('ready')
       

@@ -2,8 +2,9 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
-import { streamText } from "ai"
+import { streamText, stepCountIs } from "ai"
 import type { CoreMessage } from "ai"
+import { tools } from "@/lib/tools"
 import {
   incrementMessageCount,
   logUserMessage,
@@ -96,10 +97,10 @@ export async function POST(req: Request) {
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: effectiveSystemPrompt,
       messages: messages,
-      tools: {},
+      tools: tools,
+      stopWhen: stepCountIs(5), // Allow multi-step tool calls
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
-        // Don't set streamError anymore - let the AI SDK handle it through the stream
       },
 
       onFinish: async ({ response }) => {
@@ -116,7 +117,17 @@ export async function POST(req: Request) {
       },
     })
 
-    return result.toTextStreamResponse()
+    return result.toUIMessageStreamResponse({
+      onError: (error) => {
+        if (error instanceof Error) {
+          if (error.message.includes("Rate limit")) {
+            return "Rate limit exceeded. Please try again later."
+          }
+        }
+        console.error(error)
+        return "An error occurred."
+      },
+    })
   } catch (err: unknown) {
     console.error("Error in /api/chat:", err)
     const error = err as {
