@@ -61,11 +61,14 @@ export function MessageUser({
     if (typeof content === 'string') {
       return content
     }
-    // For multimodal content, extract text parts
-    return content
+    // For multimodal content, extract text parts and preserve original text
+    const textParts = content
       .filter(part => part.type === 'text')
       .map(part => part.text || '')
-      .join(' ')
+    
+    // Return the first text part only (the original user input)
+    const result = textParts[0] || ''
+    return result
   }
 
   // Extract image parts from multimodal content
@@ -195,7 +198,7 @@ export function MessageUser({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <>
           {/* Render images from multimodal content */}
           {imageParts.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
@@ -236,26 +239,12 @@ export function MessageUser({
           {/* Render text content */}
           <MessageContent
             className="bg-accent relative max-w-[70%] rounded-3xl px-5 py-2.5"
-            markdown={true}
+            markdown={false}
             ref={contentRef}
-            components={{
-              code: ({ children }) => <>{children}</>,
-              pre: ({ children }) => <>{children}</>,
-              h1: ({ children }) => <p>{children}</p>,
-              h2: ({ children }) => <p>{children}</p>,
-              h3: ({ children }) => <p>{children}</p>,
-              h4: ({ children }) => <p>{children}</p>,
-              h5: ({ children }) => <p>{children}</p>,
-              h6: ({ children }) => <p>{children}</p>,
-              p: ({ children }) => <p>{children}</p>,
-              li: ({ children }) => <p>- {children}</p>,
-              ul: ({ children }) => <>{children}</>,
-              ol: ({ children }) => <>{children}</>,
-            }}
           >
             {textContent}
           </MessageContent>
-        </div>
+        </>
       )}
       <MessageActions className="flex gap-0 opacity-0 transition-opacity duration-0 group-hover:opacity-100">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">

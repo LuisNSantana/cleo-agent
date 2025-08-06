@@ -20,6 +20,12 @@ export type MarkdownProps = {
 }
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
+  // If the text is simple (no markdown formatting), return it as a single block
+  const hasMarkdownSyntax = /[#*_`\[\]!]/.test(markdown)
+  if (!hasMarkdownSyntax) {
+    return [markdown]
+  }
+  
   const tokens = marked.lexer(markdown)
   return tokens.map((token) => token.raw)
 }
@@ -90,9 +96,10 @@ const MemoizedMarkdownBlock = memo(
     content: string
     components?: Partial<Components>
   }) {
+    console.log('DEBUG - MemoizedMarkdownBlock content:', JSON.stringify(content))
     return (
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
+        remarkPlugins={[remarkGfm]}
         components={components}
       >
         {content}
