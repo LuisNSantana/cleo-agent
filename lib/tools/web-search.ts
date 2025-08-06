@@ -22,18 +22,35 @@ interface BraveSearchResponse {
   }
 }
 
+// Define output schema for type safety (AI SDK 5 best practice)
+const webSearchOutputSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  query: z.string(),
+  results: z.array(z.object({
+    title: z.string(),
+    url: z.string(),
+    description: z.string(),
+    hostname: z.string(),
+    age: z.string()
+  })),
+  total_results: z.number().optional()
+})
+
 export const webSearchTool = tool({
-  description: `Busca información actualizada en internet usando Brave Search API. 
-  Útil para obtener información reciente, noticias, datos específicos o cualquier consulta que requiera información actualizada de la web.`,
+  description: 'Search the web for current information using Brave Search API. Use this when users ask for recent news, current events, latest information, or any topic requiring up-to-date web data.',
   inputSchema: z.object({
-    query: z.string().describe('La consulta de búsqueda web'),
-    count: z.number().min(1).max(20).optional().default(10).describe('Número de resultados a devolver'),
-    country: z.string().optional().default('us').describe('Código de país para la búsqueda'),
-    search_lang: z.string().optional().default('es').describe('Idioma de búsqueda'),
-    freshness: z.enum(['pd', 'pw', 'pm', 'py']).optional().describe('Filtro de tiempo: pd=día, pw=semana, pm=mes, py=año'),
-    safesearch: z.enum(['strict', 'moderate', 'off']).optional().default('moderate').describe('Nivel de búsqueda segura'),
+    query: z.string().min(1).max(200).describe('The search query to find relevant web information'),
+    count: z.number().min(1).max(20).optional().default(10).describe('Number of search results to return (default: 10)'),
   }),
-  execute: async ({ query, count = 10, country = 'us', search_lang = 'es', freshness, safesearch = 'moderate' }) => {
+  outputSchema: webSearchOutputSchema,
+  onInputStart: ({ toolCallId }) => {
+    console.log('🔍 Starting web search:', toolCallId);
+  },
+  onInputAvailable: ({ input, toolCallId }) => {
+    console.log('🔍 Search query ready:', input.query, toolCallId);
+  },
+  execute: async ({ query, count = 10 }) => {
     try {
       const apiKey = process.env.BRAVE_SEARCH_API_KEY
       
@@ -44,14 +61,10 @@ export const webSearchTool = tool({
       const searchParams = new URLSearchParams({
         q: query,
         count: count.toString(),
-        country,
-        search_lang,
-        safesearch,
+        country: 'us',
+        search_lang: 'es',
+        safesearch: 'moderate',
       })
-
-      if (freshness) {
-        searchParams.append('freshness', freshness)
-      }
 
       const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${searchParams}`, {
         method: 'GET',

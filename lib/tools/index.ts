@@ -18,11 +18,26 @@ const weatherCache: Record<string, { data: WeatherResult; expiry: number }> = {}
 
 // Weather tool - simulates weather data
 export const weatherTool = tool({
-  description: 'Get current weather information for a specific location',
+  description: 'Get current weather information for any location worldwide. Provides temperature, conditions, humidity, and wind speed.',
   inputSchema: z.object({
-    location: z.string().describe('The city or location to get weather for (e.g., "Madrid", "New York", "London")'),
+    location: z.string().min(1).describe('The city or location to get weather for (e.g., "Madrid", "New York", "London")'),
     unit: z.enum(['celsius', 'fahrenheit']).optional().default('celsius').describe('Temperature unit preference'),
   }),
+  outputSchema: z.union([
+    z.object({
+      location: z.string(),
+      temperature: z.number(),
+      unit: z.enum(['celsius', 'fahrenheit']),
+      condition: z.string().optional(),
+      humidity: z.string().optional(),
+      windSpeed: z.string().optional(),
+      icon: z.string().optional(),
+      timestamp: z.string(),
+    }),
+    z.object({
+      error: z.string(),
+    })
+  ]),
   execute: async ({ location, unit }) => {
     const unitsParam = unit === 'fahrenheit' ? 'imperial' : 'metric'
     const cacheKey = `${location.toLowerCase()}-${unitsParam}`
@@ -176,11 +191,13 @@ export const cryptoPriceTool = tool({
       if (!res.ok) return { error: `CoinGecko error ${res.status}` }
       const data: Record<string, Record<string, number>> = await res.json()
       if (!data[coinId]) return { error: `Coin id "${coinId}" not found` }
+      
+      const currency = vsCurrency || 'usd'
       return {
         coinId,
-        vsCurrency,
-        price: data[coinId][vsCurrency],
-        change24h: (data[coinId] as Record<string, number>)[`${vsCurrency}_24h_change`],
+        vsCurrency: currency,
+        price: data[coinId][currency],
+        change24h: (data[coinId] as Record<string, number>)[`${currency}_24h_change`],
         timestamp: new Date().toISOString(),
       }
     } catch {
