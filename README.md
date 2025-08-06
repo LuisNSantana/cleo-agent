@@ -134,6 +134,8 @@ We welcome contributions! Please feel free to submit issues and pull requests.
 
 Apache License 2.0
 
+**Important:** While the source code is licensed under Apache 2.0, the "Cleo" name, logos, and trademarks are owned by Huminary Labs and are not covered by this license. See our [Trademark Policy](./TRADEMARK_POLICY.md) for details on acceptable use of the Cleo brand.
+
 ## Support
 
 If you encounter any issues or have questions:
@@ -142,6 +144,10 @@ If you encounter any issues or have questions:
 2. Create a new issue with detailed information
 3. Join our community discussions
 
+**For trademark or brand-related inquiries:** legal@huminarylabs.com
+
 ## Notes
 
 Cleo is actively developed and new features are added regularly. The codebase follows modern React and Next.js best practices.
+
+**Trademark Notice:** Cleo™ is a trademark of Huminary Labs. The source code is available under Apache License 2.0, but trademark rights are separately owned and protected. See our [Trademark Policy](./TRADEMARK_POLICY.md) for usage guidelines.

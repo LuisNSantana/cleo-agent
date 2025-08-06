@@ -186,7 +186,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2025 Julien Thibeaut
+   Copyright 2025 Huminary Labs
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -199,3 +199,8 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+   TRADEMARK NOTICE:
+   The "Cleo" name, logos, and related trademarks are owned by Huminary Labs
+   and are not covered by this license. Use of these trademarks is governed
+   by our Trademark Policy. See TRADEMARK_POLICY.md for details.
