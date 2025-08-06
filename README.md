@@ -27,22 +27,52 @@ Cleo is designed to make your daily life easier through empathetic AI interactio
 - Supabase account (for database)
 - API keys for Grok-4 (xAI) and Groq (Llama models)
 
-### Installation
+### Installation / Instalación
 
+#### English
 ```bash
 # Clone the repository
 git clone https://github.com/LuisNSantana/cleo-agent.git
 cd cleo-agent
 
-# Install dependencies
-npm install
+# Install dependencies (recommended: pnpm)
+pnpm install
+
+# If you have issues with the stable version of Next.js, install the canary version:
+pnpm add next@canary
+
+# Install any missing dependencies indicated by the build (e.g., framer-motion):
+pnpm add framer-motion
 
 # Set up environment variables
 cp .env.example .env.local
-# Edit .env.local with your API keys and Supabase credentials
+# Edit .env.local with your credentials and API keys
 
 # Run the development server
-npm run dev
+pnpm dev
+```
+
+#### Español
+```bash
+# Clona el repositorio
+git clone https://github.com/LuisNSantana/cleo-agent.git
+cd cleo-agent
+
+# Instala las dependencias (recomendado: pnpm)
+pnpm install
+
+# Si tienes problemas con la versión estable de Next.js, instala la versión canary:
+pnpm add next@canary
+
+# Instala cualquier dependencia faltante que indique el build (por ejemplo, framer-motion):
+pnpm add framer-motion
+
+# Configura las variables de entorno
+cp .env.example .env.local
+# Edita .env.local con tus credenciales y API keys
+
+# Ejecuta el servidor de desarrollo
+pnpm dev
 ```
 
 ### Environment Variables
