@@ -1,5 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { webSearchTool } from './web-search';
 
 // simple in-memory cache { key: data, expiry }
 interface WeatherResult {
@@ -248,6 +249,7 @@ export const tools = {
   calculator: calculatorTool,
   cryptoPrice: cryptoPriceTool,
   randomFact: randomFactTool,
+  webSearch: webSearchTool,
 };
 
 export type ToolName = keyof typeof tools;
