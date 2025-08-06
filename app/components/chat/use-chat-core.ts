@@ -1,19 +1,23 @@
 // AI SDK v5 compatible useChat hook
-import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { toast } from "@/components/ui/toast"
+import { getOrCreateGuestUserId } from "@/lib/api"
 import { Attachment } from "@/lib/file-handling"
-import { API_ROUTE_CHAT } from "@/lib/routes"
 import { isImageFile } from "@/lib/image-utils"
+import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
+import { API_ROUTE_CHAT } from "@/lib/routes"
 import type { UserProfile } from "@/lib/user/types"
 import type { UIMessage } from "@ai-sdk/react"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { getOrCreateGuestUserId } from '@/lib/api'
 
 // Extended message type with content property
 export interface ChatMessage extends UIMessage {
   content: string
-  experimental_attachments?: Array<{ name: string; contentType: string; url: string }>
+  experimental_attachments?: Array<{
+    name: string
+    contentType: string
+    url: string
+  }>
 }
 
 type UseChatCoreProps = {
@@ -67,15 +71,14 @@ export function useChatCore({
     if (user?.system_prompt) {
       return user.system_prompt
     }
-    
+
     // Get current model name for logging
-    const currentModelName = sanitizeModelName(selectedModel || 'unknown-model')
-    
+    const currentModelName = sanitizeModelName(selectedModel || "unknown-model")
+
     // Log model information for debugging
 
-    
     // Return Cleo's modular prompt with current model info
-    return getCleoPrompt(currentModelName, 'default')
+    return getCleoPrompt(currentModelName, "default")
   }, [user?.system_prompt, selectedModel])
 
   // Search params handling
@@ -99,294 +102,335 @@ export function useChatCore({
   }, [])
 
   // Manual state management for chat
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages as ChatMessage[])
-  const [status, setStatus] = useState<'ready' | 'in_progress' | 'error'>('ready')
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    initialMessages as ChatMessage[]
+  )
+  const [status, setStatus] = useState<"ready" | "in_progress" | "error">(
+    "ready"
+  )
   const [error, setError] = useState<Error | null>(null)
-  
+
   // Map internal status to Conversation component expected status
   const conversationStatus = useMemo(() => {
     switch (status) {
-      case 'in_progress':
-        return 'submitted' as const
-      case 'error':
-        return 'error' as const
+      case "in_progress":
+        return "submitted" as const
+      case "error":
+        return "error" as const
       default:
-        return 'ready' as const
+        return "ready" as const
     }
   }, [status])
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Custom sendMessage function
-  const sendMessage = useCallback(async ({ text, files }: { text: string; files?: FileList; experimental_attachments?: unknown[] }) => {
-    // For guest users, get or create a proper guest user ID
-    let effectiveUserId: string | null = user?.id || null
-    if (!effectiveUserId) {
-      effectiveUserId = await getOrCreateGuestUserId(user)
+  const sendMessage = useCallback(
+    async ({
+      text,
+      files,
+    }: {
+      text: string
+      files?: FileList
+      experimental_attachments?: unknown[]
+    }) => {
+      // For guest users, get or create a proper guest user ID
+      let effectiveUserId: string | null = user?.id || null
       if (!effectiveUserId) {
-        handleError(new Error('Unable to create user session'))
-        return
-      }
-    }
-    
-    let effectiveChatId = chatId
-    if (!effectiveChatId) {
-      effectiveChatId = await ensureChatExists(effectiveUserId, text)
-      if (!effectiveChatId) {
-        handleError(new Error('Unable to create chat session'))
-        return
-      }
-    }
-
-    setStatus('in_progress')
-    setError(null)
-    
-    // Process files if any (following AI SDK v5 pattern)
-    const parts: Array<{ type: 'text' | 'file'; text?: string; mediaType?: string; url?: string; name?: string }> = [
-      { type: 'text', text }
-    ]
-    
-    if (files && files.length > 0) {
-      // Convert files to data URLs (like AI SDK v5 does automatically)
-      const fileDataUrls = await Promise.all(
-        Array.from(files).map((file) => 
-          new Promise<{ type: 'file'; mediaType: string; url: string; name: string }>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => {
-              const result = {
-                type: 'file' as const,
-                mediaType: file.type,
-                url: reader.result as string,
-                name: file.name
-              }
-              resolve(result)
-            }
-            reader.onerror = (error) => {
-              reject(error)
-            }
-            reader.readAsDataURL(file)
-          })
-        )
-      )
-      
-      parts.push(...fileDataUrls)
-    }
-    
-    // Create attachments for display (convert file parts to attachment format)
-    const attachments = parts
-      .filter(part => part.type === 'file')
-      .map(part => ({
-        name: part.name || 'file',
-        contentType: part.mediaType || 'application/octet-stream',
-        url: part.url || ''
-      }))
-    
-    // Add user message immediately
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: parts.length > 1 ? parts : text, // Use multimodal content if files, otherwise text
-      createdAt: new Date(),
-      parts: parts,
-      experimental_attachments: attachments.length > 0 ? attachments : undefined,
-    } as ChatMessage
-    
-    setMessages(prev => [...prev, userMessage])
-    cacheAndAddMessage(userMessage)
-
-    try {
-      abortControllerRef.current = new AbortController()
-      
-      const response = await fetch(API_ROUTE_CHAT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          chatId: effectiveChatId,
-          userId: effectiveUserId,
-          model: selectedModel,
-          isAuthenticated,
-          systemPrompt,
-          enableSearch,
-        }),
-        signal: abortControllerRef.current.signal,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to send message')
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response body')
-
-      let buffer = ''
-      const assistantMessageObj: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '',
-        createdAt: new Date(),
-        parts: [],
-      } as ChatMessage
-
-      setMessages(prev => [...prev, assistantMessageObj])
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = new TextDecoder().decode(value)
-        buffer += chunk
-        
-        // Parse streaming data line by line
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
-        
-        for (const line of lines) {
-          // Skip SSE terminator line
-          if (line.trim() === 'data: [DONE]') {
-            continue
-          }
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              
-              // Handle different types of streaming data
-              switch (data.type) {
-                case 'tool-input-start': {
-                  // Add tool invocation part in partial-call state
-                  assistantMessageObj.parts.push({
-                    type: 'tool-invocation',
-                    toolInvocation: {
-                      state: 'partial-call',
-                      toolName: data.toolName,
-                      toolCallId: data.toolCallId,
-                      args: {},
-                    },
-                  } as any)
-                  break
-                }
-                  
-                case 'tool-input-available': {
-                  // Update tool invocation with full arguments (call state)
-                  const toolPart = assistantMessageObj.parts.find(
-                    (p: any) =>
-                      p.type === 'tool-invocation' &&
-                      p.toolInvocation?.toolCallId === data.toolCallId
-                  ) as any
-                  if (toolPart) {
-                    toolPart.toolInvocation.state = 'call'
-                    toolPart.toolInvocation.args = data.input
-                  }
-                  break
-                }
-                  
-                case 'tool-output-available': {
-                  // Update tool invocation with result (completed state)
-                  const toolPart = assistantMessageObj.parts.find(
-                    (p: any) =>
-                      p.type === 'tool-invocation' &&
-                      p.toolInvocation?.toolCallId === data.toolCallId
-                  ) as any
-                  if (toolPart) {
-                    toolPart.toolInvocation.state = 'result'
-                    toolPart.toolInvocation.result = data.output
-                  }
-                  break
-                }
-                  
-                case 'text-start':
-                  // Start text part
-                  assistantMessageObj.parts.push({
-                    type: 'text',
-                    text: '',
-                  })
-                  break
-                  
-                case 'text-delta':
-                  // Update text part
-                  const textPart = assistantMessageObj.parts.findLast(
-                    p => p.type === 'text'
-                  )
-                  if (textPart && textPart.type === 'text') {
-                    textPart.text += data.delta
-                    // Update content for backward compatibility
-                    assistantMessageObj.content = assistantMessageObj.parts
-                      .filter(p => p.type === 'text')
-                      .map(p => p.type === 'text' ? p.text : '')
-                      .join('')
-                  }
-                  break
-              }
-              
-              // Update the message in state
-              setMessages(prev => {
-                const newMessages = [...prev]
-                newMessages[newMessages.length - 1] = { ...assistantMessageObj }
-                return newMessages
-              })
-              
-            } catch {
-              // If JSON parsing fails, treat as plain text (fallback)
-              const textPart = assistantMessageObj.parts.findLast(
-                p => p.type === 'text'
-              )
-              if (textPart && textPart.type === 'text') {
-                textPart.text += line.slice(6)
-                assistantMessageObj.content += line.slice(6)
-              } else {
-                assistantMessageObj.parts.push({
-                  type: 'text',
-                  text: line.slice(6),
-                })
-                assistantMessageObj.content += line.slice(6)
-              }
-              
-              setMessages(prev => {
-                const newMessages = [...prev]
-                newMessages[newMessages.length - 1] = { ...assistantMessageObj }
-                return newMessages
-              })
-            }
-          }
+        effectiveUserId = await getOrCreateGuestUserId(user)
+        if (!effectiveUserId) {
+          handleError(new Error("Unable to create user session"))
+          return
         }
       }
 
-      // Cache final assistant message
-      cacheAndAddMessage({ 
-        ...assistantMessageObj, 
-        parts: assistantMessageObj.parts
-      } as UIMessage)
-      setStatus('ready')
-      
-    } catch (err) {
-      const error = err as Error
-      if (error.name !== 'AbortError') {
-        setError(error)
-        setStatus('error')
-        handleError(error)
+      let effectiveChatId = chatId
+      if (!effectiveChatId) {
+        effectiveChatId = await ensureChatExists(effectiveUserId, text)
+        if (!effectiveChatId) {
+          handleError(new Error("Unable to create chat session"))
+          return
+        }
       }
-    }
-  }, [user, chatId, selectedModel, isAuthenticated, systemPrompt, enableSearch, messages, cacheAndAddMessage, handleError, ensureChatExists])
+
+      setStatus("in_progress")
+      setError(null)
+
+      // Process files if any (following AI SDK v5 pattern)
+      const parts: Array<{
+        type: "text" | "file"
+        text?: string
+        mediaType?: string
+        url?: string
+        name?: string
+      }> = [{ type: "text", text }]
+
+      if (files && files.length > 0) {
+        // Convert files to data URLs (like AI SDK v5 does automatically)
+        const fileDataUrls = await Promise.all(
+          Array.from(files).map(
+            (file) =>
+              new Promise<{
+                type: "file"
+                mediaType: string
+                url: string
+                name: string
+              }>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const result = {
+                    type: "file" as const,
+                    mediaType: file.type,
+                    url: reader.result as string,
+                    name: file.name,
+                  }
+                  resolve(result)
+                }
+                reader.onerror = (error) => {
+                  reject(error)
+                }
+                reader.readAsDataURL(file)
+              })
+          )
+        )
+
+        parts.push(...fileDataUrls)
+      }
+
+      // Create attachments for display (convert file parts to attachment format)
+      const attachments = parts
+        .filter((part) => part.type === "file")
+        .map((part) => ({
+          name: part.name || "file",
+          contentType: part.mediaType || "application/octet-stream",
+          url: part.url || "",
+        }))
+
+      // Add user message immediately
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "user",
+        content: parts.length > 1 ? parts : text, // Use multimodal content if files, otherwise text
+        createdAt: new Date(),
+        parts: parts,
+        experimental_attachments:
+          attachments.length > 0 ? attachments : undefined,
+      } as ChatMessage
+
+      setMessages((prev) => [...prev, userMessage])
+      cacheAndAddMessage(userMessage)
+
+      try {
+        abortControllerRef.current = new AbortController()
+
+        const response = await fetch(API_ROUTE_CHAT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: [...messages, userMessage],
+            chatId: effectiveChatId,
+            userId: effectiveUserId,
+            model: selectedModel,
+            isAuthenticated,
+            systemPrompt,
+            enableSearch,
+          }),
+          signal: abortControllerRef.current.signal,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to send message")
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error("No response body")
+
+        let buffer = ""
+        const assistantMessageObj: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "",
+          createdAt: new Date(),
+          parts: [],
+        } as ChatMessage
+
+        setMessages((prev) => [...prev, assistantMessageObj])
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = new TextDecoder().decode(value)
+          buffer += chunk
+
+          // Parse streaming data line by line
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || "" // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            // Skip SSE terminator line
+            if (line.trim() === "data: [DONE]") {
+              continue
+            }
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6))
+
+                // Handle different types of streaming data
+                switch (data.type) {
+                  case "tool-input-start": {
+                    // Add tool invocation part in partial-call state
+                    assistantMessageObj.parts.push({
+                      type: "tool-invocation",
+                      toolInvocation: {
+                        state: "partial-call",
+                        toolName: data.toolName,
+                        toolCallId: data.toolCallId,
+                        args: {},
+                      },
+                    } as any)
+                    break
+                  }
+
+                  case "tool-input-available": {
+                    // Update tool invocation with full arguments (call state)
+                    const toolPart = assistantMessageObj.parts.find(
+                      (p: any) =>
+                        p.type === "tool-invocation" &&
+                        p.toolInvocation?.toolCallId === data.toolCallId
+                    ) as any
+                    if (toolPart) {
+                      toolPart.toolInvocation.state = "call"
+                      toolPart.toolInvocation.args = data.input
+                    }
+                    break
+                  }
+
+                  case "tool-output-available": {
+                    // Update tool invocation with result (completed state)
+                    const toolPart = assistantMessageObj.parts.find(
+                      (p: any) =>
+                        p.type === "tool-invocation" &&
+                        p.toolInvocation?.toolCallId === data.toolCallId
+                    ) as any
+                    if (toolPart) {
+                      toolPart.toolInvocation.state = "result"
+                      toolPart.toolInvocation.result = data.output
+                    }
+                    break
+                  }
+
+                  case "text-start":
+                    // Start text part
+                    assistantMessageObj.parts.push({
+                      type: "text",
+                      text: "",
+                    })
+                    break
+
+                  case "text-delta":
+                    // Update text part
+                    const textPart = assistantMessageObj.parts.findLast(
+                      (p) => p.type === "text"
+                    )
+                    if (textPart && textPart.type === "text") {
+                      textPart.text += data.delta
+                      // Update content for backward compatibility
+                      assistantMessageObj.content = assistantMessageObj.parts
+                        .filter((p) => p.type === "text")
+                        .map((p) => (p.type === "text" ? p.text : ""))
+                        .join("")
+                    }
+                    break
+                }
+
+                // Update the message in state
+                setMessages((prev) => {
+                  const newMessages = [...prev]
+                  newMessages[newMessages.length - 1] = {
+                    ...assistantMessageObj,
+                  }
+                  return newMessages
+                })
+              } catch {
+                // If JSON parsing fails, treat as plain text (fallback)
+                const textPart = assistantMessageObj.parts.findLast(
+                  (p) => p.type === "text"
+                )
+                if (textPart && textPart.type === "text") {
+                  textPart.text += line.slice(6)
+                  assistantMessageObj.content += line.slice(6)
+                } else {
+                  assistantMessageObj.parts.push({
+                    type: "text",
+                    text: line.slice(6),
+                  })
+                  assistantMessageObj.content += line.slice(6)
+                }
+
+                setMessages((prev) => {
+                  const newMessages = [...prev]
+                  newMessages[newMessages.length - 1] = {
+                    ...assistantMessageObj,
+                  }
+                  return newMessages
+                })
+              }
+            }
+          }
+        }
+
+        // Cache final assistant message
+        cacheAndAddMessage({
+          ...assistantMessageObj,
+          parts: assistantMessageObj.parts,
+        } as UIMessage)
+        setStatus("ready")
+      } catch (err) {
+        const error = err as Error
+        if (error.name !== "AbortError") {
+          setError(error)
+          setStatus("error")
+          handleError(error)
+        }
+      }
+    },
+    [
+      user,
+      chatId,
+      selectedModel,
+      isAuthenticated,
+      systemPrompt,
+      enableSearch,
+      messages,
+      cacheAndAddMessage,
+      handleError,
+      ensureChatExists,
+    ]
+  )
 
   // Stop function
   const stop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-      setStatus('ready')
+      setStatus("ready")
     }
   }, [])
 
   // Regenerate function
   const regenerate = useCallback(async () => {
     if (messages.length === 0) return
-    
+
     // Remove last assistant message and resend last user message
-    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')
+    const lastUserMessage = messages
+      .slice()
+      .reverse()
+      .find((m) => m.role === "user")
     if (lastUserMessage) {
-      const messagesWithoutLastAssistant = messages.filter((m, i) => 
-        !(i === messages.length - 1 && m.role === 'assistant')
+      const messagesWithoutLastAssistant = messages.filter(
+        (m, i) => !(i === messages.length - 1 && m.role === "assistant")
       )
       setMessages(messagesWithoutLastAssistant)
       await sendMessage({ text: lastUserMessage.content })
@@ -399,6 +443,11 @@ export function useChatCore({
       requestAnimationFrame(() => setInput(prompt))
     }
   }, [prompt])
+
+  // Sync local messages state with initialMessages when it changes (e.g., switching chats)
+  useEffect(() => {
+    setMessages(initialMessages as ChatMessage[])
+  }, [initialMessages])
 
   // Reset messages when navigating from a chat to home
   if (
@@ -418,65 +467,78 @@ export function useChatCore({
   }, [])
 
   // Handle form submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!input.trim() || isSubmitting) return
-    
-    const messageText = input.trim() // Guardar el texto antes de limpiar
-    const currentFiles = [...files] // Guardar archivos antes de limpiar
-    setInput("") // Limpiar input inmediatamente
-    setFiles([]) // Limpiar archivos inmediatamente
-    clearDraft() // Limpiar draft inmediatamente
-    setIsSubmitting(true)
-    
-    try {
-      // Handle file uploads to Supabase for documents (if needed)
-      let supabaseAttachments: Attachment[] = []
-      const documentFiles = currentFiles.filter(file => !isImageFile(file))
-      if (documentFiles.length > 0 && user?.id && chatId) {
-        const uploadedAttachments = await handleFileUploads(user.id, chatId)
-        if (uploadedAttachments) {
-          supabaseAttachments = uploadedAttachments
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      if (!input.trim() || isSubmitting) return
+
+      const messageText = input.trim() // Guardar el texto antes de limpiar
+      const currentFiles = [...files] // Guardar archivos antes de limpiar
+      setInput("") // Limpiar input inmediatamente
+      setFiles([]) // Limpiar archivos inmediatamente
+      clearDraft() // Limpiar draft inmediatamente
+      setIsSubmitting(true)
+
+      try {
+        // Handle file uploads to Supabase for documents (if needed)
+        let supabaseAttachments: Attachment[] = []
+        const documentFiles = currentFiles.filter((file) => !isImageFile(file))
+        if (documentFiles.length > 0 && user?.id && chatId) {
+          const uploadedAttachments = await handleFileUploads(user.id, chatId)
+          if (uploadedAttachments) {
+            supabaseAttachments = uploadedAttachments
+          }
         }
-      }
-      
-      // Create FileList with ALL files (images AND documents) for AI analysis
-      let allFilesList: FileList | undefined = undefined
-      if (currentFiles.length > 0) {
-        const dt = new DataTransfer()
-        currentFiles.forEach((file) => {
-          dt.items.add(file)
-        })
-        allFilesList = dt.files
-      }
 
-      // Send message using AI SDK v5 sendMessage with ALL files
-      await sendMessage({
-        text: messageText,
-        ...(allFilesList && { files: allFilesList }),
-        // Add Supabase attachments for UI display if any
-        ...(supabaseAttachments.length > 0 && {
-          experimental_attachments: supabaseAttachments.map(att => ({
-            name: att.name,
-            contentType: att.contentType,
-            url: att.url,
-          }))
-        })
-      })
+        // Create FileList with ALL files (images AND documents) for AI analysis
+        let allFilesList: FileList | undefined = undefined
+        if (currentFiles.length > 0) {
+          const dt = new DataTransfer()
+          currentFiles.forEach((file) => {
+            dt.items.add(file)
+          })
+          allFilesList = dt.files
+        }
 
-      // Input and files already cleared at the start
-      
-    } catch (error) {
-      console.error("Submit error:", error)
-      toast({
-        title: "Failed to send message",
-        status: "error",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [input, isSubmitting, files, user?.id, chatId, handleFileUploads, sendMessage, setFiles, clearDraft, toast])
+        // Send message using AI SDK v5 sendMessage with ALL files
+        await sendMessage({
+          text: messageText,
+          ...(allFilesList && { files: allFilesList }),
+          // Add Supabase attachments for UI display if any
+          ...(supabaseAttachments.length > 0 && {
+            experimental_attachments: supabaseAttachments.map((att) => ({
+              name: att.name,
+              contentType: att.contentType,
+              url: att.url,
+            })),
+          }),
+        })
+
+        // Input and files already cleared at the start
+      } catch (error) {
+        console.error("Submit error:", error)
+        toast({
+          title: "Failed to send message",
+          status: "error",
+        })
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [
+      input,
+      isSubmitting,
+      files,
+      user?.id,
+      chatId,
+      handleFileUploads,
+      sendMessage,
+      setFiles,
+      clearDraft,
+      toast,
+    ]
+  )
 
   // Handle regenerate
   const handleRegenerate = useCallback(async () => {

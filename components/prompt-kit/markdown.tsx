@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils"
 import { marked } from "marked"
 import { memo, useId, useMemo } from "react"
 import ReactMarkdown, { Components } from "react-markdown"
-import remarkBreaks from "remark-breaks"
 import remarkGfm from "remark-gfm"
 import { ButtonCopy } from "../common/button-copy"
 import {
@@ -20,6 +19,11 @@ export type MarkdownProps = {
 }
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
+  // Defensive check: ensure markdown is a string
+  if (typeof markdown !== 'string') {
+    return [String(markdown || '')]
+  }
+  
   // If the text is simple (no markdown formatting), return it as a single block
   const hasMarkdownSyntax = /[#*_`\[\]!]/.test(markdown)
   if (!hasMarkdownSyntax) {
@@ -96,7 +100,6 @@ const MemoizedMarkdownBlock = memo(
     content: string
     components?: Partial<Components>
   }) {
-    console.log('DEBUG - MemoizedMarkdownBlock content:', JSON.stringify(content))
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -121,7 +124,10 @@ function MarkdownComponent({
 }: MarkdownProps) {
   const generatedId = useId()
   const blockId = id ?? generatedId
-  const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
+  
+  // Ensure children is a string before processing
+  const safeChildren = typeof children === 'string' ? children : String(children || '')
+  const blocks = useMemo(() => parseMarkdownIntoBlocks(safeChildren), [safeChildren])
 
   return (
     <div className={className}>

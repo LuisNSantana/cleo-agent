@@ -28,6 +28,9 @@ type MessageBubbleProps = {
 
 function MessageBubble({ content, role }: MessageBubbleProps) {
   const isUser = role === "user"
+  
+  // Ensure content is a valid string
+  const safeContent = content && typeof content === 'string' ? content : String(content || '')
 
   if (isUser) {
     return (
@@ -51,7 +54,7 @@ function MessageBubble({ content, role }: MessageBubbleProps) {
               ol: ({ children }) => <>{children}</>,
             }}
           >
-            {content}
+            {safeContent}
           </MessageContent>
         </div>
       </div>
@@ -97,7 +100,7 @@ function MessageBubble({ content, role }: MessageBubbleProps) {
             ),
           }}
         >
-          {content}
+          {safeContent}
         </MessageContent>
       </div>
     </div>
