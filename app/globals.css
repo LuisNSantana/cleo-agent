@@ -160,3 +160,41 @@ code {
 [data-sonner-toaster] > li {
   width: 100%;
 }
+
+/* Prevent horizontal scroll from document content */
+.chat-message {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure pre and code blocks don't cause horizontal scroll */
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+code {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Prevent images from causing horizontal scroll */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ensure document content wraps properly */
+.document-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+  overflow-x: hidden;
+}

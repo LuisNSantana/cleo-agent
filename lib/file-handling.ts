@@ -5,7 +5,7 @@ import { DAILY_FILE_UPLOAD_LIMIT } from "./config"
 import { createClient } from "./supabase/client"
 import { isSupabaseEnabled } from "./supabase/config"
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 
 const ALLOWED_FILE_TYPES = [
   // Images
@@ -14,6 +14,8 @@ const ALLOWED_FILE_TYPES = [
   "image/gif",
   "image/webp",
   "image/svg+xml",
+  "image/heic",
+  "image/heif",
   // Documents
   "application/pdf",
   "text/plain",
@@ -57,18 +59,43 @@ export async function validateFile(
 
   // For files without clear MIME types, check by extension
   const fileName = file.name.toLowerCase()
-  const textFileExtensions = ['.txt', '.md', '.csv', '.json', '.rtf']
-  const documentExtensions = ['.doc', '.docx', '.pdf', '.ppt', '.pptx', '.xls', '.xlsx']
-  const hasTextExtension = textFileExtensions.some(ext => fileName.endsWith(ext))
-  const hasDocumentExtension = documentExtensions.some(ext => fileName.endsWith(ext))
-  
+  const textFileExtensions = [".txt", ".md", ".csv", ".json", ".rtf"]
+  const documentExtensions = [
+    ".doc",
+    ".docx",
+    ".pdf",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+  ]
+  const imageExtensions = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".heic",
+    ".heif",
+  ]
+  const hasTextExtension = textFileExtensions.some((ext) =>
+    fileName.endsWith(ext)
+  )
+  const hasDocumentExtension = documentExtensions.some((ext) =>
+    fileName.endsWith(ext)
+  )
+  const hasImageExtension = imageExtensions.some((ext) =>
+    fileName.endsWith(ext)
+  )
+
   if (hasTextExtension) {
     // Validate it's actually text by checking if it's readable as text
     try {
       const buffer = await file.arrayBuffer()
-      const text = new TextDecoder('utf-8').decode(buffer.slice(0, 1000))
+      const text = new TextDecoder("utf-8").decode(buffer.slice(0, 1000))
       // If we can decode it as text and it doesn't contain null bytes, it's likely text
-      if (text && !text.includes('\0')) {
+      if (text && !text.includes("\0")) {
         return { isValid: true }
       }
     } catch {
@@ -81,6 +108,11 @@ export async function validateFile(
     return { isValid: true }
   }
 
+  // Allow common image formats by extension
+  if (hasImageExtension) {
+    return { isValid: true }
+  }
+
   // For binary files, use file-type detection
   const buffer = await file.arrayBuffer()
   const type = await fileType.fileTypeFromBuffer(
@@ -90,7 +122,7 @@ export async function validateFile(
   if (!type || !ALLOWED_FILE_TYPES.includes(type.mime)) {
     return {
       isValid: false,
-      error: `File type not supported. Supported types: images (jpg, png, gif, webp, svg), documents (pdf, doc, docx, txt, md, rtf, csv, json), spreadsheets (xls, xlsx), presentations (ppt, pptx)`,
+      error: `File type not supported. Supported types: images (jpg, png, gif, webp, svg, heic, heif), documents (pdf, doc, docx, txt, md, rtf, csv, json), spreadsheets (xls, xlsx), presentations (ppt, pptx)`,
     }
   }
 
@@ -123,38 +155,39 @@ export async function uploadFile(
 // Normalize MIME type based on file extension
 function normalizeMimeType(file: File): string {
   const fileName = file.name.toLowerCase()
-  
+
   // If the file already has a proper MIME type, use it
-  if (file.type && file.type !== 'application/octet-stream') {
+  if (file.type && file.type !== "application/octet-stream") {
     return file.type
   }
-  
+
   // Map extensions to proper MIME types
   const extensionToMime: Record<string, string> = {
-    '.md': 'text/markdown',
-    '.txt': 'text/plain',
-    '.csv': 'text/csv',
-    '.json': 'application/json',
-    '.pdf': 'application/pdf',
-    '.doc': 'application/msword',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.rtf': 'application/rtf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.svg': 'image/svg+xml',
+    ".md": "text/markdown",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".json": "application/json",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".rtf": "application/rtf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
   }
-  
+
   for (const [ext, mime] of Object.entries(extensionToMime)) {
     if (fileName.endsWith(ext)) {
       return mime
     }
   }
-  
+
   // Fallback to original type
-  return file.type || 'application/octet-stream'
+  return file.type || "application/octet-stream"
 }
 
 export function createAttachment(file: File, url: string): Attachment {
@@ -187,11 +220,11 @@ export async function processFiles(
 
     try {
       let url: string
-      
+
       if (supabase) {
         // Use Supabase storage when available
         url = await uploadFile(supabase, file)
-        
+
         const { error } = await supabase.from("chat_attachments").insert({
           chat_id: chatId,
           user_id: userId,
@@ -212,8 +245,10 @@ export async function processFiles(
           reader.onerror = reject
           reader.readAsDataURL(file)
         })
-        
-        console.log(`[FILE-HANDLING] Created data URL for ${file.name} (${file.type}) - ${(file.size / 1024).toFixed(1)}KB`)
+
+        console.log(
+          `[FILE-HANDLING] Created data URL for ${file.name} (${file.type}) - ${(file.size / 1024).toFixed(1)}KB`
+        )
       }
 
       attachments.push(createAttachment(file, url))
