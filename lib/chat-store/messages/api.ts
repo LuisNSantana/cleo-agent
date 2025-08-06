@@ -1,6 +1,18 @@
 import { createClient } from "@/lib/supabase/client"
 import { isSupabaseEnabled } from "@/lib/supabase/config"
-import type { Message as MessageAISDK } from "ai"
+// Extended message type with content property for compatibility
+export interface MessageAISDK {
+  id: string
+  role: "system" | "user" | "assistant" | "data"
+  content: string
+  experimental_attachments?: Array<{
+    name: string
+    contentType: string
+    url: string
+  }>
+  createdAt?: Date
+  parts?: any[]
+}
 import { readFromIndexedDB, writeToIndexedDB } from "../persist"
 
 export async function getMessagesFromDb(

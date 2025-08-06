@@ -2,7 +2,7 @@
 
 import { toast } from "@/components/ui/toast"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import type { Message as MessageAISDK } from "ai"
+import type { MessageAISDK } from "./api"
 import { createContext, useContext, useEffect, useState } from "react"
 import { writeToIndexedDB } from "../persist"
 import {
@@ -83,6 +83,12 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setMessages((prev) => {
+        // Check if message already exists to avoid duplicates
+        const messageExists = prev.some(m => m.id === message.id)
+        if (messageExists) {
+          return prev // Don't add duplicate
+        }
+        
         const updated = [...prev, message]
         writeToIndexedDB("messages", { id: chatId, messages: updated })
         return updated

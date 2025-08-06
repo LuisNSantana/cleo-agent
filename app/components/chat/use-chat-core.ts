@@ -445,9 +445,14 @@ export function useChatCore({
   }, [prompt])
 
   // Sync local messages state with initialMessages when it changes (e.g., switching chats)
+  // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
+  // Also, only sync if the chatId has changed to avoid conflicts during message streaming
   useEffect(() => {
-    setMessages(initialMessages as ChatMessage[])
-  }, [initialMessages])
+    const chatIdChanged = prevChatIdRef.current !== chatId
+    if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
+      setMessages(initialMessages as ChatMessage[])
+    }
+  }, [initialMessages, isSubmitting, chatId, messages.length])
 
   // Reset messages when navigating from a chat to home
   if (
