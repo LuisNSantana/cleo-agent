@@ -333,7 +333,7 @@ ${documentContent}`
         undefined
     }
 
-    // Inject userId into global context for tools that need it
+    // Inject userId and model into global context for tools that need it
     // Get the real Supabase user ID instead of the frontend userId
     let realUserId = userId
     if (supabase && isAuthenticated) {
@@ -344,6 +344,7 @@ ${documentContent}`
       }
     }
     ;(globalThis as any).__currentUserId = realUserId
+    ;(globalThis as any).__currentModel = model
 
     const result = streamText({
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
@@ -358,6 +359,7 @@ ${documentContent}`
       onFinish: async ({ response }) => {
         // Clean up global context
         delete (globalThis as any).__currentUserId
+        delete (globalThis as any).__currentModel
         
         if (supabase) {
           await storeAssistantMessage({
@@ -376,6 +378,7 @@ ${documentContent}`
       onError: (error) => {
         // Clean up global context on error
         delete (globalThis as any).__currentUserId
+        delete (globalThis as any).__currentModel
         
         if (error instanceof Error) {
           if (
@@ -395,6 +398,7 @@ ${documentContent}`
   } catch (err: unknown) {
     // Clean up global context on exception
     delete (globalThis as any).__currentUserId
+    delete (globalThis as any).__currentModel
     
     console.error("Error in /api/chat:", err)
     const error = err as {

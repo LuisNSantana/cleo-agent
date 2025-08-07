@@ -127,16 +127,30 @@ async function makeGoogleCalendarRequest(accessToken: string, endpoint: string, 
 
 // 📅 List upcoming calendar events
 export const listCalendarEventsTool = tool({
-  description: '📅 List upcoming events from Google Calendar. Shows events for the next 7 days by default. Use this when user asks about their schedule, upcoming meetings, or calendar events.',
+  description: '📅 List upcoming events from Google Calendar. ALWAYS use this when user asks about their schedule, calendar, events, meetings, or what they have planned for any specific day (like Monday, today, tomorrow, etc.). Shows events for the next 7 days by default unless specified otherwise. IMPORTANT: The current date is August 7, 2025. When user asks about "Monday" or future dates, use 2025 dates.',
   inputSchema: z.object({
-    maxResults: z.number().min(1).max(50).optional().default(10).describe('Maximum number of events to return (1-50)'),
-    timeMin: z.string().optional().describe('Lower bound for events to return (ISO 8601 format, e.g. "2024-08-07T00:00:00Z"). Defaults to now.'),
-    timeMax: z.string().optional().describe('Upper bound for events to return (ISO 8601 format, e.g. "2024-08-14T23:59:59Z"). Defaults to 7 days from now.'),
-    calendarId: z.string().optional().default('primary').describe('Calendar ID to fetch events from. Use "primary" for the main calendar.'),
+    maxResults: z.number().min(1).max(50).optional().default(10).describe('Maximum number of events to return (1-50). Default is 10.'),
+    timeMin: z.string().optional().describe('Start time filter in ISO 8601 format (e.g. "2025-08-11T00:00:00Z" for Monday August 11, 2025). If not provided, defaults to current time. IMPORTANT: Use 2025 for current year dates.'),
+    timeMax: z.string().optional().describe('End time filter in ISO 8601 format (e.g. "2025-08-11T23:59:59Z" for end of Monday August 11, 2025). If not provided, defaults to 7 days from now. IMPORTANT: Use 2025 for current year dates.'),
+    calendarId: z.string().optional().default('primary').describe('Calendar ID to fetch events from. Use "primary" for the main/default calendar.'),
   }),
   execute: async ({ maxResults = 10, timeMin, timeMax, calendarId = 'primary' }) => {
-    // Get userId from global context (injected by chat handler)
+    // Get userId and model from global context (injected by chat handler)
     const userId = (globalThis as any).__currentUserId
+    const currentModel = (globalThis as any).__currentModel
+    
+    // Debug logging for different models
+    console.log('🔧 [Google Calendar] Tool execution started:', {
+      userId: userId ? 'present' : 'missing',
+      model: currentModel || 'unknown',
+      params: {
+        maxResults,
+        timeMin,
+        timeMax,
+        calendarId
+      },
+      currentTime: new Date().toISOString()
+    })
     
     try {
       if (!userId) {
@@ -162,15 +176,61 @@ export const listCalendarEventsTool = tool({
       const now = new Date()
       const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
       
+      let finalTimeMin = timeMin || now.toISOString()
+      let finalTimeMax = timeMax || weekFromNow.toISOString()
+      
+      // Validation for Llama 4 Maverick: Check if dates are in the past and auto-correct
+      const timeMinDate = new Date(finalTimeMin)
+      const timeMaxDate = new Date(finalTimeMax)
+      const currentYear = now.getFullYear()
+      
+      if (currentModel === 'llama-4-maverick' && (timeMinDate.getFullYear() < currentYear || timeMaxDate.getFullYear() < currentYear)) {
+        console.log('🚨 [LLAMA 4 MAVERICK] Detected past year dates, auto-correcting:', {
+          originalTimeMin: finalTimeMin,
+          originalTimeMax: finalTimeMax,
+          currentYear
+        })
+        
+        // Auto-correct the year to current year
+        if (timeMinDate.getFullYear() < currentYear) {
+          timeMinDate.setFullYear(currentYear)
+          finalTimeMin = timeMinDate.toISOString()
+        }
+        if (timeMaxDate.getFullYear() < currentYear) {
+          timeMaxDate.setFullYear(currentYear)
+          finalTimeMax = timeMaxDate.toISOString()
+        }
+        
+        console.log('🚨 [LLAMA 4 MAVERICK] Auto-corrected dates:', {
+          correctedTimeMin: finalTimeMin,
+          correctedTimeMax: finalTimeMax
+        })
+      }
+      
+      console.log('🔧 [Google Calendar] Time range:', {
+        finalTimeMin,
+        finalTimeMax,
+        providedTimeMin: timeMin,
+        providedTimeMax: timeMax,
+        defaultRange: `${now.toISOString()} to ${weekFromNow.toISOString()}`
+      })
+      
       const params = new URLSearchParams({
         maxResults: maxResults.toString(),
         orderBy: 'startTime',
         singleEvents: 'true',
-        timeMin: timeMin || now.toISOString(),
-        timeMax: timeMax || weekFromNow.toISOString(),
+        timeMin: finalTimeMin,
+        timeMax: finalTimeMax,
       })
 
       const data = await makeGoogleCalendarRequest(accessToken, `calendars/${calendarId}/events?${params}`)
+
+      console.log('🔧 [Google Calendar] API Response:', {
+        totalItems: data.items?.length || 0,
+        hasItems: !!data.items,
+        firstEventSummary: data.items?.[0]?.summary || 'none',
+        allEventSummaries: data.items?.map((e: any) => e.summary) || []
+      })
 
       const events = data.items?.map((event: any) => ({
         id: event.id,
@@ -184,12 +244,14 @@ export const listCalendarEventsTool = tool({
         htmlLink: event.htmlLink,
       })) || []
 
-      return {
+      const result = {
         success: true,
         message: `Found ${events.length} upcoming events`,
         events,
         total_count: events.length
       }
+
+      return result
     } catch (error) {
       console.error('Error listing calendar events:', error)
       return {

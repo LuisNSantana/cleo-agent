@@ -98,6 +98,7 @@ const TOOLS_INTEGRATION = `AVAILABLE TOOLS AND CAPABILITIES:
   - createCalendarEvent: Create new calendar events with date/time, attendees, location, and reminders.
   - Use when users ask about: "my schedule", "upcoming meetings", "what's on my calendar", "create meeting", "schedule appointment".
   - Automatically handle time zones, date formatting, and provide helpful scheduling suggestions.
+  - IMPORTANT: Current date is August 7, 2025. When referencing dates like "Monday", "next week", always use 2025 as the year.
 - 🔍 WEB SEARCH TOOL (Brave Search):
   - webSearch: For current information, news, or technical documentation.
   - Use for: Recent events, trending topics, library docs, or any up-to-date data.
