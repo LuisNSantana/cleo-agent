@@ -1,18 +1,32 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils"
 import {
-  CaretDown,
-  CheckCircle,
-  Code,
-  Link,
-  Nut,
-  Spinner,
-  Wrench,
+  CaretDownIcon,
+  CheckCircleIcon,
+  CodeIcon,
+  LinkIcon,
+  NutIcon,
+  SpinnerIcon,
+  WrenchIcon,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
+import { getToolIcon } from "@/components/icons/tool-icons"
+
+// Define the tool invocation types based on how they're used in the codebase
+interface ToolInvocation {
+  state: "partial-call" | "call" | "result"
+  toolName: string
+  toolCallId: string
+  args?: any
+  result?: any
+}
+
+interface ToolInvocationUIPart {
+  type: "tool-invocation"
+  toolInvocation: ToolInvocation
+}
 
 interface ToolInvocationProps {
   toolInvocations: ToolInvocationUIPart[]
@@ -21,7 +35,7 @@ interface ToolInvocationProps {
 }
 
 const TRANSITION = {
-  type: "spring",
+  type: "spring" as const,
   duration: 0.2,
   bounce: 0,
 }
@@ -74,13 +88,13 @@ export function ToolInvocation({
           className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
         >
           <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-            <Nut className="text-muted-foreground size-4" />
+            <NutIcon className="text-muted-foreground size-4" />
             <span className="text-sm">Tools executed</span>
             <div className="bg-secondary text-secondary-foreground rounded-full px-1.5 py-0.5 font-mono text-xs">
               {uniqueToolIds.length}
             </div>
           </div>
-          <CaretDown
+          <CaretDownIcon
             className={cn(
               "h-4 w-4 transition-transform",
               isExpanded ? "rotate-180 transform" : ""
@@ -298,7 +312,7 @@ function SingleToolCard({
                     className="text-primary group flex items-center gap-1 font-medium hover:underline"
                   >
                     {item.title}
-                    <Link className="h-3 w-3 opacity-70 transition-opacity group-hover:opacity-100" />
+                    <LinkIcon className="h-3 w-3 opacity-70 transition-opacity group-hover:opacity-100" />
                   </a>
                   <div className="text-muted-foreground mt-1 font-mono text-xs">
                     {item.url}
@@ -344,7 +358,7 @@ function SingleToolCard({
                 className="text-primary flex items-center gap-1 hover:underline"
               >
                 <span className="font-mono">{htmlUrl}</span>
-                <Link className="h-3 w-3 opacity-70" />
+                <LinkIcon className="h-3 w-3 opacity-70" />
               </a>
             </div>
           )}
@@ -382,7 +396,10 @@ function SingleToolCard({
         className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-          <Wrench className="text-muted-foreground size-4" />
+          {(() => {
+            const ToolIcon = getToolIcon(toolName)
+            return <ToolIcon className="text-muted-foreground size-4" />
+          })()}
           <span className="font-mono text-sm">{toolName}</span>
           <AnimatePresence mode="popLayout" initial={false}>
             {isLoading ? (
@@ -394,7 +411,7 @@ function SingleToolCard({
                 key="loading"
               >
                 <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
-                  <Spinner className="mr-1 h-3 w-3 animate-spin" />
+                  <SpinnerIcon className="mr-1 h-3 w-3 animate-spin" />
                   Running
                 </div>
               </motion.div>
@@ -407,14 +424,14 @@ function SingleToolCard({
                 key="completed"
               >
                 <div className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400">
-                  <CheckCircle className="mr-1 h-3 w-3" />
+                  <CheckCircleIcon className="mr-1 h-3 w-3" />
                   Completed
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-        <CaretDown
+        <CaretDownIcon
           className={cn(
             "h-4 w-4 transition-transform",
             isExpanded ? "rotate-180 transform" : ""
@@ -463,7 +480,7 @@ function SingleToolCard({
               {/* Tool call ID */}
               <div className="text-muted-foreground flex items-center justify-between text-xs">
                 <div className="flex items-center">
-                  <Code className="mr-1 inline size-3" />
+                  <CodeIcon className="mr-1 inline size-3" />
                   Tool Call ID:{" "}
                   <span className="ml-1 font-mono">{toolCallId}</span>
                 </div>
