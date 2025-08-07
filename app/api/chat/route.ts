@@ -333,6 +333,18 @@ ${documentContent}`
         undefined
     }
 
+    // Inject userId into global context for tools that need it
+    // Get the real Supabase user ID instead of the frontend userId
+    let realUserId = userId
+    if (supabase && isAuthenticated) {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (!userError && userData?.user) {
+        realUserId = userData.user.id
+        console.log('🔍 Using real Supabase user ID for tools:', realUserId)
+      }
+    }
+    ;(globalThis as any).__currentUserId = realUserId
+
     const result = streamText({
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: effectiveSystemPrompt,
@@ -344,6 +356,9 @@ ${documentContent}`
       },
 
       onFinish: async ({ response }) => {
+        // Clean up global context
+        delete (globalThis as any).__currentUserId
+        
         if (supabase) {
           await storeAssistantMessage({
             supabase,
@@ -359,6 +374,9 @@ ${documentContent}`
 
     return result.toUIMessageStreamResponse({
       onError: (error) => {
+        // Clean up global context on error
+        delete (globalThis as any).__currentUserId
+        
         if (error instanceof Error) {
           if (
             error.message.includes("Rate limit") ||
@@ -375,6 +393,9 @@ ${documentContent}`
       },
     })
   } catch (err: unknown) {
+    // Clean up global context on exception
+    delete (globalThis as any).__currentUserId
+    
     console.error("Error in /api/chat:", err)
     const error = err as {
       code?: string

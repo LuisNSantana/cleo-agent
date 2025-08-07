@@ -122,6 +122,23 @@ BEFORE UPDATE ON user_preferences
 FOR EACH ROW
 EXECUTE PROCEDURE update_user_preferences_updated_at();
 
+-- User service connections table
+CREATE TABLE user_service_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  service_id TEXT NOT NULL,
+  connected BOOLEAN DEFAULT FALSE,
+  access_token TEXT,
+  refresh_token TEXT,
+  token_expires_at TIMESTAMPTZ,
+  account_info JSONB,
+  scopes TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT user_service_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, service_id)
+);
+
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
@@ -131,6 +148,7 @@ ALTER TABLE chat_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_service_connections ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS Policies
 -- Users can view and update their own data
@@ -175,3 +193,9 @@ CREATE POLICY "Users can delete their own keys." ON user_keys FOR DELETE USING (
 CREATE POLICY "Users can view their own preferences." ON user_preferences FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert their own preferences." ON user_preferences FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own preferences." ON user_preferences FOR UPDATE USING (auth.uid() = user_id);
+
+-- User service connections policies
+CREATE POLICY "Users can view their own service connections." ON user_service_connections FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own service connections." ON user_service_connections FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own service connections." ON user_service_connections FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own service connections." ON user_service_connections FOR DELETE USING (auth.uid() = user_id);

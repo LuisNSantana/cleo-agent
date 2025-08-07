@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { webSearchTool } from './web-search';
+import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
 
 // simple in-memory cache { key: data, expiry }
 interface WeatherResult {
@@ -267,6 +268,8 @@ export const tools = {
   cryptoPrice: cryptoPriceTool,
   randomFact: randomFactTool,
   webSearch: webSearchTool,
+  listCalendarEvents: listCalendarEventsTool,
+  createCalendarEvent: createCalendarEventTool,
 };
 
 export type ToolName = keyof typeof tools;

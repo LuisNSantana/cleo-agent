@@ -121,6 +121,18 @@ export function useChatCore({
         return "ready" as const
     }
   }, [status])
+
+  // Map internal status to ChatInput component expected status (includes "streaming")
+  const chatInputStatus = useMemo(() => {
+    switch (status) {
+      case "in_progress":
+        return "streaming" as const
+      case "error":
+        return "error" as const
+      default:
+        return "ready" as const
+    }
+  }, [status])
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Custom sendMessage function
@@ -574,6 +586,7 @@ export function useChatCore({
     systemPrompt,
     status,
     conversationStatus, // Mapped status for Conversation component
+    chatInputStatus, // Mapped status for ChatInput component (includes "streaming")
     hasSentFirstMessageRef,
     submit: () => handleSubmit({ preventDefault: () => {} } as React.FormEvent),
     handleSuggestion: (suggestion: string) => {

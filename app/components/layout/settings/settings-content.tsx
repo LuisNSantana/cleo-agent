@@ -18,8 +18,9 @@ import { InteractionPreferences } from "./appearance/interaction-preferences"
 import { LayoutSettings } from "./appearance/layout-settings"
 import { ThemeSelection } from "./appearance/theme-selection"
 import { ConnectionsPlaceholder } from "./connections/connections-placeholder"
-import { DeveloperTools } from "./connections/developer-tools"
-import { OllamaSection } from "./connections/ollama-section"
+import { ServiceConnections } from "./connections/service-connections"
+// import { DeveloperTools } from "./connections/developer-tools" // Disabled for now
+// import { OllamaSection } from "./connections/ollama-section" // Disabled for now
 import { AccountManagement } from "./general/account-management"
 import { UserProfile } from "./general/user-profile"
 import { SimpleModelsInfo } from "./models/simple-models-info"
@@ -121,9 +122,9 @@ export function SettingsContent({
             </TabsContent>
 
             <TabsContent value="connections" className="space-y-6 px-6">
-              {!isDev && <ConnectionsPlaceholder />}
-              {isDev && <OllamaSection />}
-              {isDev && <DeveloperTools />}
+              <ServiceConnections />
+              {/* {isDev && <OllamaSection />} */} {/* Disabled for now */}
+              {/* {isDev && <DeveloperTools />} */} {/* Disabled for now */}
             </TabsContent>
           </div>
         ) : (
@@ -197,9 +198,9 @@ export function SettingsContent({
               </TabsContent>
 
               <TabsContent value="connections" className="mt-0 space-y-6">
-                {!isDev && <ConnectionsPlaceholder />}
-                {isDev && <OllamaSection />}
-                {isDev && <DeveloperTools />}
+                <ServiceConnections />
+                {/* {isDev && <OllamaSection />} */} {/* Disabled for now */}
+                {/* {isDev && <DeveloperTools />} */} {/* Disabled for now */}
               </TabsContent>
             </div>
           </>

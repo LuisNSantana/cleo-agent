@@ -9,7 +9,7 @@ import {
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, StopIcon } from "@phosphor-icons/react"
+import { ArrowUpIcon, StopIcon, CircleNotch } from "@phosphor-icons/react"
 import { useCallback, useMemo } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -75,12 +75,7 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (isSubmitting) {
-        e.preventDefault()
-        return
-      }
-
-      if (e.key === "Enter" && status === "streaming") {
+      if (isSubmitting || status === "streaming") {
         e.preventDefault()
         return
       }
@@ -168,6 +163,7 @@ export function ChatInput({
             placeholder="Ask Cleo"
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
+            disabled={status === "streaming"}
             className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
@@ -197,13 +193,13 @@ export function ChatInput({
               <Button
                 size="sm"
                 className="size-9 rounded-full transition-all duration-300 ease-out"
-                disabled={!value || isSubmitting || isOnlyWhitespace(value)}
+                disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
                 aria-label={status === "streaming" ? "Stop" : "Send message"}
               >
                 {status === "streaming" ? (
-                  <StopIcon className="size-4" />
+                  <CircleNotch className="size-4 animate-spin" />
                 ) : (
                   <ArrowUpIcon className="size-4" />
                 )}

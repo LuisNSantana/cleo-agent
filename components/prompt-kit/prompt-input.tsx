@@ -49,6 +49,7 @@ type PromptInputProps = {
   onSubmit?: () => void
   children: React.ReactNode
   className?: string
+  disabled?: boolean
 }
 
 function PromptInput({
