@@ -6,8 +6,8 @@ import {
 } from "@/components/prompt-kit/message"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
-import type { Message as MessageAISDK } from "@ai-sdk/react"
-import { ArrowClockwise, Check, Copy } from "@phosphor-icons/react"
+import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
+import { ArrowClockwiseIcon, CheckIcon, CopyIcon } from "@phosphor-icons/react"
 import { getSources } from "./get-sources"
 import { Reasoning } from "./reasoning"
 import { SearchImages } from "./search-images"
@@ -40,21 +40,21 @@ export function MessageAssistant({
   const { preferences } = useUserPreferences()
   const sources = getSources(parts)
   const toolInvocationParts = parts?.filter(
-    (part) => part.type === "tool-invocation"
+    (part: any) => part.type === "tool-invocation"
   )
-  const reasoningParts = parts?.find((part) => part.type === "reasoning")
+  const reasoningParts = parts?.find((part: any) => part.type === "reasoning")
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
   const searchImageResults =
     parts
       ?.filter(
-        (part) =>
+        (part: any) =>
           part.type === "tool-invocation" &&
           part.toolInvocation?.state === "result" &&
           part.toolInvocation?.toolName === "imageSearch" &&
           part.toolInvocation?.result?.content?.[0]?.type === "images"
       )
-      .flatMap((part) =>
+      .flatMap((part: any) =>
         part.type === "tool-invocation" &&
         part.toolInvocation?.state === "result" &&
         part.toolInvocation?.toolName === "imageSearch" &&
@@ -72,9 +72,9 @@ export function MessageAssistant({
       )}
     >
       <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
-        {reasoningParts && reasoningParts.reasoning && (
+        {reasoningParts && (reasoningParts as any).reasoning && (
           <Reasoning
-            reasoning={reasoningParts.reasoning}
+            reasoning={(reasoningParts as any).reasoning}
             isStreaming={status === "streaming"}
           />
         )}
@@ -82,7 +82,7 @@ export function MessageAssistant({
         {toolInvocationParts &&
           toolInvocationParts.length > 0 &&
           preferences.showToolInvocations && (
-            <ToolInvocation toolInvocations={toolInvocationParts} />
+            <ToolInvocation toolInvocations={toolInvocationParts as any} />
           )}
 
         {searchImageResults.length > 0 && (
@@ -120,9 +120,9 @@ export function MessageAssistant({
                 type="button"
               >
                 {copied ? (
-                  <Check className="size-4" />
+                  <CheckIcon className="size-4" />
                 ) : (
-                  <Copy className="size-4" />
+                  <CopyIcon className="size-4" />
                 )}
               </button>
             </MessageAction>
@@ -138,7 +138,7 @@ export function MessageAssistant({
                   onClick={onReload}
                   type="button"
                 >
-                  <ArrowClockwise className="size-4" />
+                  <ArrowClockwiseIcon className="size-4" />
                 </button>
               </MessageAction>
             ) : null}
