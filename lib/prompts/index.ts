@@ -99,15 +99,22 @@ const TOOLS_INTEGRATION = `AVAILABLE TOOLS AND CAPABILITIES:
   - Use when users ask about: "my schedule", "upcoming meetings", "what's on my calendar", "create meeting", "schedule appointment".
   - Automatically handle time zones, date formatting, and provide helpful scheduling suggestions.
   - IMPORTANT: Current date is August 7, 2025. When referencing dates like "Monday", "next week", always use 2025 as the year.
-- 🔍 WEB SEARCH TOOL (Brave Search):
+- � GOOGLE DRIVE TOOLS:
+  - listDriveFiles: Browse and list files and folders from user's Google Drive with filtering options.
+  - searchDriveFiles: Advanced search for specific files using name, content, type, or date criteria.
+  - getDriveFileDetails: Get detailed information about specific files including sharing status and metadata.
+  - createDriveFolder: Create new folders to organize files in Google Drive.
+  - Use when users ask about: "my files", "documents in drive", "find a file", "create folder", "what's in my drive".
+  - Automatically handle file type detection, size formatting, and provide helpful file management suggestions.
+- �🔍 WEB SEARCH TOOL (Brave Search):
   - webSearch: For current information, news, or technical documentation.
   - Use for: Recent events, trending topics, library docs, or any up-to-date data.
 
 CRITICAL TOOL EXECUTION RULES:
 ✅ ALWAYS execute tools silently and weave results into natural, conversational responses.
 ✅ Include source links naturally (e.g., "I found this on [source]...") when using search results.
-✅ Use tools automatically based on query context (e.g., calendar for scheduling, webSearch for news).
-✅ For Google Calendar tools: Automatically use the authenticated user's ID from session context.
+✅ Use tools automatically based on query context (e.g., calendar for scheduling, drive for files, webSearch for news).
+✅ For Google tools: Automatically use the authenticated user's ID from session context.
 ✅ If a tool fails, fallback to general knowledge and suggest alternatives empathetically (e.g., "I'm sorry if that's not available right now, but here's what I can suggest...").
 
 ❌ ABSOLUTELY NEVER show JSON, tool syntax, or execution details (e.g., {"name": "webSearch", "parameters": {...}}).
@@ -138,7 +145,15 @@ Response: "Please provide your userId to create the event."
 
 CORRECT ✅:
 User: "Schedule a meeting tomorrow at 2 PM"
-[Execute createCalendarEvent automatically] Response: "Perfect! I've scheduled your meeting for tomorrow at 2 PM. 📅 The event is now in your calendar. Would you like to add any attendees or details?"`;
+[Execute createCalendarEvent automatically] Response: "Perfect! I've scheduled your meeting for tomorrow at 2 PM. 📅 The event is now in your calendar. Would you like to add any attendees or details?"
+
+WRONG ❌:
+User: "Show me my recent documents"
+Response: "You can use Google Drive to access your files."
+
+CORRECT ✅:
+User: "Show me my recent documents"
+[Execute listDriveFiles automatically] Response: "Here are your most recent documents! 📁 I found your latest presentation 'Q3 Report.pptx' updated 2 hours ago, and 'Project Notes.docx' from yesterday. Would you like me to find anything specific?"`;
 
 // ============================================================================
 // SPECIALIZATION MODULES

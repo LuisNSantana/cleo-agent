@@ -5,7 +5,10 @@ import {
   CurrencyCircleDollarIcon, 
   LightbulbIcon,
   MagnifyingGlassIcon,
-  CalendarIcon
+  CalendarIcon,
+  FolderIcon,
+  FileIcon,
+  MagnifyingGlassIcon as SearchIcon
 } from "@phosphor-icons/react"
 import Image from "next/image"
 
@@ -19,6 +22,10 @@ export const toolIconMap = {
   webSearch: MagnifyingGlassIcon,
   listCalendarEvents: GoogleCalendarIcon,
   createCalendarEvent: GoogleCalendarIcon,
+  listDriveFiles: GoogleDriveIcon,
+  searchDriveFiles: GoogleDriveIcon,
+  getDriveFileDetails: GoogleDriveIcon,
+  createDriveFolder: GoogleDriveIcon,
 } as const
 
 export type ToolName = keyof typeof toolIconMap
@@ -35,6 +42,20 @@ export function GoogleCalendarIcon({ className }: { className?: string }) {
     <Image 
       src="/icons/google-calendar.svg" 
       alt="Google Calendar"
+      className={className}
+      width={16}
+      height={16}
+      priority // Para iconos que se muestran inmediatamente
+    />
+  )
+}
+
+// Custom Google Drive SVG icon component using the official icon
+export function GoogleDriveIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/google-drive.svg" 
+      alt="Google Drive"
       className={className}
       width={16}
       height={16}
