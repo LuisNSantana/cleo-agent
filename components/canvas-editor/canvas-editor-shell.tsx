@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useCanvasEditorStore } from '@/lib/canvas-editor/store'
 import { exportContent } from '@/lib/canvas-editor/exports'
 import { markdownToHtml, wrapPrintHtml } from '@/lib/markdown-to-html'
@@ -8,7 +8,14 @@ import { htmlToMarkdown, htmlToText } from '@/lib/canvas-editor/convert'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { updateDocument } from '@/lib/documents'
+import { uploadToDrive } from '@/lib/google-drive'
 const RichEditor = dynamic(() => import('./rich-editor').then(m => m.RichEditor), { ssr: false })
+const Markdown = dynamic(() => import("@/components/prompt-kit/markdown").then(m => m.Markdown), { ssr: false })
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { toast } from '@/components/ui/toast'
 
 // Phase 1: plain textarea (rich mode real editor deferred)
 
@@ -24,6 +31,10 @@ export function CanvasEditorShell({
   const { isOpen, close, currentText, setText, currentHtml, setHtml, mode, setMode, markSaved, initialText, initialHtml, documentId, filename } = useCanvasEditorStore()
   const [remoteSaving, setRemoteSaving] = useState(false)
   const [remoteSavedAt, setRemoteSavedAt] = useState<number | null>(null)
+  const [driveOpen, setDriveOpen] = useState(false)
+  const [driveUploading, setDriveUploading] = useState(false)
+  const [driveFilename, setDriveFilename] = useState<string>('')
+  const [driveLink, setDriveLink] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const lastAutoSave = useRef<number>(0)
   const saveTimer = useRef<any>(null)
@@ -103,6 +114,16 @@ export function CanvasEditorShell({
 
   const dirty = currentText !== initialText || currentHtml !== initialHtml
   const counts = getCounts(mode === 'rich' && currentHtml ? htmlToPlain(currentHtml) : currentText)
+
+  // Derived content and default filename for Drive
+  const driveContent = useMemo(() => {
+    return (mode === 'rich' && currentHtml) ? htmlToMarkdown(currentHtml) : (currentText || '')
+  }, [mode, currentHtml, currentText])
+  useEffect(() => {
+    const base = (filename || 'documento.md')
+    const ensured = base.endsWith('.md') ? base : `${base}`.replace(/\.[^.]+$/, '.md')
+    setDriveFilename(ensured)
+  }, [filename, isOpen])
 
   if (!isOpen) return null
 
@@ -256,6 +277,18 @@ export function CanvasEditorShell({
                 title="Exportar como PDF"
               >🖨️ PDF</button>
               <button
+                onClick={() => setDriveOpen(true)}
+                className="rounded-md border px-2 py-1 text-xs flex items-center gap-1 hover:bg-green-200 dark:hover:bg-green-900 transition-colors"
+                title="Subir este documento a tu Google Drive"
+              >
+                <img
+                  src="/icons/google-drive.svg"
+                  alt="Google Drive"
+                  style={{ width: 18, height: 18, verticalAlign: 'middle', display: 'inline-block' }}
+                />
+                <span>Drive</span>
+              </button>
+              <button
                 onClick={close}
                 className="rounded-md border border-destructive/50 px-2 py-1 text-xs hover:bg-destructive hover:text-destructive-foreground transition-colors"
                 title="Cerrar editor"
@@ -340,6 +373,108 @@ console.log('Hello World!');
           )}
         </main>
       )}
+      {/* Google Drive Upload Dialog */}
+      <Dialog open={driveOpen} onOpenChange={(open) => {
+        setDriveOpen(open)
+        if (!open) {
+          setDriveUploading(false)
+          setDriveLink(null)
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <img src="/icons/google-drive.svg" alt="Google Drive" className="size-5" />
+              Subir a Google Drive
+            </DialogTitle>
+            <DialogDescription>
+              Revisa el nombre y el contenido del documento antes de enviarlo. Se subirá como archivo Markdown (.md).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <label className="text-sm font-medium text-muted-foreground">Nombre del archivo</label>
+              <div className="sm:col-span-2 flex items-center gap-2">
+                <Input
+                  value={driveFilename}
+                  onChange={(e) => setDriveFilename(e.target.value)}
+                  placeholder="documento.md"
+                  disabled={driveUploading}
+                />
+              </div>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-muted/50 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+                <span>Vista previa</span>
+                <span>{driveContent?.length || 0} caracteres</span>
+              </div>
+              <div className="max-h-[50vh] overflow-auto p-4">
+                {driveContent ? (
+                  <Markdown className="prose prose-sm dark:prose-invert max-w-none">
+                    {driveContent}
+                  </Markdown>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No hay contenido para previsualizar.</p>
+                )}
+              </div>
+            </div>
+
+            {driveUploading && (
+              <div className="space-y-2">
+                <Progress value={25} className="h-2" />
+                <p className="text-xs text-muted-foreground">Subiendo a Google Drive…</p>
+              </div>
+            )}
+
+            {driveLink && (
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200/50 dark:border-green-900/50 rounded-md p-3 text-sm flex items-center justify-between">
+                <span className="text-green-700 dark:text-green-300">Archivo subido correctamente.</span>
+                <a href={driveLink} target="_blank" rel="noreferrer" className="text-green-700 underline text-xs">Abrir</a>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDriveOpen(false)}
+              disabled={driveUploading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!driveContent?.trim()) {
+                  toast({ title: 'No hay contenido para subir', status: 'warning' })
+                  return
+                }
+                if (!driveFilename?.trim()) {
+                  toast({ title: 'Ingresa un nombre de archivo', status: 'warning' })
+                  return
+                }
+                const name = driveFilename.endsWith('.md') ? driveFilename : `${driveFilename}`.replace(/\.[^.]+$/, '.md')
+                try {
+                  setDriveUploading(true)
+                  setDriveLink(null)
+                  const { file } = await uploadToDrive({ filename: name, content: driveContent, mimeType: 'text/markdown' })
+                  const link = file.webViewLink || file.webContentLink || null
+                  setDriveLink(link)
+                  setDriveUploading(false)
+                  toast({ title: 'Subido a Google Drive', description: file.name, status: 'success' })
+                } catch (e: any) {
+                  setDriveUploading(false)
+                  toast({ title: 'No se pudo subir a Drive', description: e?.message || 'Error desconocido', status: 'error' })
+                }
+              }}
+              disabled={driveUploading}
+            >
+              {driveUploading ? 'Subiendo…' : 'Subir a Drive'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }function htmlToPlain(html: string) {
