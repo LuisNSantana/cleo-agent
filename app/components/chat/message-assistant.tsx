@@ -13,7 +13,6 @@ import { Reasoning } from "./reasoning"
 import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
-import { useCanvasEditorStore } from '@/lib/canvas-editor/store'
 import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
 
 type MessageAssistantProps = {
@@ -29,21 +28,7 @@ type MessageAssistantProps = {
   userMessage?: string // Añadido para detección de archivos
 }
 
-function OpenInCanvasAction({ content }: { content: string }) {
-  const open = useCanvasEditorStore(s => s.open)
-  return (
-    <MessageAction tooltip="Editar en Canvas" side="bottom">
-      <button
-        className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
-        aria-label="Editar en Canvas"
-        type="button"
-        onClick={() => open({ text: content, mode: 'rich' })}
-      >
-        <span className="text-[10px] font-semibold">Ed</span>
-      </button>
-    </MessageAction>
-  )
-}
+// Removed extra inline "Editar en Canvas" action to keep the actions row clean.
 
 export function MessageAssistant({
   children,
@@ -114,6 +99,7 @@ export function MessageAssistant({
           <AssistantMessageWithFiles 
             content={children} 
             userMessage={userMessage}
+            isStreaming={status === "streaming"}
           />
         )}
 
@@ -158,10 +144,7 @@ export function MessageAssistant({
                 </button>
               </MessageAction>
             ) : null}
-            {/* Open in canvas para textos largos (para mensajes sin archivos dedicados) */}
-            {children && children.length > 800 && (
-              <OpenInCanvasAction content={children} />
-            )}
+            {/* Canvas open now handled via file detection when a document is generated */}
           </MessageActions>
         )}
       </div>

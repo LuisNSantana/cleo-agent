@@ -2,7 +2,7 @@ import { Markdown } from "@/components/prompt-kit/markdown"
 import { cn } from "@/lib/utils"
 import { CaretDownIcon } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type ReasoningProps = {
   reasoning: string
@@ -10,19 +10,23 @@ type ReasoningProps = {
 }
 
 const TRANSITION = {
-  type: "spring",
+  type: "spring" as const,
   duration: 0.2,
   bounce: 0,
 }
 
 export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
-  const [wasStreaming, setWasStreaming] = useState(isStreaming ?? false)
-  const [isExpanded, setIsExpanded] = useState(() => isStreaming ?? true)
+  // Start expanded only while streaming to signal "thinking"; collapse by default after
+  const [isExpanded, setIsExpanded] = useState<boolean>(Boolean(isStreaming))
+  const prevStreaming = useRef<boolean>(Boolean(isStreaming))
 
-  if (wasStreaming && isStreaming === false) {
-    setWasStreaming(false)
-    setIsExpanded(false)
-  }
+  // When streaming finishes, auto-collapse to reduce visual noise
+  useEffect(() => {
+    if (prevStreaming.current && isStreaming === false) {
+      setIsExpanded(false)
+    }
+    prevStreaming.current = Boolean(isStreaming)
+  }, [isStreaming])
 
   return (
     <div>
@@ -32,6 +36,9 @@ export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
         type="button"
       >
         <span>Reasoning</span>
+        {isStreaming && (
+          <span className="ml-1 text-[10px] opacity-70">Thinking…</span>
+        )}
         <CaretDownIcon
           className={cn(
             "size-3 transition-transform",

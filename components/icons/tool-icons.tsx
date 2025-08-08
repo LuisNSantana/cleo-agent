@@ -26,6 +26,7 @@ export const toolIconMap = {
   searchDriveFiles: GoogleDriveIcon,
   getDriveFileDetails: GoogleDriveIcon,
   createDriveFolder: GoogleDriveIcon,
+  uploadFileToDrive: GoogleDriveIcon,
 } as const
 
 export type ToolName = keyof typeof toolIconMap

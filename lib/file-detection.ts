@@ -242,7 +242,11 @@ function detectFileType(text: string, userMessage?: string): 'md' | 'txt' | 'doc
 /**
  * Procesa un mensaje de respuesta y extrae archivos potenciales
  */
-export function processResponseForFiles(response: string, userMessage?: string): {
+export function processResponseForFiles(
+  response: string,
+  userMessage?: string,
+  options?: { skipHeuristics?: boolean }
+): {
   cleanResponse: string
   files: FileCandidate[]
 } {
@@ -267,12 +271,14 @@ export function processResponseForFiles(response: string, userMessage?: string):
     collected = hiddenFiles.map(hf => hf.candidate)
   }
 
-  // 2. Detección heurística normal sólo si no hay marcadores o el texto restante también amerita
-  const heuristicCandidate = detectFileContent(workingResponse, userMessage)
-  if (heuristicCandidate) {
-    // Evitar duplicar si coincide nombre y origen
-    const already = collected.find(f => f.filename === heuristicCandidate.filename)
-    if (!already) collected.push(heuristicCandidate)
+  // 2. Detección heurística normal SOLO si NO hubo marcadores ocultos y NO se solicitó omitir heurísticas
+  if (hiddenFiles.length === 0 && !options?.skipHeuristics) {
+    const heuristicCandidate = detectFileContent(workingResponse, userMessage)
+    if (heuristicCandidate) {
+      // Evitar duplicar si coincide nombre y origen
+      const already = collected.find(f => f.filename === heuristicCandidate.filename)
+      if (!already) collected.push(heuristicCandidate)
+    }
   }
 
   if (collected.length === 0) {
@@ -312,7 +318,9 @@ function extractHiddenGeneratedDocuments(text: string, userMessage?: string): Hi
   // ...markdown content...
   // <!--/FILE-->
   const fileMarkerRegex = /<!--\s*FILE:([^\n|]+?)(?:\|([^\n|]*?))?\|?\s*-->\s*\n?([\s\S]*?)\s*\n?<!--\s*\/FILE\s*-->/g
-  const malformedFileMarkerRegex = /<!--FILE:([^|]+)\|([^|]*)\|([\s\S]*?)<!--\/FILE-->/g
+  // Handles cases where the opening marker is malformed (missing -->) and the closing marker may or may not be present.
+  // It captures everything until an explicit closing <!--/FILE--> or the end of the text.
+  const malformedFileMarkerRegex = /<!--\s*FILE:([^|]+)\|([^|]*)\|([\s\S]*?)(?:<!--\s*\/FILE\s*-->|$)/g
 
   let match: RegExpExecArray | null
 

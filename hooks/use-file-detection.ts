@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { processResponseForFiles, type FileCandidate } from '@/lib/file-detection'
 
 interface UseFileDetectionProps {
   response: string
   userMessage?: string
   enabled?: boolean
+  isStreaming?: boolean
 }
 
 interface UseFileDetectionReturn {
@@ -22,11 +23,13 @@ interface UseFileDetectionReturn {
 export function useFileDetection({ 
   response, 
   userMessage, 
-  enabled = true 
+  enabled = true,
+  isStreaming = false,
 }: UseFileDetectionProps): UseFileDetectionReturn {
   const [cleanResponse, setCleanResponse] = useState(response)
   const [detectedFiles, setDetectedFiles] = useState<FileCandidate[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const spinnerTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!enabled || !response.trim()) {
@@ -35,14 +38,18 @@ export function useFileDetection({
       return
     }
 
-    setIsProcessing(true)
+    // Debounce the spinner to avoid flicker on fast parses
+    if (spinnerTimerRef.current) window.clearTimeout(spinnerTimerRef.current)
+    spinnerTimerRef.current = window.setTimeout(() => setIsProcessing(true), 250)
 
     // Simular procesamiento asíncrono para no bloquear la UI
     const processFiles = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 100)) // Pequeño delay para suavidad
-        
-        const result = processResponseForFiles(response, userMessage)
+        // Pequeño delay para suavidad
+        await new Promise(resolve => setTimeout(resolve, 80))
+
+  // Avoid heuristics while streaming to prevent early duplication/partial captures
+  const result = processResponseForFiles(response, userMessage, { skipHeuristics: isStreaming })
         
         setCleanResponse(result.cleanResponse)
         setDetectedFiles(result.files)
@@ -51,12 +58,16 @@ export function useFileDetection({
         setCleanResponse(response)
         setDetectedFiles([])
       } finally {
+        if (spinnerTimerRef.current) {
+          window.clearTimeout(spinnerTimerRef.current)
+          spinnerTimerRef.current = null
+        }
         setIsProcessing(false)
       }
     }
 
     processFiles()
-  }, [response, userMessage, enabled])
+  }, [response, userMessage, enabled, isStreaming])
 
   return {
     cleanResponse,

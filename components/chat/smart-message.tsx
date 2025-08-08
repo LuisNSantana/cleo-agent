@@ -13,6 +13,7 @@ interface SmartMessageProps {
   content: string
   userMessage?: string
   enableFileDetection?: boolean
+  isStreaming?: boolean
 }
 
 /**
@@ -22,24 +23,26 @@ export function SmartMessage({
   children, 
   content, 
   userMessage, 
-  enableFileDetection = true 
+  enableFileDetection = true,
+  isStreaming = false,
 }: SmartMessageProps) {
   const { cleanResponse, detectedFiles, isProcessing, hasFiles } = useFileDetection({
     response: content,
     userMessage,
-    enabled: enableFileDetection
+    enabled: enableFileDetection,
+    isStreaming,
   })
   const open = useCanvasEditorStore(s => s.open)
   const openedRef = useRef(false)
 
   // Auto-abrir el primer archivo detectado en el Canvas para revisión
   useEffect(() => {
-    if (!isProcessing && hasFiles && detectedFiles.length > 0 && !openedRef.current) {
+    if (!isStreaming && !isProcessing && hasFiles && detectedFiles.length > 0 && !openedRef.current) {
       const first = detectedFiles[0]
       open({ text: first.content, mode: 'rich', filename: first.filename })
       openedRef.current = true
     }
-  }, [isProcessing, hasFiles, detectedFiles, open])
+  }, [isStreaming, isProcessing, hasFiles, detectedFiles, open])
 
   if (isProcessing) {
     return (
@@ -96,18 +99,21 @@ interface AssistantMessageWithFilesProps {
   content: string
   userMessage?: string
   children?: ReactNode
+  isStreaming?: boolean
 }
 
 export function AssistantMessageWithFiles({ 
   content, 
   userMessage, 
-  children 
+  children,
+  isStreaming = false,
 }: AssistantMessageWithFilesProps) {
   return (
     <SmartMessage 
       content={content} 
       userMessage={userMessage}
       enableFileDetection={true}
+      isStreaming={isStreaming}
     >
       {children}
     </SmartMessage>
