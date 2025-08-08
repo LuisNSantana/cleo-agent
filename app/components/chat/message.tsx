@@ -1,4 +1,4 @@
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import React, { useState } from "react"
 import { MessageAssistant } from "./message-assistant"
 import { MessageUser } from "./message-user"
@@ -16,6 +16,7 @@ type MessageProps = {
   parts?: MessageType["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
+  userMessage?: string // Para detección de archivos
 }
 
 export function Message({

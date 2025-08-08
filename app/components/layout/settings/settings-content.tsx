@@ -10,6 +10,7 @@ import {
   GearSixIcon,
   PaintBrushIcon,
   PlugsConnectedIcon,
+  FileTextIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { useState } from "react"
@@ -19,6 +20,7 @@ import { LayoutSettings } from "./appearance/layout-settings"
 import { ThemeSelection } from "./appearance/theme-selection"
 import { ConnectionsPlaceholder } from "./connections/connections-placeholder"
 import { ServiceConnections } from "./connections/service-connections"
+import { FilesSection } from "./files/files-section"
 // import { DeveloperTools } from "./connections/developer-tools" // Disabled for now
 // import { OllamaSection } from "./connections/ollama-section" // Disabled for now
 import { AccountManagement } from "./general/account-management"
@@ -29,7 +31,7 @@ type SettingsContentProps = {
   isDrawer?: boolean
 }
 
-type TabType = "general" | "appearance" | "models" | "connections"
+type TabType = "general" | "appearance" | "models" | "connections" | "files"
 
 export function SettingsContent({
   isDrawer = false,
@@ -96,6 +98,13 @@ export function SettingsContent({
                   <PlugsConnectedIcon className="size-4" />
                   <span>Connections</span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="files"
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <FileTextIcon className="size-4" />
+                  <span>Files</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -125,6 +134,9 @@ export function SettingsContent({
               <ServiceConnections />
               {/* {isDev && <OllamaSection />} */} {/* Disabled for now */}
               {/* {isDev && <DeveloperTools />} */} {/* Disabled for now */}
+            </TabsContent>
+            <TabsContent value="files" className="space-y-6 px-6">
+              <FilesSection />
             </TabsContent>
           </div>
         ) : (
@@ -171,6 +183,15 @@ export function SettingsContent({
                     <span>Connections</span>
                   </div>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="files"
+                  className="w-full justify-start rounded-md px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileTextIcon className="size-4" />
+                    <span>Files</span>
+                  </div>
+                </TabsTrigger>
               </div>
             </TabsList>
 
@@ -201,6 +222,9 @@ export function SettingsContent({
                 <ServiceConnections />
                 {/* {isDev && <OllamaSection />} */} {/* Disabled for now */}
                 {/* {isDev && <DeveloperTools />} */} {/* Disabled for now */}
+              </TabsContent>
+              <TabsContent value="files" className="mt-0 space-y-6">
+                <FilesSection />
               </TabsContent>
             </div>
           </>

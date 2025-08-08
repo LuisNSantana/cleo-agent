@@ -1,0 +1,308 @@
+/* Canvas Editor Custom Styles */
+
+/* Enhanced prose styling for better readability */
+.ProseMirror {
+  outline: none;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+  max-width: none;
+  padding: 2rem;
+  margin: 0 auto;
+  background: hsl(var(--background));
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Improved spacing for better reading flow */
+.ProseMirror > * + * {
+  margin-top: 0.75rem;
+}
+
+/* Headings with better spacing and typography */
+.ProseMirror h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: hsl(var(--foreground));
+  border-bottom: 2px solid hsl(var(--border));
+  padding-bottom: 0.5rem;
+}
+
+.ProseMirror h2 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.75rem;
+  margin-bottom: 0.875rem;
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 1.25rem;
+  margin-bottom: 0.625rem;
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror h5 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Paragraphs with optimal spacing */
+.ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  line-height: 1.75;
+}
+
+/* Enhanced list styling */
+.ProseMirror ul {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 1rem 0;
+}
+
+.ProseMirror ul li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror ul li::before {
+  content: "•";
+  color: hsl(var(--primary));
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.ProseMirror ol li {
+  margin-bottom: 0.5rem;
+  padding-left: 0.25rem;
+}
+
+/* Task list styling */
+.ProseMirror .task-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.ProseMirror .task-list .task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  position: relative;
+}
+
+.ProseMirror .task-list .task-item::before {
+  display: none;
+}
+
+.ProseMirror .task-list .task-item > label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ProseMirror .task-list .task-item > label > input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid hsl(var(--border));
+  border-radius: 0.25rem;
+  background: hsl(var(--background));
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ProseMirror .task-list .task-item > label > input[type="checkbox"]:checked {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='m13.854 3.646-7.5 7.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l7.146-7.147a.5.5 0 0 1 .708.708z'/%3e%3c/svg%3e");
+  background-size: 0.75rem;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.ProseMirror .task-list .task-item > label > input[type="checkbox"]:checked + * {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.ProseMirror .task-list .task-item > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Blockquote styling */
+.ProseMirror blockquote {
+  border-left: 4px solid hsl(var(--primary));
+  background: hsl(var(--muted) / 0.5);
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  position: relative;
+}
+
+.ProseMirror blockquote::before {
+  content: '"';
+  font-size: 3rem;
+  color: hsl(var(--primary));
+  position: absolute;
+  top: -0.5rem;
+  left: 0.5rem;
+  line-height: 1;
+}
+
+/* Code styling */
+.ProseMirror code {
+  background: hsl(var(--muted));
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.875em;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  font-weight: 500;
+}
+
+/* Code block styling */
+.ProseMirror pre {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875rem;
+  border: none;
+  font-weight: 400;
+}
+
+/* Link styling */
+.ProseMirror a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.ProseMirror a:hover {
+  color: hsl(var(--primary) / 0.8);
+}
+
+/* Table styling */
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  width: 100%;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.ProseMirror table th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.ProseMirror table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.ProseMirror table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Strong and emphasis */
+.ProseMirror strong {
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror em {
+  font-style: italic;
+  color: hsl(var(--foreground));
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid hsl(var(--border));
+  margin: 2rem 0;
+  opacity: 0.7;
+}
+
+/* Selection styling */
+.ProseMirror ::selection {
+  background: hsl(var(--primary) / 0.2);
+}
+
+/* Focus styles */
+.ProseMirror:focus-within {
+  outline: none;
+}
+
+/* Placeholder styling */
+.ProseMirror .is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

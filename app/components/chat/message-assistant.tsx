@@ -13,6 +13,8 @@ import { Reasoning } from "./reasoning"
 import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
+import { useCanvasEditorStore } from '@/lib/canvas-editor/store'
+import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
 
 type MessageAssistantProps = {
   children: string
@@ -24,6 +26,23 @@ type MessageAssistantProps = {
   parts?: MessageAISDK["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
+  userMessage?: string // Añadido para detección de archivos
+}
+
+function OpenInCanvasAction({ content }: { content: string }) {
+  const open = useCanvasEditorStore(s => s.open)
+  return (
+    <MessageAction tooltip="Editar en Canvas" side="bottom">
+      <button
+        className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+        aria-label="Editar en Canvas"
+        type="button"
+        onClick={() => open({ text: content, mode: 'rich' })}
+      >
+        <span className="text-[10px] font-semibold">Ed</span>
+      </button>
+    </MessageAction>
+  )
 }
 
 export function MessageAssistant({
@@ -36,9 +55,11 @@ export function MessageAssistant({
   parts,
   status,
   className,
+  userMessage,
 }: MessageAssistantProps) {
   const { preferences } = useUserPreferences()
   const sources = getSources(parts)
+  
   const toolInvocationParts = parts?.filter(
     (part: any) => part.type === "tool-invocation"
   )
@@ -90,20 +111,15 @@ export function MessageAssistant({
         )}
 
         {contentNullOrEmpty ? null : (
-          <MessageContent
-            className={cn(
-              "prose dark:prose-invert relative min-w-full bg-transparent p-0",
-              "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-8 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-3 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-h4:scroll-m-20 prose-h5:scroll-m-20 prose-h6:scroll-m-20 prose-strong:font-medium prose-table:block prose-table:overflow-y-auto"
-            )}
-            markdown={true}
-          >
-            {children}
-          </MessageContent>
+          <AssistantMessageWithFiles 
+            content={children} 
+            userMessage={userMessage}
+          />
         )}
 
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
-        {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
+  {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
           <MessageActions
             className={cn(
               "-ml-2 flex gap-0 opacity-0 transition-opacity group-hover:opacity-100"
@@ -142,6 +158,10 @@ export function MessageAssistant({
                 </button>
               </MessageAction>
             ) : null}
+            {/* Open in canvas para textos largos (para mensajes sin archivos dedicados) */}
+            {children && children.length > 800 && (
+              <OpenInCanvasAction content={children} />
+            )}
           </MessageActions>
         )}
       </div>

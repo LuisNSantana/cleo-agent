@@ -129,13 +129,13 @@ async function makeGoogleDriveRequest(accessToken: string, endpoint: string, opt
 export const listDriveFilesTool = tool({
   description: '📁 List files and folders from Google Drive. ALWAYS use this when user asks about their files, documents, folders, or wants to see what\'s in their Drive. Supports filtering by file type, name, and folder location. IMPORTANT: Shows recent files by default.',
   inputSchema: z.object({
-    maxResults: z.number().min(1).max(100).optional().default(20).describe('Maximum number of files to return (1-100). Default is 20.'),
+    maxResults: z.number().min(1).max(100).optional().default(50).describe('Maximum number of files to return (1-100). Default is 50.'),
     query: z.string().optional().describe('Search query to filter files (e.g., "name contains \'presentation\'", "mimeType = \'application/pdf\'", or just "presentation" for simple search)'),
     orderBy: z.string().optional().default('modifiedTime desc').describe('How to order results: "modifiedTime desc" (newest first), "name", "createdTime desc", "quotaBytesUsed desc" (largest first)'),
     includeItemsFromAllDrives: z.boolean().optional().default(false).describe('Include files from shared drives and other drives'),
     spaces: z.string().optional().default('drive').describe('Spaces to search: "drive" (main Drive), "appDataFolder", or "photos"'),
   }),
-  execute: async ({ maxResults = 20, query, orderBy = 'modifiedTime desc', includeItemsFromAllDrives = false, spaces = 'drive' }) => {
+  execute: async ({ maxResults = 50, query, orderBy = 'modifiedTime desc', includeItemsFromAllDrives = false, spaces = 'drive' }) => {
     // Get userId and model from global context (injected by chat handler)
     const userId = (globalThis as any).__currentUserId
     const currentModel = (globalThis as any).__currentModel
@@ -244,12 +244,12 @@ export const searchDriveFilesTool = tool({
   inputSchema: z.object({
     searchTerm: z.string().describe('What to search for (file name, content, or description)'),
     fileType: z.string().optional().describe('Filter by file type: "document", "spreadsheet", "presentation", "pdf", "image", "video", "audio", "folder", or specific mime type'),
-    maxResults: z.number().min(1).max(50).optional().default(10).describe('Maximum number of results (1-50). Default is 10.'),
+    maxResults: z.number().min(1).max(50).optional().default(25).describe('Maximum number of results (1-50). Default is 25.'),
     includeContent: z.boolean().optional().default(false).describe('Search inside file content (for documents, PDFs, etc.)'),
     modifiedAfter: z.string().optional().describe('Find files modified after this date (ISO format: "2025-08-01T00:00:00Z")'),
     sharedWithMe: z.boolean().optional().default(false).describe('Only search files shared with me'),
   }),
-  execute: async ({ searchTerm, fileType, maxResults = 10, includeContent = false, modifiedAfter, sharedWithMe = false }) => {
+  execute: async ({ searchTerm, fileType, maxResults = 25, includeContent = false, modifiedAfter, sharedWithMe = false }) => {
     // Get userId from global context
     const userId = (globalThis as any).__currentUserId
     

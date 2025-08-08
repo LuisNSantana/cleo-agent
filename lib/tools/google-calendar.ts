@@ -129,12 +129,12 @@ async function makeGoogleCalendarRequest(accessToken: string, endpoint: string, 
 export const listCalendarEventsTool = tool({
   description: '📅 List upcoming events from Google Calendar. ALWAYS use this when user asks about their schedule, calendar, events, meetings, or what they have planned for any specific day (like Monday, today, tomorrow, etc.). Shows events for the next 7 days by default unless specified otherwise. IMPORTANT: The current date is August 7, 2025. When user asks about "Monday" or future dates, use 2025 dates.',
   inputSchema: z.object({
-    maxResults: z.number().min(1).max(50).optional().default(10).describe('Maximum number of events to return (1-50). Default is 10.'),
+    maxResults: z.number().min(1).max(50).optional().default(25).describe('Maximum number of events to return (1-50). Default is 25.'),
     timeMin: z.string().optional().describe('Start time filter in ISO 8601 format (e.g. "2025-08-11T00:00:00Z" for Monday August 11, 2025). If not provided, defaults to current time. IMPORTANT: Use 2025 for current year dates.'),
     timeMax: z.string().optional().describe('End time filter in ISO 8601 format (e.g. "2025-08-11T23:59:59Z" for end of Monday August 11, 2025). If not provided, defaults to 7 days from now. IMPORTANT: Use 2025 for current year dates.'),
     calendarId: z.string().optional().default('primary').describe('Calendar ID to fetch events from. Use "primary" for the main/default calendar.'),
   }),
-  execute: async ({ maxResults = 10, timeMin, timeMax, calendarId = 'primary' }) => {
+  execute: async ({ maxResults = 25, timeMin, timeMax, calendarId = 'primary' }) => {
     // Get userId and model from global context (injected by chat handler)
     const userId = (globalThis as any).__currentUserId
     const currentModel = (globalThis as any).__currentModel

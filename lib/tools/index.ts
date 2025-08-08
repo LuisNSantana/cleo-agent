@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { webSearchTool } from './web-search';
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool } from './google-drive';
+import { createDocumentTool } from './create-document';
 
 // simple in-memory cache { key: data, expiry }
 interface WeatherResult {
@@ -269,6 +270,7 @@ export const tools = {
   cryptoPrice: cryptoPriceTool,
   randomFact: randomFactTool,
   webSearch: webSearchTool,
+  createDocument: createDocumentTool,
   listCalendarEvents: listCalendarEventsTool,
   createCalendarEvent: createCalendarEventTool,
   listDriveFiles: listDriveFilesTool,

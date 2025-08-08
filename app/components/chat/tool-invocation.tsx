@@ -13,6 +13,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
 import { getToolIcon } from "@/components/icons/tool-icons"
+import { DocumentToolDisplay } from "@/components/chat/document-tool-display"
 
 // Define the tool invocation types based on how they're used in the codebase
 interface ToolInvocation {
@@ -284,6 +285,11 @@ function SingleToolCard({
   // Render generic results based on their structure
   const renderResults = () => {
     if (!parsedResult) return "No result data available"
+
+    // Handle createDocumentTool specifically
+    if (toolName === "createDocumentTool" && parsedResult) {
+      return <DocumentToolDisplay result={parsedResult} />
+    }
 
     // Handle array of items with url, title, and snippet (like search results)
     if (Array.isArray(parsedResult) && parsedResult.length > 0) {

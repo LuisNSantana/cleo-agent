@@ -49,6 +49,11 @@ export function Conversation({
             const hasScrollAnchor =
               isLast && messages.length > initialMessageCount.current
 
+            // Para mensajes del asistente, buscar el mensaje del usuario anterior
+            const userMessage = message.role === 'assistant' && index > 0 
+              ? messages[index - 1]?.content 
+              : undefined
+
             return (
               <Message
                 key={message.id}
@@ -62,6 +67,7 @@ export function Conversation({
                 hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
                 status={status}
+                userMessage={userMessage} // Pasar contexto del usuario
               >
                 {message.content}
               </Message>

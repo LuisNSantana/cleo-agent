@@ -88,3 +88,4 @@ export default async function RootLayout({
     </html>
   )
 }
+// CanvasEditorEntry moved to LayoutClient (client component)
