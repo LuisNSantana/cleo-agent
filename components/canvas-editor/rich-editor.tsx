@@ -12,6 +12,7 @@ import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table
 import { createLowlight, common } from 'lowlight'
 import { useEffect } from 'react'
 import './editor-styles.css'
+import { markdownToHtml } from '@/lib/markdown-to-html'
 
 interface RichEditorProps {
   htmlValue?: string
@@ -24,7 +25,7 @@ interface RichEditorProps {
 export function RichEditor({ htmlValue, textValue, onChange, editorRef }: RichEditorProps) {
   const initialContent = htmlValue
     ? htmlValue
-    : buildParagraphsFromPlain(textValue || '')
+    : convertTextToHtml(textValue || '')
 
   // Create a scoped lowlight instance only once.
   // Lowlight common bundle already includes popular languages (js, ts, json, markdown, etc.)
@@ -96,8 +97,8 @@ export function RichEditor({ htmlValue, textValue, onChange, editorRef }: RichEd
     if (!editor) return
     if (htmlValue && htmlValue !== editor.getHTML()) {
       editor.commands.setContent(htmlValue)
-    } else if (!htmlValue && textValue) {
-      const generated = buildParagraphsFromPlain(textValue)
+    } else if (!htmlValue && typeof textValue === 'string') {
+      const generated = convertTextToHtml(textValue)
       if (generated !== editor.getHTML()) editor.commands.setContent(generated)
     }
   }, [htmlValue, textValue, editor])
@@ -124,4 +125,32 @@ function buildParagraphsFromPlain(text: string) {
   if (!text) return ''
   const blocks = text.trim().split(/\n{2,}/).map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
   return blocks.join('')
+}
+
+function isLikelyMarkdown(text: string) {
+  if (!text) return false
+  const mdSignals = [
+    /^\s{0,3}#{1,6}\s/m,        // headings
+    /\*\*[^*]+\*\*/m,         // bold
+    /\*[^*]+\*/m,              // italics
+    /^\s*[-*+]\s+/m,           // unordered list
+    /^\s*\d+\.\s+/m,         // ordered list
+    /```[\s\S]*?```/m,        // fenced code block
+    /^>\s.+/m,                 // blockquote
+  ]
+  return mdSignals.some(rx => rx.test(text))
+}
+
+function convertTextToHtml(text: string) {
+  if (!text) return ''
+  // If it looks like Markdown, convert to HTML to preserve styling in the rich editor
+  if (isLikelyMarkdown(text)) {
+    try {
+      return markdownToHtml(text)
+    } catch {
+      // Fallback to plain paragraphs if conversion fails
+      return buildParagraphsFromPlain(text)
+    }
+  }
+  return buildParagraphsFromPlain(text)
 }
