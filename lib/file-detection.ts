@@ -26,13 +26,13 @@ export function detectFileContent(text: string, userMessage?: string): FileCandi
   // Palabras clave que indican solicitud EXPLÍCITA y DIRECTA de documento
   const explicitFileRequests = [
     // Spanish requests
-    'escribe un ensayo', 'crea un ensayo', 'redacta un ensayo',
-    'escribe un artículo', 'crea un artículo', 'redacta un artículo',
-    'escribe una historia', 'crea una historia', 'redacta una historia',
+  'escribe un ensayo', 'crea un ensayo', 'redacta un ensayo', 'hazme un ensayo', 'haz un ensayo',
+  'escribe un artículo', 'crea un artículo', 'redacta un artículo', 'hazme un artículo', 'haz un artículo',
+  'escribe una historia', 'crea una historia', 'redacta una historia', 'hazme una historia', 'haz una historia',
     'escribe un cuento', 'crea un cuento', 'redacta un cuento',
-    'escribe un reporte', 'crea un reporte', 'redacta un reporte',
-    'escribe un informe', 'crea un informe', 'redacta un informe',
-    'escribe un documento', 'crea un documento', 'redacta un documento',
+  'escribe un reporte', 'crea un reporte', 'redacta un reporte', 'hazme un reporte', 'haz un reporte',
+  'escribe un informe', 'crea un informe', 'redacta un informe', 'hazme un informe', 'haz un informe',
+  'escribe un documento', 'crea un documento', 'redacta un documento', 'hazme un documento', 'haz un documento',
     'escribe una guía', 'crea una guía', 'redacta una guía',
     'escribe un manual', 'crea un manual', 'redacta un manual',
     'escribe un tutorial', 'crea un tutorial', 'redacta un tutorial',
@@ -41,14 +41,14 @@ export function detectFileContent(text: string, userMessage?: string): FileCandi
     'archivo .md', 'archivo .txt', 'archivo markdown',
     'documento editable', 'texto editable',
     // English requests
-    'write an essay', 'create an essay', 'draft an essay',
-    'write an article', 'create an article', 'draft an article',
-    'write a story', 'create a story', 'draft a story',
-    'write a report', 'create a report', 'draft a report',
-    'write a document', 'create a document', 'draft a document',
-    'write a guide', 'create a guide', 'draft a guide',
-    'write a manual', 'create a manual', 'draft a manual',
-    'write a tutorial', 'create a tutorial', 'draft a tutorial',
+  'write an essay', 'create an essay', 'draft an essay', 'make me an essay', 'make an essay',
+  'write an article', 'create an article', 'draft an article', 'make me an article', 'make an article',
+  'write a story', 'create a story', 'draft a story', 'make me a story', 'make a story',
+  'write a report', 'create a report', 'draft a report', 'make me a report', 'make a report',
+  'write a document', 'create a document', 'draft a document', 'make me a document', 'make a document',
+  'write a guide', 'create a guide', 'draft a guide', 'make me a guide', 'make a guide',
+  'write a manual', 'create a manual', 'draft a manual', 'make me a manual', 'make a manual',
+  'write a tutorial', 'create a tutorial', 'draft a tutorial', 'make me a tutorial', 'make a tutorial',
     'generate a file', 'create a file', 'save as file',
     'export to file', 'download as file',
     'file .md', 'file .txt', 'markdown file',
@@ -92,7 +92,7 @@ export function detectFileContent(text: string, userMessage?: string): FileCandi
     text.includes('modificado ayer') ||
     text.includes('total') && text.includes('MB') ||
     text.includes('Sugerencias: Organiza') ||
-    text.includes('Vista previa de') ||
+  // text.includes('Vista previa de') || // Removed to avoid blocking canvas when showing preview wording
     // English patterns
     text.includes('I found') ||
     text.includes('files:') ||
@@ -109,7 +109,7 @@ export function detectFileContent(text: string, userMessage?: string): FileCandi
     text.includes('modified yesterday') ||
     text.includes('total') && text.includes('MB') ||
     text.includes('Suggestions: Organize') ||
-    text.includes('Preview of') ||
+  // text.includes('Preview of') || // Removed to avoid blocking canvas when showing preview wording
     // Emoji patterns (language independent)
     text.includes('📄 **') ||
     text.includes('📊 **') ||

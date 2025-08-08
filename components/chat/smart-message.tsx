@@ -1,11 +1,12 @@
 "use client"
 
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { useFileDetection } from '@/hooks/use-file-detection'
 import { GeneratedFile } from './generated-file'
 import { Loader2 } from 'lucide-react'
 import { MessageContent } from '@/components/prompt-kit/message'
 import { cn } from '@/lib/utils'
+import { useCanvasEditorStore } from '@/lib/canvas-editor/store'
 
 interface SmartMessageProps {
   children?: ReactNode
@@ -28,6 +29,17 @@ export function SmartMessage({
     userMessage,
     enabled: enableFileDetection
   })
+  const open = useCanvasEditorStore(s => s.open)
+  const openedRef = useRef(false)
+
+  // Auto-abrir el primer archivo detectado en el Canvas para revisión
+  useEffect(() => {
+    if (!isProcessing && hasFiles && detectedFiles.length > 0 && !openedRef.current) {
+      const first = detectedFiles[0]
+      open({ text: first.content, mode: 'rich', filename: first.filename })
+      openedRef.current = true
+    }
+  }, [isProcessing, hasFiles, detectedFiles, open])
 
   if (isProcessing) {
     return (

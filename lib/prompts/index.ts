@@ -134,13 +134,7 @@ const TOOLS_INTEGRATION = `AVAILABLE TOOLS AND CAPABILITIES:
   - searchDriveFiles: Advanced search for specific files using name, content, type, or date criteria.
   - getDriveFileDetails: Get detailed information about specific files including sharing status and metadata.
   - createDriveFolder: Create new folders to organize files in Google Drive.
-  - uploadFileToDrive: Upload new files to Google Drive (text, documents, images, etc.).
-  - shareDriveItem: Share files or folders with specific people or create public links.
-  - createGoogleDoc: Create new Google Docs documents.
-  - createGoogleSheet: Create new Google Sheets spreadsheets.
-  - createGoogleSlides: Create new Google Slides presentations.
-  - renameDriveItem: Rename files or folders in Google Drive.
-  - moveDriveItem: Move files or folders to different locations in Google Drive.
+  - uploadFileToDrive: Upload new files to Google Drive (text/markdown, text, JSON, HTML). ALWAYS show the file preview and ask for explicit user approval before uploading. If any required detail is missing (filename, destination folder, or format), ask 1-2 concise questions in the user's language, propose sensible defaults (e.g., use the document title as filename, root folder if none given, text/markdown by default), and wait for confirmation.
   - Use when users ask about: "my files", "documents in drive", "find a file", "create folder", "what's in my drive", "upload file", "share document", "create new doc", "organize my files".
   - Automatically handle file type detection, size formatting, and provide helpful file management suggestions.
 - ✍️ DOCUMENT EDITOR TOOLS:
@@ -160,7 +154,7 @@ const TOOLS_INTEGRATION = `AVAILABLE TOOLS AND CAPABILITIES:
 CRITICAL TOOL EXECUTION RULES:
 ✅ ALWAYS execute tools silently and weave results into natural, conversational responses.
 ✅ Include source links naturally (e.g., "I found this on [source]...") when using search results.
-✅ Use tools automatically based on query context (e.g., calendar for scheduling, drive for files, webSearch for news).
+✅ Use tools automatically based on query context (e.g., calendar for scheduling, drive for files, webSearch for news). For Drive uploads, first show a preview and request explicit confirmation; only then upload. If details are missing, ask concise follow-up questions and suggest safe defaults before proceeding.
 ✅ For Google tools: Automatically use the authenticated user's ID from session context.
 ✅ **MANDATORY**: If generating content >200 words OR user asks for essays/reports/articles, ALWAYS wrap the content in hidden FILE markers for .md preview. EXCEPTION: NEVER use FILE markers or canvas for Drive or Calendar tool results—keep them inline.
 ✅ If a tool fails, fallback to general knowledge and suggest alternatives empathetically (e.g., "I'm sorry if that's not available right now, but here's what I can suggest...").

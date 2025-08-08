@@ -35,6 +35,8 @@ export function CanvasEditorShell({
   const [driveUploading, setDriveUploading] = useState(false)
   const [driveFilename, setDriveFilename] = useState<string>('')
   const [driveLink, setDriveLink] = useState<string | null>(null)
+  const [driveFolderId, setDriveFolderId] = useState<string>('')
+  const [driveFormat, setDriveFormat] = useState<'md' | 'txt' | 'html'>('md')
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const lastAutoSave = useRef<number>(0)
   const saveTimer = useRef<any>(null)
@@ -388,7 +390,7 @@ console.log('Hello World!');
               Subir a Google Drive
             </DialogTitle>
             <DialogDescription>
-              Revisa el nombre y el contenido del documento antes de enviarlo. Se subirá como archivo Markdown (.md).
+              Revisa y confirma los detalles. Te mostraré una vista previa y podrás cambiar el nombre, formato y carpeta destino antes de subirlo.
             </DialogDescription>
           </DialogHeader>
 
@@ -399,16 +401,46 @@ console.log('Hello World!');
                 <Input
                   value={driveFilename}
                   onChange={(e) => setDriveFilename(e.target.value)}
-                  placeholder="documento.md"
+                  placeholder={driveFormat === 'md' ? 'documento.md' : driveFormat === 'txt' ? 'documento.txt' : 'documento.html'}
+                  disabled={driveUploading}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <label className="text-sm font-medium text-muted-foreground">Formato</label>
+              <div className="sm:col-span-2 flex items-center gap-2">
+                <select
+                  className="rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                  value={driveFormat}
+                  onChange={(e) => setDriveFormat(e.target.value as any)}
+                  disabled={driveUploading}
+                >
+                  <option value="md">Markdown (.md)</option>
+                  <option value="txt">Texto (.txt)</option>
+                  <option value="html">HTML (.html)</option>
+                </select>
+                <span className="text-[11px] text-muted-foreground">Markdown conserva títulos, listas y formato.</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <label className="text-sm font-medium text-muted-foreground">Carpeta destino (opcional)</label>
+              <div className="sm:col-span-2 flex items-center gap-2">
+                <Input
+                  value={driveFolderId}
+                  onChange={(e) => setDriveFolderId(e.target.value)}
+                  placeholder="ID de carpeta en Drive (déjalo vacío para raíz)"
                   disabled={driveUploading}
                 />
               </div>
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <div className="bg-muted/50 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+              <div className="bg-muted/50 px-3 py-2 text-xs text-muted-foreground grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <span>Vista previa</span>
-                <span>{driveContent?.length || 0} caracteres</span>
+                <span className="text-right">{counts.words} palabras</span>
+                <span className="text-right hidden sm:block">{counts.chars} caracteres</span>
               </div>
               <div className="max-h-[50vh] overflow-auto p-4">
                 {driveContent ? (
@@ -454,11 +486,28 @@ console.log('Hello World!');
                   toast({ title: 'Ingresa un nombre de archivo', status: 'warning' })
                   return
                 }
-                const name = driveFilename.endsWith('.md') ? driveFilename : `${driveFilename}`.replace(/\.[^.]+$/, '.md')
+                // Asegurar extensión según formato
+                const ensureExt = (base: string) => {
+                  if (driveFormat === 'md') return base.endsWith('.md') ? base : base.replace(/\.[^.]+$/, '.md')
+                  if (driveFormat === 'txt') return base.endsWith('.txt') ? base : base.replace(/\.[^.]+$/, '.txt')
+                  if (driveFormat === 'html') return base.endsWith('.html') ? base : base.replace(/\.[^.]+$/, '.html')
+                  return base
+                }
+                const name = ensureExt(driveFilename)
+                const mime = driveFormat === 'md' ? 'text/markdown' : driveFormat === 'txt' ? 'text/plain' : 'text/html'
+                const contentForFormat = (() => {
+                  if (driveFormat === 'md') return driveContent
+                  if (driveFormat === 'txt') return (mode === 'rich' && currentHtml) ? htmlToPlain(currentHtml) : (currentText || '')
+                  if (driveFormat === 'html') {
+                    const body = (mode === 'rich' && currentHtml) ? currentHtml : markdownToHtml(currentText)
+                    return wrapPrintHtml(name.replace(/\.[^.]+$/, ''), body)
+                  }
+                  return driveContent
+                })()
                 try {
                   setDriveUploading(true)
                   setDriveLink(null)
-                  const { file } = await uploadToDrive({ filename: name, content: driveContent, mimeType: 'text/markdown' })
+                  const { file } = await uploadToDrive({ filename: name, content: contentForFormat, mimeType: mime, folderId: driveFolderId || undefined })
                   const link = file.webViewLink || file.webContentLink || null
                   setDriveLink(link)
                   setDriveUploading(false)

@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { webSearchTool } from './web-search';
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
-import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool } from './google-drive';
+import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive';
 import { createDocumentTool } from './create-document';
 
 // simple in-memory cache { key: data, expiry }
@@ -277,6 +277,7 @@ export const tools = {
   searchDriveFiles: searchDriveFilesTool,
   getDriveFileDetails: getDriveFileDetailsTool,
   createDriveFolder: createDriveFolderTool,
+  uploadFileToDrive: uploadFileToDriveTool,
 };
 
 export type ToolName = keyof typeof tools;

@@ -506,6 +506,109 @@ export const createDriveFolderTool = tool({
   },
 })
 
+// ⬆️ Upload a new file to Google Drive
+export const uploadFileToDriveTool = tool({
+  description: '⬆️ Upload a new file to Google Drive. Use after the user has reviewed a preview and explicitly approved the upload. Supports specifying a target folder and MIME type.',
+  inputSchema: z.object({
+    filename: z.string().min(1).describe('Filename to create in Drive (e.g., "documento.md")'),
+    content: z.string().min(1).describe('File content as a UTF-8 string (for markdown, text, JSON, etc.)'),
+    mimeType: z.string().optional().default('text/markdown').describe('MIME type of the file (e.g., text/markdown, text/plain, application/json, text/html)'),
+    folderId: z.string().optional().describe('Optional destination folder ID in Drive'),
+  }),
+  execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
+    const userId = (globalThis as any).__currentUserId
+    try {
+      if (!userId) {
+        return {
+          success: false,
+          message: 'Authentication required to upload to Google Drive',
+          file: null,
+        }
+      }
+
+      // Get (and refresh if needed) the access token
+      let accessToken = await getGoogleDriveAccessToken(userId)
+      if (!accessToken) {
+        return {
+          success: false,
+          message: 'Google Drive not connected. Connect it in Settings > Connections and try again.',
+          file: null,
+        }
+      }
+
+      // Build multipart/related body per Drive API
+      const boundary = 'gcpmultipart' + Math.random().toString(36).slice(2)
+      const metadata: Record<string, any> = { name: filename }
+      if (folderId) metadata.parents = [folderId]
+
+      const bodyParts = [
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
+        `--${boundary}\r\nContent-Type: ${mimeType}; charset=UTF-8\r\n\r\n${content}\r\n`,
+        `--${boundary}--`,
+      ]
+      const multipartBody = bodyParts.join('')
+
+      const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,mimeType,parents,createdTime,modifiedTime,iconLink,thumbnailLink'
+
+      async function attemptUpload(token: string) {
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: multipartBody,
+        })
+        return res
+      }
+
+      let res = await attemptUpload(accessToken)
+      // If unauthorized, try fetching a fresh token once and retry
+      if (res.status === 401 || res.status === 403) {
+        const maybeRefreshed = await getGoogleDriveAccessToken(userId)
+        if (maybeRefreshed && maybeRefreshed !== accessToken) {
+          accessToken = maybeRefreshed
+          res = await attemptUpload(accessToken)
+        }
+      }
+
+      if (!res.ok) {
+        const details = await res.text().catch(() => '')
+        return {
+          success: false,
+          message: `Drive upload failed (${res.status}). ${details || 'Please reconnect Google Drive and try again.'}`,
+          file: null,
+        }
+      }
+
+      const data = await res.json()
+      return {
+        success: true,
+        message: `Uploaded "${data.name}" to Google Drive successfully`,
+        file: {
+          id: data.id,
+          name: data.name,
+          mimeType: data.mimeType,
+          parents: data.parents || [],
+          webViewLink: data.webViewLink,
+          webContentLink: data.webContentLink,
+          createdTime: data.createdTime,
+          modifiedTime: data.modifiedTime,
+          iconLink: data.iconLink,
+          thumbnailLink: data.thumbnailLink,
+        },
+      }
+    } catch (error) {
+      console.error('Error uploading file to Drive:', error)
+      return {
+        success: false,
+        message: `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        file: null,
+      }
+    }
+  },
+})
+
 // Helper functions
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
@@ -561,5 +664,6 @@ export const googleDriveTools = {
   listFiles: listDriveFilesTool,
   searchFiles: searchDriveFilesTool,
   getFileDetails: getDriveFileDetailsTool,
-  createFolder: createDriveFolderTool
+  createFolder: createDriveFolderTool,
+  uploadFile: uploadFileToDriveTool
 }
