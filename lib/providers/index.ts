@@ -11,11 +11,11 @@ import OpenAI from "@/components/icons/openai"
 import OpenRouter from "@/components/icons/openrouter"
 import Preplexity from "@/components/icons/perplexity"
 import Xai from "@/components/icons/xai"
+// Fireworks placeholder uses OpenAI icon until custom icon added
 
 export type Provider = {
   id: string
   name: string
-  available: boolean
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
 }
 
@@ -84,5 +84,10 @@ export const PROVIDERS: Provider[] = [
     id: "perplexity",
     name: "Perplexity",
     icon: Preplexity,
+  },
+  {
+    id: "fireworks",
+    name: "Fireworks",
+    icon: OpenAI, // TODO: replace with dedicated Fireworks logo component
   },
 ] as Provider[]

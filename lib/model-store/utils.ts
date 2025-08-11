@@ -21,30 +21,28 @@ export function filterAndSortModels(
   const validFavorites = favoriteModels?.filter(fav => 
     availableModels.some(model => model.id === fav)
   ) || []
-  
-  return availableModels
-    .filter((model) => {
-      // If user has valid favorite models, only show those
-      if (validFavorites.length > 0) {
-        return validFavorites.includes(model.id)
-      }
-      // If no valid favorites, show all models
-      return true
-    })
-    .filter((model) =>
-      model.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      // If user has valid favorite models, maintain their order
-      if (validFavorites.length > 0) {
-        const aIndex = validFavorites.indexOf(a.id)
-        const bIndex = validFavorites.indexOf(b.id)
-        return aIndex - bIndex
-      }
 
-      // Fallback to original sorting (free models first)
-      const aIsFree = FREE_MODELS_IDS.includes(a.id)
-      const bIsFree = FREE_MODELS_IDS.includes(b.id)
-      return aIsFree === bIsFree ? 0 : aIsFree ? -1 : 1
-    })
+  // Separate favorites and others
+  const favoriteList: ModelConfig[] = []
+  const others: ModelConfig[] = []
+  for (const m of availableModels) {
+    if (validFavorites.includes(m.id)) favoriteList.push(m)
+    else others.push(m)
+  }
+
+  // Sort others: free models first, then by name
+  others.sort((a, b) => {
+    const aIsFree = FREE_MODELS_IDS.includes(a.id)
+    const bIsFree = FREE_MODELS_IDS.includes(b.id)
+    if (aIsFree !== bIsFree) return aIsFree ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
+
+  const merged = [...favoriteList, ...others]
+
+  // Apply search filter at the end
+  const needle = searchQuery.toLowerCase()
+  return needle
+    ? merged.filter(m => m.name.toLowerCase().includes(needle))
+    : merged
 }

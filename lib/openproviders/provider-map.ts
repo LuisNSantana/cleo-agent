@@ -124,6 +124,9 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Static Ollama models
   "llama3.2:latest": "ollama",
   "qwen2.5-coder:latest": "ollama",
+
+  // Fireworks models (add base ones we intend to support)
+  "accounts/fireworks/models/llama4-scout-instruct-basic": "fireworks",
 }
 
 // Function to check if a model is likely an Ollama model based on naming patterns
@@ -164,6 +167,11 @@ export function getProviderForModel(model: SupportedModel): Provider {
   // If not found in static mapping, check if it looks like an Ollama model
   if (isOllamaModel(model)) {
     return "ollama"
+  }
+
+  // Fireworks heuristic: path pattern accounts/fireworks/models/
+  if (model.startsWith("accounts/fireworks/models/")) {
+    return "fireworks"
   }
 
   throw new Error(`Unknown provider for model: ${model}`)

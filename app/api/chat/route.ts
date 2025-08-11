@@ -1,4 +1,6 @@
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import { retrieveRelevant, buildContextBlock } from '@/lib/rag/retrieve'
+import { indexDocument } from '@/lib/rag/index-document'
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import { tools } from "@/lib/tools"
@@ -24,6 +26,8 @@ type ChatRequest = {
   systemPrompt: string
   enableSearch: boolean
   message_group_id?: string
+  documentId?: string // optional: restrict RAG retrieval to a single document
+  debugRag?: boolean // optional: extra logging / echo
 }
 
 export async function POST(req: Request) {
@@ -37,7 +41,20 @@ export async function POST(req: Request) {
       systemPrompt,
       enableSearch,
       message_group_id,
+      documentId,
+      debugRag,
     } = (await req.json()) as ChatRequest
+
+    console.log('[RAG] Incoming chat request flags', { enableSearch, documentId, debugRag })
+    
+    // Auto-enable RAG for personalized responses - always try to retrieve user context
+    const autoRagEnabled = true
+    const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
+    if (!retrievalRequested) {
+      console.log('[RAG] Retrieval skipped: enableSearch is false and no documentId provided.')
+    } else if (autoRagEnabled && !enableSearch && !documentId) {
+      console.log('[RAG] Auto-RAG enabled: searching user documents for personalization')
+    }
 
     if (!messages || !chatId || !userId) {
       return new Response(
@@ -346,9 +363,141 @@ ${documentContent}`
     ;(globalThis as any).__currentUserId = realUserId
     ;(globalThis as any).__currentModel = model
 
+    // RAG retrieval when enableSearch flag is true
+    // We'll collect context chunks here and later add them as their own system message block
+    let ragSystemAddon = ''
+    if (retrievalRequested) {
+      try {
+        const lastUser = messages.slice().reverse().find(m => m.role === 'user')
+        let userPlain = ''
+        if (lastUser) {
+          if (typeof lastUser.content === 'string') userPlain = lastUser.content
+          else if (Array.isArray(lastUser.content)) {
+            userPlain = lastUser.content
+              .filter((p: any) => p?.type === 'text')
+              .map((p: any) => p.text || p.content || '')
+              .join('\n')
+          }
+        }
+        console.log('[RAG] Extracted user query length', userPlain.length)
+        if (userPlain.trim()) {
+          // Pre-diagnostics: how many documents & chunks exist?
+          try {
+            if (supabase) {
+              const { count: docCount } = await (supabase as any).from('documents').select('id', { count: 'exact', head: true }).eq('user_id', realUserId)
+              const { count: chunkCount } = await (supabase as any).from('document_chunks').select('id', { count: 'exact', head: true }).eq('user_id', realUserId)
+              console.log('[RAG] User docs:', docCount, 'chunks:', chunkCount)
+            }
+          } catch (e:any) {
+            console.log('[RAG] Doc/chunk diagnostics failed', e.message)
+          }
+
+          console.log('[RAG] Starting hybrid retrieval topK=6 docFilter=', documentId ? documentId : 'NONE')
+          let retrieved = await retrieveRelevant({ 
+            userId: realUserId, 
+            query: userPlain, 
+            topK: 6, 
+            documentId,
+            useHybrid: true,
+            useReranking: true
+          })
+          if (retrieved.length) {
+            ragSystemAddon = buildContextBlock(retrieved)
+            console.log('[RAG] Retrieved', retrieved.length, 'chunks. Top similarity:', retrieved[0]?.similarity)
+            if (debugRag) {
+              console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0,400))
+            }
+          } else {
+            console.log('[RAG] No chunks retrieved initially. Attempting auto-index of recent docs...')
+            if (!documentId) {
+              // fetch last 3 documents and ensure chunks exist; index if missing
+              try {
+                if (supabase) {
+                  const { data: docs } = await (supabase as any).from('documents').select('id, updated_at').eq('user_id', realUserId).order('updated_at', { ascending: false }).limit(3)
+                  if (docs?.length) {
+                    for (const d of docs) {
+                      const { count } = await (supabase as any).from('document_chunks').select('id', { count: 'exact', head: true }).eq('document_id', d.id)
+                      if (!count || count === 0) {
+                        console.log('[RAG] Auto-indexing doc', d.id)
+                        try { await indexDocument(d.id, { force: true }) } catch (e:any){ console.error('[RAG] Auto-index doc failed', d.id, e.message) }
+                      }
+                    }
+                    // retry retrieval once
+                    retrieved = await retrieveRelevant({ 
+                      userId: realUserId, 
+                      query: userPlain, 
+                      topK: 6,
+                      useHybrid: true,
+                      useReranking: true
+                    })
+                    if (retrieved.length) {
+                      ragSystemAddon = buildContextBlock(retrieved)
+                      console.log('[RAG] Retrieved after auto-index', retrieved.length)
+                    } else {
+                      console.log('[RAG] Still no chunks after auto-index.')
+                    }
+                  }
+                }
+              } catch (e:any) {
+                console.error('[RAG] Auto-index attempt failed', e.message)
+              }
+            } else {
+              console.log('[RAG] No chunks for specified document.')
+            }
+          }
+
+          // Multi-pass personalization retrieval: if we have <3 chunks, run a synthetic profile query to pull user profile info
+          if (ragSystemAddon && ragSystemAddon.trim().length > 0) {
+            const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
+            if (currentChunkCount < 3) {
+              try {
+                const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales';
+                console.log('[RAG] Running secondary profile retrieval query')
+                const extra = await retrieveRelevant({ 
+                  userId: realUserId, 
+                  query: profileQuery, 
+                  topK: 6, 
+                  documentId,
+                  useHybrid: true,
+                  useReranking: true
+                })
+                // Merge unique extra chunks not already present
+                const existingIds = new Set((ragSystemAddon.match(/doc:([0-9a-fA-F-]{8})/g) || []))
+                const merged = [...extra]
+                if (extra.length) {
+                  const extraBlock = buildContextBlock(extra)
+                  if (extraBlock && extraBlock.length > 0) {
+                    ragSystemAddon += '\n' + extraBlock
+                    console.log('[RAG] Added secondary profile retrieval chunks:', extra.length)
+                  }
+                }
+              } catch (e:any) {
+                console.log('[RAG] Secondary profile retrieval failed', e.message)
+              }
+            }
+          }
+
+          // If still nothing, surface hint (only when debug)
+          if (!ragSystemAddon && debugRag) {
+            console.log('[RAG] Diagnostic: No context. Possible reasons: (1) documentos sin chunks (2) embeddings fallaron (3) user_id mismatch (4) texto muy corto. Recomendado: crear un documento "perfil_usuario.md" con lineas: Nombre:, Comida favorita:, Intereses:, Hobbies:, Objetivos:, Estilo de comunicación:')
+          }
+        }
+      } catch (e) {
+        console.error('RAG retrieval failed', e)
+      }
+    }
+
+    // Build final system prompt. We PREPEND the context so it has higher salience for the model.
+    const personalizationInstruction = 'IMPORTANTE: Usa la información personal del CONTEXTO para personalizar tu respuesta (nombre, intereses, comida favorita, hobbies, estilo). Si la pregunta se refiere explícitamente a un dato personal que no está en el contexto, pide confirmación educadamente.'
+    const finalSystemPrompt = ragSystemAddon
+      ? `${ragSystemAddon}\n\n${personalizationInstruction}\n\n${effectiveSystemPrompt}`
+      : effectiveSystemPrompt
+
+    console.log('[RAG] Using context?', !!ragSystemAddon, 'Final system prompt length:', finalSystemPrompt.length)
+
     const result = streamText({
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
-      system: effectiveSystemPrompt,
+      system: finalSystemPrompt,
       messages: convertedMessages,
       tools: tools,
       stopWhen: stepCountIs(5), // Allow multi-step tool calls

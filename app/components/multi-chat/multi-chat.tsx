@@ -10,9 +10,10 @@ import { getCleoPrompt } from "@/lib/prompts"
 import { useModel } from "@/lib/model-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
+// Using any for message type to avoid strict role mismatch issues
+type MessageType = any
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState, useEffect } from "react"
 import { MultiChatInput } from "./multi-chat-input"
 import { useMultiChat } from "./use-multi-chat"
 
@@ -85,6 +86,7 @@ export function MultiChat() {
   }
 
   const modelChats = useMultiChat(allModelsToMaintain)
+  const [enableSearch, setEnableSearch] = useState(false)
   // Generate system prompt with fallback to default Cleo prompt
   const systemPrompt = useMemo(
     () => user?.system_prompt || getCleoPrompt('multi-chat-model', 'default'),
@@ -263,7 +265,13 @@ export function MultiChat() {
         selectedModelIds.includes(chat.model.id)
       )
 
-      await Promise.all(
+      // Optional debug document id (set in browser console: localStorage.setItem('debugDocumentId', '<doc-id>'))
+      let debugDocumentId: string | undefined
+      if (typeof window !== 'undefined') {
+        debugDocumentId = localStorage.getItem('debugDocumentId') || undefined
+      }
+
+  await Promise.all(
         selectedChats.map(async (chat) => {
           const options = {
             body: {
@@ -272,8 +280,10 @@ export function MultiChat() {
               model: chat.model.id,
               isAuthenticated: !!user?.id,
               systemPrompt: systemPrompt,
-              enableSearch: false,
+              enableSearch: enableSearch || !!debugDocumentId, // auto-enable if debug doc id present
+              documentId: debugDocumentId,
               message_group_id,
+              debugRag: true,
             },
           }
 
@@ -302,6 +312,7 @@ export function MultiChat() {
     multiChatId,
     chatId,
     createNewChat,
+  enableSearch,
   ])
 
   const handleFileUpload = useCallback((newFiles: File[]) => {
@@ -345,6 +356,8 @@ export function MultiChat() {
       stop: handleStop,
       status: anyLoading ? ("streaming" as const) : ("ready" as const),
       anyLoading,
+      enableSearch,
+      setEnableSearch,
     }),
     [
       prompt,
@@ -357,6 +370,7 @@ export function MultiChat() {
       isAuthenticated,
       handleStop,
       anyLoading,
+      enableSearch,
     ]
   )
 

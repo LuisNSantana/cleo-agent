@@ -138,6 +138,7 @@ export type Provider =
   | "xai"
   | "ollama"
   | "openrouter"
+  | "fireworks"
 
 export type SupportedModel =
   | OpenAIModel
@@ -148,3 +149,8 @@ export type SupportedModel =
   | XaiModel
   | OllamaModel
   | OpenRouterModel
+  | FireworksModel
+
+export type FireworksModel =
+  | "accounts/fireworks/models/llama4-scout-instruct-basic"
+  | (string & {})

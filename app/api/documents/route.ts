@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { indexDocument } from '@/lib/rag/index-document'
 
 // POST /api/documents  { filename, title?, content_md, content_html?, chat_id?, project_id? }
 export async function POST(request: Request) {
@@ -40,7 +41,15 @@ export async function POST(request: Request) {
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+    // Auto index (fire and forget)
+    try {
+      if (cleanContentMd.trim()) {
+        indexDocument(data.id).then(r => console.log('[RAG] Auto-index success', r.chunks)).catch(e => console.error('[RAG] Auto-index error', e.message))
+      }
+    } catch (e: any) {
+      console.error('[RAG] Failed to schedule auto-index', e)
+    }
+    return NextResponse.json({ ...data, _autoIndexed: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

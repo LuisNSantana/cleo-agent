@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { indexDocument } from '@/lib/rag/index-document'
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
+  const params = await (ctx as any).params
   const supabase = await createClient()
   if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
   const { data: auth } = await supabase.auth.getUser()
@@ -17,8 +19,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   return NextResponse.json(data)
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
   try {
+    const params = await (ctx as any).params
     const supabase = await createClient()
     if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
     const { data: auth } = await supabase.auth.getUser()
@@ -39,13 +42,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+
+    // Force reindex if content changed
+    let ingestion: any = null
+    const contentChanged = 'content_md' in update || 'content_html' in update
+    if (contentChanged) {
+      try {
+        ingestion = await indexDocument(params.id, { force: true })
+      } catch (e: any) {
+        console.error('[PATCH] Reindex failed', e)
+        ingestion = { error: e.message }
+      }
+    }
+
+    return NextResponse.json({ ...data, _ingestion: ingestion })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
+  const params = await (ctx as any).params
   const supabase = await createClient()
   if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
   const { data: auth } = await supabase.auth.getUser()

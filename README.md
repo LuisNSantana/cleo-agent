@@ -10,6 +10,7 @@ Cleo is designed to make your daily life easier through empathetic AI interactio
 
 - **Multi-model support**: Powered by Grok-4 (xAI) and Llama 4 Maverick (Groq)
 - **Emotionally Intelligent**: Designed to understand and respond with empathy and warmth
+- **RAG System**: Advanced Retrieval-Augmented Generation for personalized responses using your documents
 - **No API Keys Required**: Ready to use without BYOK (Bring Your Own Key)
 - **Daily Task Assistant**: Specialized in making your everyday life easier
 - **Clean, Modern UI**: Responsive design with light/dark themes
@@ -88,6 +89,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 # AI Models
 XAI_API_KEY=your_xai_api_key
 GROQ_API_KEY=your_groq_api_key
+OPENAI_API_KEY=your_openai_api_key  # Required for RAG embeddings
+
+# RAG Enhancement (optional - significantly improves retrieval accuracy)
+HUGGINGFACE_API_KEY=your_huggingface_api_key  # For cross-encoder reranking
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -96,8 +101,41 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ### Database Setup
 
 1. Create a new Supabase project
-2. Run the database migrations (see `supabase/migrations/`)
+2. Run the database migrations:
+   - Execute `supabase_schema.sql` for basic tables
+   - Execute `supabase_schema_add_documents.sql` for document management
+   - Execute `supabase_schema_rag.sql` for RAG functionality (requires pgvector extension)
+   - Execute `supabase_schema_hybrid_rag.sql` for enhanced hybrid search capabilities
 3. Update your environment variables
+
+## Personalization with RAG
+
+Cleo features an advanced **Retrieval-Augmented Generation (RAG)** system that learns from your personal documents to provide truly personalized responses:
+
+### How it Works
+- **Automatic Learning**: Upload documents through Settings → Files and Cleo automatically indexes them
+- **Hybrid Search**: Combines semantic vector search with keyword matching for maximum relevance
+- **Smart Reranking**: Uses cross-encoder models to reorder results by actual relevance
+- **Intelligent Retrieval**: Searches your documents for relevant context automatically
+- **Personalized Responses**: Cleo uses your information to tailor responses to your preferences, interests, and needs
+
+### Getting Started with RAG
+1. **Upload Personal Info**: Create a document with your preferences, interests, and personal details
+2. **Structure for Best Results**: Use clear headers like "Name:", "Favorite Food:", "Interests:", "Work:"
+3. **Chat Naturally**: Ask questions about your preferences and watch Cleo respond with your personal context
+
+### Advanced Features
+- **Hybrid Retrieval**: Automatically combines vector similarity and full-text search
+- **Cross-Encoder Reranking**: Reorders results using advanced relevance models
+- **Multi-Pass Retrieval**: Searches both specific content and general profile information
+- **Automatic Fallbacks**: Robust error handling and graceful degradation
+
+### Example Use Cases
+- "What's my favorite type of cuisine?" → Cleo knows from your documents
+- "Suggest something based on my interests" → Cleo references your uploaded preferences  
+- "How should I be addressed?" → Cleo uses your preferred name and communication style
+
+*The RAG system works automatically with significant accuracy improvements over basic vector search - no configuration needed. Just upload your documents and start chatting!*
 
 Open [http://localhost:3000](http://localhost:3000) to start chatting with Cleo!
 
@@ -106,11 +144,13 @@ Open [http://localhost:3000](http://localhost:3000) to start chatting with Cleo!
 - **Framework**: [Next.js 14](https://nextjs.org/) with TypeScript
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com) and [Tailwind CSS](https://tailwindcss.com/)
 - **AI Integration**: [Vercel AI SDK](https://sdk.vercel.ai/) v5
-- **Database**: [Supabase](https://supabase.com) (PostgreSQL with real-time features)
+- **Database**: [Supabase](https://supabase.com) (PostgreSQL with pgvector for RAG)
 - **Authentication**: Supabase Auth
 - **AI Models**: 
   - [xAI Grok-4](https://x.ai/) via @ai-sdk/xai
   - [Groq Llama Models](https://groq.com/) via groq-sdk
+  - [OpenAI Embeddings](https://openai.com/) for RAG vector search
+- **RAG System**: Vector embeddings with intelligent chunking and retrieval
 - **Deployment**: Vercel-ready
 - **Styling**: Responsive design with dark/light theme support
 
@@ -125,8 +165,9 @@ We welcome contributions! Please feel free to submit issues and pull requests.
 ## Roadmap
 
 - [ ] Enhanced file processing capabilities
-- [ ] Voice interaction support
+- [ ] Voice interaction support  
 - [ ] Mobile app development
+- [ ] Advanced RAG features (multi-document synthesis, temporal understanding)
 - [ ] Advanced task automation
 - [ ] Integration with popular productivity tools
 
