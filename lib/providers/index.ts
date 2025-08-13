@@ -11,7 +11,10 @@ import OpenAI from "@/components/icons/openai"
 import OpenRouter from "@/components/icons/openrouter"
 import Preplexity from "@/components/icons/perplexity"
 import Xai from "@/components/icons/xai"
-// Fireworks placeholder uses OpenAI icon until custom icon added
+/**
+ * Provider definitions for Cleo Agent models
+ * Maps model providers to their display names and icons
+ */
 
 export type Provider = {
   id: string
@@ -84,10 +87,5 @@ export const PROVIDERS: Provider[] = [
     id: "perplexity",
     name: "Perplexity",
     icon: Preplexity,
-  },
-  {
-    id: "fireworks",
-    name: "Fireworks",
-    icon: OpenAI, // TODO: replace with dedicated Fireworks logo component
   },
 ] as Provider[]

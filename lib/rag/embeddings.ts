@@ -13,7 +13,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   constructor(modelId = 'text-embedding-3-small', dimension = 1536) {
     this.modelId = modelId
     this.dimension = dimension
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    // For embeddings, use OpenAI directly (not the local backend)
+    this.client = new OpenAI({ 
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: 'https://api.openai.com/v1'
+    })
   }
   async embed(texts: string[]): Promise<number[][]> {
     if (!texts.length) return []

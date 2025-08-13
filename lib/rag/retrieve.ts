@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { defaultEmbeddingProvider } from './embeddings'
 import { defaultReranker } from './reranking'
-import { getRetrievalStrategy } from './llama-scout-config'
 
 export interface RetrieveOptions {
   userId: string
@@ -44,14 +43,13 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   if (!query.trim()) return []
   
-  // Usar estrategia adaptativa para Llama4 Scout
-  const strategy = getRetrievalStrategy(query)
-  const dynamicTopK = opts.topK || strategy.topK
-  const chunkLimit = strategy.chunkLimit
+  // Usar configuración estándar para el retrieval
+  const dynamicTopK = opts.topK || 10
+  const chunkLimit = 15 // Límite balanceado para contexto
   
-    console.log(`🔍 RAG Strategy: topK=${dynamicTopK}, limit=${chunkLimit}, aggressive=${strategy.useAggressive}`)
-    const queryTokens = Math.ceil(query.length / 4)
-    console.log(`📊 Context Usage: query ≈${queryTokens} tokens, chunkLimit=${chunkLimit}, contextWindow=${strategy.chunkLimit * 2000 + queryTokens} tokens (aprox)`)
+  console.log(`🔍 RAG Retrieval: topK=${dynamicTopK}, chunkLimit=${chunkLimit}`)
+  const queryTokens = Math.ceil(query.length / 4)
+  console.log(`📊 Context Usage: query ≈${queryTokens} tokens, chunkLimit=${chunkLimit}, contextWindow=${chunkLimit * 2000 + queryTokens} tokens (aprox)`)
   
   const supabase = await createClient()
   if (!supabase) return []

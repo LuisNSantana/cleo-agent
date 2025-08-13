@@ -16,9 +16,9 @@ export interface ChunkOptions {
 }
 
 const DEFAULT_OPTS: Required<ChunkOptions> = {
-  maxTokens: 2000, // Incrementado para aprovechar Llama4 Scout 10M context
-  overlapTokens: 200, // Más overlap para mejor coherencia
-  minChunkChars: 500, // Chunks más sustanciales
+  maxTokens: 1000, // Tamaño estándar para balance de contexto y relevancia
+  overlapTokens: 150, // Overlap balanceado para coherencia
+  minChunkChars: 400, // Chunks con contenido sustancial
 }
 
 function approximateTokens(str: string): number {

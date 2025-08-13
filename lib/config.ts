@@ -28,7 +28,6 @@ export const FREE_MODELS_IDS = [
   "llama-3-1-8b-groq",
   "grok-4",
   "gpt-oss-120b",
-  "accounts/fireworks/models/llama4-scout-instruct-basic",
 ]
 
 export const MODEL_DEFAULT = "llama-4-maverick"

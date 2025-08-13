@@ -2,7 +2,6 @@ import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { grokModels } from "./data/grok"
 import { llamaModels } from "./data/llama"
 import { gptOssModels } from "./data/gpt-oss"
-import { fireworksModels } from './data/fireworks'
 import { ModelConfig } from "./types"
 
 /**
@@ -21,7 +20,6 @@ const STATIC_MODELS: ModelConfig[] = [
   ...grokModels, // Cleo Agent (Grok-4)
   ...llamaModels, // Llama models for comparison
   ...gptOssModels, // GPT-OSS 120B for advanced reasoning
-  ...fireworksModels, // Fireworks Llama 4 Scout
 ]
 
 // Debug: Log available models

@@ -100,14 +100,5 @@ export function openproviders<T extends SupportedModel>(modelId: T, _settings?: 
     return ollamaProvider(modelId as OllamaModel)
   }
 
-  if (provider === "fireworks") {
-    const fw = createOpenAI({
-      apiKey: apiKey || process.env.FIREWORKS_API_KEY,
-      baseURL: "https://api.fireworks.ai/inference/v1",
-      name: "fireworks",
-    })
-    return fw(modelId as any)
-  }
-
   throw new Error(`Unsupported model: ${modelId}`)
 }
