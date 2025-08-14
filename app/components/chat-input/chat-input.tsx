@@ -10,13 +10,17 @@ import {
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
 import { ArrowUpIcon, StopIcon, CircleNotch } from "@phosphor-icons/react"
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useEffect, useRef, useState } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
 import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
+import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
+import { useBreakpoint } from "@/app/hooks/use-breakpoint"
+import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
+import Image from "next/image"
 
 type ChatInputProps = {
   value: string
@@ -59,6 +63,76 @@ export function ChatInput({
   const selectModelConfig = getModelInfo(selectedModel)
   const hasSearchSupport = Boolean(selectModelConfig?.webSearch)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
+  const isMobile = useBreakpoint(768)
+  const { openCanvas } = useInteractiveCanvasStore()
+
+  // Canvas message handling
+  const { pendingMessage, consumePendingMessage, hasPendingMessage } = usePendingCanvasMessage()
+  const processedMessageRef = useRef<string | null>(null)
+  const [isProcessingCanvas, setIsProcessingCanvas] = useState(false)
+
+  // Procesar automáticamente mensajes pendientes del canvas (for instant send)
+  useEffect(() => {
+    if (hasPendingMessage && pendingMessage && pendingMessage.timestamp) {
+      const messageId = `${pendingMessage.timestamp}-${pendingMessage.chatId}`
+      
+      // Evitar procesar el mismo mensaje dos veces
+      if (processedMessageRef.current === messageId) {
+        return
+      }
+
+      const processCanvasMessage = async () => {
+        console.log('Procesando mensaje del canvas en chat-input:', pendingMessage)
+        
+        try {
+          // Marcar como procesado inmediatamente y mostrar indicador
+          processedMessageRef.current = messageId
+          setIsProcessingCanvas(true)
+          
+          // Convertir el data URL a un archivo blob
+          const dataURL = pendingMessage.imageFile
+          
+          // Convertir data URL a blob
+          const arr = dataURL.split(',')
+          const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
+          const bstr = atob(arr[1])
+          let n = bstr.length
+          const u8arr = new Uint8Array(n)
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n)
+          }
+          const blob = new Blob([u8arr], { type: mime })
+          const file = new File([blob], 'canvas-drawing.png', { type: 'image/png' })
+          
+          // Guardar mensaje antes de consumir
+          const messageText = pendingMessage.message
+          
+          // Consumir el mensaje pendiente primero
+          consumePendingMessage()
+          
+          // Agregar el archivo a la lista de archivos
+          onFileUpload([file])
+          
+          // Establecer el mensaje 
+          onValueChange(messageText)
+          
+          // Enviar automáticamente después de un pequeño delay
+          setTimeout(() => {
+            console.log('Auto-sending canvas message:', messageText)
+            setIsProcessingCanvas(false)
+            onSend()
+          }, 100)
+          
+        } catch (error) {
+          console.error('Error procesando mensaje del canvas:', error)
+          setIsProcessingCanvas(false)
+          consumePendingMessage() // Limpiar el mensaje incluso si hay error
+        }
+      }
+      
+      processCanvasMessage()
+    }
+  }, [hasPendingMessage, pendingMessage?.timestamp]) // Solo depender de hasPendingMessage y timestamp
 
   const handleSend = useCallback(() => {
     if (isSubmitting) {
@@ -155,6 +229,35 @@ export function ChatInput({
           onValueChange={onValueChange}
         >
           <FileList files={files} onFileRemove={onFileRemove} />
+          
+          {/* Canvas processing indicator */}
+          {isProcessingCanvas && (
+            <div className="mx-3 my-2 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-6 h-6 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Preparing your drawing...
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Converting sketch for Cleo
+                  </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-slate-400 rounded-full animate-pulse"></div>
+                    <div className="w-1 h-1 bg-slate-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-1 h-1 bg-slate-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <ImageSuggestions 
             hasImages={files.some(isImageFile)} 
             onSuggestion={onSuggestion} 
@@ -179,6 +282,24 @@ export function ChatInput({
                 isUserAuthenticated={isUserAuthenticated}
                 className="rounded-full"
               />
+              {/* Mobile Draw Button */}
+              {isMobile && (
+                <Button
+                  onClick={openCanvas}
+                  size="sm"
+                  variant="outline"
+                  className="size-9 p-0 rounded-full"
+                  aria-label="Open Drawing Canvas"
+                >
+                  <Image
+                    src="/logocleo.png"
+                    alt="Draw"
+                    width={16}
+                    height={16}
+                    className="object-contain brightness-0 dark:invert"
+                  />
+                </Button>
+              )}
               {hasSearchSupport ? (
                 <ButtonSearch
                   isSelected={enableSearch}

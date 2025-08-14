@@ -23,6 +23,9 @@ export function FileItem({ file, onRemove }: FileItemProps) {
   const [isRemoving, setIsRemoving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
 
+  // Detectar si es un dibujo del canvas
+  const isCanvasDrawing = file.name === 'canvas-drawing.png'
+
   const handleRemove = () => {
     setIsRemoving(true)
     onRemove(file)
@@ -35,16 +38,35 @@ export function FileItem({ file, onRemove }: FileItemProps) {
         onOpenChange={setIsOpen}
       >
         <HoverCardTrigger className="w-full">
-          <div className="bg-background hover:bg-accent border-input flex w-full items-center gap-3 rounded-2xl border p-2 pr-3 transition-colors">
-            <div className="bg-accent-foreground flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md">
+          <div className={`
+            flex w-full items-center gap-3 rounded-xl border p-2.5 pr-3 transition-all duration-200
+            ${isCanvasDrawing 
+              ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm' 
+              : 'bg-background hover:bg-accent border-input'
+            }
+          `}>
+            <div className={`
+              flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg relative
+              ${isCanvasDrawing 
+                ? 'bg-slate-100 dark:bg-slate-700/50 ring-1 ring-slate-200 dark:ring-slate-600' 
+                : 'bg-accent-foreground'
+              }
+            `}>
               {file.type.includes("image") ? (
-                <Image
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
-                  width={40}
-                  height={40}
-                  className="h-full w-full object-cover"
-                />
+                <>
+                  <Image
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-cover rounded-md"
+                  />
+                  {isCanvasDrawing && (
+                    <div className="absolute top-0 right-0 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center text-xs text-gray-400">
                   {file.name.split(".").pop()?.toUpperCase()}
@@ -52,21 +74,42 @@ export function FileItem({ file, onRemove }: FileItemProps) {
               )}
             </div>
             <div className="flex flex-col overflow-hidden">
-              <span className="truncate text-xs font-medium">{file.name}</span>
-              <span className="text-xs text-gray-500">
-                {(file.size / 1024).toFixed(2)}kB
+              <span className={`
+                truncate text-sm font-medium
+                ${isCanvasDrawing ? 'text-slate-700 dark:text-slate-300' : ''}
+              `}>
+                {isCanvasDrawing ? 'Canvas Drawing' : file.name}
+              </span>
+              <span className={`
+                text-xs
+                ${isCanvasDrawing ? 'text-slate-500 dark:text-slate-400' : 'text-gray-500'}
+              `}>
+                {isCanvasDrawing ? 'Sketch • ' : ''}{(file.size / 1024).toFixed(1)}kB
               </span>
             </div>
           </div>
         </HoverCardTrigger>
-        <HoverCardContent side="top">
-          <Image
-            src={URL.createObjectURL(file)}
-            alt={file.name}
-            width={200}
-            height={200}
-            className="h-full w-full object-cover"
-          />
+        <HoverCardContent side="top" className={`
+          ${isCanvasDrawing 
+            ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900' 
+            : ''
+          }
+        `}>
+          <div className="relative">
+            <Image
+              src={URL.createObjectURL(file)}
+              alt={file.name}
+              width={200}
+              height={200}
+              className="h-full w-full object-cover rounded-lg"
+            />
+            {isCanvasDrawing && (
+              <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                Canvas
+              </div>
+            )}
+          </div>
         </HoverCardContent>
       </HoverCard>
       {!isRemoving ? (

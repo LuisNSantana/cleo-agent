@@ -4,6 +4,7 @@ import { indexDocument } from '@/lib/rag/index-document'
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import { tools } from "@/lib/tools"
+import { filterImagesForModel, MODEL_IMAGE_LIMITS } from "@/lib/image-management"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { stepCountIs, streamText } from "ai"
 import type { CoreMessage } from "ai"
@@ -334,10 +335,94 @@ ${documentContent}`
       })
     )
 
-    // Log conversion summary
+    // Log conversion summary and count images
     const convertedMultimodal = convertedMessages.filter((msg) =>
       Array.isArray(msg.content)
     )
+    
+    // Apply intelligent image filtering to prevent API errors
+    const imageLimit = MODEL_IMAGE_LIMITS[model]?.maxImages || MODEL_IMAGE_LIMITS.default.maxImages
+    
+    // Count total images in the conversation
+    let totalImages = 0
+    convertedMessages.forEach(msg => {
+      if (Array.isArray(msg.content)) {
+        totalImages += msg.content.filter(part => part.type === 'image').length
+      }
+    })
+    
+    console.log(`[IMAGE MGMT] Model ${model}: ${totalImages} images found, limit: ${imageLimit}`)
+    
+    // If too many images, apply intelligent filtering
+    if (totalImages > imageLimit) {
+      console.log(`[IMAGE MGMT] Applying intelligent image filtering`)
+      
+      // Collect all images with priority scoring
+      const imageRefs: Array<{
+        msgIdx: number
+        partIdx: number
+        priority: number
+        isCanvas: boolean
+      }> = []
+      
+      convertedMessages.forEach((msg, msgIdx) => {
+        if (Array.isArray(msg.content)) {
+          msg.content.forEach((part, partIdx) => {
+            if (part.type === 'image') {
+              const isCanvas = typeof part.image === 'string' && part.image.includes('data:image') && msg.role === 'user'
+              const isRecent = msgIdx >= convertedMessages.length - 3
+              
+              let priority = 0
+              if (isCanvas) priority += 100 // Canvas drawings get highest priority
+              if (isRecent) priority += 50 // Recent messages
+              priority += msgIdx * 10 // More recent = higher priority
+              
+              imageRefs.push({
+                msgIdx,
+                partIdx,
+                priority,
+                isCanvas
+              })
+            }
+          })
+        }
+      })
+      
+      // Sort by priority and keep top images
+      const keepImages = imageRefs
+        .sort((a, b) => b.priority - a.priority)
+        .slice(0, imageLimit)
+        .map(ref => `${ref.msgIdx}-${ref.partIdx}`)
+      
+      // Filter messages
+      for (let i = 0; i < convertedMessages.length; i++) {
+        const msg = convertedMessages[i]
+        if (Array.isArray(msg.content)) {
+          const filteredContent: any[] = []
+          
+          msg.content.forEach((part, partIdx) => {
+            if (part.type === 'image') {
+              const key = `${i}-${partIdx}`
+              if (keepImages.includes(key)) {
+                filteredContent.push(part)
+              } else {
+                filteredContent.push({
+                  type: 'text' as const,
+                  text: '[Image removed due to model limit - Canvas drawings are prioritized]'
+                })
+              }
+            } else {
+              filteredContent.push(part)
+            }
+          })
+          
+          ;(convertedMessages[i] as any).content = filteredContent
+        }
+      }
+      
+      console.log(`[IMAGE MGMT] Filtered to ${imageLimit} images with intelligent prioritization`)
+    }
+    
     if (convertedMultimodal.length > 0) {
     }
 

@@ -8,6 +8,13 @@ import { CanvasEditorShell } from "@/components/canvas-editor/canvas-editor-shel
 import { useState, useEffect, useCallback } from "react"
 import { PencilSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
+import dynamic from "next/dynamic"
+
+// Dynamic import to prevent SSR issues with canvas
+const InteractiveCanvasEntry = dynamic(
+  () => import("@/components/interactive-canvas-entry").then(m => ({ default: m.InteractiveCanvasEntry })),
+  { ssr: false }
+)
 
 export function LayoutApp({ children }: { children: React.ReactNode }) {
   const { preferences } = useUserPreferences()
@@ -151,7 +158,8 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
         )}
       </div>
       
-      {/* Floating action button for editor */}
+      {/* Floating action button for editor (hidden to avoid confusion with Cleo draw) */}
+      {/*
       {!isOpen && (
         <button
           onClick={() => open({ text: 'Escribe aquí tu documento largo...\n\n', mode: 'markdown' })}
@@ -161,6 +169,10 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           <PencilSimple className="h-5 w-5" />
         </button>
       )}
+      */}
+      
+      {/* Interactive Drawing Canvas */}
+      <InteractiveCanvasEntry />
     </div>
   )
 }

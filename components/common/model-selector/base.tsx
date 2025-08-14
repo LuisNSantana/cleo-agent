@@ -137,14 +137,18 @@ export function ModelSelector({
   const trigger = (
     <Button
       variant="outline"
-      className={cn("dark:bg-secondary justify-between", className)}
+      className={cn(
+        "dark:bg-secondary justify-between",
+        isMobile ? "size-9 p-0" : "",
+        className
+      )}
       disabled={isLoadingModels}
     >
       <div className="flex items-center gap-2">
         {currentProvider?.icon && <currentProvider.icon className="size-5" />}
-        <span>{currentModel?.name || "Select model"}</span>
+        {!isMobile && <span>{currentModel?.name || "Select model"}</span>}
       </div>
-      <CaretDownIcon className="size-4 opacity-50" />
+      {!isMobile && <CaretDownIcon className="size-4 opacity-50" />}
     </Button>
   )
 
@@ -165,7 +169,8 @@ export function ModelSelector({
                 size="sm"
                 variant="secondary"
                 className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
+                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent",
+                  isMobile ? "w-9 p-0" : "w-auto",
                   className
                 )}
                 type="button"
@@ -173,8 +178,8 @@ export function ModelSelector({
                 {currentProvider?.icon && (
                   <currentProvider.icon className="size-5" />
                 )}
-                {currentModel?.name}
-                <CaretDownIcon className="size-4" />
+                {!isMobile && currentModel?.name}
+                {!isMobile && <CaretDownIcon className="size-4" />}
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
