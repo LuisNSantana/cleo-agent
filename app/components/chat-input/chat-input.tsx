@@ -14,6 +14,7 @@ import { useCallback, useMemo, useEffect, useRef, useState } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
+import { ConnectionStatus } from "./connection-status"
 import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
@@ -276,6 +277,7 @@ export function ChatInput({
                 isUserAuthenticated={isUserAuthenticated}
                 model={selectedModel}
               />
+              {isUserAuthenticated && <ConnectionStatus />}
               <ModelSelector
                 selectedModelId={selectedModel}
                 setSelectedModelId={onSelectModel}

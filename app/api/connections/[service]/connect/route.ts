@@ -22,8 +22,16 @@ export async function POST(
 
     // Generate OAuth URL based on service
     let authUrl: string
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    // Always derive base URL from the current request to avoid mismatches (e.g. tunnels, custom domains)
+    const baseUrl = request.nextUrl.origin
     const redirectUri = `${baseUrl}/api/connections/${service}/callback`
+
+    // Capture where the user started the connect flow to support proper fallback redirects
+    // Prefer Referer header (page initiating the request), fallback to baseUrl
+    const referer = request.headers.get("referer") || baseUrl
+    const statePayload = encodeURIComponent(
+      JSON.stringify({ service, returnTo: referer })
+    )
 
     switch (service) {
       case "google-calendar":
@@ -32,7 +40,7 @@ export async function POST(
           "https://www.googleapis.com/auth/userinfo.profile",
           "https://www.googleapis.com/auth/calendar.readonly",
           "https://www.googleapis.com/auth/calendar.events"
-        ])
+        ], statePayload)
         break
       case "google-drive":
         authUrl = generateGoogleOAuthUrl(redirectUri, [
@@ -40,10 +48,10 @@ export async function POST(
           "https://www.googleapis.com/auth/userinfo.profile",
           "https://www.googleapis.com/auth/drive.readonly",
           "https://www.googleapis.com/auth/drive.file"
-        ])
+        ], statePayload)
         break
       case "notion":
-        authUrl = generateNotionOAuthUrl(redirectUri)
+        authUrl = generateNotionOAuthUrl(redirectUri, statePayload)
         break
       default:
         return NextResponse.json({ error: "Unsupported service" }, { status: 400 })
@@ -56,26 +64,30 @@ export async function POST(
   }
 }
 
-function generateGoogleOAuthUrl(redirectUri: string, scopes: string[]): string {
+function generateGoogleOAuthUrl(redirectUri: string, scopes: string[], state?: string): string {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || "",
     redirect_uri: redirectUri,
     response_type: "code",
     scope: scopes.join(" "),
     access_type: "offline",
-    prompt: "consent"
+    prompt: "consent",
   })
+
+  if (state) params.set("state", state)
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
-function generateNotionOAuthUrl(redirectUri: string): string {
+function generateNotionOAuthUrl(redirectUri: string, state?: string): string {
   const params = new URLSearchParams({
     client_id: process.env.NOTION_CLIENT_ID || "",
     redirect_uri: redirectUri,
     response_type: "code",
     owner: "user"
   })
+
+  if (state) params.set("state", state)
 
   return `https://api.notion.com/v1/oauth/authorize?${params.toString()}`
 }

@@ -92,6 +92,9 @@ export function ServiceConnections() {
 
   const checkConnectionStatus = async () => {
     try {
+      // First, clean up any stale connections
+      await fetch('/api/connections/cleanup', { method: 'POST' })
+      
       // Check status for each service individually
       const statusPromises = services.map(async (service) => {
         try {
@@ -146,40 +149,61 @@ export function ServiceConnections() {
       if (response.ok) {
         const data = await response.json()
         if (data.authUrl) {
-          // Open OAuth flow in new window
-          const authWindow = window.open(data.authUrl, "_blank", "width=500,height=600")
+          // Open OAuth flow in popup window with specific features to prevent double windows
+          const authWindow = window.open(
+            data.authUrl, 
+            `oauth-${serviceId}`, 
+            "width=500,height=600,scrollbars=yes,resizable=yes,status=no,location=no,toolbar=no,menubar=no"
+          )
           
           // Check if window was blocked
           if (!authWindow) {
             throw new Error("Popup window was blocked. Please allow popups for this site.")
           }
 
+          // Focus the popup window to prevent background opening
+          authWindow.focus()
+
           // Listen for OAuth success message from callback
           const handleMessage = async (event: MessageEvent) => {
+            // Only accept messages from same-origin for security
+            if (event.origin !== window.location.origin) return
+            console.log('🔧 [OAuth] Received message:', event.data)
+            
             if ((event.data.type === 'oauth-success' || event.data.type === 'oauth-error') && event.data.service === serviceId) {
+              console.log('🔧 [OAuth] Processing OAuth result:', event.data)
               window.removeEventListener('message', handleMessage)
               window.removeEventListener('focus', handleFocus)
-              authWindow.close()
+              
+              // Close the auth window
+              try {
+                authWindow.close()
+              } catch (e) {
+                console.warn('Could not close auth window:', e)
+              }
               
               if (event.data.success) {
-                // Wait a moment for the callback to process, then check status
+                // Update UI immediately to show success
+                setServices(prevServices =>
+                  prevServices.map(service =>
+                    service.id === serviceId ? { ...service, status: "connected" } : service
+                  )
+                )
+                
+                // Wait briefly for the callback to persist tokens, then re-check
                 setTimeout(async () => {
                   await checkConnectionStatus()
-                  
-                  // Find the updated service status
-                  const service = services.find(s => s.id === serviceId)
-                  if (service?.status === "connected") {
-                    toast({
-                      title: "Connection successful",
-                      description: `Successfully connected to ${service.name}`,
-                    })
-                  } else {
-                    toast({
-                      title: "Connection failed",
-                      description: "Please try connecting again.",
-                    })
-                  }
-                }, 1000)
+                  // Notify other components about the connection update
+                  localStorage.setItem('connection-updated', Date.now().toString())
+                  window.dispatchEvent(new StorageEvent('storage', { 
+                    key: 'connection-updated', 
+                    newValue: Date.now().toString() 
+                  }))
+                  toast({
+                    title: "Connection successful",
+                    description: `Successfully connected to ${serviceId.replace('-', ' ')}`,
+                  })
+                }, 800)
               } else {
                 // Handle error case
                 setServices(prevServices =>
@@ -197,10 +221,21 @@ export function ServiceConnections() {
 
           // Fallback: Listen for window focus to detect when user returns from OAuth
           const handleFocus = async () => {
+            console.log('🔧 [OAuth] Window focus detected, checking if auth window is closed')
             // Check if the auth window is closed
             if (authWindow.closed) {
+              console.log('🔧 [OAuth] Auth window is closed, cleaning up')
               window.removeEventListener('focus', handleFocus)
               window.removeEventListener('message', handleMessage)
+              
+              // Reset status if still connecting (user might have cancelled)
+              setServices(prevServices =>
+                prevServices.map(service =>
+                  service.id === serviceId && service.status === "connecting"
+                    ? { ...service, status: "disconnected" }
+                    : service
+                )
+              )
               
               // Wait a moment for the callback to process
               setTimeout(async () => {
@@ -247,27 +282,38 @@ export function ServiceConnections() {
 
   const handleDisconnect = async (serviceId: string) => {
     try {
+      // Update UI immediately to show disconnecting
+      setServices(prevServices =>
+        prevServices.map(service =>
+          service.id === serviceId 
+            ? { ...service, status: "disconnected", connectedAccount: undefined }
+            : service
+        )
+      )
+      
       const response = await fetch(`/api/connections/${serviceId}/disconnect`, {
         method: "POST"
       })
       
       if (response.ok) {
-        setServices(prevServices =>
-          prevServices.map(service =>
-            service.id === serviceId 
-              ? { ...service, status: "disconnected", connectedAccount: undefined }
-              : service
-          )
-        )
         toast({
           title: "Disconnected",
           description: `Successfully disconnected from ${services.find(s => s.id === serviceId)?.name}`,
         })
+        // Refresh status to confirm and notify other components
+        await checkConnectionStatus()
+        localStorage.setItem('connection-updated', Date.now().toString())
+        window.dispatchEvent(new StorageEvent('storage', { 
+          key: 'connection-updated', 
+          newValue: Date.now().toString() 
+        }))
       } else {
         throw new Error("Failed to disconnect")
       }
     } catch (error) {
       console.error("Error disconnecting service:", error)
+      // Revert UI on error
+      await checkConnectionStatus()
       toast({
         title: "Disconnection failed",
         description: "Failed to disconnect from the service. Please try again.",
@@ -315,7 +361,7 @@ export function ServiceConnections() {
           const IconComponent = service.icon
           
           return (
-            <Card key={service.id} className="relative">
+            <Card key={service.id} className="relative" data-service-id={service.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
