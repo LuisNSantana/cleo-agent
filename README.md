@@ -195,6 +195,49 @@ Runs Ollama and Cleo together (see `docker-compose.ollama.yml`).
 docker compose -f docker-compose.ollama.yml up -d
 ```
 
+### Development with hot-reload (Docker)
+
+If you're actively developing Cleo and want fast iteration without rebuilding the image each time, run Next.js in development mode inside the container with file mounts and hot-reload.
+
+1) Create the override file (we include a sample `docker-compose.override.yml` in the repo that mounts the project into the container and runs `pnpm run dev`). This file mounts your source code into `/app` and starts Next in `dev` mode with polling enabled to ensure file changes are detected inside Docker.
+
+2) Start the stack with the override (this will use your local files and enable HMR):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up --build
+```
+
+Notes and tips:
+- The override mounts your repository into the container so edits you make locally are visible immediately inside the container.
+- We keep `/app/node_modules` inside the container to avoid cross-platform node_modules issues; the container runs `pnpm install` on start if needed.
+- If file changes aren't picked up, the override sets `CHOKIDAR_USEPOLLING=true` to force polling. For better performance, remove polling (or tune the polling interval) if your host supports filesystem events across mounts.
+- To run detached (background):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+```
+
+- To view logs (hot-reload and server logs):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml logs -f cleo
+```
+
+- To stop and remove containers created by the override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml down
+```
+
+When to rebuild the image instead of using hot-reload
+- If you change the Dockerfile, the base image, or native dependencies that require a rebuild (e.g., you changed `package.json` in a way that requires a different binary), you should run:
+
+```bash
+docker compose -f docker-compose.yml up --build -d
+```
+
+Hot-reload is ideal for code-level iteration (JS/TS, components, API routes). Use the rebuild flow for infra-level or dependency changes.
+
 ### Troubleshooting
 - Permission denied to Docker daemon on WSL: open Docker Desktop and enable WSL integration, or run with `sudo`, or add your user to the `docker` group.
 - Port 3000 already in use: stop the other service or change the mapped port in the compose file.

@@ -1,6 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+
 /node_modules
 /.pnp
 .pnp.*
@@ -10,28 +11,64 @@
 !.yarn/releases
 !.yarn/versions
 
+
+# pnpm
+.pnpm-store/
+
+# Docker override y archivos locales
+docker-compose.override.yml
+*.override.yml
+
+# scripts temporales
+scripts/*.tmp
+scripts/*.cache
+scripts/*.log
+
+# Supabase
+supabase/.temp/
+
+# Ignorar todo en scripts excepto los archivos rastreados
+scripts/*
+!scripts/generate-encryption-key.js
+
+# Ignorar assets generados en public
+public/*.tmp
+public/*.cache
 # testing
 /coverage
 
+
+# OS-specific
+Thumbs.db
 # next.js
 /.next/
 /out/
 
 # production
+
+# Jupyter y checkpoints
+.ipynb_checkpoints/
 /build
 
 # misc
 .DS_Store
 *.pem
 
+# Backups
+*.bak
+
 # debug
 npm-debug.log*
+
+# Test output
+*.test-output
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
 .env.local
+
 .env.development.local
 .env.test.local
 .env.production.local
