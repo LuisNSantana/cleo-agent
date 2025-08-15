@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { service: string } }
+  { params }: { params: Promise<{ service: string }> }
 ) {
+  const { service } = await params
+  
   try {
-    const { service } = await params
-    
     const supabase = await createClient()
     
     if (!supabase) {
@@ -51,7 +51,7 @@ export async function POST(
 
     return NextResponse.json({ authUrl })
   } catch (error) {
-    console.error(`Error initiating ${params.service} connection:`, error)
+    console.error(`Error initiating ${service} connection:`, error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -139,6 +139,73 @@ Cleo features an advanced **Retrieval-Augmented Generation (RAG)** system that l
 
 Open [http://localhost:3000](http://localhost:3000) to start chatting with Cleo!
 
+## Docker
+
+Run Cleo in an isolated, reproducible environment using Docker.
+
+### Requirements
+- Docker Desktop (Windows/macOS) or Docker CE (Linux)
+- Docker Compose v2 (included with Docker Desktop)
+- On Windows, enable WSL integration for your Ubuntu distro in Docker Desktop
+
+### 1) Configure environment
+Create and edit `.env.local` at the project root (Compose will load it automatically):
+
+Required (minimum):
+- NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE
+- CSRF_SECRET (32 characters)
+- ENCRYPTION_KEY (32‑byte base64)
+- OPENAI_API_KEY (for RAG embeddings)
+
+Optional:
+- OLLAMA_BASE_URL (e.g., http://localhost:11434) for local models
+
+Tip (optional, to generate a 32‑byte base64 key):
+```bash
+pnpm gen:key          # prints the base64 key
+pnpm gen:key --env    # prints ENCRYPTION_KEY=...
+```
+
+### 2) Build
+```bash
+docker compose build
+```
+
+### 3) Run
+```bash
+docker compose up -d
+```
+
+### 4) Verify
+```bash
+curl -f http://localhost:3000/api/health
+```
+Open http://localhost:3000
+
+### Logs and lifecycle
+```bash
+docker compose logs -f cleo
+docker compose up -d --force-recreate   # apply env changes
+docker compose down                     # stop and remove
+```
+
+### Use local models (Ollama) [optional]
+Runs Ollama and Cleo together (see `docker-compose.ollama.yml`).
+```bash
+docker compose -f docker-compose.ollama.yml up -d
+```
+
+### Troubleshooting
+- Permission denied to Docker daemon on WSL: open Docker Desktop and enable WSL integration, or run with `sudo`, or add your user to the `docker` group.
+- Port 3000 already in use: stop the other service or change the mapped port in the compose file.
+- Missing ENCRYPTION_KEY/CSRF_SECRET: ensure they’re present in `.env.local` before running.
+
+### Why Docker?
+- Reproducible builds with pinned Node 20 and a standalone Next.js output
+- Isolation of dependencies and environment variables
+- Smaller, production‑oriented runtime image with non‑root user and healthcheck
+- One‑command start/stop, easy to update and roll back
+
 ## Tech Stack
 
 - **Framework**: [Next.js 14](https://nextjs.org/) with TypeScript

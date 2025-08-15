@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { indexDocument } from '@/lib/rag/index-document'
 
-export async function GET(_: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
-  const params = await (ctx as any).params
+export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const supabase = await createClient()
   if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
   const { data: auth } = await supabase.auth.getUser()
@@ -19,9 +19,9 @@ export async function GET(_: Request, ctx: { params: Promise<{ id: string }> | {
   return NextResponse.json(data)
 }
 
-export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const params = await (ctx as any).params
+    const params = await ctx.params
     const supabase = await createClient()
     if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
     const { data: auth } = await supabase.auth.getUser()
@@ -61,8 +61,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   }
 }
 
-export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> | { id: string } }) {
-  const params = await (ctx as any).params
+export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const supabase = await createClient()
   if (!supabase) return NextResponse.json({ error: 'Supabase disabled' }, { status: 200 })
   const { data: auth } = await supabase.auth.getUser()

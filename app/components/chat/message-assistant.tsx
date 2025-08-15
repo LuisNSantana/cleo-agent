@@ -6,7 +6,7 @@ import {
 } from "@/components/prompt-kit/message"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
-import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
+import type { UIMessage as MessageAISDK } from "ai"
 import { ArrowClockwiseIcon, CheckIcon, CopyIcon } from "@phosphor-icons/react"
 import { getSources } from "./get-sources"
 import { Reasoning } from "./reasoning"

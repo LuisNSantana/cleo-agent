@@ -2,8 +2,7 @@
  * Semantic reranking using OpenAI embeddings and cosine similarity
  * Consistent with existing embedding pipeline, no external dependencies
  */
-
-import { openai } from '@ai-sdk/openai'
+// Removed unused OpenAI provider import to avoid build-time env checks
 
 export interface RerankResult {
   index: number

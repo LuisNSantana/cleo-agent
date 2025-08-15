@@ -22,6 +22,16 @@ export interface Shape {
   color: string
   strokeWidth?: number
   radius?: number
+  // Optional visual and geometry props used by various shape renderers
+  fill?: string
+  rotation?: number
+  points?: Array<{ x: number; y: number }>
+  // For line-like shapes that may store end coordinates separately
+  endX?: number
+  endY?: number
+  // For text shapes
+  text?: string
+  fontSize?: number
   timestamp: number
 }
 
@@ -30,6 +40,8 @@ export interface GameElement {
   type: string
   x: number
   y: number
+  // Flexible data payload for specific game types (tic-tac-toe, grid, checkerboard, etc.)
+  data?: any
   timestamp: number
 }
 
@@ -44,6 +56,10 @@ export interface Tool {
     gridSize?: number
     cols?: number
     rows?: number
+  // drawing tool specific
+  opacity?: number
+  width?: number
+  size?: number
   }
 }
 

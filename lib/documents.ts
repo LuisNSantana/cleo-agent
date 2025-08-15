@@ -1,4 +1,3 @@
-import { fetcher } from '@/lib/fetch'
 
 export interface DocumentRecord {
   id: string

@@ -16,6 +16,9 @@ import {
 } from "./api"
 import { createErrorResponse } from "./utils"
 
+// Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
+export const runtime = "nodejs"
+
 export const maxDuration = 60
 
 type ChatRequest = {
@@ -81,29 +84,20 @@ export async function POST(req: Request) {
       // Process the content to create a clean summary for database storage
       let contentForDB = ""
 
-      if (typeof userMessage.content === "string") {
-        contentForDB = userMessage.content
-      } else if (Array.isArray(userMessage.content)) {
-        // Process multimodal content to create a summary without base64 data
-        const parts = userMessage.content
-          .map((part: unknown) => {
-            const typedPart = part as {
-              type: string
-              name?: string
-              mediaType?: string
-              text?: string
-              content?: string
-            }
+      // Handle AI SDK v5 structure (parts) or legacy structure (content)
+      if ((userMessage as any).parts && Array.isArray((userMessage as any).parts)) {
+        // AI SDK v5 structure with parts
+        const parts = (userMessage as any).parts
+          .map((part: any) => {
+            if (part.type === "text") {
+              return part.text || ""
+            } else if (part.type === "file") {
+              const fileName = part.name || "archivo"
+              const fileType = part.mimeType || part.mediaType || "unknown"
 
-            if (typedPart.type === "text") {
-              return typedPart.text || typedPart.content || ""
-            } else if (typedPart.type === "file") {
-              const fileName = typedPart.name || "archivo"
-              const fileType = typedPart.mediaType || "unknown"
-
-              if (typedPart.mediaType?.startsWith("image/")) {
+              if (fileType.startsWith("image/")) {
                 return `[IMAGEN ADJUNTA: ${fileName}]`
-              } else if (typedPart.mediaType === "application/pdf") {
+              } else if (fileType === "application/pdf") {
                 return `[PDF ADJUNTO: ${fileName}]`
               } else {
                 return `[ARCHIVO ADJUNTO: ${fileName} (${fileType})]`
@@ -111,12 +105,53 @@ export async function POST(req: Request) {
             }
             return ""
           })
-          .filter((part) => part !== "")
+          .filter((part: string) => part !== "")
           .join("\n\n")
+        
+        contentForDB = parts || "Mensaje del usuario"
+      } else if ((userMessage as any).content) {
+        // Legacy structure with content
+        const content = (userMessage as any).content
+        
+        if (typeof content === "string") {
+          contentForDB = content
+        } else if (Array.isArray(content)) {
+          // Process multimodal content to create a summary without base64 data
+          const parts = content
+            .map((part: unknown) => {
+              const typedPart = part as {
+                type: string
+                name?: string
+                mediaType?: string
+                text?: string
+                content?: string
+              }
 
-        contentForDB = parts
+              if (typedPart.type === "text") {
+                return typedPart.text || typedPart.content || ""
+              } else if (typedPart.type === "file") {
+                const fileName = typedPart.name || "archivo"
+                const fileType = typedPart.mediaType || "unknown"
+
+                if (typedPart.mediaType?.startsWith("image/")) {
+                  return `[IMAGEN ADJUNTA: ${fileName}]`
+                } else if (typedPart.mediaType === "application/pdf") {
+                  return `[PDF ADJUNTO: ${fileName}]`
+                } else {
+                  return `[ARCHIVO ADJUNTO: ${fileName} (${fileType})]`
+                }
+              }
+              return ""
+            })
+            .filter((part) => part !== "")
+            .join("\n\n")
+
+          contentForDB = parts
+        } else {
+          contentForDB = JSON.stringify(content)
+        }
       } else {
-        contentForDB = JSON.stringify(userMessage.content)
+        contentForDB = "Mensaje del usuario"
       }
 
       await logUserMessage({
@@ -580,8 +615,14 @@ ${documentContent}`
 
     console.log('[RAG] Using context?', !!ragSystemAddon, 'Final system prompt length:', finalSystemPrompt.length)
 
+    // Safe env diagnostics (no secrets)
+    const hasGroqKey = !!process.env.GROQ_API_KEY
+    if (!hasGroqKey) {
+      console.warn('[Env] GROQ_API_KEY not found in process.env at /api/chat runtime')
+    }
+
     const result = streamText({
-      model: modelConfig.apiSdk(apiKey, { enableSearch }),
+      model: modelConfig.apiSdk(process.env.OPENAI_API_KEY || apiKey, { enableSearch }),
       system: finalSystemPrompt,
       messages: convertedMessages,
       tools: tools,
@@ -590,7 +631,7 @@ ${documentContent}`
         console.error("Streaming error occurred:", err)
       },
 
-      onFinish: async ({ response }) => {
+  onFinish: async ({ response }: { response: any }) => {
         // Clean up global context
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel
@@ -609,7 +650,7 @@ ${documentContent}`
     })
 
     return result.toUIMessageStreamResponse({
-      onError: (error) => {
+  onError: (error: unknown) => {
         // Clean up global context on error
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel

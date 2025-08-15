@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { TldrawWrapper } from "./index"
+import TldrawWrapper from "./TldrawWrapper"
 
 export function DrawDrawer({ open, onOpenChange, onSendToChat }: {
   open: boolean

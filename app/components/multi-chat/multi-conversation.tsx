@@ -9,7 +9,7 @@ import { ScrollButton } from "@/components/prompt-kit/scroll-button"
 import { getModelInfo } from "@/lib/models"
 import { PROVIDERS } from "@/lib/providers"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
+import type { UIMessage as MessageType } from "ai"
 import { useEffect, useState } from "react"
 import { Message } from "../chat/message"
 
@@ -38,6 +38,14 @@ type ResponseCardProps = {
 function ResponseCard({ response, group }: ResponseCardProps) {
   const model = getModelInfo(response.model)
   const providerIcon = PROVIDERS.find((p) => p.id === model?.baseProviderId)
+  const extractTextFromParts = (parts?: any[]): string => {
+    if (!parts || !Array.isArray(parts)) return ""
+    return parts
+      .filter((p) => p && p.type === "text")
+      .map((p) => p.text || "")
+      .filter(Boolean)
+      .join("\n\n")
+  }
 
   return (
     <div className="relative">
@@ -62,11 +70,12 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             id={response.message.id}
             variant="assistant"
             parts={
-              response.message.parts || [
-                { type: "text", text: response.message.content },
-              ]
+              response.message.parts ||
+              (typeof (response.message as any).content === "string"
+                ? [{ type: "text", text: (response.message as any).content }]
+                : undefined)
             }
-            attachments={response.message.experimental_attachments}
+            attachments={undefined}
             onDelete={() => group.onDelete(response.model, response.message.id)}
             onEdit={(id, newText) => group.onEdit(response.model, id, newText)}
             onReload={() => group.onReload(response.model)}
@@ -75,7 +84,7 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             hasScrollAnchor={false}
             className="bg-transparent p-0 px-0"
           >
-            {response.message.content}
+            {extractTextFromParts(response.message.parts) || (response.message as any).content || ""}
           </Message>
         ) : response.isLoading ? (
           <div className="space-y-2">
@@ -136,18 +145,22 @@ export function MultiModelConversation({
                       <Message
                         id={group.userMessage.id}
                         variant="user"
-                        parts={
-                          group.userMessage.parts || [
-                            { type: "text", text: group.userMessage.content },
-                          ]
-                        }
-                        attachments={group.userMessage.experimental_attachments}
+                        parts={group.userMessage.parts}
+                        attachments={undefined}
                         onDelete={() => {}}
                         onEdit={() => {}}
                         onReload={() => {}}
                         status="ready"
                       >
-                        {group.userMessage.content}
+                        {(() => {
+                          const parts = group.userMessage.parts as any[] | undefined
+                          if (!parts) return ""
+                          return parts
+                            .filter((p) => p && p.type === "text")
+                            .map((p) => p.text || "")
+                            .filter(Boolean)
+                            .join("\n\n")
+                        })()}
                       </Message>
                     </div>
 

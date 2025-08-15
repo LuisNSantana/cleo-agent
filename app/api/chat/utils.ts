@@ -1,4 +1,4 @@
-import { Message as MessageAISDK } from "ai"
+import { UIMessage as MessageAISDK } from "ai"
 
 /**
  * Clean messages when switching between agents with different tool capabilities.
@@ -6,7 +6,7 @@ import { Message as MessageAISDK } from "ai"
  * to prevent OpenAI API errors.
  */
 export function cleanMessagesForTools(
-  messages: MessageAISDK[],
+  messages: any[], // Using any[] for flexibility with different message formats
   hasTools: boolean
 ): MessageAISDK[] {
   if (hasTools) {
@@ -23,56 +23,77 @@ export function cleanMessagesForTools(
       }
 
       if (message.role === "assistant") {
-        const cleanedMessage: MessageAISDK = { ...message }
+        const cleanedMessage: any = { ...message }
 
-        if (message.toolInvocations && message.toolInvocations.length > 0) {
-          delete cleanedMessage.toolInvocations
-        }
-
-        if (Array.isArray(message.content)) {
-          const filteredContent = (
-            message.content as Array<{ type?: string; text?: string }>
-          ).filter((part: { type?: string }) => {
-            if (part && typeof part === "object" && part.type) {
-              // Remove tool-call, tool-result, and tool-invocation parts
-              const isToolPart =
-                part.type === "tool-call" ||
-                part.type === "tool-result" ||
-                part.type === "tool-invocation"
-              return !isToolPart
-            }
-            return true
+        // Handle AI SDK v5 parts structure
+        if (message.parts && Array.isArray(message.parts)) {
+          const filteredParts = message.parts.filter((part: any) => {
+            return part.type !== "tool-call" && 
+                   part.type !== "tool-result" && 
+                   part.type !== "tool-invocation"
           })
+          
+          const textParts = filteredParts.filter((part: any) => part.type === "text")
+          
+          if (textParts.length === 0) {
+            filteredParts.push({
+              type: "text",
+              text: "[Assistant response]"
+            })
+          }
+          
+          cleanedMessage.parts = filteredParts
+        }
+        // Handle legacy content structure (backwards compatibility)
+        else if ((message as any).content) {
+          const content = (message as any).content
+          
+          if (Array.isArray(content)) {
+            const filteredContent = content.filter((part: any) => {
+              if (part && typeof part === "object" && part.type) {
+                const isToolPart =
+                  part.type === "tool-call" ||
+                  part.type === "tool-result" ||
+                  part.type === "tool-invocation"
+                return !isToolPart
+              }
+              return true
+            })
 
-          // Extract text content
-          const textParts = filteredContent.filter(
-            (part: { type?: string }) =>
+            const textParts = filteredContent.filter((part: any) => 
               part && typeof part === "object" && part.type === "text"
-          )
+            )
 
-          if (textParts.length > 0) {
-            // Combine text parts into a single string
-            const textContent = textParts
-              .map((part: { text?: string }) => part.text || "")
-              .join("\n")
-              .trim()
-            cleanedMessage.content = textContent || "[Assistant response]"
-          } else if (filteredContent.length === 0) {
-            // If no content remains after filtering, provide fallback
-            cleanedMessage.content = "[Assistant response]"
+            if (textParts.length === 0) {
+              // Convert to parts format for AI SDK v5
+              cleanedMessage.parts = [{
+                type: "text",
+                text: "[Assistant response]"
+              }]
+            } else {
+              cleanedMessage.parts = textParts.map((part: any) => ({
+                type: "text",
+                text: part.text || "[Assistant response]"
+              }))
+            }
+          } else if (typeof content === "string" && content.trim()) {
+            cleanedMessage.parts = [{
+              type: "text", 
+              text: content
+            }]
           } else {
-            // Keep the filtered content as string if possible
-            cleanedMessage.content = "[Assistant response]"
+            cleanedMessage.parts = [{
+              type: "text",
+              text: "[Assistant response]"
+            }]
           }
         }
-
-        // If the message has no meaningful content after cleaning, provide fallback
-        if (
-          !cleanedMessage.content ||
-          (typeof cleanedMessage.content === "string" &&
-            cleanedMessage.content.trim() === "")
-        ) {
-          cleanedMessage.content = "[Assistant response]"
+        // Fallback case
+        else {
+          cleanedMessage.parts = [{
+            type: "text",
+            text: "[Assistant response]"
+          }]
         }
 
         return cleanedMessage
@@ -114,12 +135,20 @@ export function cleanMessagesForTools(
 /**
  * Check if a message contains tool-related content
  */
-export function messageHasToolContent(message: MessageAISDK): boolean {
+export function messageHasToolContent(message: any): boolean {
   return !!(
-    message.toolInvocations?.length ||
+    // Check for tool-related parts in AI SDK v5 structure
+    (message.parts && Array.isArray(message.parts) &&
+      message.parts.some((part: any) =>
+        part.type === "tool-call" ||
+        part.type === "tool-result" ||
+        part.type === "tool-invocation"
+      )) ||
+    // Check for tool role
     (message as { role: string }).role === "tool" ||
-    (Array.isArray(message.content) &&
-      (message.content as Array<{ type?: string }>).some(
+    // Check legacy content structure for backwards compatibility
+    ((message as any).content && Array.isArray((message as any).content) &&
+      ((message as any).content as Array<{ type?: string }>).some(
         (part: { type?: string }) =>
           part &&
           typeof part === "object" &&

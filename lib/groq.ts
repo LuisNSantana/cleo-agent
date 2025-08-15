@@ -1,4 +1,4 @@
-import { groq } from '@ai-sdk/groq'
+import { createGroq } from '@ai-sdk/groq'
 
 /**
  * Groq SDK for Llama models
@@ -20,5 +20,19 @@ const MODEL_MAPPING: Record<string, string> = {
  */
 export function getGroqModel(modelId: string) {
   const groqModelName = MODEL_MAPPING[modelId] || modelId
-  return groq(groqModelName)
+
+  // Load API key explicitly to avoid build/runtime env pitfalls
+  const apiKey = process.env.GROQ_API_KEY
+
+  if (!apiKey) {
+    // Safe diagnostic without leaking secrets
+    console.error('[Groq] GROQ_API_KEY is missing at runtime. Ensure it is set in .env.local and passed to the container.')
+    // Return a provider without key; downstream will throw a clear error when used
+    const provider = createGroq({}) as unknown as (model: string) => any
+    return provider(groqModelName)
+  }
+
+  // Configure provider with explicit apiKey, then select the model
+  const provider = createGroq({ apiKey }) as unknown as (model: string) => any
+  return provider(groqModelName)
 }

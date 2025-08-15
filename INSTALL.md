@@ -88,6 +88,10 @@ Zola supports BYOK functionality, allowing users to securely store and use their
 The `ENCRYPTION_KEY` is used to encrypt user API keys before storing them in the database. Generate a 32-byte base64-encoded key:
 
 ```bash
+# Using package script (recommended)
+pnpm gen:key          # prints the base64 key
+pnpm gen:key --env    # prints ENCRYPTION_KEY=...
+
 # Using Node.js
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 

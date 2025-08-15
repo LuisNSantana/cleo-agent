@@ -39,7 +39,12 @@ export async function POST(request: Request) {
           message_count: 0,
           premium: false,
           created_at: new Date().toISOString(),
-          favorite_models: [MODEL_DEFAULT, "grok-4", "gpt-oss-120b"],
+          favorite_models: [
+            MODEL_DEFAULT,
+            "grok-4",
+            "gpt-oss-120b",
+            "gpt-5-nano",
+          ],
         })
         .select("*")
         .single()

@@ -3,6 +3,7 @@ import { grokModels } from "./data/grok"
 import { llamaModels } from "./data/llama"
 import { gptOssModels } from "./data/gpt-oss"
 import { ModelConfig } from "./types"
+import { openaiModels } from "./data/openai.clean"
 
 /**
  * Cleo Agent Models
@@ -20,6 +21,7 @@ const STATIC_MODELS: ModelConfig[] = [
   ...grokModels, // Cleo Agent (Grok-4)
   ...llamaModels, // Llama models for comparison
   ...gptOssModels, // GPT-OSS 120B for advanced reasoning
+  ...openaiModels, // OpenAI additions (e.g., GPT-5 Nano)
 ]
 
 // Debug: Log available models

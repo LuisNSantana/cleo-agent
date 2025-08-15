@@ -1,10 +1,9 @@
-version: '3.8'
 
 services:
   # Ollama service for local LLM hosting
   ollama:
     image: ollama/ollama:latest
-    container_name: zola-ollama
+    container_name: cleo-ollama
     ports:
       - "11434:11434"
     volumes:
@@ -19,12 +18,15 @@ services:
       retries: 3
       start_period: 30s
 
-  # Zola application
-  zola:
+  # Cleo application
+  cleo:
     build: .
-    container_name: zola-app
+    container_name: cleo-app
+    image: cleo-agent:latest
     ports:
       - "3000:3000"
+    env_file:
+      - ./.env.local
     environment:
       - NODE_ENV=production
       # Ollama configuration

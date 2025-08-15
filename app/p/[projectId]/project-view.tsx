@@ -9,9 +9,10 @@ import { ProjectChatItem } from "@/app/components/layout/sidebar/project-chat-it
 import { toast } from "@/components/ui/toast"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
+import type { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { MESSAGE_MAX_LENGTH, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { Attachment } from "@/lib/file-handling"
-import { API_ROUTE_CHAT } from "@/lib/routes"
+// API_ROUTE_CHAT no longer used with useChat v5
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import { useChat } from "@ai-sdk/react"
@@ -20,6 +21,7 @@ import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { usePathname } from "next/navigation"
 import { useCallback, useMemo, useState } from "react"
+import type { Chat } from "@/lib/chat-store/types"
 
 type Project = {
   id: string
@@ -30,6 +32,30 @@ type Project = {
 
 type ProjectViewProps = {
   projectId: string
+}
+
+// Convert UIMessage to MessageAISDK
+function convertToMessageAISDK(message: any): MessageAISDK {
+  return {
+    id: message.id || crypto.randomUUID(),
+    role: message.role,
+    content: message.content || extractTextFromParts(message.parts),
+    parts: message.parts,
+    createdAt: new Date(),
+    experimental_attachments: message.experimental_attachments,
+  }
+}
+
+// Extract text content from parts array for AI SDK v5
+function extractTextFromParts(parts: any[]): string {
+  if (!parts || !Array.isArray(parts)) return ""
+  
+  const textParts = parts
+    .filter((part) => part?.type === "text")
+    .map((part) => part.text || "")
+    .filter(Boolean)
+  
+  return textParts.join("\n\n") || "User message"
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
@@ -66,7 +92,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const { chats: allChats } = useChats()
 
   // Filter chats for this project
-  const chats = allChats.filter((chat) => chat.project_id === projectId)
+  const chats = allChats.filter((chat: Chat) => chat.project_id === projectId)
 
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
 
@@ -85,22 +111,19 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     })
   }, [])
 
-  const {
-    messages,
-    input,
-    handleSubmit,
-    status,
-    reload,
-    stop,
-    setMessages,
-    setInput,
-  } = useChat({
+  const chatHelpers = useChat({
     id: `project-${projectId}-${currentChatId}`,
-    api: API_ROUTE_CHAT,
-    initialMessages: [],
-    onFinish: cacheAndAddMessage,
+    onFinish: (message: any) => cacheAndAddMessage(convertToMessageAISDK(message)),
     onError: handleError,
   })
+  const messages = (chatHelpers as any).messages as any[]
+  const input = (chatHelpers as any).input as string
+  const handleSubmit = (chatHelpers as any).handleSubmit as (e?: any, options?: any) => void
+  const status = (chatHelpers as any).status as any
+  const reload = (chatHelpers as any).reload as (options?: any) => void
+  const stop = (chatHelpers as any).stop as () => void
+  const setMessages = (chatHelpers as any).setMessages as (updater: any) => void
+  const setInput = (chatHelpers as any).setInput as (value: string | ((prev: string) => string)) => void
 
   const { selectedModel, handleModelChange } = useModel({
     currentChat: null,
@@ -208,7 +231,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         optimisticAttachments.length > 0 ? optimisticAttachments : undefined,
     }
 
-    setMessages((prev) => [...prev, optimisticMessage])
+  setMessages((prev: any[]) => [...prev, optimisticMessage])
     setInput("")
 
     const submittedFiles = [...files]
@@ -217,7 +240,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     try {
       const currentChatId = await ensureChatExists(user.id)
       if (!currentChatId) {
-        setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
         cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
         return
       }
@@ -227,7 +250,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           title: `The message you submitted was too long, please submit something shorter. (Max ${MESSAGE_MAX_LENGTH} characters)`,
           status: "error",
         })
-        setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
         cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
         return
       }
@@ -236,7 +259,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       if (submittedFiles.length > 0) {
         attachments = await handleFileUploads(user.id, currentChatId)
         if (attachments === null) {
-          setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+          setMessages((prev: any[]) => prev.filter((m: any) => m.id !== optimisticId))
           cleanupOptimisticAttachments(
             optimisticMessage.experimental_attachments
           )
@@ -257,16 +280,16 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       }
 
       handleSubmit(undefined, options)
-      setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
       cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
-      cacheAndAddMessage(optimisticMessage)
+      cacheAndAddMessage(convertToMessageAISDK(optimisticMessage))
 
       // Bump existing chats to top (non-blocking, after submit)
       if (messages.length > 0) {
         bumpChat(currentChatId)
       }
     } catch {
-      setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
       cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
       toast({ title: "Failed to send message", status: "error" })
     } finally {
@@ -430,12 +453,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
             Recent chats
           </h2>
           <div className="space-y-2">
-            {chats.map((chat) => (
-              <ProjectChatItem
-                key={chat.id}
-                chat={chat}
-                formatDate={formatDate}
-              />
+            {chats.map((chat: Chat) => (
+              <ProjectChatItem key={chat.id} chat={chat} formatDate={formatDate} />
             ))}
           </div>
         </div>

@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { service: string } }
+  { params }: { params: Promise<{ service: string }> }
 ) {
+  const { service } = await params
+  
   try {
-    const { service } = await params
-    
     const supabase = await createClient()
     
     if (!supabase) {
@@ -46,7 +46,7 @@ export async function GET(
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error(`Error checking ${params.service} status:`, error)
+    console.error(`Error checking ${service} status:`, error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

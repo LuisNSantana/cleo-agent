@@ -10,7 +10,7 @@ import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import { sanitizeUserInput } from "@/lib/sanitize"
 import { validateUserIdentity } from "@/lib/server/api"
 import { checkUsageByModel, incrementUsage } from "@/lib/usage"
-import { getUserKey, type ProviderWithoutOllama } from "@/lib/user-keys"
+import { getEffectiveApiKey, getUserKey, type ProviderWithoutOllama } from "@/lib/user-keys"
 
 export async function validateAndTrackUsage({
   userId,
@@ -33,13 +33,14 @@ export async function validateAndTrackUsage({
     const provider = getProviderForModel(model)
 
     if (provider !== "ollama") {
-      const userApiKey = await getUserKey(
+      // Accept either a user-stored key or an environment key
+      const effectiveKey = await getEffectiveApiKey(
         userId,
         provider as ProviderWithoutOllama
       )
 
-      // If no API key and model is not in free list, deny access
-      if (!userApiKey && !FREE_MODELS_IDS.includes(model)) {
+      // If no API key anywhere and model is not in free list, deny access
+      if (!effectiveKey && !FREE_MODELS_IDS.includes(model)) {
         throw new Error(
           `This model requires an API key for ${provider}. Please add your API key in settings or use a free model.`
         )

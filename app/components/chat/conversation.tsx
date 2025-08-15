@@ -4,7 +4,7 @@ import {
 } from "@/components/prompt-kit/chat-container"
 import { Loader } from "@/components/prompt-kit/loader"
 import { ScrollButton } from "@/components/prompt-kit/scroll-button"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "ai"
 import { useRef } from "react"
 import { Message } from "./message"
 
@@ -24,6 +24,21 @@ export function Conversation({
   onReload,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
+
+  // AI SDK v5: extract concatenated text from UIMessage.parts for display
+  const extractTextFromMessage = (msg?: MessageType): string => {
+    if (!msg) return ""
+    const anyMsg = msg as any
+    if (typeof anyMsg.content === "string") return anyMsg.content
+    if (Array.isArray(msg.parts)) {
+      return msg.parts
+        .filter((p: any) => p && p.type === "text")
+        .map((p: any) => p.text || "")
+        .join(" ")
+        .trim()
+    }
+    return ""
+  }
 
 
   if (!messages || messages.length === 0)
@@ -50,16 +65,20 @@ export function Conversation({
               isLast && messages.length > initialMessageCount.current
 
             // Para mensajes del asistente, buscar el mensaje del usuario anterior
-            const userMessage = message.role === 'assistant' && index > 0 
-              ? messages[index - 1]?.content 
-              : undefined
+            const userMessage =
+              message.role === "assistant" && index > 0
+                ? extractTextFromMessage(messages[index - 1])
+                : undefined
+
+            const messageText = extractTextFromMessage(message)
 
             return (
               <Message
                 key={message.id}
                 id={message.id}
                 variant={message.role}
-                attachments={message.experimental_attachments}
+                // UIMessage v5 has no experimental_attachments; attachments are handled upstream
+                attachments={undefined}
                 isLast={isLast}
                 onDelete={onDelete}
                 onEdit={onEdit}
@@ -69,7 +88,7 @@ export function Conversation({
                 status={status}
                 userMessage={userMessage} // Pasar contexto del usuario
               >
-                {message.content}
+                {messageText}
               </Message>
             )
           })}

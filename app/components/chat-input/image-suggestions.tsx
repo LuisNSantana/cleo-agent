@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { getImageAnalysisPrompts } from "@/lib/image-utils"
 import { Image, Sparkle } from "@phosphor-icons/react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence } from "framer-motion"
 
 type ImageSuggestionsProps = {
   hasImages: boolean
@@ -11,9 +11,9 @@ type ImageSuggestionsProps = {
 }
 
 const TRANSITION = {
-  type: "spring",
+  type: "spring" as const,
   duration: 0.2,
-  bounce: 0,
+  bounce: 0.2,
 }
 
 export function ImageSuggestions({ hasImages, onSuggestion }: ImageSuggestionsProps) {

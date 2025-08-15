@@ -95,6 +95,14 @@ export function MultiChat() {
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
 
   const createPersistedGroups = useCallback(() => {
+    const extractTextFromParts = (parts?: any[]): string => {
+      if (!parts || !Array.isArray(parts)) return ""
+      return parts
+        .filter((p) => p && p.type === "text")
+        .map((p) => p.text || "")
+        .filter(Boolean)
+        .join("\n\n")
+    }
     const persistedGroups: { [key: string]: GroupedMessage } = {}
 
     if (persistedMessages.length === 0) return persistedGroups
@@ -110,7 +118,7 @@ export function MultiChat() {
       const message = persistedMessages[i]
 
       if (message.role === "user") {
-        const groupKey = message.content
+        const groupKey = (message as any).content || extractTextFromParts((message as any).parts)
         if (!groups[groupKey]) {
           groups[groupKey] = {
             userMessage: message,
@@ -127,7 +135,7 @@ export function MultiChat() {
         }
 
         if (associatedUserMessage) {
-          const groupKey = associatedUserMessage.content
+          const groupKey = (associatedUserMessage as any).content || extractTextFromParts((associatedUserMessage as any).parts)
           if (!groups[groupKey]) {
             groups[groupKey] = {
               userMessage: associatedUserMessage,
@@ -167,6 +175,14 @@ export function MultiChat() {
   }, [persistedMessages, selectedModelIds, models])
 
   const messageGroups = useMemo(() => {
+    const extractTextFromParts = (parts?: any[]): string => {
+      if (!parts || !Array.isArray(parts)) return ""
+      return parts
+        .filter((p) => p && p.type === "text")
+        .map((p) => p.text || "")
+        .filter(Boolean)
+        .join("\n\n")
+    }
     const persistedGroups = createPersistedGroups()
     const liveGroups = { ...persistedGroups }
 
@@ -176,7 +192,7 @@ export function MultiChat() {
         const assistantMsg = chat.messages[i + 1]
 
         if (userMsg?.role === "user") {
-          const groupKey = userMsg.content
+          const groupKey = (userMsg as any).content || extractTextFromParts((userMsg as any).parts)
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -203,13 +219,13 @@ export function MultiChat() {
             }
           } else if (
             chat.isLoading &&
-            userMsg.content === prompt &&
+            ((userMsg as any).content || extractTextFromParts((userMsg as any).parts)) === prompt &&
             selectedModelIds.includes(chat.model.id)
           ) {
             const placeholderMessage: MessageType = {
               id: `loading-${chat.model.id}`,
               role: "assistant",
-              content: "",
+              parts: [{ type: "text", text: "" }],
             }
             liveGroups[groupKey].responses.push({
               model: chat.model.id,

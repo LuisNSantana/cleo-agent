@@ -1,4 +1,4 @@
-import { Attachment } from "@ai-sdk/ui-utils"
+import type { Attachment } from "@/lib/file-handling"
 
 export type Json =
   | string

@@ -44,17 +44,22 @@ export const webSearchTool = tool({
     count: z.number().min(1).max(20).optional().default(10).describe('Number of search results to return (default: 10)'),
   }),
   outputSchema: webSearchOutputSchema,
-  onInputStart: ({ toolCallId }) => {
+  onInputStart: ({ toolCallId }: { toolCallId?: string }) => {
     console.log('🔍 Starting web search:', toolCallId);
   },
-  onInputAvailable: ({ input, toolCallId }) => {
+  onInputAvailable: ({ input, toolCallId }: { input: { query: string }, toolCallId?: string }) => {
     console.log('🔍 Search query ready:', input.query, toolCallId);
   },
-  execute: async ({ query, count = 10 }) => {
+  execute: async ({ query, count = 10 }: { query: string, count?: number }) => {
     try {
-      const apiKey = process.env.BRAVE_SEARCH_API_KEY
+      // Support multiple env var names for convenience
+      const apiKey =
+        process.env.BRAVE_SEARCH_API_KEY ||
+        process.env.BRAVE_API_KEY ||
+        process.env.SEARCH_API_KEY
       
       if (!apiKey) {
+        console.warn('[WebSearch] Brave API key not found in env (BRAVE_SEARCH_API_KEY/BRAVE_API_KEY/SEARCH_API_KEY)')
         throw new Error('BRAVE_SEARCH_API_KEY no está configurada en las variables de entorno')
       }
 

@@ -1,18 +1,56 @@
 // AI SDK v5 compatible useChat hook
 import { toast } from "@/components/ui/toast"
 import { getOrCreateGuestUserId } from "@/lib/api"
+import { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { Attachment } from "@/lib/file-handling"
 import { isImageFile } from "@/lib/image-utils"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { API_ROUTE_CHAT } from "@/lib/routes"
 import type { UserProfile } from "@/lib/user/types"
-import type { UIMessage } from "@ai-sdk/react"
+import type { UIMessage } from "ai"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-// Extended message type with content property
+// Utility function to convert UIMessage to MessageAISDK for AI SDK v5 compatibility
+function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
+  // Extract content from message
+  let content = ""
+  
+  if ('content' in message && typeof message.content === 'string') {
+    content = message.content
+  } else if (message.parts && Array.isArray(message.parts)) {
+    // Extract text from parts for AI SDK v5
+    const textParts = message.parts
+      .filter((part: any) => part.type === "text")
+      .map((part: any) => part.text || "")
+    content = textParts.join(" ") || "User message"
+  } else {
+    content = "User message"
+  }
+
+  return {
+    id: message.id || Date.now().toString(),
+    role: message.role,
+    content,
+    parts: message.parts,
+    createdAt: (message as any).createdAt,
+    experimental_attachments: (message as any).experimental_attachments,
+  }
+}
+
+// Helper function to ensure parts array exists
+function ensureParts(message: ChatMessage): void {
+  if (!message.parts) {
+    message.parts = []
+  }
+}
+
+// Extended message type with content property for AI SDK v5 compatibility
 export interface ChatMessage extends UIMessage {
+  id: string
   content: string
+  parts: any[]
+  createdAt?: Date
   experimental_attachments?: Array<{
     name: string
     contentType: string
@@ -23,7 +61,7 @@ export interface ChatMessage extends UIMessage {
 type UseChatCoreProps = {
   initialMessages: UIMessage[]
   draftValue: string
-  cacheAndAddMessage: (message: UIMessage) => void
+  cacheAndAddMessage: (message: MessageAISDK) => Promise<void>
   chatId: string | null
   user: UserProfile | null
   files: File[]
@@ -228,8 +266,8 @@ export function useChatCore({
           attachments.length > 0 ? attachments : undefined,
       } as ChatMessage
 
-      setMessages((prev) => [...prev, userMessage])
-      cacheAndAddMessage(userMessage)
+      setMessages((prev: ChatMessage[]) => [...prev, userMessage])
+      cacheAndAddMessage(convertToMessageAISDK(userMessage))
 
       try {
         abortControllerRef.current = new AbortController()
@@ -268,7 +306,7 @@ export function useChatCore({
           parts: [],
         } as ChatMessage
 
-        setMessages((prev) => [...prev, assistantMessageObj])
+        setMessages((prev: ChatMessage[]) => [...prev, assistantMessageObj])
 
         while (true) {
           const { done, value } = await reader.read()
@@ -294,6 +332,9 @@ export function useChatCore({
                 switch (data.type) {
                   case "tool-input-start": {
                     // Add tool invocation part in partial-call state
+                    if (!assistantMessageObj.parts) {
+                      assistantMessageObj.parts = []
+                    }
                     assistantMessageObj.parts.push({
                       type: "tool-invocation",
                       toolInvocation: {
@@ -308,7 +349,8 @@ export function useChatCore({
 
                   case "tool-input-available": {
                     // Update tool invocation with full arguments (call state)
-                    const toolPart = assistantMessageObj.parts.find(
+                    ensureParts(assistantMessageObj)
+                    const toolPart = assistantMessageObj.parts!.find(
                       (p: any) =>
                         p.type === "tool-invocation" &&
                         p.toolInvocation?.toolCallId === data.toolCallId
@@ -359,7 +401,7 @@ export function useChatCore({
                 }
 
                 // Update the message in state
-                setMessages((prev) => {
+                setMessages((prev: ChatMessage[]) => {
                   const newMessages = [...prev]
                   newMessages[newMessages.length - 1] = {
                     ...assistantMessageObj,
@@ -382,7 +424,7 @@ export function useChatCore({
                   assistantMessageObj.content += line.slice(6)
                 }
 
-                setMessages((prev) => {
+                setMessages((prev: ChatMessage[]) => {
                   const newMessages = [...prev]
                   newMessages[newMessages.length - 1] = {
                     ...assistantMessageObj,
@@ -395,10 +437,10 @@ export function useChatCore({
         }
 
         // Cache final assistant message
-        cacheAndAddMessage({
+        cacheAndAddMessage(convertToMessageAISDK({
           ...assistantMessageObj,
           parts: assistantMessageObj.parts,
-        } as UIMessage)
+        } as UIMessage))
         setStatus("ready")
       } catch (err) {
         const error = err as Error
@@ -439,13 +481,27 @@ export function useChatCore({
     const lastUserMessage = messages
       .slice()
       .reverse()
-      .find((m) => m.role === "user")
+      .find((m: any) => m.role === "user")
     if (lastUserMessage) {
       const messagesWithoutLastAssistant = messages.filter(
-        (m, i) => !(i === messages.length - 1 && m.role === "assistant")
+        (m: any, i: number) => !(i === messages.length - 1 && m.role === "assistant")
       )
       setMessages(messagesWithoutLastAssistant)
-      await sendMessage({ text: lastUserMessage.content })
+      
+      // Handle both AI SDK v5 (parts) and legacy (content) message structure
+      let messageText = ""
+      if (lastUserMessage.parts && Array.isArray(lastUserMessage.parts)) {
+        // AI SDK v5 structure
+        const textPart = lastUserMessage.parts.find((part: any) => part.type === "text")
+        messageText = textPart?.text || ""
+      } else if ((lastUserMessage as any).content) {
+        // Legacy structure
+        messageText = typeof (lastUserMessage as any).content === "string" 
+          ? (lastUserMessage as any).content 
+          : ""
+      }
+      
+      await sendMessage({ text: messageText })
     }
   }, [messages, sendMessage])
 
@@ -485,7 +541,7 @@ export function useChatCore({
 
   // Handle form submission
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    async (e: { preventDefault: () => void }) => {
       e.preventDefault()
 
       if (!input.trim() || isSubmitting) return
@@ -588,7 +644,7 @@ export function useChatCore({
     conversationStatus, // Mapped status for Conversation component
     chatInputStatus, // Mapped status for ChatInput component (includes "streaming")
     hasSentFirstMessageRef,
-    submit: () => handleSubmit({ preventDefault: () => {} } as React.FormEvent),
+    submit: () => handleSubmit({ preventDefault: () => {} }),
     handleSuggestion: (suggestion: string) => {
       setInput(suggestion)
     },

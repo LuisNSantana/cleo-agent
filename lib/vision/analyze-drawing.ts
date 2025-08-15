@@ -1,4 +1,4 @@
-import { generateText, ImagePart, CoreMessage } from "ai"
+import { generateText, type ImagePart, type CoreMessage } from "ai"
 import { openproviders } from "@/lib/openproviders"
 import { MODEL_DEFAULT } from "@/lib/config"
 
@@ -47,7 +47,7 @@ ${truncated}` },
 
   // Compose messages with the system prompt + user
   const messages: CoreMessage[] = [
-    { role: "system", content: [{ type: "text", text: systemPrompt }] },
+    { role: "system", content: systemPrompt },
     ...userMessages,
   ]
 
@@ -55,8 +55,8 @@ ${truncated}` },
     model: providerModel,
     messages,
     // be conservative
-    temperature: 0.2,
-    maxTokens: 800,
+  temperature: 0.2,
+  maxOutputTokens: 800,
   })
 
   const raw = res.text?.trim() ?? ""

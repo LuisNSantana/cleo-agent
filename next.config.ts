@@ -10,6 +10,13 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     optimizePackageImports: ["@phosphor-icons/react"],
   },
   serverExternalPackages: ["shiki", "vscode-oniguruma"],
+  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+    // Handle canvas module for konva/react-konva in server-side builds
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'canvas']
+    }
+    return config
+  },
   images: {
     remotePatterns: [
       {

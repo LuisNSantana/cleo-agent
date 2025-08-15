@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/client"
 import { isSupabaseEnabled } from "@/lib/supabase/config"
+import type { UIMessage } from "ai"
+
 // Extended message type with content property for compatibility
-export interface MessageAISDK {
+export interface MessageAISDK extends Omit<UIMessage, 'content'> {
   id: string
-  role: "system" | "user" | "assistant" | "data"
   content: string
   experimental_attachments?: Array<{
     name: string
@@ -11,7 +12,6 @@ export interface MessageAISDK {
     url: string
   }>
   createdAt?: Date
-  parts?: any[]
 }
 import { readFromIndexedDB, writeToIndexedDB } from "../persist"
 
@@ -43,6 +43,8 @@ export async function getMessagesFromDb(
   return data.map((message) => ({
     ...message,
     id: String(message.id),
+    // coerce unsupported 'data' role to 'assistant' for UI
+    role: (message.role === 'data' ? 'assistant' : message.role) as MessageAISDK['role'],
     content: message.content ?? "",
     createdAt: new Date(message.created_at || ""),
     parts: (message?.parts as MessageAISDK["parts"]) || undefined,
