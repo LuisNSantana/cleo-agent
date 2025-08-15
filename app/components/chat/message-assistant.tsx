@@ -48,8 +48,59 @@ export function MessageAssistant({
   const toolInvocationParts = parts?.filter(
     (part: any) => part.type === "tool-invocation"
   )
-  const reasoningParts = parts?.find((part: any) => part.type === "reasoning")
-  const contentNullOrEmpty = children === null || children === ""
+  
+  // Handle AI SDK v5 reasoning parts
+  const reasoningParts = parts?.filter((part: any) => part.type === "reasoning")
+  const reasoningTextFromParts = (reasoningParts?.map((part: any) => (part as any).text).filter(Boolean).join("\n") || "")
+  
+  // Extract thinking from message content if present (fallback for text-based reasoning)
+  let extractedThinking = null
+  let cleanedContent = children
+  
+  if (typeof children === 'string') {
+    console.log('🔍 Debug: Processing message content:', children.substring(0, 200))
+    
+    // Try to extract <thinking> tags first
+    if (children.includes('<thinking>')) {
+      const thinkingMatch = children.match(/<thinking>([\s\S]*?)<\/thinking>/);
+      if (thinkingMatch) {
+        extractedThinking = thinkingMatch[1].trim()
+        cleanedContent = children.replace(/<thinking>[\s\S]*?<\/thinking>\s*/, '').trim()
+        console.log('✅ Extracted thinking from tags:', extractedThinking.substring(0, 100))
+      } else {
+        // Handle streaming case where thinking tag is not yet closed
+        const thinkingStart = children.indexOf('<thinking>')
+        if (thinkingStart !== -1) {
+          const thinkingContent = children.substring(thinkingStart + 10) // 10 is length of '<thinking>'
+          if (thinkingContent.length > 0) {
+            extractedThinking = thinkingContent
+            cleanedContent = children.substring(0, thinkingStart).trim()
+            console.log('🔄 Streaming thinking from tags:', extractedThinking.substring(0, 100))
+          }
+        }
+      }
+    }
+    // Try to extract "thought:" and "content:" format if no thinking tags
+    else if (children.includes('thought:') && children.includes('content:')) {
+      const thoughtMatch = children.match(/thought:\s*([\s\S]*?)(?=content:|$)/i);
+      const contentMatch = children.match(/content:\s*([\s\S]*)/i);
+      
+      if (thoughtMatch && contentMatch) {
+        extractedThinking = thoughtMatch[1].trim()
+        cleanedContent = contentMatch[1].trim()
+        console.log('✅ Extracted thinking from thought/content format:', extractedThinking.substring(0, 100))
+        console.log('✅ Cleaned content from format:', cleanedContent.substring(0, 100))
+      }
+    } else {
+      console.log('❌ No thinking tags or thought/content format found in content')
+    }
+  }
+  // Decide which reasoning text to show: prefer SDK parts if non-empty, else fallback to extracted <thinking>
+  const effectiveReasoningText = (reasoningTextFromParts && reasoningTextFromParts.trim().length > 0)
+    ? reasoningTextFromParts
+    : (extractedThinking || "")
+  
+  const contentNullOrEmpty = cleanedContent === null || cleanedContent === ""
   const isLastStreaming = status === "streaming" && isLast
   const searchImageResults =
     parts
@@ -69,6 +120,20 @@ export function MessageAssistant({
           : []
       ) ?? []
 
+  // Debug log parts
+  console.log('🔍 Message parts:', parts?.map(p => ({ 
+    type: (p as any).type, 
+    hasText: !!(p as any).text,
+    text: (p as any).text ? (p as any).text.substring(0, 100) + '...' : null,
+    keys: Object.keys(p as any)
+  })))
+  console.log('🔍 Reasoning parts found:', reasoningParts?.length || 0)
+  if (reasoningParts && reasoningParts.length > 0) {
+    console.log('🧠 Reasoning content:', reasoningParts.map(p => (p as any).text?.substring(0, 200)))
+  }
+  console.log('🔍 Extracted thinking:', extractedThinking ? extractedThinking.substring(0, 200) : 'none')
+  console.log('✅ Effective reasoning used:', effectiveReasoningText.substring(0, 160))
+
   return (
     <Message
       className={cn(
@@ -78,9 +143,10 @@ export function MessageAssistant({
       )}
     >
       <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
-        {reasoningParts && (reasoningParts as any).reasoning && (
+        {/* Show reasoning when available (prefer parts, else <thinking>) or while streaming */}
+        {(effectiveReasoningText || status === "streaming") && (
           <Reasoning
-            reasoning={(reasoningParts as any).reasoning}
+            reasoning={effectiveReasoningText}
             isStreaming={status === "streaming"}
           />
         )}
@@ -97,7 +163,7 @@ export function MessageAssistant({
 
         {contentNullOrEmpty ? null : (
           <AssistantMessageWithFiles 
-            content={children} 
+            content={cleanedContent} 
             userMessage={userMessage}
             isStreaming={status === "streaming"}
           />

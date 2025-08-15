@@ -621,7 +621,8 @@ ${documentContent}`
       console.warn('[Env] GROQ_API_KEY not found in process.env at /api/chat runtime')
     }
 
-    const result = streamText({
+    // Prepare additional parameters for reasoning models
+    const additionalParams: any = {
       model: modelConfig.apiSdk(process.env.OPENAI_API_KEY || apiKey, { enableSearch }),
       system: finalSystemPrompt,
       messages: convertedMessages,
@@ -630,8 +631,7 @@ ${documentContent}`
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
       },
-
-  onFinish: async ({ response }: { response: any }) => {
+      onFinish: async ({ response }: { response: any }) => {
         // Clean up global context
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel
@@ -647,10 +647,19 @@ ${documentContent}`
           })
         }
       },
-    })
+    }
+    
+    // Add reasoning effort for GPT-5 models
+    if (model.startsWith('gpt-5')) {
+      additionalParams.reasoning_effort = 'medium' // Can be: minimal, low, medium, high
+      console.log(`[GPT-5] Setting reasoning_effort to: medium for model ${model}`)
+    }
+
+    const result = streamText(additionalParams)
 
     return result.toUIMessageStreamResponse({
-  onError: (error: unknown) => {
+      sendReasoning: true, // Enable reasoning parts to be sent to the client
+      onError: (error: unknown) => {
         // Clean up global context on error
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel

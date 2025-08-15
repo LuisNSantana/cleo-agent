@@ -3,6 +3,16 @@ import { NextResponse, type NextRequest } from "next/server"
 import { validateCsrfToken } from "./lib/csrf"
 
 export async function middleware(request: NextRequest) {
+  // Silence noisy dev source-map requests from dependencies (e.g., supabase-js)
+  // Next dev overlay may try to fetch /src/*.ts and /_next/src/*.ts which don't exist in our app.
+  const p = request.nextUrl.pathname
+  if (
+    (process.env.NODE_ENV === "development") &&
+    (p.startsWith("/src/") || p.startsWith("/_next/src/"))
+  ) {
+    return new NextResponse(null, { status: 204 }) // no content, avoid 404 spam
+  }
+
   const response = await updateSession(request)
 
   // CSRF protection for state-changing requests
@@ -33,7 +43,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  // Exclude API, Next internals, and common assets; allow /src and /_next/src so we can silence them above
+  "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
   runtime: "nodejs",
 }

@@ -1,0 +1,47 @@
+# Development Dockerfile for Next.js with pnpm hot reload
+FROM node:20-alpine AS dev
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies needed for canvas/konva
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev \
+    pangomm-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
+
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Configure pnpm
+RUN pnpm config set store-dir /app/.pnpm-store
+
+# Copy package files first for better caching
+COPY package.json pnpm-lock.yaml* ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code (this will be overridden by volume in docker-compose)
+COPY . .
+
+# Set environment variables for development
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
+# Expose development port
+EXPOSE 3000
+
+# Default command for development
+CMD ["pnpm", "run", "dev"]

@@ -5,7 +5,8 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 })
 
 const nextConfig: NextConfig = withBundleAnalyzer({
-  output: "standalone",
+  // Only use standalone in production builds, not in development
+  ...(process.env.NODE_ENV === "production" && { output: "standalone" }),
   experimental: {
     optimizePackageImports: ["@phosphor-icons/react"],
   },

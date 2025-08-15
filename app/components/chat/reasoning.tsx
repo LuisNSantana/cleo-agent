@@ -16,17 +16,21 @@ const TRANSITION = {
 }
 
 export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
-  // Start expanded only while streaming to signal "thinking"; collapse by default after
-  const [isExpanded, setIsExpanded] = useState<boolean>(Boolean(isStreaming))
+  // Only show if there's actual reasoning content or while streaming
+  const hasContent = Boolean(reasoning && reasoning.trim().length > 0)
+  const [isExpanded, setIsExpanded] = useState<boolean>(Boolean(isStreaming) || hasContent)
   const prevStreaming = useRef<boolean>(Boolean(isStreaming))
 
-  // When streaming finishes, auto-collapse to reduce visual noise
+  // When streaming finishes, keep expanded if there's reasoning content
   useEffect(() => {
     if (prevStreaming.current && isStreaming === false) {
-      setIsExpanded(false)
+      setIsExpanded(hasContent) // Keep expanded only if there's actual content
     }
     prevStreaming.current = Boolean(isStreaming)
-  }, [isStreaming])
+  }, [isStreaming, hasContent])
+
+  // Don't render if there's no content and not streaming
+  if (!hasContent && !isStreaming) return null
 
   return (
     <div>

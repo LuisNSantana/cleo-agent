@@ -327,6 +327,9 @@ export function useChatCore({
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6))
+                
+                // Debug: Log ALL data types we receive
+                console.log('🔍 [STREAM] Received data type:', data.type, data)
 
                 // Handle different types of streaming data
                 switch (data.type) {
@@ -384,6 +387,11 @@ export function useChatCore({
                     })
                     break
 
+                  case "start":
+                  case "start-step":
+                    // Stream initialization events - no action needed
+                    break
+
                   case "text-delta":
                     // Update text part
                     const textPart = assistantMessageObj.parts.findLast(
@@ -397,6 +405,64 @@ export function useChatCore({
                         .map((p) => (p.type === "text" ? p.text : ""))
                         .join("")
                     }
+                    break
+
+                  case "reasoning-start":
+                    // Start reasoning part
+                    console.log('🧠 [STREAM] Reasoning started')
+                    assistantMessageObj.parts.push({
+                      type: "reasoning",
+                      text: "",
+                    })
+                    break
+
+                  case "reasoning-delta":
+                    // Update reasoning part
+                    console.log('🧠 [STREAM] Reasoning delta:', data.delta?.substring(0, 50))
+                    const reasoningPart = assistantMessageObj.parts.findLast(
+                      (p) => p.type === "reasoning"
+                    )
+                    if (reasoningPart && reasoningPart.type === "reasoning") {
+                      reasoningPart.text += data.delta
+                    }
+                    break
+
+                  case "reasoning-end":
+                    // Finish reasoning part - the actual reasoning content might be here
+                    console.log('🧠 [STREAM] Reasoning ended:', JSON.stringify(data, null, 2))
+                    const endReasoningPart = assistantMessageObj.parts.findLast(
+                      (p) => p.type === "reasoning"
+                    )
+                    if (endReasoningPart && endReasoningPart.type === "reasoning" && data.text) {
+                      endReasoningPart.text = data.text
+                      console.log('🧠 [STREAM] Set reasoning text:', data.text.substring(0, 200))
+                    }
+                    break
+
+                  case "finish":
+                    console.log('✅ [STREAM] Finish event received:', JSON.stringify(data, null, 2))
+                    // Check if reasoning is included in the finish event
+                    if (data.reasoning) {
+                      console.log('🧠 [STREAM] Found reasoning in finish event:', data.reasoning.substring(0, 200))
+                      // Add reasoning part if it doesn't exist
+                      const existingReasoningPart = assistantMessageObj.parts.find(p => p.type === "reasoning")
+                      if (existingReasoningPart) {
+                        existingReasoningPart.text = data.reasoning
+                      } else {
+                        assistantMessageObj.parts.unshift({
+                          type: "reasoning",
+                          text: data.reasoning,
+                        })
+                      }
+                    }
+                    break
+
+                  case "finish-step":
+                    console.log('🔍 [STREAM] Finish-step event:', JSON.stringify(data, null, 2))
+                    break
+
+                  default:
+                    console.log('⚠️ [STREAM] Unknown data type:', data.type, JSON.stringify(data, null, 2))
                     break
                 }
 
