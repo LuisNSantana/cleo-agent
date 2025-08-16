@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log(`🔧 [Cleanup] Cleaning up stale connections for user:`, userData.user.id)
+    // Clean up stale connections for user
 
     // Remove connections that are marked as not connected and have no valid tokens
     const { error } = await (supabase as any)
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to clean up connections" }, { status: 500 })
     }
 
-    console.log(`🔧 [Cleanup] Successfully cleaned up stale connections`)
+    // Cleanup completed successfully
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error in cleanup:", error)

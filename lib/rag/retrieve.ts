@@ -45,11 +45,10 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   // Usar configuración estándar para el retrieval
   const dynamicTopK = opts.topK || 10
-  const chunkLimit = 15 // Límite balanceado para contexto
+  const chunkLimit = 10 // Reducido para dejar más espacio de salida
   
-  console.log(`🔍 RAG Retrieval: topK=${dynamicTopK}, chunkLimit=${chunkLimit}`)
+  // RAG diagnostic logs removed for cleaner output
   const queryTokens = Math.ceil(query.length / 4)
-  console.log(`📊 Context Usage: query ≈${queryTokens} tokens, chunkLimit=${chunkLimit}, contextWindow=${chunkLimit * 2000 + queryTokens} tokens (aprox)`)
   
   const supabase = await createClient()
   if (!supabase) return []
@@ -91,10 +90,9 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       metadata: item.metadata
     }))
 
-      const totalChunkTokens = results.reduce((sum, c) => sum + (c.metadata?.tokenEstimate || 0), 0)
-      console.log(`[HYBRID] Retrieved ${results.length} chunks, total tokens (estimate): ${totalChunkTokens}`)
+      // Keep only essential hybrid search logging
       if (results.length > 0) {
-        console.log(`[HYBRID] Top hybrid score: ${results[0]?.hybrid_score?.toFixed(3)}`)
+        console.log(`[HYBRID] Retrieved ${results.length} chunks, top score: ${results[0]?.hybrid_score?.toFixed(3)}`)
       }
   } else {
     // Fallback to vector-only search
@@ -167,7 +165,7 @@ async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk
   }))
 }
 
-export function buildContextBlock(chunks: RetrievedChunk[], maxChars = 8000) {
+export function buildContextBlock(chunks: RetrievedChunk[], maxChars = 6000) {
   if (!chunks.length) return ''
   const lines: string[] = []
   lines.push('--- Retrieved Context (most relevant first) ---')

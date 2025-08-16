@@ -43,8 +43,8 @@ const grokModels: ModelConfig[] = [
     apiDocs: "https://docs.x.ai/docs/models/grok-4-0709",
     modelPage: "https://x.ai/grok",
     releasedAt: "2024-12-01",
-    icon: "xai",
-    apiSdk: () => getXAIModel("grok-4") as any, // Cast temporal para compatibilidad v1/v2
+  icon: "xai",
+  apiSdk: (apiKey?: string) => getXAIModel("grok-4", apiKey) as any, // allow override key from route
   }
 ]
 

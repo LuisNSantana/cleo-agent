@@ -346,6 +346,31 @@ export const CLEO_PROMPTS = {
   // Developer specialization
   developer: (modelName: string) => buildCleoSystemPrompt(modelName, "developer"),
 
+  // Enhanced prompt for reasoning models (GPT-5, etc.)
+  reasoning: (modelName: string) => buildCleoSystemPrompt(modelName) + `
+
+🧠 REASONING MODEL OPTIMIZATION:
+- CRITICAL: After using ANY tool, ALWAYS generate a comprehensive response. Never end with just tool execution.
+- SYNTHESIS PRIORITY: When tools provide data, immediately synthesize findings into structured, actionable insights.
+- POST-TOOL WORKFLOW: 1) Execute tool → 2) Process results → 3) Generate detailed analysis → 4) Provide next steps
+- RESPONSE STRUCTURE: Use markdown formatting, bullet points, and clear sections for tool-derived information.
+- CONTEXT AWARENESS: Reference tool results naturally in conversation, not as raw data dumps.
+- PROACTIVE INSIGHTS: Go beyond reporting—analyze patterns, implications, and actionable recommendations.
+
+EXAMPLE POST-TOOL RESPONSE PATTERN:
+"Based on my search, here's what I found about [topic]:
+
+## Key Findings
+- [Insight 1 with analysis]
+- [Insight 2 with context]
+- [Insight 3 with implications]
+
+## What This Means for You
+[Personalized analysis based on context]
+
+## Recommended Next Steps
+[Actionable suggestions based on findings]"`,
+
   // Minimal prompt for performance-sensitive scenarios
   minimal: (modelName: string) => `${CORE_IDENTITY}
 

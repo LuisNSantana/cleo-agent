@@ -49,16 +49,9 @@ export async function POST(req: Request) {
       debugRag,
     } = (await req.json()) as ChatRequest
 
-    console.log('[RAG] Incoming chat request flags', { enableSearch, documentId, debugRag })
-    
     // Auto-enable RAG for personalized responses - always try to retrieve user context
     const autoRagEnabled = true
     const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
-    if (!retrievalRequested) {
-      console.log('[RAG] Retrieval skipped: enableSearch is false and no documentId provided.')
-    } else if (autoRagEnabled && !enableSearch && !documentId) {
-      console.log('[RAG] Auto-RAG enabled: searching user documents for personalization')
-    }
 
     if (!messages || !chatId || !userId) {
       return new Response(
@@ -173,7 +166,15 @@ export async function POST(req: Request) {
       throw new Error(`Model ${model} not found`)
     }
 
-    const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
+    // Use reasoning-optimized prompt for GPT-5 models
+    let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
+    if (model.startsWith('gpt-5') && !systemPrompt) {
+      const { getCleoPrompt } = await import("@/lib/prompts")
+      baseSystemPrompt = getCleoPrompt(model, 'reasoning')
+      console.log(`[GPT-5] Using reasoning-optimized prompt for ${model}`)
+    }
+    
+    const effectiveSystemPrompt = baseSystemPrompt
     // Attempt to parse personality type from system prompt for observability
     try {
       const match = effectiveSystemPrompt.match(/Type:\s*(empathetic|playful|professional|creative|analytical|friendly)/i)
@@ -511,20 +512,8 @@ ${documentContent}`
               .join('\n')
           }
         }
-        console.log('[RAG] Extracted user query length', userPlain.length)
         if (userPlain.trim()) {
-          // Pre-diagnostics: how many documents & chunks exist?
-          try {
-            if (supabase) {
-              const { count: docCount } = await (supabase as any).from('documents').select('id', { count: 'exact', head: true }).eq('user_id', realUserId)
-              const { count: chunkCount } = await (supabase as any).from('document_chunks').select('id', { count: 'exact', head: true }).eq('user_id', realUserId)
-              console.log('[RAG] User docs:', docCount, 'chunks:', chunkCount)
-            }
-          } catch (e:any) {
-            console.log('[RAG] Doc/chunk diagnostics failed', e.message)
-          }
-
-          console.log('[RAG] Starting hybrid retrieval topK=6 docFilter=', documentId ? documentId : 'NONE')
+          // Essential RAG logging only
           let retrieved = await retrieveRelevant({ 
             userId: realUserId, 
             query: userPlain, 
@@ -583,8 +572,8 @@ ${documentContent}`
             const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
             if (currentChunkCount < 3) {
               try {
+                // Try secondary profile retrieval for personalization
                 const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales';
-                console.log('[RAG] Running secondary profile retrieval query')
                 const extra = await retrieveRelevant({ 
                   userId: realUserId, 
                   query: profileQuery, 
@@ -600,11 +589,10 @@ ${documentContent}`
                   const extraBlock = buildContextBlock(extra)
                   if (extraBlock && extraBlock.length > 0) {
                     ragSystemAddon += '\n' + extraBlock
-                    console.log('[RAG] Added secondary profile retrieval chunks:', extra.length)
                   }
                 }
               } catch (e:any) {
-                console.log('[RAG] Secondary profile retrieval failed', e.message)
+                // Secondary profile retrieval failed
               }
             }
           }
@@ -639,7 +627,7 @@ ${documentContent}`
       system: finalSystemPrompt,
       messages: convertedMessages,
       tools: tools,
-      stopWhen: stepCountIs(5), // Allow multi-step tool calls
+      stopWhen: stepCountIs(8), // More steps for better synthesis after tools
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
       },
@@ -662,10 +650,17 @@ ${documentContent}`
       },
     }
     
-    // Add reasoning effort for GPT-5 models
+    // Add reasoning effort for GPT-5 models with model-specific tuning
     if (model.startsWith('gpt-5')) {
-      additionalParams.reasoning_effort = 'medium' // Can be: minimal, low, medium, high
-      console.log(`[GPT-5] Setting reasoning_effort to: medium for model ${model}`)
+      if (model === 'gpt-5-nano') {
+        // For nano, use minimal reasoning to allow more focus on tool synthesis
+        additionalParams.reasoning_effort = 'minimal' // Less reasoning overhead, more tool response focus
+        console.log(`[GPT-5] Setting reasoning_effort to: minimal for GPT-5 Nano (optimized for tool responses)`)
+      } else {
+        // For other GPT-5 models, keep medium
+        additionalParams.reasoning_effort = 'medium' // Can be: minimal, low, medium, high
+        console.log(`[GPT-5] Setting reasoning_effort to: medium for model ${model}`)
+      }
     }
 
     const result = streamText(additionalParams)

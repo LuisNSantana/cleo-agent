@@ -232,7 +232,7 @@ export function Chat() {
 
       <motion.div
         className={cn(
-          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
+          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl"
         )}
         layout="position"
         layoutId="chat-input-container"

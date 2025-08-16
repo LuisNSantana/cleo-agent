@@ -4,6 +4,7 @@ import { webSearchTool } from './web-search';
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive';
 import { createDocumentTool } from './create-document';
+import { memoryAddNoteTool } from './memory';
 
 // simple in-memory cache { key: data, expiry }
 interface WeatherResult {
@@ -278,6 +279,7 @@ export const tools = {
   getDriveFileDetails: getDriveFileDetailsTool,
   createDriveFolder: createDriveFolderTool,
   uploadFileToDrive: uploadFileToDriveTool,
+  memoryAddNote: memoryAddNoteTool,
 };
 
 export type ToolName = keyof typeof tools;

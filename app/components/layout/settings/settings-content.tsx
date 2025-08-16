@@ -12,7 +12,10 @@ import {
   PlugsConnectedIcon,
   FileTextIcon,
   XIcon,
+  ChartLineUpIcon,
+  ArrowSquareOutIcon,
 } from "@phosphor-icons/react"
+import Link from "next/link"
 import { useState } from "react"
 
 import { InteractionPreferences } from "./appearance/interaction-preferences"
@@ -32,7 +35,7 @@ type SettingsContentProps = {
   isDrawer?: boolean
 }
 
-type TabType = "general" | "appearance" | "models" | "connections" | "files"
+type TabType = "general" | "appearance" | "models" | "connections" | "files" | "dashboard"
 
 export function SettingsContent({
   isDrawer = false,
@@ -42,7 +45,7 @@ export function SettingsContent({
   return (
     <div
       className={cn(
-        "flex w-full flex-col overflow-y-auto",
+  "flex w-full flex-col overflow-y-auto overflow-x-hidden",
         isDrawer ? "p-0 pb-16" : "py-0"
       )}
     >
@@ -57,11 +60,11 @@ export function SettingsContent({
         </div>
       )}
 
-      <Tabs
+    <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as TabType)}
         className={cn(
-          "flex w-full flex-row",
+      "flex w-full max-w-full flex-row overflow-x-hidden",
           isDrawer ? "" : "flex min-h-[400px]"
         )}
       >
@@ -76,6 +79,13 @@ export function SettingsContent({
                 >
                   <GearSixIcon className="size-4" />
                   <span>General</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="dashboard"
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <ChartLineUpIcon className="size-4" />
+                  <span>Dashboard</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="appearance"
@@ -119,6 +129,19 @@ export function SettingsContent({
               )}
             </TabsContent>
 
+            <TabsContent value="dashboard" className="space-y-6 px-6">
+              <div className="text-sm text-muted-foreground">
+                The analytics dashboard lives in a dedicated page due to the amount of information.
+              </div>
+              <div>
+                <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent">
+                  <ChartLineUpIcon className="size-4" />
+                  Open Dashboard
+                  <ArrowSquareOutIcon className="size-4" />
+                </Link>
+              </div>
+            </TabsContent>
+
             <TabsContent value="appearance" className="space-y-6 px-6">
               <ThemeSelection />
               <LayoutSettings />
@@ -146,7 +169,7 @@ export function SettingsContent({
         ) : (
           // Desktop version - tabs on left
           <>
-            <TabsList className="block w-48 rounded-none bg-transparent px-3 pt-4">
+            <TabsList className="block w-48 min-w-48 rounded-none bg-transparent px-3 pt-4">
               <div className="flex w-full flex-col gap-1">
                 <TabsTrigger
                   value="general"
@@ -155,6 +178,16 @@ export function SettingsContent({
                   <div className="flex items-center gap-2">
                     <GearSixIcon className="size-4" />
                     <span>General</span>
+                  </div>
+                </TabsTrigger>
+
+                <TabsTrigger
+                  value="dashboard"
+                  className="w-full justify-start rounded-md px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <ChartLineUpIcon className="size-4" />
+                    <span>Dashboard</span>
                   </div>
                 </TabsTrigger>
 
@@ -200,7 +233,8 @@ export function SettingsContent({
             </TabsList>
 
             {/* Desktop tabs content */}
-            <div className="flex-1 px-6 pt-4">
+            <div className="flex-1 px-6 pt-4 min-w-0">
+              <div className="mx-auto max-w-4xl min-w-0">
               <TabsContent value="general" className="mt-0 space-y-6">
                 <UserProfile />
                 {isSupabaseEnabled && (
@@ -208,6 +242,19 @@ export function SettingsContent({
                     <AccountManagement />
                   </>
                 )}
+              </TabsContent>
+
+              <TabsContent value="dashboard" className="mt-0 space-y-6">
+                <div className="text-sm text-muted-foreground">
+                  The Dashboard lives on a separate page for a better experience.
+                </div>
+                <div>
+                  <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent">
+                    <ChartLineUpIcon className="size-4" />
+                    Open Dashboard
+                    <ArrowSquareOutIcon className="size-4" />
+                  </Link>
+                </div>
               </TabsContent>
 
               <TabsContent value="appearance" className="mt-0 space-y-6">
@@ -218,7 +265,7 @@ export function SettingsContent({
 
 
 
-              <TabsContent value="models" className="mt-0 space-y-6">
+              <TabsContent value="models" className="mt-0 space-y-6 overflow-x-hidden">
                 <SimpleModelsInfo />
                 <CleoPersonalitySettings />
               </TabsContent>
@@ -231,6 +278,7 @@ export function SettingsContent({
               <TabsContent value="files" className="mt-0 space-y-6">
                 <FilesSection />
               </TabsContent>
+              </div>
             </div>
           </>
         )}

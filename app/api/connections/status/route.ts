@@ -44,9 +44,9 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(connectionStatus)
+  return NextResponse.json(connectionStatus)
   } catch (error) {
-    console.error("Error in connections status:", error)
+  // console.error("Error in connections status:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

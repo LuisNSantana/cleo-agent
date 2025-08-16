@@ -200,7 +200,7 @@ export function ModelsSettings() {
       <Separator />
 
       {/* Favorite Models - Drag and Drop List */}
-      <div>
+  <div className="overflow-x-hidden">
         <div className="mb-3 flex items-center justify-between">
           <h4 className="text-sm font-medium">Your favorites</h4>
           <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-xs">
@@ -368,17 +368,17 @@ export function ModelsSettings() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.15 }}
-                          className="flex items-center justify-between rounded-md px-1 py-1 hover:bg-muted/40"
+              className="flex items-center justify-between rounded-md px-1 py-1 hover:bg-muted/40"
                         >
-                          <div className="flex flex-col">
+              <div className="flex min-w-0 flex-col">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm">{model.name}</span>
-                              <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-2xs">
+                <span className="text-sm truncate max-w-[220px] sm:max-w-none">{model.name}</span>
+                <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-2xs whitespace-normal">
                                 via {modelProvider?.name || model.provider}
                               </span>
                             </div>
                             {model.description && (
-                              <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground text-xs line-clamp-1">
                                 {model.description}
                               </span>
                             )}

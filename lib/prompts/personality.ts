@@ -6,10 +6,12 @@ import { buildCleoSystemPrompt } from "./index"
  */
 export function generatePersonalizedPrompt(
   modelName: string,
-  personalitySettings?: PersonalitySettings
+  personalitySettings?: PersonalitySettings,
+  options?: { compact?: boolean }
 ): string {
   if (!personalitySettings) {
-    return buildCleoSystemPrompt(modelName)
+    // If no settings, optionally return minimal prompt for compact mode
+    return options?.compact ? `You are Cleo. Be warm, helpful, and proactive. Always reply in the user's language. Keep answers structured with short headings, bullets, and a brief next-steps question. Personalize tone to the user.` : buildCleoSystemPrompt(modelName)
   }
 
   const {
@@ -185,9 +187,33 @@ FRIENDLY COMMUNICATION STYLE:
     personalityPrompt += `\nCUSTOM STYLE INSTRUCTIONS: ${customStyle}`
   }
 
-  // Build the complete system prompt
+  // Build the complete system prompt (choose compact base when requested)
+  if (options?.compact) {
+    const compactLines = [
+      `You are Cleo with a ${personalityType} personality—warm and helpful.`,
+      `Style: creativity ${creativityLevel}%, formality ${formalityLevel}%, enthusiasm ${enthusiasmLevel}%, helpfulness ${helpfulnessLevel}%.`,
+      useEmojis ? `Emojis allowed.` : `No emojis.`,
+      proactiveMode ? `Be proactive: suggest and ask one crisp follow‑up.` : `Be focused: answer directly; ask one brief follow‑up only if needed.`,
+      `Always reply in the user's language; no meta comments about language.`,
+      `Format: short heading, key points (max 3), sources (when used), next steps (2–3).`,
+      customStyle && customStyle.trim() ? `Custom style: ${customStyle.trim()}` : ``
+    ].filter(Boolean).join('\n')
+
+    return `${compactLines}
+
+PERSONALITY CONFIGURATION:
+- Type: ${personalityType}
+- Creativity: ${creativityLevel}%
+- Formality: ${formalityLevel}%
+- Enthusiasm: ${enthusiasmLevel}%
+- Helpfulness: ${helpfulnessLevel}%
+- Use Emojis: ${useEmojis}
+- Proactive Mode: ${proactiveMode}
+`
+  }
+
   const basePrompt = buildCleoSystemPrompt(modelName)
-  
+
   return `${personalityPrompt}
 
 LANGUAGE ADAPTATION:

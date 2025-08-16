@@ -33,51 +33,51 @@ import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 const personalityTypes = [
   {
     id: "empathetic" as PersonalityType,
-    name: "Empática",
-    description: "Respuestas cálidas y comprensivas, como una buena amiga",
+    name: "Empathetic",
+    description: "Warm, supportive responses like a caring friend",
     icon: HeartIcon,
     color: "bg-pink-100 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800",
-    example: "Entiendo cómo te sientes. Estoy aquí para ayudarte paso a paso 💙"
+    example: "I understand how you feel. I'm here to help you step by step 💙"
   },
   {
     id: "playful" as PersonalityType,
-    name: "Divertida",
-    description: "Respuestas alegres y creativas, con humor y energía",
+    name: "Playful",
+    description: "Cheerful, creative responses with humor and energy",
     icon: MaskHappyIcon,
     color: "bg-orange-100 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800",
-    example: "¡Oh, qué interesante! 🎉 Vamos a hacer algo genial con esto ✨"
+    example: "Oooh, interesting! 🎉 Let's make something awesome with this ✨"
   },
   {
     id: "professional" as PersonalityType,
-    name: "Profesional",
-    description: "Respuestas claras y directas, enfocada en eficiencia",
+    name: "Professional",
+    description: "Clear, direct responses focused on efficiency",
     icon: GearIcon,
     color: "bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-    example: "Analicemos tu consulta. Te propongo tres opciones efectivas:"
+    example: "Let's analyze your query. I propose three effective options:"
   },
   {
     id: "creative" as PersonalityType,
-    name: "Creativa",
-    description: "Respuestas imaginativas y fuera de lo común",
+    name: "Creative",
+    description: "Imaginative, outside-the-box responses",
     icon: SparkleIcon,
     color: "bg-purple-100 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800",
-    example: "¡Qué fascinante! 🌟 Imagina si combinamos esto con... ¿y si probamos algo diferente?"
+    example: "Fascinating! 🌟 Imagine combining this with... what if we try something different?"
   },
   {
     id: "analytical" as PersonalityType,
-    name: "Analítica",
-    description: "Respuestas detalladas y bien fundamentadas",
+    name: "Analytical",
+    description: "Detailed, well-reasoned explanations",
     icon: BrainIcon,
     color: "bg-green-100 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-    example: "Considerando los factores A, B y C, el análisis sugiere que..."
+    example: "Considering factors A, B, and C, the analysis suggests that..."
   },
   {
     id: "friendly" as PersonalityType,
-    name: "Amigable",
-    description: "Respuestas conversacionales y relajadas",
+    name: "Friendly",
+    description: "Conversational and relaxed replies",
     icon: ChatCircleDotsIcon,
     color: "bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800",
-    example: "¡Hola! Me encanta tu pregunta. Vamos a verlo juntos 😊"
+    example: "Hey! I love your question. Let's check it out together 😊"
   },
 ]
 
@@ -127,7 +127,7 @@ export function CleoPersonalitySettings() {
 
   const handlePersonalityChange = (personality: PersonalityType) => {
     setAndSave({ personalityType: personality }, { debounceSave: false })
-    toast({ title: "Estilo actualizado", description: "La personalidad de Cleo cambió.", status: "success" })
+    toast({ title: "Style updated", description: "Cleo's personality changed.", status: "success" })
   }
 
   const handleSliderChange = (key: keyof PersonalitySettings, value: number[]) => {
@@ -142,23 +142,23 @@ export function CleoPersonalitySettings() {
     const defaults = defaultPreferences.personalitySettings!
     setLocalSettings(defaults)
     updatePreferences({ personalitySettings: defaults })
-    toast({ title: "Valores restaurados" })
+    toast({ title: "Defaults restored" })
   }
 
   return (
     <div className="space-y-8 overflow-x-hidden">
       <div>
-        <h3 className="mb-2 text-lg font-medium">Personalidad de Cleo</h3>
+        <h3 className="mb-2 text-lg font-medium">Cleo personality</h3>
         <div className="mb-4 flex items-center justify-between">
           <p className="text-muted-foreground text-sm">
-            Personaliza cómo Cleo se comunica contigo. Elige un estilo base y ajusta los detalles.
+            Personalize how Cleo communicates with you. Choose a base style and fine‑tune the details.
           </p>
           <div className="text-xs">
             {saveState === "saving" && (
-              <span className="text-muted-foreground">Guardando…</span>
+              <span className="text-muted-foreground">Saving…</span>
             )}
             {saveState === "saved" && (
-              <span className="text-emerald-600 dark:text-emerald-400">Guardado</span>
+              <span className="text-emerald-600 dark:text-emerald-400">Saved</span>
             )}
           </div>
         </div>
@@ -166,12 +166,15 @@ export function CleoPersonalitySettings() {
 
       {/* Personality Types Grid */}
       <div>
-        <h4 className="mb-4 text-sm font-medium">Estilo de personalidad</h4>
-        <div
-          className="grid items-stretch gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]"
-          role="radiogroup"
-          aria-label="Estilo de personalidad"
-        >
+        <h4 className="mb-2 text-sm font-medium">Personality style</h4>
+        <div className="relative rounded-xl">
+          {/* soft background accent */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.07),transparent_60%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.06),transparent_60%)]" />
+          <div
+            className="grid items-stretch gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]"
+            role="radiogroup"
+            aria-label="Personality style"
+          >
           {personalityTypes.map((personality) => {
             const Icon = personality.icon
             const isSelected = localSettings.personalityType === personality.id
@@ -179,6 +182,7 @@ export function CleoPersonalitySettings() {
             return (
               <motion.div
                 key={personality.id}
+                layout
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.99 }}
               >
@@ -192,24 +196,24 @@ export function CleoPersonalitySettings() {
                       handlePersonalityChange(personality.id)
                     }
                   }}
-                  className={`group relative cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  className={`group relative cursor-pointer rounded-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     isSelected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "hover:bg-muted/40 hover:border-muted-foreground/20"
-                  }`}
+                      ? "border-primary/60 ring-1 ring-primary/40 bg-gradient-to-b from-primary/10 to-transparent shadow-md"
+                      : "hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)] hover:bg-muted/40 hover:border-muted-foreground/25"
+                  } min-h-[132px]`}
                   onClick={() => handlePersonalityChange(personality.id)}
                 >
                   <CardContent className="p-3 sm:p-4">
                     {isSelected && (
-                      <Badge className="absolute right-2 top-2" variant="secondary">Activa</Badge>
+                      <Badge className="absolute right-2 top-2 shadow" variant="secondary">Active</Badge>
                     )}
                     <div className="flex items-start gap-3">
-                      <div className={`flex size-8 sm:size-9 items-center justify-center rounded-md border shrink-0 ${isSelected ? "bg-primary/10 border-primary/20" : "bg-muted/40"}`}>
-                        <Icon className="size-4 sm:size-5" />
+                      <div className={`flex size-9 sm:size-10 items-center justify-center rounded-md border shrink-0 transition-colors ${isSelected ? "bg-primary/10 border-primary/30" : "bg-muted/40"}`}>
+                        <Icon className="size-4 sm:size-5"/>
                       </div>
                       <div className="min-w-0 flex-1">
                         <h5 className="mb-1 text-sm font-medium">{personality.name}</h5>
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
+                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
                           {personality.description}
                         </p>
                         <blockquote className="rounded-md bg-muted/30 px-2 py-1.5 text-xs italic border-l-2 border-primary/20 max-h-12 overflow-hidden break-words whitespace-normal">
@@ -222,12 +226,13 @@ export function CleoPersonalitySettings() {
               </motion.div>
             )
           })}
+          </div>
         </div>
       </div>
 
       {/* Fine-tuning Controls */}
-      <div className="space-y-6">
-        <h4 className="text-sm font-medium">Ajustes finos</h4>
+      <div className="space-y-6 overflow-x-hidden">
+        <h4 className="text-sm font-medium">Fine-tuning</h4>
 
         {/* Quick Presets */}
         <div className="flex flex-wrap gap-2">
@@ -247,7 +252,7 @@ export function CleoPersonalitySettings() {
               )
             }
           >
-            Equilibrada
+            Balanced
           </Button>
           <Button
             size="sm"
@@ -266,7 +271,7 @@ export function CleoPersonalitySettings() {
               )
             }
           >
-            Creativa+
+            Creative+
           </Button>
           <Button
             size="sm"
@@ -285,22 +290,24 @@ export function CleoPersonalitySettings() {
               )
             }
           >
-            Profesional
+            Professional
           </Button>
         </div>
         
-        {/* Creativity Level */}
-        <div className="space-y-3">
+        {/* Sliders grid */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Creativity Level */}
+          <div className="space-y-3 min-w-0">
           <div className="flex items-center justify-between">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <label className="flex cursor-help items-center gap-2 text-sm font-medium">
+          <label className="flex cursor-help items-center gap-2 text-sm font-medium">
                     <SparkleIcon className="size-4" />
-                    Creatividad
+          Creativity
                   </label>
                 </TooltipTrigger>
-                <TooltipContent>Ideas originales y soluciones fuera de lo común.</TooltipContent>
+        <TooltipContent>Original ideas and outside‑the‑box solutions.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <span className="text-sm text-muted-foreground">{localSettings.creativityLevel}%</span>
@@ -311,26 +318,26 @@ export function CleoPersonalitySettings() {
             max={100}
             min={0}
             step={10}
-            className="w-full"
+            className="w-full max-w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Conservadora</span>
-            <span>Muy creativa</span>
+            <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Conservative</span>
+            <span>Highly creative</span>
           </div>
-        </div>
+          </div>
 
-        {/* Formality Level */}
-        <div className="space-y-3">
+          {/* Formality Level */}
+          <div className="space-y-3 min-w-0">
           <div className="flex items-center justify-between">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <label className="flex cursor-help items-center gap-2 text-sm font-medium">
+          <label className="flex cursor-help items-center gap-2 text-sm font-medium">
                     <GraduationCapIcon className="size-4" />
-                    Formalidad
+          Formality
                   </label>
                 </TooltipTrigger>
-                <TooltipContent>Tono casual vs. profesional y técnico.</TooltipContent>
+        <TooltipContent>Casual tone vs. professional/technical.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <span className="text-sm text-muted-foreground">{localSettings.formalityLevel}%</span>
@@ -341,26 +348,26 @@ export function CleoPersonalitySettings() {
             max={100}
             min={0}
             step={10}
-            className="w-full"
+            className="w-full max-w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-xs text-muted-foreground">
             <span>Casual</span>
-            <span>Muy formal</span>
+            <span>Highly formal</span>
           </div>
-        </div>
+          </div>
 
-        {/* Enthusiasm Level */}
-        <div className="space-y-3">
+          {/* Enthusiasm Level */}
+          <div className="space-y-3 min-w-0">
           <div className="flex items-center justify-between">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <label className="flex cursor-help items-center gap-2 text-sm font-medium">
+          <label className="flex cursor-help items-center gap-2 text-sm font-medium">
                     <SmileyIcon className="size-4" />
-                    Entusiasmo
+          Enthusiasm
                   </label>
                 </TooltipTrigger>
-                <TooltipContent>Energía y expresividad en las respuestas.</TooltipContent>
+        <TooltipContent>Energy and expressiveness in replies.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <span className="text-sm text-muted-foreground">{localSettings.enthusiasmLevel}%</span>
@@ -371,26 +378,26 @@ export function CleoPersonalitySettings() {
             max={100}
             min={0}
             step={10}
-            className="w-full"
+            className="w-full max-w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Calmada</span>
-            <span>Muy entusiasta</span>
+            <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Calm</span>
+            <span>Very enthusiastic</span>
           </div>
-        </div>
+          </div>
 
-        {/* Helpfulness Level */}
-        <div className="space-y-3">
+          {/* Helpfulness Level */}
+          <div className="space-y-3 min-w-0">
           <div className="flex items-center justify-between">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <label className="flex cursor-help items-center gap-2 text-sm font-medium">
+          <label className="flex cursor-help items-center gap-2 text-sm font-medium">
                     <LightbulbIcon className="size-4" />
-                    Proactividad útil
+          Helpful proactivity
                   </label>
                 </TooltipTrigger>
-                <TooltipContent>Grado de orientación a soluciones y pasos concretos.</TooltipContent>
+        <TooltipContent>Degree of solution‑orientation and concrete steps.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <span className="text-sm text-muted-foreground">{localSettings.helpfulnessLevel}%</span>
@@ -401,21 +408,22 @@ export function CleoPersonalitySettings() {
             max={100}
             min={0}
             step={10}
-            className="w-full"
+            className="w-full max-w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Respuestas básicas</span>
-            <span>Muy orientada a soluciones</span>
+            <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Basic responses</span>
+            <span>Highly solution‑oriented</span>
+          </div>
           </div>
         </div>
 
-        {/* Additional Switches */}
-        <div className="space-y-4 border-t pt-4">
+  {/* Additional Switches */}
+  <div className="space-y-4 border-t pt-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">Usar emojis</label>
+              <label className="text-sm font-medium">Use emojis</label>
               <p className="text-xs text-muted-foreground">
-                Incluir emojis en las respuestas para mayor expresividad
+                Include emojis in responses for extra expressiveness
               </p>
             </div>
             <Switch
@@ -426,9 +434,9 @@ export function CleoPersonalitySettings() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">Modo proactivo</label>
+              <label className="text-sm font-medium">Proactive mode</label>
               <p className="text-xs text-muted-foreground">
-                Ofrecer sugerencias y hacer preguntas de seguimiento
+                Offer suggestions and ask follow‑up questions
               </p>
             </div>
             <Switch
@@ -439,16 +447,16 @@ export function CleoPersonalitySettings() {
         </div>
 
         {/* Custom Style */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Instrucciones de estilo personalizadas</label>
+    <div className="space-y-2">
+          <label className="text-sm font-medium">Custom style instructions</label>
           <Textarea
             value={localSettings.customStyle}
             onChange={(e) => {
               const val = e.target.value.slice(0, 500)
               setAndSave({ customStyle: val })
             }}
-            placeholder="Opcional: añade indicaciones específicas sobre el tono, vocabulario o límites."
-            className="min-h-24"
+            placeholder="Optional: add specific guidance about tone, vocabulary, or boundaries."
+      className="min-h-24"
           />
           <div className="text-right text-xs text-muted-foreground">
             {localSettings.customStyle.length}/500
@@ -460,10 +468,10 @@ export function CleoPersonalitySettings() {
       <div className="rounded-lg border p-4">
         <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
           <LightbulbIcon className="size-4" />
-          Vista previa del estilo actual
+          Style preview
         </h4>
         <div className="rounded-md bg-muted/30 p-3 text-sm">
-          <p className="mb-2 font-medium">Ejemplo de respuesta:</p>
+          <p className="mb-2 font-medium">Example response:</p>
           <div className="italic">
             {(() => {
               const base = personalityTypes.find((p) => p.id === localSettings.personalityType)?.example || ""
@@ -473,19 +481,19 @@ export function CleoPersonalitySettings() {
           </div>
           <div className="mt-3 flex gap-2 text-xs">
             <Badge variant="outline">
-              Creatividad: {localSettings.creativityLevel}%
+              Creativity: {localSettings.creativityLevel}%
             </Badge>
             <Badge variant="outline">
-              Formalidad: {localSettings.formalityLevel}%
+              Formality: {localSettings.formalityLevel}%
             </Badge>
             <Badge variant="outline">
-              Entusiasmo: {localSettings.enthusiasmLevel}%
+              Enthusiasm: {localSettings.enthusiasmLevel}%
             </Badge>
             <Badge variant="outline">
-              Utilidad: {localSettings.helpfulnessLevel}%
+              Helpfulness: {localSettings.helpfulnessLevel}%
             </Badge>
-            <Badge variant="outline">Emojis: {localSettings.useEmojis ? "Sí" : "No"}</Badge>
-            <Badge variant="outline">Proactiva: {localSettings.proactiveMode ? "Sí" : "No"}</Badge>
+            <Badge variant="outline">Emojis: {localSettings.useEmojis ? "Yes" : "No"}</Badge>
+            <Badge variant="outline">Proactive: {localSettings.proactiveMode ? "Yes" : "No"}</Badge>
           </div>
           <div className="mt-3 flex justify-end gap-2">
             <Button
@@ -494,10 +502,10 @@ export function CleoPersonalitySettings() {
               onClick={() => {
                 const prompt = generatePersonalizedPrompt("preview-model", localSettings)
                 navigator.clipboard.writeText(prompt)
-                toast({ title: "Prompt copiado al portapapeles" })
+                toast({ title: "Prompt copied to clipboard" })
               }}
             >
-              Copiar prompt
+              Copy prompt
             </Button>
           </div>
         </div>
@@ -506,7 +514,7 @@ export function CleoPersonalitySettings() {
       {/* Reset Button */}
       <div className="flex justify-end border-t pt-4">
         <Button variant="outline" onClick={resetToDefaults}>
-          Restaurar valores por defecto
+          Restore defaults
         </Button>
       </div>
     </div>

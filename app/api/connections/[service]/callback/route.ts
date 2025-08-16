@@ -86,14 +86,7 @@ export async function GET(
       updated_at: new Date().toISOString()
     }
     
-    console.log('🔧 [OAuth] Storing connection data:', {
-      service,
-      userId: userData.user.id,
-      connected: true,
-      hasAccessToken: !!tokenData.access_token,
-      hasRefreshToken: !!tokenData.refresh_token,
-      accountEmail: accountInfo?.email
-    })
+    // Store connection data
 
     const { error: dbError } = await (supabase as any)
       .from("user_service_connections")
@@ -104,7 +97,7 @@ export async function GET(
       return NextResponse.redirect(`${returnTo}?error=storage_failed`)
     }
     
-    console.log('🔧 [OAuth] Connection stored successfully')
+    // Connection stored successfully
 
     // Close popup window and notify opener. If no opener, redirect to Settings > Connections.
     const targetOrigin = (() => { try { return new URL(returnTo).origin } catch { return baseUrl } })()

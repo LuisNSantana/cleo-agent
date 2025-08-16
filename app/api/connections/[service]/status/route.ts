@@ -28,11 +28,7 @@ export async function GET(
       .eq("service_id", service)
       .single()
 
-    console.log(`🔍 Checking connection status for service "${service}" and user "${userData.user.id}":`, {
-      hasConnection: !!connection,
-      connected: connection?.connected,
-      error: error?.code || error?.message
-    })
+    // Connection status check completed
 
     if (error && error.code !== "PGRST116") { // PGRST116 is "not found"
       console.error("Error fetching connection status:", error)

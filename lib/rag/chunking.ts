@@ -37,9 +37,6 @@ export function chunkMarkdown(md: string, opts?: ChunkOptions): Chunk[] {
   const { maxTokens, overlapTokens, minChunkChars } = { ...DEFAULT_OPTS, ...opts }
   const totalTokens = approximateTokens(md)
   
-  console.log(`[CHUNK] Starting chunking: ${md.length} chars (~${totalTokens} tokens)`)
-  console.log(`[CHUNK] Config: maxTokens=${maxTokens}, overlap=${overlapTokens}, minChars=${minChunkChars}`)
-  
   const paras = splitIntoParagraphs(md)
   const chunks: Chunk[] = []
   let buffer: string[] = []
@@ -75,11 +72,9 @@ export function chunkMarkdown(md: string, opts?: ChunkOptions): Chunk[] {
   }
   flush(true)
   
-  const totalChunkTokens = chunks.reduce((sum, chunk) => sum + chunk.tokenEstimate, 0)
-  console.log(`[CHUNK] ✅ Created ${chunks.length} chunks (~${totalChunkTokens} tokens total)`)
-  chunks.forEach((chunk, i) => {
-    console.log(`[CHUNK]   ${i + 1}: ${chunk.tokenEstimate} tokens, ${chunk.text.length} chars`)
-  })
+  
+  // Essential chunking log only
+  console.log(`[CHUNK] Created ${chunks.length} chunks from ${md.length} chars`)
   
   return chunks
 }

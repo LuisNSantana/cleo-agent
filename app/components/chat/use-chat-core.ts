@@ -109,28 +109,38 @@ export function useChatCore({
   const { preferences } = useUserPreferences()
   
   // Generate dynamic system prompt with current model info and personality settings
-  const systemPrompt = useMemo(() => {
-    if (user?.system_prompt) {
-      return user.system_prompt
-    }
+    const systemPrompt = useMemo(() => {
+      // Get current model name for logging
+      const currentModelName = sanitizeModelName(selectedModel || "unknown-model")
 
-    // Get current model name for logging
-    const currentModelName = sanitizeModelName(selectedModel || "unknown-model")
+      // Build the base Cleo prompt (personality-aware if available)
+      let basePrompt: string
+      if (preferences.personalitySettings) {
+        try {
+          console.log('[Chat][SystemPrompt] Using personality settings', {
+            personalityType: preferences.personalitySettings.personalityType,
+            model: currentModelName,
+          })
+        } catch {}
+        basePrompt = generatePersonalizedPrompt(currentModelName, preferences.personalitySettings)
+      } else {
+        try {
+          console.log('[Chat][SystemPrompt] Using default prompt', { model: currentModelName })
+        } catch {}
+        basePrompt = getCleoPrompt(currentModelName, "default")
+      }
 
-    // Use personality settings if available, otherwise fall back to default
-    if (preferences.personalitySettings) {
-      try {
-        console.log('[Chat][SystemPrompt] Using personality settings', {
-          personalityType: preferences.personalitySettings.personalityType,
-          model: currentModelName,
-        })
-      } catch {}
-      return generatePersonalizedPrompt(currentModelName, preferences.personalitySettings)
-    }
+      // If the user has a custom system prompt, append it as an addendum instead of replacing
+      if (user?.system_prompt && user.system_prompt.trim().length > 0) {
+        const addendum = user.system_prompt.trim()
+        try {
+          console.log('[Chat][SystemPrompt] Appending user addendum to base prompt', { addendumLen: addendum.length })
+        } catch {}
+        return `${basePrompt}\n\nUSER ADDENDUM:\n${addendum}`
+      }
 
-    // Return Cleo's default prompt with current model info
-    return getCleoPrompt(currentModelName, "default")
-  }, [user?.system_prompt, selectedModel, preferences.personalitySettings])
+      return basePrompt
+    }, [user?.system_prompt, selectedModel, preferences.personalitySettings])
 
   // Search params handling
   const searchParams = useSearchParams()
@@ -159,8 +169,6 @@ export function useChatCore({
   const [status, setStatus] = useState<"ready" | "in_progress" | "error">(
     "ready"
   )
-  const [error, setError] = useState<Error | null>(null)
-
   // Map internal status to Conversation component expected status
   const conversationStatus = useMemo(() => {
     switch (status) {
@@ -186,130 +194,96 @@ export function useChatCore({
   }, [status])
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Custom sendMessage function
+  // Error state for UI consumers
+  const [error, setError] = useState<Error | null>(null)
+
+  // Core sendMessage with SSE streaming handling
   const sendMessage = useCallback(
     async ({
       text,
       files,
+      experimental_attachments,
     }: {
       text: string
       files?: FileList
-      experimental_attachments?: unknown[]
+      experimental_attachments?: any[]
     }) => {
-      // For guest users, get or create a proper guest user ID
-      let effectiveUserId: string | null = user?.id || null
-      if (!effectiveUserId) {
-        effectiveUserId = await getOrCreateGuestUserId(user)
-        if (!effectiveUserId) {
-          handleError(new Error("Unable to create user session"))
-          return
-        }
-      }
-
-      let effectiveChatId = chatId
-      if (!effectiveChatId) {
-        effectiveChatId = await ensureChatExists(effectiveUserId, text)
-        if (!effectiveChatId) {
-          handleError(new Error("Unable to create chat session"))
-          return
-        }
-      }
-
-      setStatus("in_progress")
-      setError(null)
-
-      // Process files if any (following AI SDK v5 pattern)
-      const parts: Array<{
-        type: "text" | "file"
-        text?: string
-        mediaType?: string
-        url?: string
-        name?: string
-      }> = [{ type: "text", text }]
-
-      if (files && files.length > 0) {
-        // Convert files to data URLs (like AI SDK v5 does automatically)
-        const fileDataUrls = await Promise.all(
-          Array.from(files).map(
-            (file) =>
-              new Promise<{
-                type: "file"
-                mediaType: string
-                url: string
-                name: string
-              }>((resolve, reject) => {
-                const reader = new FileReader()
-                reader.onload = () => {
-                  const result = {
-                    type: "file" as const,
-                    mediaType: file.type,
-                    url: reader.result as string,
-                    name: file.name,
-                  }
-                  resolve(result)
-                }
-                reader.onerror = (error) => {
-                  reject(error)
-                }
-                reader.readAsDataURL(file)
-              })
-          )
-        )
-
-        parts.push(...fileDataUrls)
-      }
-
-      // Create attachments for display (convert file parts to attachment format)
-      const attachments = parts
-        .filter((part) => part.type === "file")
-        .map((part) => ({
-          name: part.name || "file",
-          contentType: part.mediaType || "application/octet-stream",
-          url: part.url || "",
-        }))
-
-      // Add user message immediately
+      // Optimistically add the user message
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "user",
-        content: parts.length > 1 ? parts : text, // Use multimodal content if files, otherwise text
+        content: text,
         createdAt: new Date(),
-        parts: parts,
-        experimental_attachments:
-          attachments.length > 0 ? attachments : undefined,
-      } as ChatMessage
+        parts: [{ type: "text", text }],
+        ...(experimental_attachments ? { experimental_attachments } : {}),
+      }
+      setMessages((prev) => [...prev, userMessage])
 
-      setMessages((prev: ChatMessage[]) => [...prev, userMessage])
-      cacheAndAddMessage(convertToMessageAISDK(userMessage))
+      // Prepare controller
+      if (abortControllerRef.current) {
+        try { abortControllerRef.current.abort() } catch {}
+      }
+      abortControllerRef.current = new AbortController()
+      setStatus("in_progress")
+      setError(null)
 
       try {
-        abortControllerRef.current = new AbortController()
+        const effectiveUserId = isAuthenticated
+          ? (user?.id as string)
+          : await getOrCreateGuestUserId(user)
+        if (!effectiveUserId) {
+          throw new Error('Unable to resolve a user id (guest sign-in failed)')
+        }
+
+        // Ensure chat exists if needed
+        let effectiveChatId = chatId
+        try {
+          if (!effectiveChatId && ensureChatExists) {
+            effectiveChatId = await ensureChatExists(effectiveUserId, text)
+          }
+        } catch (e) {
+          console.warn("[Chat] ensureChatExists failed", e)
+        }
+        if (!effectiveChatId) {
+          throw new Error('Unable to create or locate a chat session')
+        }
 
         const response = await fetch(API_ROUTE_CHAT, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: [...messages, userMessage],
-            chatId: effectiveChatId,
             userId: effectiveUserId,
+            chatId: effectiveChatId,
             model: selectedModel,
             isAuthenticated,
             systemPrompt,
             enableSearch,
+            messages: [...messages, userMessage].map(convertToMessageAISDK),
           }),
           signal: abortControllerRef.current.signal,
         })
 
+        try {
+          console.log('[PromptDiag][Client] Sending chat', {
+            model: selectedModel,
+            enableSearch,
+            sysLen: (systemPrompt || '').length,
+          })
+        } catch {}
+
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to send message")
+          let errText = "Failed to send message"
+          try {
+            const errorData = await response.json()
+            errText = errorData.error || errText
+          } catch {}
+          throw new Error(errText)
         }
 
         const reader = response.body?.getReader()
         if (!reader) throw new Error("No response body")
 
+        // Prepare assistant placeholder
         let buffer = ""
         const assistantMessageObj: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -468,6 +442,20 @@ export function useChatCore({
                         })
                       }
                     }
+
+                    // Capture finish-event text if present and no text part exists
+                    try {
+                      const finishText = typeof (data?.text) === 'string' ? (data.text as string) : ''
+                      const hasAnyTextPart = assistantMessageObj.parts.some((p: any) => p.type === 'text' && (p.text || '').trim().length > 0)
+                      if (finishText && !hasAnyTextPart) {
+                        assistantMessageObj.parts.push({ type: 'text', text: finishText })
+                        assistantMessageObj.content = finishText
+                        console.log('[STREAM] Captured final text from finish event (no prior text-delta)')
+                      }
+                    } catch {}
+
+                    // DISABLED: Fallback synthesis system - let the model generate its own responses
+                    console.log('[STREAM] Finish processing complete - letting model handle its own response generation')
                     break
 
                   case "finish-step":
@@ -529,8 +517,7 @@ export function useChatCore({
           handleError(error)
         }
       }
-    },
-    [
+    }, [
       user,
       chatId,
       selectedModel,
@@ -541,8 +528,7 @@ export function useChatCore({
       cacheAndAddMessage,
       handleError,
       ensureChatExists,
-    ]
-  )
+    ])
 
   // Stop function
   const stop = useCallback(() => {

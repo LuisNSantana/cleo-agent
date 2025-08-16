@@ -35,17 +35,26 @@ export function encryptKey(plaintext: string): {
 }
 
 export function decryptKey(encryptedData: string, ivHex: string): string {
-  const [encrypted, authTagHex] = encryptedData.split(":")
+  const [encrypted, authTagHex] = (encryptedData || '').split(":")
+  if (!encrypted || !authTagHex || !ivHex) {
+    throw new Error('Invalid encrypted payload for decryptKey')
+  }
   const iv = Buffer.from(ivHex, "hex")
   const authTag = Buffer.from(authTagHex, "hex")
 
   const decipher = createDecipheriv(ALGORITHM, getKey(), iv)
   decipher.setAuthTag(authTag)
 
-  let decrypted = decipher.update(encrypted, "hex", "utf8")
-  decrypted += decipher.final("utf8")
-
-  return decrypted
+  try {
+    let decrypted = decipher.update(encrypted, "hex", "utf8")
+    decrypted += decipher.final("utf8")
+    return decrypted
+  } catch {
+    // Common with AES-GCM when key/iv/tag don't match (rotated key or corrupted data)
+    throw new Error(
+      "Unsupported state or unable to authenticate data: likely ENCRYPTION_KEY changed/rotated, IV mismatch, or corrupted ciphertext. Re-save the provider API key in Settings to re-encrypt with the current ENCRYPTION_KEY."
+    )
+  }
 }
 
 export function maskKey(key: string): string {

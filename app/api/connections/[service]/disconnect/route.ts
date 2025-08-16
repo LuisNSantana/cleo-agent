@@ -21,7 +21,7 @@ export async function POST(
     }
 
     // Update the connection status to disconnected and clear tokens
-    console.log(`🔧 [Disconnect] Disconnecting ${service} for user:`, userData.user.id)
+    // Disconnect service for user
     
     const { error } = await (supabase as any)
       .from("user_service_connections")
@@ -41,7 +41,7 @@ export async function POST(
       return NextResponse.json({ error: "Failed to disconnect service" }, { status: 500 })
     }
 
-    console.log(`🔧 [Disconnect] Successfully disconnected ${service}`)
+    // Successfully disconnected service
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error(`Error disconnecting ${service}:`, error)

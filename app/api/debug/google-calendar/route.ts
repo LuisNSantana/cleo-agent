@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log('Debugging Google Calendar connection for user:', userData.user.id)
+    // Debug Google Calendar connection
 
     // Check Google Calendar connection
     const { data: connection, error } = await (supabase as any)
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .eq("service_id", "google-calendar")
       .single()
 
-    console.log('Connection query result:', { connection, error })
+    // Connection query completed
 
     if (error && error.code !== "PGRST116") {
       console.error("Error fetching Google Calendar connection:", error)
