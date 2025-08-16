@@ -47,7 +47,8 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   const dynamicTopK = opts.topK || 10
   const chunkLimit = 10 // Reducido para dejar más espacio de salida
   
-  // RAG diagnostic logs removed for cleaner output
+  // DEBUG: Log the search query being used
+  console.log('[RAG] DEBUG - Search query:', JSON.stringify(query.slice(0, 200)))
   const queryTokens = Math.ceil(query.length / 4)
   
   const supabase = await createClient()
@@ -168,23 +169,19 @@ async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk
 export function buildContextBlock(chunks: RetrievedChunk[], maxChars = 6000) {
   if (!chunks.length) return ''
   const lines: string[] = []
-  lines.push('--- Retrieved Context (most relevant first) ---')
+  lines.push('=== USER CONTEXT (relevant information found) ===')
+  lines.push('')
   for (const c of chunks) {
-    let header = `[doc:${(c.document_id||'').toString().slice(0,8)} idx:${c.chunk_index}]`
-    
-    // Add scoring info for debugging
-    if (c.rerank_score !== undefined) {
-      header += ` rerank:${c.rerank_score.toFixed(3)}`
-    } else if (c.hybrid_score !== undefined) {
-      header += ` hybrid:${c.hybrid_score.toFixed(3)}`
-    } else {
-      header += ` sim:${(c.similarity??0).toFixed(3)}`
-    }
+    // User-friendly header in English
+    let header = `📄 Document (relevance: ${(c.rerank_score || c.hybrid_score || c.similarity || 0).toFixed(2)})`
     
     lines.push(header)
     lines.push(c.content?.trim() || '')
+    lines.push('')
     lines.push('---')
+    lines.push('')
     if (lines.join('\n').length > maxChars) break
   }
+  lines.push('=== END OF CONTEXT ===')
   return lines.join('\n')
 }

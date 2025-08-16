@@ -1,18 +1,27 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { DateTime } from 'luxon'  // Nueva dep: yarn add luxon (para mejor handling de dates/timezones)
 
+// Cache simple para tokens (in-memory, exp 5min)
+const tokenCache: Record<string, { token: string; expiry: number }> = {}
+
+// Mejora: Función refresh token optimizada con cache y retry
 async function getGoogleCalendarAccessToken(userId: string): Promise<string | null> {
-  console.log('🔍 Getting Google Calendar access token for user:', userId)
+  console.log('🔍 Fetching Google Calendar token for user:', userId)
   
+  const cacheKey = `gcal:${userId}`
+  const cached = tokenCache[cacheKey]
+  if (cached && cached.expiry > Date.now()) {
+    console.log('🔍 Token cache hit')
+    return cached.token
+  }
+
   try {
     const supabase = await createClient()
-    if (!supabase) {
-      console.error('❌ Failed to create Supabase client')
-      return null
-    }
+    if (!supabase) return null
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
@@ -20,33 +29,26 @@ async function getGoogleCalendarAccessToken(userId: string): Promise<string | nu
       .eq('connected', true)
       .single()
 
-    console.log('🔍 Database query result:', {
-      hasData: !!data,
-      error: error,
-      hasAccessToken: data?.access_token ? 'yes' : 'no',
-      hasRefreshToken: data?.refresh_token ? 'yes' : 'no',
-      tokenExpiresAt: data?.token_expires_at
-    })
-
     if (error || !data) {
-      console.error('No Google Calendar connection found:', error)
+      console.error('No connection:', error)
       return null
     }
 
-    // Check if token is expired or missing expiry, and refresh if necessary
-    const now = new Date()
-    const expiresAt = data.token_expires_at ? new Date(data.token_expires_at) : null
-    const shouldRefresh = (!expiresAt || now >= expiresAt) && data.refresh_token
+    const now = Date.now()
+    const expiresAt = data.token_expires_at ? new Date(data.token_expires_at).getTime() : 0
+    if (expiresAt > now + 300000 && data.access_token) {  // 5min buffer
+      tokenCache[cacheKey] = { token: data.access_token, expiry: expiresAt }
+      return data.access_token
+    }
 
-    if (shouldRefresh) {
-      console.log('Token expired or missing expiry, attempting refresh...')
+    if (!data.refresh_token) return null
+
+    // Refresh con retry (max 2)
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        // Refresh the token
         const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
             client_id: process.env.GOOGLE_CLIENT_ID!,
             client_secret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -56,53 +58,36 @@ async function getGoogleCalendarAccessToken(userId: string): Promise<string | nu
         })
 
         if (!refreshResponse.ok) {
-          const errorText = await refreshResponse.text()
-          console.error('Failed to refresh Google token:', errorText)
-          // Marcar como desconectado si el refresh falla
-          await (supabase as any)
-            .from('user_service_connections')
-            .update({ connected: false })
-            .eq('user_id', userId)
-            .eq('service_id', 'google-calendar')
-          return null
+          const errText = await refreshResponse.text()
+          console.error(`Refresh failed (attempt ${attempt}):`, errText)
+          if (attempt === 2) {
+            await supabase.from('user_service_connections').update({ connected: false }).eq('user_id', userId).eq('service_id', 'google-calendar')
+            return null
+          }
+          await new Promise(r => setTimeout(r, 1000))  // 1s backoff
+          continue
         }
 
         const tokenData = await refreshResponse.json()
-        const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000)
+        const newExpiresAt = new Date(now + tokenData.expires_in * 1000).toISOString()
 
-        // Update the token in the database
-        const { error: updateError } = await (supabase as any)
-          .from('user_service_connections')
-          .update({
-            access_token: tokenData.access_token,
-            token_expires_at: newExpiresAt.toISOString(),
-            connected: true
-          })
-          .eq('user_id', userId)
-          .eq('service_id', 'google-calendar')
+        await supabase.from('user_service_connections').update({
+          access_token: tokenData.access_token,
+          token_expires_at: newExpiresAt,
+          connected: true
+        }).eq('user_id', userId).eq('service_id', 'google-calendar')
 
-        if (updateError) {
-          console.error('Failed to update refreshed token:', updateError)
-          return null
-        }
-
-        console.log('Token refreshed successfully')
+        tokenCache[cacheKey] = { token: tokenData.access_token, expiry: now + tokenData.expires_in * 1000 }
+        console.log('Token refreshed')
         return tokenData.access_token
-      } catch (refreshError) {
-        console.error('Error refreshing token:', refreshError)
-        // Marcar como desconectado si el refresh falla
-        await (supabase as any)
-          .from('user_service_connections')
-          .update({ connected: false })
-          .eq('user_id', userId)
-          .eq('service_id', 'google-calendar')
-        return null
+      } catch (e) {
+        console.error('Refresh error:', e)
+        if (attempt === 2) return null
       }
     }
-
-    return data.access_token
-  } catch (error) {
-    console.error('Error getting Google Calendar access token:', error)
+    return null
+  } catch (e) {
+    console.error('Token fetch error:', e)
     return null
   }
 }
@@ -119,224 +104,175 @@ async function makeGoogleCalendarRequest(accessToken: string, endpoint: string, 
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Google Calendar API error: ${response.status} ${errorText}`)
+    throw new Error(`API error: ${response.status} - ${errorText}`)
   }
 
   return response.json()
 }
 
-// 📅 List upcoming calendar events
+// 📅 List upcoming calendar events - Mejorado: Soporte timezones, recurring expand, human-readable dates, filter by keyword
 export const listCalendarEventsTool = tool({
-  description: '📅 List upcoming events from Google Calendar. ALWAYS use this when user asks about their schedule, calendar, events, meetings, or what they have planned for any specific day (like Monday, today, tomorrow, etc.). Shows events for the next 7 days by default unless specified otherwise. IMPORTANT: The current date is August 7, 2025. When user asks about "Monday" or future dates, use 2025 dates.',
+  description: '📅 List upcoming events from Google Calendar. Use when user asks about schedule, events, meetings. Defaults to next 7 days from August 17, 2025. Supports timezone (default Europe/Madrid for Huminary Labs). Returns human-readable dates and filters.',
   inputSchema: z.object({
-    maxResults: z.number().min(1).max(50).optional().default(25).describe('Maximum number of events to return (1-50). Default is 25.'),
-    timeMin: z.string().optional().describe('Start time filter in ISO 8601 format (e.g. "2025-08-11T00:00:00Z" for Monday August 11, 2025). If not provided, defaults to current time. IMPORTANT: Use 2025 for current year dates.'),
-    timeMax: z.string().optional().describe('End time filter in ISO 8601 format (e.g. "2025-08-11T23:59:59Z" for end of Monday August 11, 2025). If not provided, defaults to 7 days from now. IMPORTANT: Use 2025 for current year dates.'),
-    calendarId: z.string().optional().default('primary').describe('Calendar ID to fetch events from. Use "primary" for the main/default calendar.'),
+    maxResults: z.number().min(1).max(100).optional().default(50).describe('Max events (1-100).'),
+    timeMin: z.string().optional().describe('Start ISO 8601 (e.g., "2025-08-17T00:00:00Z"). Defaults current.'),
+    timeMax: z.string().optional().describe('End ISO 8601. Defaults 7 days ahead.'),
+    timeZone: z.string().optional().default('Europe/Madrid').describe('Timezone for formatting (e.g., "America/New_York").'),
+    calendarId: z.string().optional().default('primary').describe('Calendar ID.'),
+    filterKeyword: z.string().optional().describe('Filter events containing keyword in summary/description.'),
+    singleEvents: z.boolean().optional().default(true).describe('Expand recurring events.')
   }),
-  execute: async ({ maxResults = 25, timeMin, timeMax, calendarId = 'primary' }) => {
-    // Get userId and model from global context (injected by chat handler)
+  execute: async ({ maxResults = 50, timeMin, timeMax, timeZone = 'Europe/Madrid', calendarId = 'primary', filterKeyword, singleEvents = true }) => {
     const userId = (globalThis as any).__currentUserId
-    const currentModel = (globalThis as any).__currentModel
+    const model = (globalThis as any).__currentModel
     
-    // Debug logging for different models
-    console.log('🔧 [Google Calendar] Tool execution started:', {
-      userId: userId ? 'present' : 'missing',
-      model: currentModel || 'unknown',
-      params: {
-        maxResults,
-        timeMin,
-        timeMax,
-        calendarId
-      },
-      currentTime: new Date().toISOString()
-    })
+    console.log('[GCal List] Execution:', { userId, model, params: { maxResults, timeMin, timeMax, timeZone } })
     
     try {
-      if (!userId) {
-        return {
-          success: false,
-          message: 'Authentication required to access Google Calendar',
-          events: [],
-          total_count: 0
-        }
-      }
+      if (!userId) return { success: false, message: 'Auth required', events: [], total: 0 }
 
       const accessToken = await getGoogleCalendarAccessToken(userId)
-      if (!accessToken) {
-        return {
-          success: false,
-          message: 'Google Calendar not connected. Please connect your Google Calendar in Settings > Connections.',
-          events: [],
-          total_count: 0
-        }
+      if (!accessToken) return { success: false, message: 'Connect Google Calendar in Settings', events: [], total: 0 }
+
+      const now = DateTime.now().setZone(timeZone)
+      const defaultMin = timeMin || now.toISO()
+      const defaultMax = timeMax || now.plus({ days: 7 }).toISO()
+
+      // Auto-correct past years (for model issues)
+      let finalMin: string | null = defaultMin
+      let finalMax: string | null = defaultMax
+      if (model.includes('llama') || model.includes('gpt-5')) {  // Expand to GPT-5 if needed
+        finalMin = correctYear(defaultMin, now.year)
+        finalMax = correctYear(defaultMax, now.year)
       }
 
-      // Set default time range if not provided
-      const now = new Date()
-      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-      
-      let finalTimeMin = timeMin || now.toISOString()
-      let finalTimeMax = timeMax || weekFromNow.toISOString()
-      
-      // Validation for Llama 4 Maverick: Check if dates are in the past and auto-correct
-      const timeMinDate = new Date(finalTimeMin)
-      const timeMaxDate = new Date(finalTimeMax)
-      const currentYear = now.getFullYear()
-      
-      if (currentModel === 'llama-4-maverick' && (timeMinDate.getFullYear() < currentYear || timeMaxDate.getFullYear() < currentYear)) {
-        console.log('🚨 [LLAMA 4 MAVERICK] Detected past year dates, auto-correcting:', {
-          originalTimeMin: finalTimeMin,
-          originalTimeMax: finalTimeMax,
-          currentYear
-        })
-        
-        // Auto-correct the year to current year
-        if (timeMinDate.getFullYear() < currentYear) {
-          timeMinDate.setFullYear(currentYear)
-          finalTimeMin = timeMinDate.toISOString()
-        }
-        if (timeMaxDate.getFullYear() < currentYear) {
-          timeMaxDate.setFullYear(currentYear)
-          finalTimeMax = timeMaxDate.toISOString()
-        }
-        
-        console.log('🚨 [LLAMA 4 MAVERICK] Auto-corrected dates:', {
-          correctedTimeMin: finalTimeMin,
-          correctedTimeMax: finalTimeMax
-        })
-      }
-      
-      console.log('🔧 [Google Calendar] Time range:', {
-        finalTimeMin,
-        finalTimeMax,
-        providedTimeMin: timeMin,
-        providedTimeMax: timeMax,
-        defaultRange: `${now.toISOString()} to ${weekFromNow.toISOString()}`
-      })
-      
       const params = new URLSearchParams({
         maxResults: maxResults.toString(),
         orderBy: 'startTime',
-        singleEvents: 'true',
-        timeMin: finalTimeMin,
-        timeMax: finalTimeMax,
+        singleEvents: singleEvents.toString(),
+        timeZone
       })
+
+      // Only add timeMin/timeMax when present to avoid passing null to URLSearchParams
+      if (finalMin) params.append('timeMin', finalMin)
+      if (finalMax) params.append('timeMax', finalMax)
 
       const data = await makeGoogleCalendarRequest(accessToken, `calendars/${calendarId}/events?${params}`)
 
-      console.log('🔧 [Google Calendar] API Response:', {
-        totalItems: data.items?.length || 0,
-        hasItems: !!data.items,
-        firstEventSummary: data.items?.[0]?.summary || 'none',
-        allEventSummaries: data.items?.map((e: any) => e.summary) || []
-      })
+      type CalendarEvent = {
+        id: string
+        summary: string
+        description: string
+        start: string
+        end: string
+        location: string
+        attendees: string
+        status: string
+        htmlLink?: string
+      }
 
-      const events = data.items?.map((event: any) => ({
+      let events: CalendarEvent[] = data.items?.map((event: any): CalendarEvent => ({
         id: event.id,
         summary: event.summary || 'No title',
         description: event.description || '',
-        start: event.start.dateTime || event.start.date,
-        end: event.end.dateTime || event.end.date,
+        start: formatDate(event.start.dateTime || event.start.date, timeZone),
+        end: formatDate(event.end.dateTime || event.end.date, timeZone),
         location: event.location || '',
-        attendees: event.attendees?.map((attendee: any) => attendee.email).join(', ') || '',
+        attendees: event.attendees?.map((a: any) => a.email).join(', ') || '',
         status: event.status,
         htmlLink: event.htmlLink,
       })) || []
 
-      const result = {
-        success: true,
-        message: `Found ${events.length} upcoming events`,
-        events,
-        total_count: events.length
+      // Filter by keyword if provided
+      if (filterKeyword) {
+        const lowerKeyword = filterKeyword.toLowerCase()
+        events = events.filter((e: CalendarEvent) => 
+          e.summary.toLowerCase().includes(lowerKeyword) || 
+          e.description.toLowerCase().includes(lowerKeyword)
+        )
       }
 
-      return result
-    } catch (error) {
-      console.error('Error listing calendar events:', error)
       return {
-        success: false,
-        message: `Failed to fetch calendar events: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        events: [],
-        total_count: 0
+        success: true,
+        message: `Found ${events.length} events in ${timeZone}`,
+        events,
+        total_count: events.length,
+        timeRange: `${formatDate(finalMin, timeZone)} to ${formatDate(finalMax, timeZone)}`
       }
+    } catch (error) {
+      console.error('[GCal List Error]:', error)
+      const msg = error instanceof Error ? error.message : String(error)
+      return { success: false, message: `Failed: ${msg}`, events: [], total_count: 0 }
     }
   },
 })
 
-// 📅 Create a new calendar event
+// Helper: Format ISO to human-readable
+function formatDate(iso: string | null | undefined, tz: string) {
+  if (!iso) return ''
+  const dt = DateTime.fromISO(iso, { zone: tz })
+  return dt.isValid ? dt.toFormat('yyyy-MM-dd HH:mm') : ''
+}
+
+// Helper: Correct year if past
+function correctYear(iso: string | null | undefined, currentYear: number): string | null {
+  if (!iso) return null
+  const dt = DateTime.fromISO(iso)
+  if (!dt.isValid) return null
+  return dt.year < currentYear ? dt.set({ year: currentYear }).toISO() : dt.toISO()
+}
+
+// 📅 Create a new calendar event - Mejorado: Reminders, auto-Meet, validation, timezone handling
 export const createCalendarEventTool = tool({
-  description: '📅 Create a new event in Google Calendar. Use this when user wants to schedule meetings, appointments, or reminders. Supports time zones, attendees, and locations.',
+  description: '📅 Create event in Google Calendar. Use for scheduling. Supports timezones (default Europe/Madrid), reminders, auto Google Meet if "meeting". Validates dates/emails.',
   inputSchema: z.object({
-    summary: z.string().min(1).describe('Event title/summary (required) - be descriptive'),
-    description: z.string().optional().describe('Event description or additional details'),
-    startDateTime: z.string().describe('Event start time in ISO 8601 format (e.g., "2024-08-07T14:00:00" for 2:00 PM)'),
-    endDateTime: z.string().describe('Event end time in ISO 8601 format (e.g., "2024-08-07T15:00:00" for 3:00 PM)'),
-    timeZone: z.string().optional().default('UTC').describe('Time zone for the event (e.g., "America/New_York", "Europe/Madrid") - use user\'s timezone if known'),
-    location: z.string().optional().describe('Event location, meeting room, or virtual meeting link'),
-    attendees: z.array(z.string().email()).optional().describe('List of attendee email addresses to invite'),
-    calendarId: z.string().optional().default('primary').describe('Calendar ID to create event in. Use "primary" for the main calendar.'),
+    summary: z.string().min(1).describe('Title (required).'),
+    description: z.string().optional().describe('Details.'),
+    startDateTime: z.string().describe('Start ISO 8601 (e.g., "2025-08-17T14:00:00").'),
+    endDateTime: z.string().describe('End ISO 8601.'),
+    timeZone: z.string().optional().default('Europe/Madrid').describe('Timezone (Huminary default).'),
+    location: z.string().optional().describe('Location or link.'),
+    attendees: z.array(z.string().email()).optional().describe('Emails to invite.'),
+    calendarId: z.string().optional().default('primary').describe('Calendar ID.'),
+    reminders: z.array(z.object({ method: z.enum(['email', 'popup']), minutes: z.number().min(0) })).optional().describe('Reminders (e.g., [{method: "email", minutes: 30}]).'),
+    addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
-  execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'UTC', location, attendees, calendarId = 'primary' }) => {
-    // Get userId from global context (injected by chat handler)
+  execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
     const userId = (globalThis as any).__currentUserId
     
     try {
-      if (!userId) {
-        return {
-          success: false,
-          message: 'Authentication required to create calendar events',
-          error: 'User not authenticated'
-        }
-      }
+      if (!userId) return { success: false, message: 'Auth required' }
 
       const accessToken = await getGoogleCalendarAccessToken(userId)
-      if (!accessToken) {
-        return {
-          success: false,
-          message: 'Google Calendar not connected. Please connect your Google Calendar in Settings > Connections.',
-          error: 'No Google Calendar connection'
-        }
+      if (!accessToken) return { success: false, message: 'Connect Google Calendar' }
+
+      // Validate dates with Luxon
+      const start = DateTime.fromISO(startDateTime, { zone: timeZone })
+      const end = DateTime.fromISO(endDateTime, { zone: timeZone })
+      if (!start.isValid || !end.isValid || start >= end) {
+        return { success: false, message: 'Invalid dates/timezone. Start must be before end.' }
       }
 
-      // Validate date formats
-      const startDate = new Date(startDateTime)
-      const endDate = new Date(endDateTime)
-      
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return {
-          success: false,
-          message: 'Invalid date format. Please use ISO 8601 format (e.g., "2024-01-15T10:00:00")',
-          error: 'Invalid date format'
-        }
-      }
+      // Auto-conference if keyword or flag
+      const needsConference = addConference || /meeting|reunión|call|conference/i.test(summary)
 
-      if (startDate >= endDate) {
-        return {
-          success: false,
-          message: 'Start time must be before end time',
-          error: 'Invalid time range'
-        }
-      }
-
-      const eventData = {
+      const eventData: any = {
         summary,
         description,
-        start: {
-          dateTime: startDateTime,
-          timeZone,
-        },
-        end: {
-          dateTime: endDateTime,
-          timeZone,
-        },
+        start: { dateTime: start.toISO(), timeZone },
+        end: { dateTime: end.toISO(), timeZone },
         location,
         attendees: attendees?.map(email => ({ email })),
+        reminders: reminders ? { useDefault: false, overrides: reminders } : { useDefault: true }
+      }
+
+      if (needsConference) {
+        eventData.conferenceData = { createRequest: { conferenceSolutionKey: { type: 'hangoutsMeet' }, requestId: `random-${Date.now()}` } }
       }
 
       const data = await makeGoogleCalendarRequest(
         accessToken,
-        `calendars/${calendarId}/events`,
+        `calendars/${calendarId}/events${needsConference ? '?conferenceDataVersion=1' : ''}`,
         {
           method: 'POST',
           body: JSON.stringify(eventData),
@@ -345,31 +281,29 @@ export const createCalendarEventTool = tool({
 
       return {
         success: true,
-        message: `Successfully created event "${summary}"`,
+        message: `Created "${summary}"`,
         event: {
           id: data.id,
-          summary: data.summary || 'No title',
+          summary: data.summary,
           description: data.description || '',
-          start: data.start.dateTime || data.start.date,
-          end: data.end.dateTime || data.end.date,
+          start: formatDate(data.start.dateTime || data.start.date, timeZone),
+          end: formatDate(data.end.dateTime || data.end.date, timeZone),
           location: data.location || '',
-          attendees: data.attendees?.map((attendee: any) => attendee.email).join(', ') || '',
+          attendees: data.attendees?.map((a: any) => a.email).join(', ') || '',
           status: data.status,
           htmlLink: data.htmlLink,
+          hangoutLink: data.hangoutsLink || data.conferenceData?.entryPoints?.[0]?.uri
         }
       }
     } catch (error) {
-      console.error('Error creating calendar event:', error)
-      return {
-        success: false,
-        message: `Failed to create calendar event: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
+      console.error('[GCal Create Error]:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, message: `Failed: ${message}` }
     }
   },
 })
 
-// Export all Google Calendar tools
+// Export
 export const googleCalendarTools = {
   listEvents: listCalendarEventsTool,
   createEvent: createCalendarEventTool

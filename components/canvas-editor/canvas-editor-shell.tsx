@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { ChevronDownIcon, DownloadIcon } from 'lucide-react'
 
 // Phase 1: plain textarea (rich mode real editor deferred)
 
@@ -242,54 +244,78 @@ export function CanvasEditorShell({
                   {remoteSaving ? '⟳ Guardando...' : remoteSavedAt ? '✓ Guardado' : '💾 Guardar'}
                 </button>
               )}
-              <button
-                onClick={() => {
-                  const base = mode === 'rich' && currentHtml ? htmlToPlain(currentHtml) : currentText
-                  exportContent({ format: 'txt', content: base })
-                }}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors"
-                title="Exportar como archivo de texto"
-              >📄 TXT</button>
-              <button
-                onClick={() => {
-                  if (mode === 'rich' && currentHtml) {
-                    exportContent({ format: 'md', content: htmlToMarkdown(currentHtml) })
-                  } else {
-                    exportContent({ format: 'md', content: currentText })
-                  }
-                }}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors"
-                title="Exportar como archivo Markdown"
-              >🔤 MD</button>
-              <button
-                onClick={() => {
-                  // Exportar PDF vía ventana de impresión
-                  const title = (filename || 'documento').replace(/\.[^.]+$/, '')
-                  const bodyHtml = (mode === 'rich' && currentHtml)
-                    ? currentHtml
-                    : markdownToHtml(currentText)
-                  const html = wrapPrintHtml(title, bodyHtml)
-                  const win = window.open('', '_blank')
-                  if (!win) return
-                  win.document.open()
-                  win.document.write(html)
-                  win.document.close()
-                }}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors"
-                title="Exportar como PDF"
-              >🖨️ PDF</button>
-              <button
-                onClick={() => setDriveOpen(true)}
-                className="rounded-md border px-2 py-1 text-xs flex items-center gap-1 hover:bg-green-200 dark:hover:bg-green-900 transition-colors"
-                title="Subir este documento a tu Google Drive"
-              >
-                <img
-                  src="/icons/google-drive.svg"
-                  alt="Google Drive"
-                  style={{ width: 18, height: 18, verticalAlign: 'middle', display: 'inline-block' }}
-                />
-                <span>Drive</span>
-              </button>
+              
+              {/* Botón de Exportación Desplegable */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="rounded-md border px-2 py-1 text-xs hover:bg-accent transition-colors flex items-center gap-1"
+                    title="Opciones de exportación"
+                  >
+                    <DownloadIcon className="w-3 h-3" />
+                    Exportar
+                    <ChevronDownIcon className="w-3 h-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      const base = mode === 'rich' && currentHtml ? htmlToText(currentHtml) : currentText
+                      exportContent({ format: 'txt', content: base })
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    📄 Archivo de Texto (.txt)
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      if (mode === 'rich' && currentHtml) {
+                        exportContent({ format: 'md', content: htmlToMarkdown(currentHtml) })
+                      } else {
+                        exportContent({ format: 'md', content: currentText })
+                      }
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    🔤 Archivo Markdown (.md)
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      // Exportar PDF vía ventana de impresión
+                      const title = (filename || 'documento').replace(/\.[^.]+$/, '')
+                      const bodyHtml = (mode === 'rich' && currentHtml)
+                        ? currentHtml
+                        : markdownToHtml(currentText)
+                      const html = wrapPrintHtml(title, bodyHtml)
+                      const win = window.open('', '_blank')
+                      if (!win) return
+                      win.document.open()
+                      win.document.write(html)
+                      win.document.close()
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    🖨️ Exportar como PDF
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem 
+                    onClick={() => setDriveOpen(true)}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    <img
+                      src="/icons/google-drive.svg"
+                      alt="Google Drive"
+                      style={{ width: 16, height: 16 }}
+                    />
+                    Subir a Google Drive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
               <button
                 onClick={close}
                 className="rounded-md border border-destructive/50 px-2 py-1 text-xs hover:bg-destructive hover:text-destructive-foreground transition-colors"

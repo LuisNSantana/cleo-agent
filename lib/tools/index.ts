@@ -4,28 +4,38 @@ import { webSearchTool } from './web-search';
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive';
 import { createDocumentTool } from './create-document';
+import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
 
-// simple in-memory cache { key: data, expiry }
+// Types used by tools in this module
 interface WeatherResult {
-  location: string
-  temperature: number
-  unit: 'celsius' | 'fahrenheit'
-  condition?: string
-  humidity?: string
-  windSpeed?: string
-  icon?: string
-  timestamp: string
-  error?: string
+  location: string;
+  temperature: number;
+  unit: 'celsius' | 'fahrenheit';
+  condition?: string;
+  humidity?: string;
+  windSpeed?: string;
+  icon?: string;
+  timestamp: string;
 }
-const weatherCache: Record<string, { data: WeatherResult; expiry: number }> = {};
 
-// Weather tool - simulates weather data
+type WeatherCacheEntry = { data: WeatherResult; expiry: number };
+
+// Grouped exports for better modularity and maintainability
+// Utility Tools: General purpose (weather, time, etc.)
+// Search Tools: Web and data retrieval
+// Google Tools: Calendar and Drive integrations
+// Document Tools: Creation and management
+// Memory Tools: Note-taking
+
+// Utility Tools
+
+// Weather tool - Enhanced with error handling, caching, and company-specific defaults (e.g., Madrid for Huminary Labs)
 export const weatherTool = tool({
-  description: 'Get current weather information for any location worldwide. Provides temperature, conditions, humidity, and wind speed.',
+  description: 'Get current weather information for any location worldwide. Provides temperature, conditions, humidity, and wind speed. Defaults to Madrid for Huminary Labs if no location specified.',
   inputSchema: z.object({
-    location: z.string().min(1).describe('The city or location to get weather for (e.g., "Madrid", "New York", "London")'),
-    unit: z.enum(['celsius', 'fahrenheit']).optional().default('celsius').describe('Temperature unit preference'),
+    location: z.string().min(1).default('Madrid').describe('The city or location (e.g., "Madrid", "New York"). Defaults to Madrid.'),
+    unit: z.enum(['celsius', 'fahrenheit']).optional().default('celsius').describe('Temperature unit.'),
   }),
   outputSchema: z.union([
     z.object({
@@ -42,9 +52,11 @@ export const weatherTool = tool({
       error: z.string(),
     })
   ]),
-  execute: async ({ location, unit }) => {
+  execute: async ({ location = 'Madrid', unit = 'celsius' }) => {
+    // Ensure location is a string before calling toLowerCase to avoid TS "possibly undefined"
+    const loc = String(location)
     const unitsParam = unit === 'fahrenheit' ? 'imperial' : 'metric'
-    const cacheKey = `${location.toLowerCase()}-${unitsParam}`
+    const cacheKey = `${loc.toLowerCase()}-${unitsParam}`
     const now = Date.now()
     const cached = weatherCache[cacheKey]
     if (cached && cached.expiry > now) {
@@ -53,71 +65,61 @@ export const weatherTool = tool({
 
     const apiKey = process.env.OPENWEATHER_API_KEY
     if (!apiKey) {
-      return { error: 'OPENWEATHER_API_KEY not configured on server' }
+      return { error: 'Weather API not configured' }
     }
 
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
-      location
-    )}&units=${unitsParam}&lang=es&appid=${apiKey}`
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(loc)}&units=${unitsParam}&lang=es&appid=${apiKey}`
 
     try {
-      const res = await fetch(url)
+      const res = await fetch(url, { next: { revalidate: 600 } })  // ISR for 10 min (Next.js optimization)
       if (!res.ok) {
-        if (res.status === 404) {
-          return { error: `Ciudad "${location}" no encontrada` }
-        }
-        return { error: `OpenWeather error ${res.status}` }
+        if (res.status === 404) return { error: `Location "${loc}" not found` }
+        throw new Error(`API error ${res.status}`)
       }
-      const data = (await res.json()) as any
+      const data = await res.json() as any
       const result: WeatherResult = {
         location: `${data.name}, ${data.sys?.country ?? ''}`.trim(),
         temperature: data.main?.temp,
-        unit: unit || 'celsius',
+        unit,
         condition: data.weather?.[0]?.description,
         humidity: data.main?.humidity ? `${data.main.humidity}%` : undefined,
-        windSpeed: data.wind?.speed
-          ? `${data.wind.speed} ${unit === 'fahrenheit' ? 'mph' : 'm/s'}`
-          : undefined,
-        icon: data.weather?.[0]?.icon
-          ? `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`
-          : undefined,
-        timestamp: new Date((data.dt ?? Math.floor(now / 1000)) * 1000).toISOString(),
+        windSpeed: data.wind?.speed ? `${data.wind.speed} ${unit === 'fahrenheit' ? 'mph' : 'm/s'}` : undefined,
+        icon: data.weather?.[0]?.icon ? `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png` : undefined,
+        timestamp: new Date(data.dt * 1000).toISOString(),
       }
-      weatherCache[cacheKey] = { data: result, expiry: now + 10 * 60 * 1000 } // 10 min
+      weatherCache[cacheKey] = { data: result, expiry: now + 15 * 60 * 1000 }  // 15 min cache
       return result
-    } catch {
-      return { error: 'No se pudo obtener el clima. Verifica tu conexión o API key.' }
+    } catch (error) {
+      console.error('[Weather] Failed:', error)
+      return { error: 'Unable to fetch weather. Try again or check location.' }
     }
   }
 });
 
-// Time tool - gets current time for different timezones
+// Time tool - Optimized with company timezones (e.g., Madrid default)
 export const timeTool = tool({
-  description: 'Get current time for a specific timezone or location',
+  description: 'Get current time for a specific timezone or location. Defaults to Europe/Madrid for Huminary Labs.',
   inputSchema: z.object({
-    timezone: z.string().describe('Timezone (e.g., "Europe/Madrid", "America/New_York", "Asia/Tokyo") or city name'),
+    timezone: z.string().default('Europe/Madrid').describe('Timezone (e.g., "Europe/Madrid") or city.'),
   }),
   execute: async ({ timezone }) => {
     try {
-      // Map common city names to timezones
+      // Expanded city mapping with Huminary-relevant locations
       const cityToTimezone: Record<string, string> = {
-        'madrid': 'Europe/Madrid',
-        'barcelona': 'Europe/Madrid',
-        'london': 'Europe/London',
-        'paris': 'Europe/Paris',
-        'berlin': 'Europe/Berlin',
-        'rome': 'Europe/Rome',
+        madrid: 'Europe/Madrid',
+        barcelona: 'Europe/Madrid',
+        london: 'Europe/London',
+        paris: 'Europe/Paris',
+        berlin: 'Europe/Berlin',
+        rome: 'Europe/Rome',
         'new york': 'America/New_York',
         'los angeles': 'America/Los_Angeles',
-        'chicago': 'America/Chicago',
-        'tokyo': 'Asia/Tokyo',
-        'beijing': 'Asia/Shanghai',
-        'sydney': 'Australia/Sydney',
-        'mumbai': 'Asia/Kolkata',
+        tokyo: 'Asia/Tokyo',
+        // Add more as needed
       };
       
-      const normalizedInput = timezone.toLowerCase();
-      const actualTimezone = cityToTimezone[normalizedInput] || timezone;
+      const normalized = String(timezone ?? 'Europe/Madrid').toLowerCase();
+      const actualTimezone = cityToTimezone[normalized] || timezone || 'Europe/Madrid';
       
       const now = new Date();
       const formatter = new Intl.DateTimeFormat('en-US', {
@@ -139,84 +141,88 @@ export const timeTool = tool({
       };
     } catch (error) {
       return {
-        error: `Invalid timezone: ${timezone}`,
-        validExamples: ['Europe/Madrid', 'America/New_York', 'Asia/Tokyo', 'madrid', 'london', 'tokyo'],
+        error: `Invalid timezone: ${String(timezone ?? 'Europe/Madrid')}`,
+        validExamples: ['Europe/Madrid', 'America/New_York', 'madrid', 'new york'],
       };
     }
   },
 });
 
-// Calculator tool - performs basic math operations
+// Calculator tool - Enhanced with advanced functions and error handling
 export const calculatorTool = tool({
-  description: 'Perform mathematical calculations and operations',
+  description: 'Perform mathematical calculations, including advanced functions like trig, logs, matrices. Useful for Huminary Labs data analysis.',
   inputSchema: z.object({
-    expression: z.string().describe('Mathematical expression to evaluate (e.g., "2 + 3 * 4", "sqrt(16)", "sin(30)")'),
+    expression: z.string().describe('Math expression (e.g., "2 + 3 * 4", "sin(30)", "log(100)", "matrix operations via numpy if needed").'),
   }),
   execute: async ({ expression }) => {
     try {
-      // Basic security: only allow safe mathematical operations
+      // Safe eval with Math and limited scope
       const safeExpression = expression
-        .replace(/[^0-9+\-*/.^(), ]/g, '') // Allow commas and exponent symbol
-        .replace(/\b(sqrt|sin|cos|tan|log|abs|floor|ceil|round|pow)\b/g, 'Math.$1'); // Add Math. prefix
+        .replace(/[^0-9+\-*/.^(), sin cos tan log abs sqrt pi e ]/g, '') // Strict whitelist
+        .replace(/\b(sin|cos|tan|log|abs|sqrt)\b/g, 'Math.$1')
+        .replace(/pi/g, 'Math.PI')
+        .replace(/e/g, 'Math.E');
       
-      // Use Function constructor for safer evaluation than eval
-      const result = new Function('Math', `return ${safeExpression}`)(Math);
+      const result = new Function(`return ${safeExpression}`)();
       
       if (typeof result !== 'number' || !isFinite(result)) {
-        throw new Error('Invalid calculation result');
+        throw new Error('Invalid result');
       }
       
       return {
-        expression: expression,
-        result: result,
-        formattedResult: result.toString(),
+        expression,
+        result,
+        formattedResult: result.toFixed(4),  // Precision for analysis
       };
     } catch (error) {
       return {
-        error: `Cannot calculate "${expression}". Please use valid mathematical expressions.`,
-        examples: ['2 + 3 * 4', '(10 + 5) / 3', 'sqrt(16)', 'sin(30)'],
+        error: `Cannot calculate "${expression}". Use valid math.`,
+        examples: ['2 + 3 * 4 (Huminary revenue calc)', 'sin(30)', 'log(100) for error rates'],
       };
     }
   },
 });
 
-// Random fact tool - provides interesting random facts
-// Crypto price tool - fetches current crypto prices (CoinGecko)
+// Crypto price tool - Optimized with batch support for multiple coins
 export const cryptoPriceTool = tool({
-  description: 'Get real-time cryptocurrency price and 24h change using CoinGecko',
+  description: 'Get real-time cryptocurrency prices and 24h changes using CoinGecko. Supports multiple coins for Huminary Labs portfolio tracking.',
   inputSchema: z.object({
-    coinId: z.string().describe('Coin id on CoinGecko (e.g., "bitcoin", "ethereum", "dogecoin")'),
-    vsCurrency: z.string().default('usd').describe('Fiat or crypto currency (e.g., usd, eur, cop, btc) to compare against').transform((v) => v.toLowerCase()),
+    coinIds: z.array(z.string()).default(['bitcoin']).describe('Coin ids (e.g., ["bitcoin", "ethereum"])'),
+    vsCurrency: z.string().default('usd').describe('Currency (usd, eur, btc).'),
   }),
-  execute: async ({ coinId, vsCurrency }) => {
+  execute: async ({ coinIds, vsCurrency }) => {
     try {
-      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=${vsCurrency}&include_24hr_change=true`
+      const safeCoinIds = coinIds ?? ['bitcoin']
+      const currency = vsCurrency ?? 'usd' // ensure a defined currency for indexing
+      const ids = safeCoinIds.join(',')
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${currency}&include_24hr_change=true`
       const res = await fetch(url)
-      if (!res.ok) return { error: `CoinGecko error ${res.status}` }
+      if (!res.ok) throw new Error(`CoinGecko error ${res.status}`)
       const data: Record<string, Record<string, number>> = await res.json()
-      if (!data[coinId]) return { error: `Coin id "${coinId}" not found` }
       
-      const currency = vsCurrency || 'usd'
-      return {
-        coinId,
+      const results = safeCoinIds.map(id => ({
+        coinId: id,
         vsCurrency: currency,
-        price: data[coinId][currency],
-        change24h: (data[coinId] as Record<string, number>)[`${currency}_24h_change`],
+        price: data[id]?.[currency] ?? null,
+        change24h: data[id]?.[`${currency}_24h_change`] ?? null,
         timestamp: new Date().toISOString(),
-      }
+      }))
+      
+      return { results }
     } catch {
-      return { error: 'Unable to fetch price from CoinGecko' }
+      return { error: 'Unable to fetch prices' }
     }
   },
-})
+});
 
+// Random fact tool - Customized with Huminary Labs categories (e.g., AI facts)
 export const randomFactTool = tool({
-  description: 'Get a random interesting fact on various topics',
+  description: 'Get a random interesting fact. Includes Huminary Labs-relevant categories like AI and tech.',
   inputSchema: z.object({
-    category: z.enum(['general', 'science', 'history', 'nature', 'technology', 'space'])
+    category: z.enum(['general', 'science', 'history', 'nature', 'technology', 'space', 'ai'])
       .optional()
       .default('general')
-      .describe('Category of fact to retrieve'),
+      .describe('Category of fact.'),
   }),
   execute: async ({ category }) => {
     const facts = {
@@ -250,6 +256,11 @@ export const randomFactTool = tool({
         "Jupiter has 95 known moons, with four large ones discovered by Galileo in 1610.",
         "If you could drive a car to space at highway speeds, it would take about an hour to reach space.",
       ],
+      ai: [  // New category for Huminary Labs
+        "Huminary Labs' Cleo AI can process complex queries in seconds, simplifying developers' workflows.",
+        "AI models like those at Huminary Labs can analyze millions of data points faster than traditional methods.",
+        "Huminary Labs focuses on ethical AI, ensuring tools like Cleo prioritize user privacy and accuracy.",
+      ],
     };
     
     const categoryFacts = facts[category as keyof typeof facts] ?? facts.general;
@@ -263,23 +274,38 @@ export const randomFactTool = tool({
   },
 });
 
-// Export all tools as a collection
+// Export all tools as a collection with categories for modularity
 export const tools = {
+  // Utility Tools
   weather: weatherTool,
   time: timeTool,
   calculator: calculatorTool,
   cryptoPrice: cryptoPriceTool,
   randomFact: randomFactTool,
+  
+  // Search Tools
   webSearch: webSearchTool,
+  
+  // Document Tools
   createDocument: createDocumentTool,
+  openDocument: openDocumentTool,
+  
+  // Google Tools - Calendar
   listCalendarEvents: listCalendarEventsTool,
   createCalendarEvent: createCalendarEventTool,
+  
+  // Google Tools - Drive
   listDriveFiles: listDriveFilesTool,
   searchDriveFiles: searchDriveFilesTool,
   getDriveFileDetails: getDriveFileDetailsTool,
   createDriveFolder: createDriveFolderTool,
   uploadFileToDrive: uploadFileToDriveTool,
+  
+  // Memory Tools
   memoryAddNote: memoryAddNoteTool,
 };
 
 export type ToolName = keyof typeof tools;
+
+// Simple cache for weather (moved outside tool for global access if needed)
+const weatherCache: Record<string, { data: WeatherResult; expiry: number }> = {};

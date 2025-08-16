@@ -306,7 +306,7 @@ export async function POST(req: Request) {
 1. **Pregunta específica:** Describe qué información necesitas del documento
 2. **Capturas de pantalla:** Toma fotos de las páginas relevantes - Los modelos Grok-4 y Llama 4 Maverick pueden analizar imágenes
 3. **Archivo más pequeño:** Usa un PDF de menos de 20 páginas
-4. **Texto directo:** Copia y pega las secciones específicas que necesitas analizar
+4. **Texto directo:** Copia y pega las secciones específicas que necesitas
 
 💡 **Tip:** Las imágenes del documento funcionan muy bien con estos modelos.`
                             } else {
@@ -514,6 +514,34 @@ ${documentContent}`
         }
         if (userPlain.trim()) {
           // Essential RAG logging only
+          // DEBUG: List user's documents and chunks
+          try {
+            const { data: userDocs, error: docsError } = await (supabase as any)
+              .from('documents')
+              .select('id, title, filename, created_at')
+              .eq('user_id', realUserId)
+              .order('created_at', { ascending: false })
+              .limit(5)
+            
+            if (!docsError && userDocs) {
+              console.log('[RAG] DEBUG - User has', userDocs.length, 'documents:')
+              userDocs.forEach((doc: any) => console.log(`  - ${doc.title || doc.filename} (${doc.id})`))
+            }
+
+            const { data: userChunks, error: chunksError } = await (supabase as any)
+              .from('document_chunks')
+              .select('document_id, content')
+              .eq('user_id', realUserId)
+              .limit(3)
+            
+            if (!chunksError && userChunks) {
+              console.log('[RAG] DEBUG - User has', userChunks.length, 'total chunks')
+              userChunks.forEach((chunk: any, i: number) => console.log(`  - Chunk ${i + 1}: "${chunk.content.slice(0, 100)}..."`))
+            }
+          } catch (e: any) {
+            console.log('[RAG] DEBUG - Failed to list user documents:', e.message)
+          }
+          
           let retrieved = await retrieveRelevant({ 
             userId: realUserId, 
             query: userPlain, 
@@ -525,6 +553,13 @@ ${documentContent}`
           if (retrieved.length) {
             ragSystemAddon = buildContextBlock(retrieved)
             console.log('[RAG] Retrieved', retrieved.length, 'chunks. Top similarity:', retrieved[0]?.similarity)
+            // DEBUG: Log what documents we're getting
+            console.log('[RAG] DEBUG - Retrieved document titles:', retrieved.map(r => r.metadata?.title || r.metadata?.filename || 'No title').slice(0, 3))
+            // DEBUG: Show actual context being sent to model
+            console.log('[RAG] DEBUG - Context preview being sent to model:')
+            console.log('=== RAG CONTEXT START ===')
+            console.log(ragSystemAddon.slice(0, 1000))
+            console.log('=== RAG CONTEXT END ===')
             if (debugRag) {
               console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0,400))
             }
@@ -608,7 +643,14 @@ ${documentContent}`
     }
 
     // Build final system prompt. We PREPEND the context so it has higher salience for the model.
-    const personalizationInstruction = 'IMPORTANTE: Usa la información personal del CONTEXTO para personalizar tu respuesta (nombre, intereses, comida favorita, hobbies, estilo). Si la pregunta se refiere explícitamente a un dato personal que no está en el contexto, pide confirmación educadamente.'
+    const personalizationInstruction = `IMPORTANT: ALWAYS use information from the CONTEXT to respond. This includes:
+- Personal information (name, interests, favorite food, hobbies, communication style)  
+- Work documents, stories, projects, notes that the user has uploaded
+- Any content the user has shared previously
+
+If the user asks about something that is in the CONTEXT, use it directly to respond. DO NOT say you don't have information if it's available in the context.
+
+SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate", "expand", "continue", "review" a document found in the context, ALWAYS suggest opening the document in the Canvas Editor. Use phrases like: "Would you like me to open [document name] in the collaborative editor so we can work on it together?"`
     const finalSystemPrompt = ragSystemAddon
       ? `${ragSystemAddon}\n\n${personalizationInstruction}\n\n${effectiveSystemPrompt}`
       : effectiveSystemPrompt
@@ -650,12 +692,16 @@ ${documentContent}`
       },
     }
     
+    // Check if user is asking to open/view a document - reduce reasoning to avoid content in reasoning
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
+    const isOpeningDocument = /abrir.*archivo|open.*document|mostrar.*documento|show.*document|ver.*archivo|view.*file|editar.*documento|work on.*doc/i.test(lastUserMessage)
+
     // Add reasoning effort for GPT-5 models with model-specific tuning
     if (model.startsWith('gpt-5')) {
-      if (model === 'gpt-5-nano') {
-        // For nano, use minimal reasoning to allow more focus on tool synthesis
+      if (model === 'gpt-5-nano' || isOpeningDocument) {
+        // For nano, or when opening documents, use minimal reasoning to avoid content in reasoning
         additionalParams.reasoning_effort = 'minimal' // Less reasoning overhead, more tool response focus
-        console.log(`[GPT-5] Setting reasoning_effort to: minimal for GPT-5 Nano (optimized for tool responses)`)
+        console.log(`[GPT-5] Setting reasoning_effort to: minimal for ${model} ${isOpeningDocument ? '(document opening detected)' : '(nano optimization)'}`)
       } else {
         // For other GPT-5 models, keep medium
         additionalParams.reasoning_effort = 'medium' // Can be: minimal, low, medium, high
@@ -665,8 +711,11 @@ ${documentContent}`
 
     const result = streamText(additionalParams)
 
+    // For document opening queries, disable sending reasoning to prevent content in expandable
+    const sendReasoning = !isOpeningDocument
+
     return result.toUIMessageStreamResponse({
-      sendReasoning: true, // Enable reasoning parts to be sent to the client
+      sendReasoning, // Disable reasoning stream for doc opens to avoid content in expandable
       onError: (error: unknown) => {
         // Clean up global context on error
         delete (globalThis as any).__currentUserId
@@ -677,7 +726,7 @@ ${documentContent}`
             error.message.includes("Rate limit") ||
             error.message.includes("Request too large")
           ) {
-            return "El documento es demasiado grande para procesar completamente. Por favor:\n\n1. Usa un archivo PDF más pequeño (menos de 20 páginas)\n2. O describe qué información específica necesitas del documento\n3. O proporciona capturas de pantalla de las secciones relevantes\n\nLos modelos Grok-4 y Llama 4 Maverick pueden analizar imágenes directamente."
+            return "El documento es demasiado grande para procesar completamente. Por favor:\n\n1. Usa un archivo PDF más pequeño (menos de 20 páginas)\n2. Usa un documento más pequeño\n3. O describe qué información específica necesitas del documento\n4. O proporciona capturas de pantalla de las secciones relevantes\n\nLos modelos Grok-4 y Llama 4 Maverick pueden analizar imágenes directamente."
           }
           if (error.message.includes("tokens per minute")) {
             return "Has alcanzado el límite de tokens por minuto. El documento es muy largo. Espera un momento o usa un archivo más pequeño."
