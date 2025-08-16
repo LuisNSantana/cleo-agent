@@ -139,6 +139,25 @@ Cleo features an advanced **Retrieval-Augmented Generation (RAG)** system that l
 
 Open [http://localhost:3000](http://localhost:3000) to start chatting with Cleo!
 
+## Personality & Memory (Preferences → Prompt + RAG)
+
+Cleo adapts to your style using two complementary layers:
+
+- Prompt Layer: Your personality settings (empathetic, playful, professional, creative, analytical, friendly) and sliders (formality, creativity, enthusiasm, helpfulness), plus customStyle, are embedded directly into the system prompt for every chat.
+- Memory Layer (RAG): When you update preferences, Cleo auto-updates a per-user document `user_profile_auto.md` (summarizing your personality and custom instructions) and indexes it into the vector store. Chat retrieval automatically pulls this profile context and prepends it to the model prompt.
+
+Verification
+- Change personality in Settings → Models. The server logs should show:
+  - `[Prefs][PUT] Saved preferences { personalityType: '...' }`
+  - `[Prefs][PUT] Updated profile doc: <doc-id>` and `[CHUNK] ... Created 1 chunks ...`
+  - On chat, `[ChatAPI] Active personality { personalityType: '...' }`
+  - `[RAG] Using context? true` with a final prompt length indicating context was prepended.
+
+Where this lives
+- Prompt generation: `lib/prompts/personality.ts`, used by `app/components/chat/use-chat-core.ts`
+- Profile sync: `app/api/user-preferences/route.ts` → `lib/rag/index-document.ts`
+- Retrieval and assembly: `lib/rag/retrieve.ts`, consumed by `app/api/chat/route.ts`
+
 ## Docker
 
 Run Cleo in an isolated, reproducible environment using Docker.

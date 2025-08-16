@@ -1,5 +1,18 @@
 export type LayoutType = "sidebar" | "fullscreen"
 
+export type PersonalityType = "empathetic" | "playful" | "professional" | "creative" | "analytical" | "friendly"
+
+export type PersonalitySettings = {
+  personalityType: PersonalityType
+  creativityLevel: number // 0-100
+  formalityLevel: number // 0-100
+  enthusiasmLevel: number // 0-100
+  helpfulnessLevel: number // 0-100
+  useEmojis: boolean
+  proactiveMode: boolean
+  customStyle: string
+}
+
 export type UserPreferences = {
   layout: LayoutType
   promptSuggestions: boolean
@@ -7,6 +20,7 @@ export type UserPreferences = {
   showConversationPreviews: boolean
   multiModelEnabled: boolean
   hiddenModels: string[]
+  personalitySettings?: PersonalitySettings
 }
 
 export const defaultPreferences: UserPreferences = {
@@ -16,6 +30,16 @@ export const defaultPreferences: UserPreferences = {
   showConversationPreviews: true,
   multiModelEnabled: false,
   hiddenModels: [],
+  personalitySettings: {
+    personalityType: "empathetic",
+    creativityLevel: 70,
+    formalityLevel: 30,
+    enthusiasmLevel: 80,
+    helpfulnessLevel: 90,
+    useEmojis: true,
+    proactiveMode: true,
+    customStyle: "",
+  },
 }
 
 // Helper functions to convert between API format (snake_case) and frontend format (camelCase)
@@ -27,6 +51,7 @@ export function convertFromApiFormat(apiData: any): UserPreferences {
     showConversationPreviews: apiData.show_conversation_previews ?? true,
     multiModelEnabled: apiData.multi_model_enabled ?? false,
     hiddenModels: apiData.hidden_models || [],
+    personalitySettings: apiData.personality_settings || defaultPreferences.personalitySettings,
   }
 }
 
@@ -43,5 +68,7 @@ export function convertToApiFormat(preferences: Partial<UserPreferences>) {
     apiData.multi_model_enabled = preferences.multiModelEnabled
   if (preferences.hiddenModels !== undefined)
     apiData.hidden_models = preferences.hiddenModels
+  if (preferences.personalitySettings !== undefined)
+    apiData.personality_settings = preferences.personalitySettings
   return apiData
 }

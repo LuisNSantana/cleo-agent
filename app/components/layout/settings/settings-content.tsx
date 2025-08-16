@@ -26,6 +26,7 @@ import { FilesSection } from "./files/files-section"
 import { AccountManagement } from "./general/account-management"
 import { UserProfile } from "./general/user-profile"
 import { SimpleModelsInfo } from "./models/simple-models-info"
+import { CleoPersonalitySettings } from "./models/cleo-personality-settings"
 
 type SettingsContentProps = {
   isDrawer?: boolean
@@ -128,6 +129,9 @@ export function SettingsContent({
 
             <TabsContent value="models" className="px-6">
               <SimpleModelsInfo />
+              <div className="mt-8">
+                <CleoPersonalitySettings />
+              </div>
             </TabsContent>
 
             <TabsContent value="connections" className="space-y-6 px-6">
@@ -196,7 +200,7 @@ export function SettingsContent({
             </TabsList>
 
             {/* Desktop tabs content */}
-            <div className="flex-1 overflow-auto px-6 pt-4">
+            <div className="flex-1 px-6 pt-4">
               <TabsContent value="general" className="mt-0 space-y-6">
                 <UserProfile />
                 {isSupabaseEnabled && (
@@ -216,6 +220,7 @@ export function SettingsContent({
 
               <TabsContent value="models" className="mt-0 space-y-6">
                 <SimpleModelsInfo />
+                <CleoPersonalitySettings />
               </TabsContent>
 
               <TabsContent value="connections" className="mt-0 space-y-6">

@@ -174,6 +174,18 @@ export async function POST(req: Request) {
     }
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
+    // Attempt to parse personality type from system prompt for observability
+    try {
+      const match = effectiveSystemPrompt.match(/Type:\s*(empathetic|playful|professional|creative|analytical|friendly)/i)
+      const inferredPersonality = match?.[1]?.toLowerCase()
+      if (inferredPersonality) {
+        console.log('[ChatAPI] Active personality', { userId, chatId, personalityType: inferredPersonality })
+      } else {
+        console.log('[ChatAPI] No personality marker found in system prompt; using default or custom prompt', { userId, chatId })
+      }
+    } catch (e) {
+      console.log('[ChatAPI] Personality parse failed')
+    }
 
     // Convert multimodal messages to correct format for the model
     const convertedMessages = await Promise.all(
@@ -644,6 +656,7 @@ ${documentContent}`
               response.messages as unknown as import("@/app/types/api.types").Message[],
             message_group_id,
             model,
+            userId: realUserId,
           })
         }
       },

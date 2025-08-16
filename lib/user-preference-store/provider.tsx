@@ -29,6 +29,7 @@ interface UserPreferencesContextType {
   setMultiModelEnabled: (enabled: boolean) => void
   toggleModelVisibility: (modelId: string) => void
   isModelHidden: (modelId: string) => boolean
+  updatePreferences: (update: Partial<UserPreferences>) => void
   isLoading: boolean
 }
 
@@ -57,7 +58,14 @@ async function updateUserPreferences(
   })
 
   if (!response.ok) {
-    throw new Error("Failed to update user preferences")
+    let detail = ""
+    try {
+      const txt = await response.text()
+      detail = txt?.slice(0, 500) || ""
+    } catch {}
+    throw new Error(
+      `Failed to update user preferences (status ${response.status})${detail ? `: ${detail}` : ""}`
+    )
   }
 
   const data = await response.json()
@@ -158,9 +166,10 @@ export function UserPreferencesProvider({
       try {
         return await updateUserPreferences(update)
       } catch (error) {
-        console.error(
-          "Failed to update user preferences in database, falling back to localStorage:",
-          error
+        // Be quiet in console; degrade gracefully to local storage
+        console.warn(
+          "Updating preferences in DB failed; using localStorage fallback.",
+          (error as Error)?.message
         )
         saveToLocalStorage(updated)
         return updated
@@ -235,6 +244,7 @@ export function UserPreferencesProvider({
         setMultiModelEnabled,
         toggleModelVisibility,
         isModelHidden,
+        updatePreferences,
         isLoading,
       }}
     >

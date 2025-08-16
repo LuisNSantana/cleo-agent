@@ -104,9 +104,44 @@ CREATE TABLE user_preferences (
   show_conversation_previews BOOLEAN DEFAULT true,
   multi_model_enabled BOOLEAN DEFAULT false,
   hidden_models TEXT[] DEFAULT '{}',
+  -- Cleo personality settings (JSONB)
+  personality_settings JSONB DEFAULT '{
+    "personalityType": "empathetic",
+    "creativityLevel": 70,
+    "formalityLevel": 30,
+    "enthusiasmLevel": 80,
+    "helpfulnessLevel": 90,
+    "useEmojis": true,
+    "proactiveMode": true,
+    "customStyle": ""
+  }'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Validate JSON shape for personality_settings
+ALTER TABLE user_preferences 
+DROP CONSTRAINT IF EXISTS valid_personality_settings;
+
+ALTER TABLE user_preferences 
+ADD CONSTRAINT valid_personality_settings 
+CHECK (
+  personality_settings IS NULL 
+  OR (
+    personality_settings ? 'personalityType'
+    AND personality_settings ? 'creativityLevel'
+    AND personality_settings ? 'formalityLevel'
+    AND personality_settings ? 'enthusiasmLevel'
+    AND personality_settings ? 'helpfulnessLevel'
+    AND personality_settings ? 'useEmojis'
+    AND personality_settings ? 'proactiveMode'
+    AND personality_settings ? 'customStyle'
+  )
+);
+
+-- Expression index to filter by personalityType quickly
+CREATE INDEX IF NOT EXISTS idx_user_preferences_personality_type 
+ON user_preferences ((personality_settings->>'personalityType'));
 
 -- Optional: keep updated_at in sync for user_preferences
 CREATE OR REPLACE FUNCTION update_user_preferences_updated_at()

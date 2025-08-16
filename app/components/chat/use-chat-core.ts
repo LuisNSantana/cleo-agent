@@ -4,7 +4,9 @@ import { getOrCreateGuestUserId } from "@/lib/api"
 import { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { Attachment } from "@/lib/file-handling"
 import { isImageFile } from "@/lib/image-utils"
+import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
+import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { API_ROUTE_CHAT } from "@/lib/routes"
 import type { UserProfile } from "@/lib/user/types"
 import type { UIMessage } from "ai"
@@ -104,7 +106,9 @@ export function useChatCore({
   const hasSentFirstMessageRef = useRef(false)
   const prevChatIdRef = useRef<string | null>(chatId)
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
-  // Generate dynamic system prompt with current model info
+  const { preferences } = useUserPreferences()
+  
+  // Generate dynamic system prompt with current model info and personality settings
   const systemPrompt = useMemo(() => {
     if (user?.system_prompt) {
       return user.system_prompt
@@ -113,11 +117,20 @@ export function useChatCore({
     // Get current model name for logging
     const currentModelName = sanitizeModelName(selectedModel || "unknown-model")
 
-    // Log model information for debugging
+    // Use personality settings if available, otherwise fall back to default
+    if (preferences.personalitySettings) {
+      try {
+        console.log('[Chat][SystemPrompt] Using personality settings', {
+          personalityType: preferences.personalitySettings.personalityType,
+          model: currentModelName,
+        })
+      } catch {}
+      return generatePersonalizedPrompt(currentModelName, preferences.personalitySettings)
+    }
 
-    // Return Cleo's modular prompt with current model info
+    // Return Cleo's default prompt with current model info
     return getCleoPrompt(currentModelName, "default")
-  }, [user?.system_prompt, selectedModel])
+  }, [user?.system_prompt, selectedModel, preferences.personalitySettings])
 
   // Search params handling
   const searchParams = useSearchParams()

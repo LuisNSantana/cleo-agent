@@ -36,10 +36,11 @@
 - **File Integration**: Image uploads, PDF annotations
 
 ### 3. RAG System (`lib/rag/`)
-- **`hybrid-search.ts`**: Combines semantic search with keyword matching
-- **`semantic-rerank.ts`**: AI-powered result reranking for relevance
-- **`documents.ts`**: Document chunking and vector embedding
-- **`vector-store.ts`**: Vector database operations
+- **`retrieve.ts`**: Hybrid retrieval (vector + full-text), reranking, and context block assembly
+- **`index-document.ts`**: Chunking + embeddings + inserts into `document_chunks`
+- **`chunking.ts`**: Markdown-aware chunking with overlap and token estimates
+- **`embeddings.ts`**: OpenAI embeddings provider (text-embedding-3-small by default)
+- **`reranking.ts`**: Cross-encoder style reranking via embeddings similarity
 
 ### 4. Google Integrations (`lib/tools/`)
 - **`google-calendar.ts`**: Event listing, creation with timezone support
@@ -147,6 +148,32 @@ lib/
 - **Reranking**: AI-powered relevance scoring for better results
 - **Document Processing**: Automatic chunking with overlap
 - **Vector Storage**: Supabase pgvector for embeddings
+
+### 3.1 Personality-aware Memory Pipeline
+- **User Preferences → Prompt + Memory**
+  - Client builds a system prompt with personality settings: `app/components/chat/use-chat-core.ts` using `lib/prompts/personality.ts` (includes customStyle, language adaptation, and sliders like formality/creativity).
+  - Server logs active personality for each chat: `app/api/chat/route.ts` parses the prompt and logs `[ChatAPI] Active personality`.
+- **Auto “User Profile” Document**
+  - On `PUT /api/user-preferences`, we upsert a lightweight `user_profile_auto.md` summarizing personality and customStyle and index it into RAG: `app/api/user-preferences/route.ts` → calls `lib/rag/index-document.ts`.
+  - This provides persistent, retrievable memory across sessions.
+- **Retrieval Strategy**
+  - Auto-RAG is enabled in `app/api/chat/route.ts`: retrieves relevant chunks for the last user query.
+  - If initial retrieval is sparse, a secondary “perfil del usuario” query runs to pull profile context.
+  - Final system prompt = `[Retrieved Context]\n\n[Personalization instruction]\n\n[Personality prompt]`.
+
+### 3.2 Observability & Logging Conventions
+- `[Prefs][PUT]` — preferences updates and saved personalityType
+- `[Prefs][GET]` — preferences retrieval and personalityType returned
+- `[CHUNK]` — chunking diagnostics (count, token estimates)
+- `[HYBRID]` / `[RERANK]` — retrieval and reranking diagnostics
+- `[ChatAPI] Active personality` — inferred personality used in chat
+- `[RAG]` — retrieval flow and context usage details
+
+### 3.3 Implementation Notes
+- Profile doc filename: `user_profile_auto.md` (per-user upsert)
+- Index is forced on preference changes to keep embeddings fresh
+- Retrieval APIs: `retrieveRelevant` (hybrid/vector fallback) and `buildContextBlock`
+- Safe fallbacks and extra retrieval pass improve recall of personal context
 
 ### 4. Google Integrations
 - **Authentication**: OAuth2 flow with secure token storage

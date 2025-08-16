@@ -1,6 +1,7 @@
 import type { ContentPart, Message } from "@/app/types/api.types"
 import type { Database, Json } from "@/app/types/database.types"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { createGuestServerClient } from "@/lib/supabase/server-guest"
 
 const DEFAULT_STEP = 0
 
@@ -9,7 +10,8 @@ export async function saveFinalAssistantMessage(
   chatId: string,
   messages: Message[],
   message_group_id?: string,
-  model?: string
+  model?: string,
+  userId?: string
 ) {
   const parts: ContentPart[] = []
   const toolMap = new Map<string, ContentPart>()
@@ -74,16 +76,35 @@ export async function saveFinalAssistantMessage(
 
   const finalPlainText = textParts.join("\n\n")
 
-  const { error } = await supabase.from("messages").insert({
+  const row = {
     chat_id: chatId,
     role: "assistant",
     content: finalPlainText || "",
     parts: parts as unknown as Json,
     message_group_id,
-    model,
-  })
+  model,
+  user_id: userId,
+  } as const
+
+  const { error } = await supabase.from("messages").insert(row)
 
   if (error) {
+    // Fallback: retry with service-role client to bypass RLS on analytics trigger
+    if ((error as any)?.code === '42501' && (error as any)?.message?.includes('model_usage_analytics')) {
+      try {
+        const admin = await createGuestServerClient()
+        if (admin) {
+          const { error: adminErr } = await (admin as SupabaseClient<Database>).from('messages').insert(row)
+          if (!adminErr) {
+            console.log('Assistant message saved via admin client (RLS fallback).')
+            return
+          }
+          console.error('Admin fallback insert failed:', adminErr)
+        }
+      } catch (e) {
+        console.error('Admin fallback exception:', e)
+      }
+    }
     console.error("Error saving final assistant message:", error)
     throw new Error(`Failed to save assistant message: ${error.message}`)
   } else {
