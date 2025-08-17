@@ -111,18 +111,22 @@ export function ChatInput({
           // Consumir el mensaje pendiente primero
           consumePendingMessage()
           
+          // Establecer el mensaje primero
+          onValueChange(messageText)
+          
+          // Esperar un tick para que el estado se actualice
+          await new Promise(resolve => setTimeout(resolve, 50))
+          
           // Agregar el archivo a la lista de archivos
           onFileUpload([file])
           
-          // Establecer el mensaje 
-          onValueChange(messageText)
+          // Esperar a que React procese completamente los estados
+          await new Promise(resolve => setTimeout(resolve, 250))
           
-          // Enviar automáticamente después de un pequeño delay
-          setTimeout(() => {
-            console.log('Auto-sending canvas message:', messageText)
-            setIsProcessingCanvas(false)
-            onSend()
-          }, 100)
+          // Verificar que los archivos se agregaron correctamente antes de enviar
+          console.log('Auto-sending canvas message:', messageText, 'Files ready for send')
+          setIsProcessingCanvas(false)
+          onSend()
           
         } catch (error) {
           console.error('Error procesando mensaje del canvas:', error)
@@ -133,7 +137,7 @@ export function ChatInput({
       
       processCanvasMessage()
     }
-  }, [hasPendingMessage, pendingMessage?.timestamp]) // Solo depender de hasPendingMessage y timestamp
+  }, [hasPendingMessage, pendingMessage?.timestamp, onValueChange, onFileUpload, onSend, consumePendingMessage]) // Agregar dependencias necesarias
 
   const handleSend = useCallback(() => {
     if (isSubmitting) {

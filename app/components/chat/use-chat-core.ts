@@ -15,11 +15,56 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 // Utility function to convert UIMessage to MessageAISDK for AI SDK v5 compatibility
 function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
-  // Extract content from message
+  // Handle messages with experimental_attachments - convert to multimodal format for backend
+  if ((message as any).experimental_attachments && Array.isArray((message as any).experimental_attachments)) {
+    const attachments = (message as any).experimental_attachments
+    const content: any[] = []
+    
+    // Add text content
+    const textContent = (message as any).content || 
+      (message.parts?.find((p: any) => p.type === 'text')?.text) || 'User message'
+    
+    content.push({
+      type: "text",
+      text: textContent
+    })
+    
+    // Add attachment content
+    for (const attachment of attachments) {
+      if (attachment.contentType?.startsWith('image/')) {
+        content.push({
+          type: "file",
+          name: attachment.name,
+          mediaType: attachment.contentType,
+          url: attachment.url,
+        })
+      } else if (!attachment.contentType?.startsWith('image/')) {
+        // For non-image files (documents, etc.)
+        content.push({
+          type: "file", 
+          name: attachment.name,
+          mediaType: attachment.contentType,
+          url: attachment.url,
+        })
+      }
+    }
+    
+    console.log(`🔍 [ConvertMessage] Converted message with ${attachments.length} attachments to multimodal content`)
+    
+    return {
+      id: message.id || Date.now().toString(),
+      role: message.role,
+      content: content as any, // Use multimodal array format for backend
+      parts: message.parts,
+      createdAt: (message as any).createdAt,
+    }
+  }
+  
+  // Handle regular text messages
   let content = ""
   
-  if ('content' in message && typeof message.content === 'string') {
-    content = message.content
+  if ((message as any).content && typeof (message as any).content === 'string') {
+    content = (message as any).content
   } else if (message.parts && Array.isArray(message.parts)) {
     // Extract text from parts for AI SDK v5
     const textParts = message.parts
@@ -36,7 +81,6 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
     content,
     parts: message.parts,
     createdAt: (message as any).createdAt,
-    experimental_attachments: (message as any).experimental_attachments,
   }
 }
 
@@ -201,14 +245,16 @@ export function useChatCore({
   const sendMessage = useCallback(
     async ({
       text,
-      files,
       experimental_attachments,
     }: {
       text: string
-      files?: FileList
-      experimental_attachments?: any[]
+      experimental_attachments?: Array<{
+        name: string
+        contentType: string
+        url: string
+      }>
     }) => {
-      // Optimistically add the user message
+      // Optimistically add the user message with attachments for display
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "user",
@@ -629,27 +675,49 @@ export function useChatCore({
           }
         }
 
-        // Create FileList with ALL files (images AND documents) for AI analysis
-        let allFilesList: FileList | undefined = undefined
+        // Convert files to experimental_attachments format
+        const fileAttachments: Array<{
+          name: string
+          contentType: string
+          url: string
+        }> = []
+
         if (currentFiles.length > 0) {
-          const dt = new DataTransfer()
-          currentFiles.forEach((file) => {
-            dt.items.add(file)
-          })
-          allFilesList = dt.files
+          for (const file of currentFiles) {
+            console.log(`🔍 [HandleSubmit] Converting file to attachment: ${file.name}, type: ${file.type}`)
+            
+            // Convert file to data URL
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = (e) => resolve(e.target?.result as string)
+              reader.readAsDataURL(file)
+            })
+            
+            fileAttachments.push({
+              name: file.name,
+              contentType: file.type,
+              url: dataUrl,
+            })
+          }
         }
 
-        // Send message using AI SDK v5 sendMessage with ALL files
+        // Combine file attachments with Supabase attachments
+        const allAttachments = [
+          ...fileAttachments,
+          ...supabaseAttachments.map((att) => ({
+            name: att.name,
+            contentType: att.contentType,
+            url: att.url,
+          }))
+        ]
+
+        console.log(`🔍 [HandleSubmit] Sending message with ${allAttachments.length} attachments`)
+
+        // Send message using experimental_attachments format
         await sendMessage({
           text: messageText,
-          ...(allFilesList && { files: allFilesList }),
-          // Add Supabase attachments for UI display if any
-          ...(supabaseAttachments.length > 0 && {
-            experimental_attachments: supabaseAttachments.map((att) => ({
-              name: att.name,
-              contentType: att.contentType,
-              url: att.url,
-            })),
+          ...(allAttachments.length > 0 && {
+            experimental_attachments: allAttachments,
           }),
         })
 

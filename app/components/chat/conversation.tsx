@@ -72,13 +72,17 @@ export function Conversation({
 
             const messageText = extractTextFromMessage(message)
 
+            // Extract attachments from experimental_attachments (AI SDK v5)
+            const anyMessage = message as any
+            const attachments = anyMessage.experimental_attachments || undefined
+
             return (
               <Message
                 key={message.id}
                 id={message.id}
                 variant={message.role}
-                // UIMessage v5 has no experimental_attachments; attachments are handled upstream
-                attachments={undefined}
+                // Extract attachments from experimental_attachments
+                attachments={attachments}
                 isLast={isLast}
                 onDelete={onDelete}
                 onEdit={onEdit}
