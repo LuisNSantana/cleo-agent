@@ -1,16 +1,33 @@
 # Web Search Tool para Cleo Agent
 
 ## Descripción
-La herramienta `webSearchTool` permite al agente Cleo buscar información actualizada en internet usando la Brave Search API. Es útil para obtener datos recientes, noticias, información específica o cualquier consulta que requiera información actualizada de la web.
+La herramienta `webSearchTool` permite al agente Cleo buscar información actualizada en internet usando la Brave Search API con fallback automático a Tavily cuando no se encuentran resultados o Brave no responde. Es ideal para obtener datos recientes, noticias, documentación técnica y cualquier consulta que requiera información actualizada de la web.
 
 ## Configuración
 
-### 1. API Key de Brave Search
+### 1. API Key de Brave Search (fallback / alternativa)
 1. Ve a [Brave Search API](https://api-dashboard.search.brave.com/register)
 2. Regístrate y obtén tu API key
 3. Agrega la clave en tu archivo `.env.local`:
 ```bash
 BRAVE_SEARCH_API_KEY=tu_api_key_aqui
+```
+
+Opcionalmente, también se aceptan estas variables alternativas si usas otros entornos:
+
+```bash
+BRAVE_API_KEY=tu_api_key_aqui
+SEARCH_API_KEY=tu_api_key_aqui
+```
+
+### 2. API Key de Tavily (primaria por defecto)
+1. Ve a [Tavily](https://tavily.com) y crea una API key
+2. Agrega la clave en tu archivo `.env.local`:
+
+```bash
+TAVILY_API_KEY=tu_api_key_tavily
+# Alternativa aceptada por el código
+TAVILYAPIKEY=tu_api_key_tavily
 ```
 
 ### 2. Precios de Brave Search API
@@ -23,15 +40,16 @@ BRAVE_SEARCH_API_KEY=tu_api_key_aqui
 | Parámetro | Tipo | Requerido | Default | Descripción |
 |-----------|------|-----------|---------|-------------|
 | `query` | string | ✅ | - | La consulta de búsqueda |
-| `count` | number | ❌ | 10 | Número de resultados (1-20) |
-| `country` | string | ❌ | 'us' | Código de país para la búsqueda |
-| `search_lang` | string | ❌ | 'es' | Idioma de búsqueda |
-| `freshness` | enum | ❌ | - | Filtro de tiempo: pd=día, pw=semana, pm=mes, py=año |
-| `safesearch` | enum | ❌ | 'moderate' | Nivel de búsqueda segura: strict, moderate, off |
+| `count` | number | ❌ | 15 | Número de resultados (1-50) |
+| `freshness` | enum | ❌ | - | Recencia: d=día, w=semana, m=mes, y=año; también pd/pw/pm/py |
+| `language` | enum | ❌ | 'en' | Idioma preferido ('es' o 'en') |
+| `goggles_id` | enum | ❌ | - | Filtros Brave (code, research, news, discussions) |
+| `use_summarizer` | boolean | ❌ | true | Intentar resumen AI (Brave/Tavily) |
+| `primary` | enum | ❌ | 'tavily' | API primaria ('tavily' o 'brave') |
 
 ## Respuesta
 
-La herramienta devuelve un objeto con:
+La herramienta devuelve un objeto con enriquecimiento visual (favicon, thumbnail) e insights/clusterización ligera:
 ```typescript
 {
   success: boolean,
@@ -41,10 +59,18 @@ La herramienta devuelve un objeto con:
     title: string,
     url: string,
     description: string,
+    snippet?: string,
     hostname: string,
-    age: string
+    age: string,
+    thumbnail?: string,
+    favicon?: string
   }>,
-  total_results?: number
+  total_results?: number,
+  ai_summary?: string,
+  suggested_query?: string,
+  insights?: string[],
+  clusters?: Array<{ title: string, results: number[] }>,
+  source: 'brave' | 'tavily'
 }
 ```
 
@@ -59,23 +85,24 @@ La herramienta devuelve un objeto con:
 
 ### Búsqueda con Filtros
 ```typescript
-// Búsqueda de noticias recientes
+// Búsqueda de noticias recientes con fallback
 "Busca noticias de la última semana sobre inteligencia artificial"
-// Ejecutará: webSearchTool({ 
-//   query: "noticias inteligencia artificial", 
+// Ejecutará: webSearchTool({
+//   query: "noticias inteligencia artificial",
 //   freshness: "pw",
-//   count: 15 
-// })
+//   count: 15,
+//   language: 'es',
+//   primary: 'tavily'
+// }) // Si Tavily no encuentra resultados, caerá a Brave automáticamente
 ```
 
 ### Búsqueda Específica por País
 ```typescript
 // Información específica de un país
 "Busca información sobre el clima en Madrid, España"
-// Ejecutará: webSearchTool({ 
-//   query: "clima Madrid España", 
-//   country: "es",
-//   search_lang: "es" 
+// Ejecutará: webSearchTool({
+//   query: "clima Madrid España",
+//   language: "es"
 // })
 ```
 
@@ -98,10 +125,16 @@ La herramienta devuelve un objeto con:
 
 ## Integración en el Chat
 
-La herramienta se integra automáticamente en el sistema de tools del agente. Cuando un usuario hace una pregunta que requiere información actualizada, el agente puede decidir usar esta herramienta automáticamente.
+La herramienta se integra automáticamente en el sistema de tools del agente (`lib/tools/index.ts`) y está disponible en `/api/chat`. Para modelos como xAI Grok con Live Search nativo, el endpoint usa la búsqueda nativa y omite este tool; para el resto, este tool se ofrece y se ejecuta según las reglas del prompt. Si Brave devuelve 0 resultados o hay error, se intenta automáticamente con Tavily (si hay API key configurada).
 
 ## Monitoreo y Límites
 
-- Revisa tu uso en el [dashboard de Brave Search API](https://api-dashboard.search.brave.com/)
+- Revisa tu uso en el [dashboard de Brave Search API](https://api-dashboard.search.brave.com/) y Tavily
 - Configura alertas para evitar exceder tu cuota
 - Considera implementar caché local para consultas frecuentes
+
+## Notas
+
+- El código soporta variables de entorno alternativas para Tavily: `TAVILY_API_KEY` o `TAVILYAPIKEY`.
+- Para Brave, también se intentan `BRAVE_API_KEY` y `SEARCH_API_KEY` si no existe `BRAVE_SEARCH_API_KEY`.
+- El tool aplica cache LRU y límites por request para evitar abuso.

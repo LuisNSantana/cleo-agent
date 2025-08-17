@@ -162,7 +162,8 @@ function summarizeResults(
 
 // Helper function for Tavily search
 async function tavilySearch({ query, language, count, use_summarizer }: { query: string; language: 'es' | 'en'; count: number; use_summarizer: boolean }) {
-  const tavilyKey = process.env.TAVILY_API_KEY
+  // Support both TAVILY_API_KEY and TAVILYAPIKEY for flexibility
+  const tavilyKey = process.env.TAVILY_API_KEY || (process.env as any).TAVILYAPIKEY
   if (!tavilyKey) {
     throw new Error('TAVILY_API_KEY not configured')
   }
@@ -193,7 +194,7 @@ async function tavilySearch({ query, language, count, use_summarizer }: { query:
 }
 
 export const webSearchTool = tool({
-  description: 'Advanced web search with automatic fallback: Primary Brave, if no results fallback to Tavily (vice versa if Tavily primary). Optimized for potency: Supports operators, freshness, AI summarizer, Goggles, clustered insights, extended snippets, favicons. Default English queries for comprehensive results (auto-translate es). Use for fresh news, technical docs. Prioritize current info.',
+  description: 'Advanced web search with automatic fallback: Primary Tavily (default), if no results fallback to Brave (or vice versa if Brave primary). Optimized for potency: Supports operators, freshness, AI summarizer, Goggles (Brave), clustered insights, extended snippets, favicons. Default English queries for comprehensive results (auto-translate es). Use for fresh news, technical docs. Prioritize current info.',
   inputSchema: z.object({
     query: z.string().min(1).max(400).describe('Search query in English by default (auto-translated if es). Supports: site:domain.com, filetype:pdf, "phrase", -exclude, intitle:term.'),
     count: z.number().min(1).max(50).optional().default(15).describe('Number of results (max 50).'),
@@ -201,7 +202,7 @@ export const webSearchTool = tool({
     language: z.enum(['es', 'en']).optional().default('en').describe('Language (en for more info).'),
     goggles_id: z.enum(['code', 'research', 'news', 'discussions']).optional().describe('Goggles: code (programming), etc.'),
     use_summarizer: z.boolean().optional().default(true).describe('AI summary.'),
-    primary: z.enum(['brave', 'tavily']).optional().default('brave').describe('Primary API (brave/tavily).')
+  primary: z.enum(['brave', 'tavily']).optional().default('tavily').describe('Primary API (tavily/brave).')
   }),
   outputSchema: webSearchOutputSchema,
   onInputStart: ({ toolCallId }: { toolCallId?: string }) => {
@@ -223,50 +224,41 @@ export const webSearchTool = tool({
         console.log(`[WebSearch] Translated: "${query}" -> "${effectiveQuery}"`)
       }
 
-      // Throttling/deduplication
-      const reqId = (globalThis as any).__requestId || 'no-request'
+      // Throttling/deduplication (NON-BLOCKING)
+      const reqId = (globalThis as any).__requestId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? (crypto as any).randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const store = (globalThis as any).__webSearchPerReq || ((globalThis as any).__webSearchPerReq = {})
       const entry: { count: number; queries: Set<string> } = store[reqId] || (store[reqId] = { count: 0, queries: new Set() })
       const normalized = `${effectiveQuery.trim().toLowerCase()}::${freshness || 'none'}::${goggles_id || 'none'}::${primary}`
+
+      // Build cache key up-front (used by duplicate/limit logic)
+      const key = `${normalized}::${count}::${language}::${use_summarizer}`
+      const now = Date.now()
+      const cachedPre = searchCache.get(key)
       if (entry.queries.has(normalized)) {
-        const key = `${normalized}::${count}::${language}::${use_summarizer}`
-        const cached = searchCache.get(key)
-        if (cached && cached.expiry > Date.now()) {
-          return { ...cached.data, note: (cached.data.note || '') + (language === 'es' ? ' (repetida; caché)' : ' (repeated; cache)') }
+        if (cachedPre && cachedPre.expiry > now) {
+          return { ...cachedPre.data, note: (cachedPre.data.note || '') + (language === 'es' ? ' (repetida; caché)' : ' (repeated; cache)') }
         }
-        return {
-          success: false,
-          message: language === 'es' ? 'Duplicada (omitida)' : 'Duplicate (skipped)',
-          query: effectiveQuery,
-          results: [],
-          insights: [],
-          clusters: []
-        }
+        // Duplicate but no cache: proceed anyway to allow fallback and fresh fetch
+        console.log('[WebSearch] Duplicate query without cache; proceeding to fetch to allow fallback.')
       }
-      const newsLike = /(news|noticias|esta\s+semana|hoy|últimas|latest|this\s+week|today)/i.test(normalized) || freshness || goggles_id
+      const newsLike = /(news|noticias|esta\s+semana|hoy|últimas|latest|this\s+week|today)/i.test(normalized) || !!freshness || !!goggles_id
       const maxPerRequest = newsLike ? 5 : 3
+      let throttled = false
       if (entry.count >= maxPerRequest) {
-        const key = `${normalized}::${count}::${language}::${use_summarizer}`
-        const cached = searchCache.get(key)
-        if (cached && cached.expiry > Date.now()) {
-          return { ...cached.data, note: (cached.data.note || '') + (language === 'es' ? ' (límite; caché)' : ' (limit; cache)') }
+        if (cachedPre && cachedPre.expiry > now) {
+          return { ...cachedPre.data, note: (cachedPre.data.note || '') + (language === 'es' ? ' (límite; caché)' : ' (limit; cache)') }
         }
-        return {
-          success: false,
-          message: language === 'es' ? 'Límite alcanzado' : 'Limit reached',
-          query: effectiveQuery,
-          results: [],
-          insights: [],
-          clusters: []
-        }
+        // Hit limit but no cached data: continue with reduced cost
+        throttled = true
+        use_summarizer = false
+        count = Math.min(count, 5)
+        console.log('[WebSearch] Limit reached for request; proceeding with reduced parameters to fetch at least one result.')
       }
       entry.count++
       entry.queries.add(normalized)
 
       searchCache.evictExpired()
-      const key = `${normalized}::${count}::${language}::${use_summarizer}`
-      const now = Date.now()
-      const cached = searchCache.get(key)
+  const cached = searchCache.get(key)
       const cacheDuration = (freshness || goggles_id) ? 20 * 60 * 1000 : 90 * 60 * 1000
       if (cached && cached.expiry > now) {
         return { ...cached.data, note: (cached.data.note || '') + (language === 'es' ? ' (caché)' : ' (cache)') }

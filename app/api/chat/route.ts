@@ -642,7 +642,7 @@ ${documentContent}`
       }
     }
 
-    // Build final system prompt. We PREPEND the context so it has higher salience for the model.
+  // Build final system prompt. We PREPEND the context so it has higher salience for the model.
     const personalizationInstruction = `IMPORTANT: ALWAYS use information from the CONTEXT to respond. This includes:
 - Personal information (name, interests, favorite food, hobbies, communication style)  
 - Work documents, stories, projects, notes that the user has uploaded
@@ -662,10 +662,17 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
     console.log('[RAG] Using context?', !!ragSystemAddon, 'Final system prompt length:', finalSystemPrompt.length)
 
-    // Safe env diagnostics (no secrets)
+  // Safe env diagnostics (no secrets)
     const hasGroqKey = !!process.env.GROQ_API_KEY
     if (!hasGroqKey) {
       console.warn('[Env] GROQ_API_KEY not found in process.env at /api/chat runtime')
+    }
+
+    // Attach a per-request id so tools (like webSearch) can throttle sanely per request
+    try {
+      (globalThis as any).__requestId = crypto.randomUUID?.() ?? `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    } catch {
+      (globalThis as any).__requestId = `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
     }
 
     // Configure tools and provider options per model
@@ -713,6 +720,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         // Clean up global context
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel
+        delete (globalThis as any).__requestId
         
         if (supabase) {
           await storeAssistantMessage({
@@ -726,7 +734,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
           })
         }
       },
-    }
+  }
 
     // Apply model-specific default params when available
     if (modelConfig.defaults) {
