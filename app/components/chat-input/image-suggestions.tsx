@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 
 type ImageSuggestionsProps = {
   hasImages: boolean
-  onSuggestion: (suggestion: string) => void
+  onSuggestionAction: (suggestion: string) => void
 }
 
 const TRANSITION = {
@@ -16,7 +16,7 @@ const TRANSITION = {
   bounce: 0.2,
 }
 
-export function ImageSuggestions({ hasImages, onSuggestion }: ImageSuggestionsProps) {
+export function ImageSuggestions({ hasImages, onSuggestionAction }: ImageSuggestionsProps) {
   const suggestions = getImageAnalysisPrompts()
 
   return (
@@ -45,7 +45,7 @@ export function ImageSuggestions({ hasImages, onSuggestion }: ImageSuggestionsPr
                   key={index}
                   variant="outline"
                   size="sm"
-                  onClick={() => onSuggestion(suggestion)}
+                  onClick={() => onSuggestionAction(suggestion)}
                   className="h-7 px-2.5 text-xs bg-background/50 hover:bg-accent border-border/50 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {suggestion}
@@ -54,7 +54,7 @@ export function ImageSuggestions({ hasImages, onSuggestion }: ImageSuggestionsPr
             </div>
             
             <div className="mt-2 text-xs text-muted-foreground/70">
-              💡 Cleo puede analizar imágenes con Grok-4 y Llama 4 Maverick
+              💡 Cleo puede analizar imágenes con Faster y Smarter
             </div>
           </div>
         </motion.div>

@@ -1,8 +1,8 @@
-import { PROVIDERS } from "@/lib/providers"
+import { PROVIDER_IDS } from "@/lib/providers/ids"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-const SUPPORTED_PROVIDERS = PROVIDERS.map((p) => p.id)
+const SUPPORTED_PROVIDERS = PROVIDER_IDS
 
 export async function GET() {
   try {

@@ -11,6 +11,7 @@ import OpenAI from "@/components/icons/openai"
 import OpenRouter from "@/components/icons/openrouter"
 import Preplexity from "@/components/icons/perplexity"
 import Xai from "@/components/icons/xai"
+import { BrainIcon, RocketLaunch } from "@phosphor-icons/react"
 /**
  * Provider definitions for Cleo Agent models
  * Maps model providers to their display names and icons
@@ -23,6 +24,16 @@ export type Provider = {
 }
 
 export const PROVIDERS: Provider[] = [
+  {
+    id: "smarter",
+    name: "Smarter",
+    icon: BrainIcon,
+  },
+  {
+    id: "faster",
+    name: "Faster",
+    icon: RocketLaunch,
+  },
   {
     id: "openrouter",
     name: "OpenRouter",

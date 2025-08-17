@@ -1,27 +1,22 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { grokModels } from "./data/grok"
-import { llamaModels } from "./data/llama"
-import { gptOssModels } from "./data/gpt-oss"
 import { ModelConfig } from "./types"
 import { openaiModels } from "./data/openai.clean"
 
 /**
  * Cleo Agent Models
  * 
- * This application offers three powerful AI models for the Cleo agent:
- * - Grok-4: Advanced reasoning, vision, and function calling capabilities
- * - Llama: Open-source alternative with strong performance
- * - GPT-OSS 120B: OpenAI's flagship open source model with MoE architecture
+ * This application offers two models:
+ * - Faster: xAI Grok-3 Mini, optimized for speed
+ * - Smarter: OpenAI GPT-5 mini, optimized for reasoning
  * 
  * Users can choose between these models to compare responses and
  * select their preferred AI for document analysis, calendar management,
  * live search, and other agent tasks.
  */
 const STATIC_MODELS: ModelConfig[] = [
-  ...grokModels, // Cleo Agent (Grok-4)
-  ...llamaModels, // Llama models for comparison
-  ...gptOssModels, // GPT-OSS 120B for advanced reasoning
-  ...openaiModels, // OpenAI additions (e.g., GPT-5 Nano)
+  ...grokModels, // Faster (Grok-3 Mini)
+  ...openaiModels, // Smarter (GPT-5 mini)
 ]
 
 // Debug: Log available models

@@ -22,13 +22,13 @@ import React from "react"
 import { PopoverContentAuth } from "./popover-content-auth"
 
 type ButtonFileUploadProps = {
-  onFileUpload: (files: File[]) => void
+  onFileUploadAction: (files: File[]) => void
   isUserAuthenticated: boolean
   model: string
 }
 
 export function ButtonFileUpload({
-  onFileUpload,
+  onFileUploadAction,
   isUserAuthenticated,
   model,
 }: ButtonFileUploadProps) {
@@ -94,7 +94,7 @@ export function ButtonFileUpload({
 
   return (
     <FileUpload
-      onFilesAdded={onFileUpload}
+  onFilesAdded={onFileUploadAction}
       multiple
       disabled={!isUserAuthenticated}
       accept=".txt,.md,.csv,.json,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/rtf,text/plain,text/markdown,application/json,text/csv,image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/heic,image/heif"

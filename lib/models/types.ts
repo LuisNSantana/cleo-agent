@@ -40,6 +40,13 @@ type ModelConfig = {
   ) => LanguageModel
 
   accessible?: boolean // true if the model is accessible to the user
+
+  // Optional model-specific runtime defaults used by the chat endpoint
+  defaults?: {
+    temperature?: number
+    topP?: number
+    maxTokens?: number
+  }
 }
 
 export type { ModelConfig }

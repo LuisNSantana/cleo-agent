@@ -222,7 +222,7 @@ export async function POST(req: Request) {
                   if (!modelConfig.vision) {
                     return {
                       type: "text" as const,
-                      text: `[IMAGEN: ${typedPart.name || "imagen.jpg"}] - El modelo ${model} no soporta análisis de imágenes. Para analizar imágenes, selecciona Grok-4 o Llama 4 Maverick que tienen capacidades de visión avanzadas.`,
+                      text: `[IMAGEN: ${typedPart.name || "imagen.jpg"}] - El modelo ${model} no soporta análisis de imágenes. Para analizar imágenes, selecciona Faster o Smarter que tienen capacidades de visión avanzadas.`,
                     }
                   }
 
@@ -295,8 +295,8 @@ export async function POST(req: Request) {
                             )
                             // Fallback for PDF processing errors with more specific guidance
                             if (
-                              model === "grok-4" ||
-                              model === "llama-4-maverick"
+                              model === "grok-3-mini" ||
+                              model === "gpt-5-mini-2025-08-07"
                             ) {
                               documentContent = `[ARCHIVO PDF - ${fileName}]
 
@@ -304,13 +304,13 @@ export async function POST(req: Request) {
 
 **Opciones disponibles:**
 1. **Pregunta específica:** Describe qué información necesitas del documento
-2. **Capturas de pantalla:** Toma fotos de las páginas relevantes - Los modelos Grok-4 y Llama 4 Maverick pueden analizar imágenes
+2. **Capturas de pantalla:** Toma fotos de las páginas relevantes - Los modelos Faster y Smarter pueden analizar imágenes
 3. **Archivo más pequeño:** Usa un PDF de menos de 20 páginas
 4. **Texto directo:** Copia y pega las secciones específicas que necesitas
 
 💡 **Tip:** Las imágenes del documento funcionan muy bien con estos modelos.`
                             } else {
-                              documentContent = `[PDF Document: ${fileName}] - Documento muy grande. Usa Grok-4 o Llama 4 Maverick para mejor análisis de documentos, o convierte a texto/imágenes.`
+                              documentContent = `[PDF Document: ${fileName}] - Documento muy grande. Usa Faster o Smarter para mejor análisis de documentos, o convierte a texto/imágenes.`
                             }
                           }
                         } else {
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
                           documentContent = `[Archivo binario: ${fileName}. Tipo: ${fileType}]
                       
 Este archivo requiere procesamiento especializado. Para mejor análisis:
-1. Para imágenes: usa Grok-4 o Llama 4 Maverick 
+1. Para imágenes: usa Faster o Smarter 
 2. Para documentos Office: convierte a PDF o texto
 3. Para texto específico: copia y pega directamente
 
@@ -651,9 +651,14 @@ ${documentContent}`
 If the user asks about something that is in the CONTEXT, use it directly to respond. DO NOT say you don't have information if it's available in the context.
 
 SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate", "expand", "continue", "review" a document found in the context, ALWAYS suggest opening the document in the Canvas Editor. Use phrases like: "Would you like me to open [document name] in the collaborative editor so we can work on it together?"`
+    // Model-specific search guidance (avoid generic webSearch tool for xAI native live search)
+    const searchGuidance = (model === 'grok-3-mini' && enableSearch)
+      ? `\n\nSEARCH MODE: For Faster (grok-3-mini), use native Live Search (built into the model). Do NOT call the webSearch tool. Include citations when available.`
+      : ''
+
     const finalSystemPrompt = ragSystemAddon
-      ? `${ragSystemAddon}\n\n${personalizationInstruction}\n\n${effectiveSystemPrompt}`
-      : effectiveSystemPrompt
+      ? `${ragSystemAddon}\n\n${personalizationInstruction}${searchGuidance}\n\n${effectiveSystemPrompt}`
+      : `${effectiveSystemPrompt}${searchGuidance}`
 
     console.log('[RAG] Using context?', !!ragSystemAddon, 'Final system prompt length:', finalSystemPrompt.length)
 
@@ -663,13 +668,44 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       console.warn('[Env] GROQ_API_KEY not found in process.env at /api/chat runtime')
     }
 
+    // Configure tools and provider options per model
+    // For xAI (grok-3-mini), ALWAYS drop the generic webSearch tool; use native Live Search when enabled
+    let toolsForRun = tools as typeof tools
+    let providerOptions: Record<string, any> | undefined
+    let activeTools: string[] | undefined
+  if (model === 'grok-3-mini') {
+      try {
+        const { webSearch, ...rest } = tools as any
+        toolsForRun = rest
+      } catch {
+        toolsForRun = tools
+      }
+      // Restrict active tools to the filtered set, preventing accidental calls to removed tools
+      activeTools = Object.keys(toolsForRun)
+
+      // Force-enable native Live Search to validate end-to-end and avoid Brave tool
+      providerOptions = {
+        xai: {
+          searchParameters: {
+            mode: 'on',
+            returnCitations: true,
+          },
+        },
+      }
+      console.log('[xAI] Live Search FORCED ENABLE for grok-3-mini')
+    }
+
     // Prepare additional parameters for reasoning models
     const additionalParams: any = {
-      model: modelConfig.apiSdk(process.env.OPENAI_API_KEY || apiKey, { enableSearch }),
+      // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
+      model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: finalSystemPrompt,
       messages: convertedMessages,
-      tools: tools,
-      stopWhen: stepCountIs(8), // More steps for better synthesis after tools
+      tools: toolsForRun,
+  ...(providerOptions ? { providerOptions } : {}),
+  ...(activeTools ? { activeTools } : {}),
+      // Avoid step cap when using xAI native Live Search to prevent early termination mid-search
+      ...(!(model === 'grok-3-mini' && enableSearch) ? { stopWhen: stepCountIs(8) } : {}),
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
       },
@@ -691,6 +727,14 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         }
       },
     }
+
+    // Apply model-specific default params when available
+    if (modelConfig.defaults) {
+      const { temperature, topP, maxTokens } = modelConfig.defaults
+      if (typeof temperature === 'number') (additionalParams as any).temperature = temperature
+      if (typeof topP === 'number') (additionalParams as any).topP = topP
+      if (typeof maxTokens === 'number') (additionalParams as any).maxTokens = maxTokens
+    }
     
     // Check if user is asking to open/view a document - reduce reasoning to avoid content in reasoning
     const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
@@ -709,10 +753,15 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       }
     }
 
+    if (providerOptions) {
+      console.log('[ChatAPI] Provider options applied:', JSON.stringify(providerOptions))
+    }
+
     const result = streamText(additionalParams)
 
     // For document opening queries, disable sending reasoning to prevent content in expandable
-    const sendReasoning = !isOpeningDocument
+  // Hide reasoning to avoid exposing internal planning; UI can add toggles later if desired
+  const sendReasoning = false
 
     return result.toUIMessageStreamResponse({
       sendReasoning, // Disable reasoning stream for doc opens to avoid content in expandable
@@ -726,7 +775,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
             error.message.includes("Rate limit") ||
             error.message.includes("Request too large")
           ) {
-            return "El documento es demasiado grande para procesar completamente. Por favor:\n\n1. Usa un archivo PDF más pequeño (menos de 20 páginas)\n2. Usa un documento más pequeño\n3. O describe qué información específica necesitas del documento\n4. O proporciona capturas de pantalla de las secciones relevantes\n\nLos modelos Grok-4 y Llama 4 Maverick pueden analizar imágenes directamente."
+            return "El documento es demasiado grande para procesar completamente. Por favor:\n\n1. Usa un archivo PDF más pequeño (menos de 20 páginas)\n2. Usa un documento más pequeño\n3. O describe qué información específica necesitas del documento\n4. O proporciona capturas de pantalla de las secciones relevantes\n\nLos modelos Faster y Smarter pueden analizar imágenes directamente."
           }
           if (error.message.includes("tokens per minute")) {
             return "Has alcanzado el límite de tokens por minuto. El documento es muy largo. Espera un momento o usa un archivo más pequeño."

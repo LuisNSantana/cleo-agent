@@ -2,7 +2,7 @@ import { ModelConfig } from "../types"
 import { getXAIModel } from "../../xai"
 
 /**
- * Cleo Agent - Powered by Grok-4
+ * Cleo Agent - Powered by Grok-3 Mini (Faster)
  * 
  * Cleo is an intelligent AI agent designed to:
  * - Analyze and create documents with deep understanding
@@ -14,38 +14,40 @@ import { getXAIModel } from "../../xai"
  */
 const grokModels: ModelConfig[] = [
   {
-    id: "grok-4",
-    name: "Cleo Agent (Grok-4)",
+    id: "grok-3-mini",
+    name: "Faster",
     provider: "xAI",
     providerId: "xai",
     modelFamily: "Grok",
     baseProviderId: "xai",
-    description: "Cleo is your intelligent AI agent powered by Grok-4. Specialized in document analysis, calendar management, live search, and complex reasoning tasks with vision capabilities.",
+    description:
+      "Lightning-fast Grok-3 Mini for low-latency tasks with tool calling and basic vision support.",
     tags: [
-      "agent", 
-      "document-analysis", 
-      "calendar-management", 
-      "live-search", 
-      "reasoning", 
-      "vision", 
-      "function-calling",
-      "real-time-info"
+      "fast",
+      "tools",
+      "vision",
+      "low-latency",
     ],
-    contextWindow: 256000,
+    contextWindow: 131072,
     vision: true,
     tools: true,
     audio: false,
-    reasoning: true,
+    reasoning: false,
     openSource: false,
     speed: "Fast",
-    intelligence: "High",
+    intelligence: "Medium",
     website: "https://x.ai",
-    apiDocs: "https://docs.x.ai/docs/models/grok-4-0709",
+    apiDocs: "https://docs.x.ai/",
     modelPage: "https://x.ai/grok",
-    releasedAt: "2024-12-01",
-  icon: "xai",
-  apiSdk: (apiKey?: string) => getXAIModel("grok-4", apiKey) as any, // allow override key from route
-  }
+    releasedAt: "2025-01-01",
+    icon: "faster",
+    defaults: {
+      temperature: 0.3,
+      topP: 0.9,
+      // leave maxTokens undefined to let the SDK stream freely; set if you want stricter caps
+    },
+    apiSdk: (apiKey?: string) => getXAIModel("grok-3-mini", apiKey) as any, // allow override key from route
+  },
 ]
 
 export { grokModels }

@@ -3,7 +3,7 @@ import { FileItem } from "./file-items"
 
 type FileListProps = {
   files: File[]
-  onFileRemove: (file: File) => void
+  onFileRemoveAction: (file: File) => void
 }
 
 const TRANSITION = {
@@ -18,7 +18,7 @@ const CANVAS_TRANSITION = {
   bounce: 0.3,
 }
 
-export function FileList({ files, onFileRemove }: FileListProps) {
+export function FileList({ files, onFileRemoveAction }: FileListProps) {
   return (
     <AnimatePresence initial={false}>
       {files.length > 0 && (
@@ -48,7 +48,7 @@ export function FileList({ files, onFileRemove }: FileListProps) {
                     <FileItem
                       key={file.name}
                       file={file}
-                      onRemove={onFileRemove}
+                      onRemove={onFileRemoveAction}
                     />
                   </motion.div>
                 )

@@ -19,8 +19,13 @@ function createXaiProvider(apiKeyOverride?: string) {
  * @returns xAI model instance
  */
 export function getXAIModel(modelId: string, apiKeyOverride?: string) {
-  // Mapear grok-4 al modelo correcto
-  const modelName = modelId === "grok-4" ? "grok-4-latest" : modelId
+  // Mapear alias a nombres oficiales
+  const modelName =
+    modelId === "grok-4"
+      ? "grok-4-latest"
+      : modelId === "grok-3-mini"
+      ? "grok-3-mini"
+      : modelId
 
   // Crear proveedor con override cuando sea necesario
   const xai = createXaiProvider(apiKeyOverride)

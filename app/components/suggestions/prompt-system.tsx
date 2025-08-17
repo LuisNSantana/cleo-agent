@@ -5,14 +5,14 @@ import React, { memo } from "react"
 import { Suggestions } from "../chat-input/suggestions"
 
 type PromptSystemProps = {
-  onValueChange: (value: string) => void
-  onSuggestion: (suggestion: string) => void
+  onValueChangeAction: (value: string) => void
+  onSuggestionAction: (suggestion: string) => void
   value: string
 }
 
 export const PromptSystem = memo(function PromptSystem({
-  onValueChange,
-  onSuggestion,
+  onValueChangeAction,
+  onSuggestionAction,
   value,
 }: PromptSystemProps) {
   return (
@@ -20,8 +20,8 @@ export const PromptSystem = memo(function PromptSystem({
       <div className="relative order-1 w-full md:absolute md:bottom-[-70px] md:order-2 md:h-[70px]">
         <AnimatePresence mode="popLayout">
           <Suggestions
-            onValueChange={onValueChange}
-            onSuggestion={onSuggestion}
+            onValueChangeAction={onValueChangeAction}
+            onSuggestionAction={onSuggestionAction}
             value={value}
           />
         </AnimatePresence>

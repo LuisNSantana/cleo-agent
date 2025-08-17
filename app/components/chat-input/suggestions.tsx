@@ -7,16 +7,16 @@ import React, { memo, useCallback, useMemo, useState } from "react"
 import { SUGGESTIONS as SUGGESTIONS_CONFIG } from "../../../lib/config"
 
 type SuggestionsProps = {
-  onValueChange: (value: string) => void
-  onSuggestion: (suggestion: string) => void
+  onValueChangeAction: (value: string) => void
+  onSuggestionAction: (suggestion: string) => void
   value?: string
 }
 
 const MotionPromptSuggestion = motion.create(PromptSuggestion)
 
 export const Suggestions = memo(function Suggestions({
-  onValueChange,
-  onSuggestion,
+  onValueChangeAction,
+  onSuggestionAction,
   value,
 }: SuggestionsProps) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
@@ -35,18 +35,18 @@ export const Suggestions = memo(function Suggestions({
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
       setActiveCategory(null)
-      onSuggestion(suggestion)
-      onValueChange("")
+      onSuggestionAction(suggestion)
+      onValueChangeAction("")
     },
-    [onSuggestion, onValueChange]
+    [onSuggestionAction, onValueChangeAction]
   )
 
   const handleCategoryClick = useCallback(
     (suggestion: { label: string; prompt: string }) => {
       setActiveCategory(suggestion.label)
-      onValueChange(suggestion.prompt)
+      onValueChangeAction(suggestion.prompt)
     },
-    [onValueChange]
+    [onValueChangeAction]
   )
 
   const suggestionsGrid = useMemo(

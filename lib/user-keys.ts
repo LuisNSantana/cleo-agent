@@ -24,8 +24,9 @@ export async function getUserKey(
     if (error || !data) return null
 
     return decryptKey(data.encrypted_key, data.iv)
-  } catch (error) {
-    console.error("Error retrieving user key:", error)
+  } catch (error: any) {
+    // Avoid noisy stack traces if ENCRYPTION_KEY changed; fall back to env key
+    console.warn("Error retrieving user key:", error?.message || String(error))
     return null
   }
 }

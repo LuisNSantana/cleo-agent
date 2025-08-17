@@ -15,7 +15,7 @@ export const MODEL_IMAGE_LIMITS: Record<string, ImageLimits> = {
     maxSizePerImage: 10 * 1024 * 1024, // 10MB
     supportedFormats: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
   },
-  'grok-4': {
+  'grok-3-mini': {
     maxImages: 10,
     maxSizePerImage: 20 * 1024 * 1024, // 20MB  
     supportedFormats: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']

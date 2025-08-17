@@ -25,40 +25,40 @@ import Image from "next/image"
 
 type ChatInputProps = {
   value: string
-  onValueChange: (value: string) => void
-  onSend: () => void
+  onValueChangeAction: (value: string) => void
+  onSendAction: () => void
   isSubmitting?: boolean
   hasMessages?: boolean
   files: File[]
-  onFileUpload: (files: File[]) => void
-  onFileRemove: (file: File) => void
-  onSuggestion: (suggestion: string) => void
+  onFileUploadAction: (files: File[]) => void
+  onFileRemoveAction: (file: File) => void
+  onSuggestionAction: (suggestion: string) => void
   hasSuggestions?: boolean
-  onSelectModel: (model: string) => void
+  onSelectModelAction: (model: string) => void
   selectedModel: string
   isUserAuthenticated: boolean
-  stop: () => void
+  stopAction: () => void
   status?: "submitted" | "streaming" | "ready" | "error"
-  setEnableSearch: (enabled: boolean) => void
+  setEnableSearchAction: (enabled: boolean) => void
   enableSearch: boolean
 }
 
 export function ChatInput({
   value,
-  onValueChange,
-  onSend,
+  onValueChangeAction,
+  onSendAction,
   isSubmitting,
   files,
-  onFileUpload,
-  onFileRemove,
-  onSuggestion,
+  onFileUploadAction,
+  onFileRemoveAction,
+  onSuggestionAction,
   hasSuggestions,
-  onSelectModel,
+  onSelectModelAction,
   selectedModel,
   isUserAuthenticated,
-  stop,
+  stopAction,
   status,
-  setEnableSearch,
+  setEnableSearchAction,
   enableSearch,
 }: ChatInputProps) {
   const selectModelConfig = getModelInfo(selectedModel)
@@ -112,13 +112,13 @@ export function ChatInput({
           consumePendingMessage()
           
           // Establecer el mensaje primero
-          onValueChange(messageText)
+          onValueChangeAction(messageText)
           
           // Esperar un tick para que el estado se actualice
           await new Promise(resolve => setTimeout(resolve, 50))
           
           // Agregar el archivo a la lista de archivos
-          onFileUpload([file])
+          onFileUploadAction([file])
           
           // Esperar a que React procese completamente los estados
           await new Promise(resolve => setTimeout(resolve, 250))
@@ -126,7 +126,7 @@ export function ChatInput({
           // Verificar que los archivos se agregaron correctamente antes de enviar
           console.log('Auto-sending canvas message:', messageText, 'Files ready for send')
           setIsProcessingCanvas(false)
-          onSend()
+          onSendAction()
           
         } catch (error) {
           console.error('Error procesando mensaje del canvas:', error)
@@ -137,7 +137,7 @@ export function ChatInput({
       
       processCanvasMessage()
     }
-  }, [hasPendingMessage, pendingMessage?.timestamp, onValueChange, onFileUpload, onSend, consumePendingMessage]) // Agregar dependencias necesarias
+  }, [hasPendingMessage, pendingMessage?.timestamp, onValueChangeAction, onFileUploadAction, onSendAction, consumePendingMessage]) // Agregar dependencias necesarias
 
   const handleSend = useCallback(() => {
     if (isSubmitting) {
@@ -145,12 +145,12 @@ export function ChatInput({
     }
 
     if (status === "streaming") {
-      stop()
+      stopAction()
       return
     }
 
-    onSend()
-  }, [isSubmitting, onSend, status, stop])
+    onSendAction()
+  }, [isSubmitting, onSendAction, status, stopAction])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -164,11 +164,11 @@ export function ChatInput({
           return
         }
 
-        e.preventDefault()
-        onSend()
+    e.preventDefault()
+    onSendAction()
       }
     },
-    [isSubmitting, onSend, status, value]
+  [isSubmitting, onSendAction, status, value]
   )
 
   const handlePaste = useCallback(
@@ -203,19 +203,19 @@ export function ChatInput({
         }
 
         if (imageFiles.length > 0) {
-          onFileUpload(imageFiles)
+      onFileUploadAction(imageFiles)
         }
       }
       // Text pasting will work by default for everyone
     },
-    [isUserAuthenticated, onFileUpload]
+    [isUserAuthenticated, onFileUploadAction]
   )
 
   useMemo(() => {
     if (!hasSearchSupport && enableSearch) {
-      setEnableSearch?.(false)
+      setEnableSearchAction?.(false)
     }
-  }, [hasSearchSupport, enableSearch, setEnableSearch])
+  }, [hasSearchSupport, enableSearch, setEnableSearchAction])
 
   const deferredValue = useDeferredValue(value)
 
@@ -223,8 +223,8 @@ export function ChatInput({
     <div className="relative flex w-full flex-col gap-4">
       {hasSuggestions && (
         <PromptSystem
-          onValueChange={onValueChange}
-          onSuggestion={onSuggestion}
+          onValueChangeAction={onValueChangeAction}
+          onSuggestionAction={onSuggestionAction}
           value={deferredValue}
         />
       )}
@@ -233,9 +233,9 @@ export function ChatInput({
           className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
           maxHeight={200}
           value={value}
-          onValueChange={onValueChange}
+          onValueChange={onValueChangeAction}
         >
-          <FileList files={files} onFileRemove={onFileRemove} />
+          <FileList files={files} onFileRemoveAction={onFileRemoveAction} />
           
           {/* Canvas processing indicator */}
           {isProcessingCanvas && (
@@ -267,7 +267,7 @@ export function ChatInput({
           
           <ImageSuggestions 
             hasImages={files.some(isImageFile)} 
-            onSuggestion={onSuggestion} 
+            onSuggestionAction={onSuggestionAction} 
           />
           <PromptInputTextarea
             placeholder="Ask Cleo"
@@ -279,14 +279,14 @@ export function ChatInput({
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2">
               <ButtonFileUpload
-                onFileUpload={onFileUpload}
+                onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
                 model={selectedModel}
               />
               {isUserAuthenticated && <ConnectionStatus />}
               <ModelSelector
                 selectedModelId={selectedModel}
-                setSelectedModelId={onSelectModel}
+                setSelectedModelId={onSelectModelAction}
                 isUserAuthenticated={isUserAuthenticated}
                 className="rounded-full"
               />
@@ -311,7 +311,7 @@ export function ChatInput({
               {hasSearchSupport ? (
                 <ButtonSearch
                   isSelected={enableSearch}
-                  onToggle={setEnableSearch}
+                  onToggle={setEnableSearchAction}
                   isAuthenticated={isUserAuthenticated}
                 />
               ) : null}

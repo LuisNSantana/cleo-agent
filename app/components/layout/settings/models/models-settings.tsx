@@ -104,7 +104,7 @@ export function ModelsSettings() {
   }
 
   // Quick actions
-  const RECOMMENDED_IDS = [MODEL_DEFAULT, "grok-4", "gpt-oss-120b"]
+  const RECOMMENDED_IDS = [MODEL_DEFAULT, "grok-3-mini", "gpt-5-mini-2025-08-07"]
   const applyRecommended = () => {
     if (!Array.isArray(models)) return
     const existing = new Set(
@@ -154,8 +154,11 @@ export function ModelsSettings() {
   }
 
   const getProviderIcon = (model: ModelConfig) => {
-    const provider = PROVIDERS.find((p) => p.id === model.baseProviderId)
-    return provider?.icon
+    // Prefer custom icon mapping via model.icon (smarter/faster)
+    const byIcon = PROVIDERS.find((p) => p.id === (model.icon || ""))
+    if (byIcon?.icon) return byIcon.icon
+    const fallback = PROVIDERS.find((p) => p.id === model.baseProviderId)
+    return fallback?.icon
   }
 
   return (

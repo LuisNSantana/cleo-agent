@@ -15,22 +15,12 @@ export const DAILY_FILE_UPLOAD_LIMIT = 5
 export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (solo Llama)
-export const NON_AUTH_ALLOWED_MODELS = [
-  "llama-4-maverick",
-  "llama-3-3-70b-groq",
-  "llama-3-1-8b-groq",
-]
+export const NON_AUTH_ALLOWED_MODELS = ["grok-3-mini", "gpt-5-mini-2025-08-07"]
 
 // Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS)
-export const FREE_MODELS_IDS = [
-  "llama-4-maverick",
-  "llama-3-3-70b-groq",
-  "llama-3-1-8b-groq",
-  "grok-4",
-  "gpt-oss-120b",
-]
+export const FREE_MODELS_IDS = ["grok-3-mini", "gpt-5-mini-2025-08-07"]
 
-export const MODEL_DEFAULT = "llama-4-maverick"
+export const MODEL_DEFAULT = "gpt-5-mini-2025-08-07" // Smarter by default
 
 export const APP_NAME = "Cleo"
 export const APP_DOMAIN = "https://zola.chat"
