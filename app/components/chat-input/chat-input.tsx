@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
 import { ArrowUpIcon, StopIcon, CircleNotch } from "@phosphor-icons/react"
-import { useCallback, useMemo, useEffect, useRef, useState } from "react"
+import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
@@ -217,13 +217,15 @@ export function ChatInput({
     }
   }, [hasSearchSupport, enableSearch, setEnableSearch])
 
+  const deferredValue = useDeferredValue(value)
+
   return (
     <div className="relative flex w-full flex-col gap-4">
       {hasSuggestions && (
         <PromptSystem
           onValueChange={onValueChange}
           onSuggestion={onSuggestion}
-          value={value}
+          value={deferredValue}
         />
       )}
       <div className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1">

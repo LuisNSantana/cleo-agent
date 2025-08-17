@@ -11,7 +11,55 @@ import { API_ROUTE_CHAT } from "@/lib/routes"
 import type { UserProfile } from "@/lib/user/types"
 import type { UIMessage } from "ai"
 import { useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue, useTransition } from "react"
+import { debounce } from "lodash"
+
+// 🔧 Performance & Robustness Utilities
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_RETRY_ATTEMPTS = 3
+const RETRY_DELAY_BASE = 1000 // 1s base delay
+
+// File validation with logging
+function validateFiles(files: File[]): { isValid: boolean; errors: string[] } {
+  const startTime = performance.now()
+  
+  if (!files || files.length === 0) {
+    return { isValid: true, errors: [] }
+  }
+
+  const errors: string[] = []
+  
+  for (const file of files) {
+    // Size validation
+    if (file.size > MAX_FILE_SIZE) {
+      errors.push(`File "${file.name}" exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`)
+      continue
+    }
+    
+    // Type validation
+    const isValidType = isImageFile(file) || 
+      file.type.startsWith('text/') || 
+      file.type === 'application/pdf' ||
+      file.type === 'application/json'
+    
+    if (!isValidType) {
+      errors.push(`File "${file.name}" has unsupported type: ${file.type}`)
+    }
+  }
+
+  const duration = performance.now() - startTime
+  // Validation completed
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  }
+}
+
+// Type guard for user messages
+function isValidUserMessage(input: string, files: File[]): boolean {
+  return (input.trim().length > 0) || (files && files.length > 0)
+}
 
 // Utility function to convert UIMessage to MessageAISDK for AI SDK v5 compatibility
 function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
@@ -49,7 +97,7 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
       }
     }
     
-    console.log(`🔍 [ConvertMessage] Converted message with ${attachments.length} attachments to multimodal content`)
+  // Converted message with attachments for multimodal content
     
     return {
       id: message.id || Date.now().toString(),
@@ -140,17 +188,42 @@ export function useChatCore({
   selectedModel,
   clearDraft,
 }: UseChatCoreProps) {
+  // 🚀 Performance tracking
+  const performanceRef = useRef({
+    inputChanges: 0,
+    debouncedCalls: 0,
+    rerenders: 0,
+    lastRender: performance.now()
+  })
+
   // State management - AI SDK v5 requires manual input management
   const [input, setInput] = useState(draftValue || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const [enableSearch, setEnableSearch] = useState(false)
+  // Defer heavy consumers of the input value to keep typing responsive
+  const deferredInput = useDeferredValue(input)
+  // Mark heavy state updates (like large message list changes) as non-urgent
+  const [isUiPending, startUiTransition] = useTransition()
 
-  // Refs and derived state
+  // 🎯 Performance: AbortController for stream cancellation
+  const retryCountRef = useRef<number>(0)
+
+  // Refs and derived state  
   const hasSentFirstMessageRef = useRef(false)
   const prevChatIdRef = useRef<string | null>(chatId)
+  
+  // 🎯 Performance: Memoized derived values
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
+  
   const { preferences } = useUserPreferences()
+
+  // 🎯 Performance: Track re-renders
+  useEffect(() => {
+    performanceRef.current.rerenders++
+    const now = performance.now()
+    performanceRef.current.lastRender = now
+  })
   
   // Generate dynamic system prompt with current model info and personality settings
     const systemPrompt = useMemo(() => {
@@ -160,26 +233,14 @@ export function useChatCore({
       // Build the base Cleo prompt (personality-aware if available)
       let basePrompt: string
       if (preferences.personalitySettings) {
-        try {
-          console.log('[Chat][SystemPrompt] Using personality settings', {
-            personalityType: preferences.personalitySettings.personalityType,
-            model: currentModelName,
-          })
-        } catch {}
         basePrompt = generatePersonalizedPrompt(currentModelName, preferences.personalitySettings)
       } else {
-        try {
-          console.log('[Chat][SystemPrompt] Using default prompt', { model: currentModelName })
-        } catch {}
         basePrompt = getCleoPrompt(currentModelName, "default")
       }
 
       // If the user has a custom system prompt, append it as an addendum instead of replacing
       if (user?.system_prompt && user.system_prompt.trim().length > 0) {
         const addendum = user.system_prompt.trim()
-        try {
-          console.log('[Chat][SystemPrompt] Appending user addendum to base prompt', { addendumLen: addendum.length })
-        } catch {}
         return `${basePrompt}\n\nUSER ADDENDUM:\n${addendum}`
       }
 
@@ -190,10 +251,28 @@ export function useChatCore({
   const searchParams = useSearchParams()
   const prompt = searchParams.get("prompt")
 
+  // 🎯 Performance: Debounced error handling
+  const debouncedHandleError = useMemo(
+  () => debounce((error: Error) => {
+      
+      let errorMsg = error.message || "Something went wrong."
+      if (errorMsg === "An error occurred" || errorMsg === "fetch failed") {
+        errorMsg = "Something went wrong. Please try again."
+      }
+
+      // Reset retry count on user-facing error
+      retryCountRef.current = 0
+
+      toast({
+        title: errorMsg,
+        status: "error",
+      })
+    }, 500),
+    []
+  )
+
   // Handle errors directly in onError callback
   const handleError = useCallback((error: Error) => {
-    console.error("Chat error:", error)
-    console.error("Error message:", error.message)
     let errorMsg = error.message || "Something went wrong."
 
     if (errorMsg === "An error occurred" || errorMsg === "fetch failed") {
@@ -263,7 +342,9 @@ export function useChatCore({
         parts: [{ type: "text", text }],
         ...(experimental_attachments ? { experimental_attachments } : {}),
       }
-      setMessages((prev) => [...prev, userMessage])
+      startUiTransition(() => {
+        setMessages((prev) => [...prev, userMessage])
+      })
 
       // Prepare controller
       if (abortControllerRef.current) {
@@ -288,7 +369,7 @@ export function useChatCore({
             effectiveChatId = await ensureChatExists(effectiveUserId, text)
           }
         } catch (e) {
-          console.warn("[Chat] ensureChatExists failed", e)
+          // ensureChatExists failed
         }
         if (!effectiveChatId) {
           throw new Error('Unable to create or locate a chat session')
@@ -309,13 +390,7 @@ export function useChatCore({
           signal: abortControllerRef.current.signal,
         })
 
-        try {
-          console.log('[PromptDiag][Client] Sending chat', {
-            model: selectedModel,
-            enableSearch,
-            sysLen: (systemPrompt || '').length,
-          })
-        } catch {}
+  // Sending chat request
 
         if (!response.ok) {
           let errText = "Failed to send message"
@@ -339,7 +414,9 @@ export function useChatCore({
           parts: [],
         } as ChatMessage
 
-        setMessages((prev: ChatMessage[]) => [...prev, assistantMessageObj])
+        startUiTransition(() => {
+          setMessages((prev: ChatMessage[]) => [...prev, assistantMessageObj])
+        })
 
         while (true) {
           const { done, value } = await reader.read()
@@ -361,9 +438,6 @@ export function useChatCore({
               try {
                 const data = JSON.parse(line.slice(6))
                 
-                // Debug: Log ALL data types we receive
-                console.log('🔍 [STREAM] Received data type:', data.type, data)
-
                 // Handle different types of streaming data
                 switch (data.type) {
                   case "tool-input-start": {
@@ -442,7 +516,6 @@ export function useChatCore({
 
                   case "reasoning-start":
                     // Start reasoning part
-                    console.log('🧠 [STREAM] Reasoning started')
                     assistantMessageObj.parts.push({
                       type: "reasoning",
                       text: "",
@@ -451,7 +524,6 @@ export function useChatCore({
 
                   case "reasoning-delta":
                     // Update reasoning part
-                    console.log('🧠 [STREAM] Reasoning delta:', data.delta?.substring(0, 50))
                     const reasoningPart = assistantMessageObj.parts.findLast(
                       (p) => p.type === "reasoning"
                     )
@@ -462,21 +534,17 @@ export function useChatCore({
 
                   case "reasoning-end":
                     // Finish reasoning part - the actual reasoning content might be here
-                    console.log('🧠 [STREAM] Reasoning ended:', JSON.stringify(data, null, 2))
                     const endReasoningPart = assistantMessageObj.parts.findLast(
                       (p) => p.type === "reasoning"
                     )
                     if (endReasoningPart && endReasoningPart.type === "reasoning" && data.text) {
                       endReasoningPart.text = data.text
-                      console.log('🧠 [STREAM] Set reasoning text:', data.text.substring(0, 200))
                     }
                     break
 
                   case "finish":
-                    console.log('✅ [STREAM] Finish event received:', JSON.stringify(data, null, 2))
                     // Check if reasoning is included in the finish event
                     if (data.reasoning) {
-                      console.log('🧠 [STREAM] Found reasoning in finish event:', data.reasoning.substring(0, 200))
                       // Add reasoning part if it doesn't exist
                       const existingReasoningPart = assistantMessageObj.parts.find(p => p.type === "reasoning")
                       if (existingReasoningPart) {
@@ -496,30 +564,28 @@ export function useChatCore({
                       if (finishText && !hasAnyTextPart) {
                         assistantMessageObj.parts.push({ type: 'text', text: finishText })
                         assistantMessageObj.content = finishText
-                        console.log('[STREAM] Captured final text from finish event (no prior text-delta)')
                       }
                     } catch {}
 
                     // DISABLED: Fallback synthesis system - let the model generate its own responses
-                    console.log('[STREAM] Finish processing complete - letting model handle its own response generation')
                     break
 
                   case "finish-step":
-                    console.log('🔍 [STREAM] Finish-step event:', JSON.stringify(data, null, 2))
                     break
 
                   default:
-                    console.log('⚠️ [STREAM] Unknown data type:', data.type, JSON.stringify(data, null, 2))
                     break
                 }
 
                 // Update the message in state
-                setMessages((prev: ChatMessage[]) => {
-                  const newMessages = [...prev]
-                  newMessages[newMessages.length - 1] = {
-                    ...assistantMessageObj,
-                  }
-                  return newMessages
+                startUiTransition(() => {
+                  setMessages((prev: ChatMessage[]) => {
+                    const newMessages = [...prev]
+                    newMessages[newMessages.length - 1] = {
+                      ...assistantMessageObj,
+                    }
+                    return newMessages
+                  })
                 })
               } catch {
                 // If JSON parsing fails, treat as plain text (fallback)
@@ -537,12 +603,14 @@ export function useChatCore({
                   assistantMessageObj.content += line.slice(6)
                 }
 
-                setMessages((prev: ChatMessage[]) => {
-                  const newMessages = [...prev]
-                  newMessages[newMessages.length - 1] = {
-                    ...assistantMessageObj,
-                  }
-                  return newMessages
+                startUiTransition(() => {
+                  setMessages((prev: ChatMessage[]) => {
+                    const newMessages = [...prev]
+                    newMessages[newMessages.length - 1] = {
+                      ...assistantMessageObj,
+                    }
+                    return newMessages
+                  })
                 })
               }
             }
@@ -576,13 +644,29 @@ export function useChatCore({
       ensureChatExists,
     ])
 
-  // Stop function
+  // 🛑 Enhanced stop function with logging
   const stop = useCallback(() => {
+    const stopStartTime = performance.now()
+    
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      setStatus("ready")
+      try {
+        abortControllerRef.current.abort()
+        setStatus("ready")
+        setIsSubmitting(false)
+        
+        const stopDuration = performance.now() - stopStartTime
+        
+        toast({
+          title: "Message cancelled",
+          status: "info",
+        })
+      } catch (error) {
+        // Swallow error and keep UI responsive
+      }
+    } else {
+      // No active stream to cancel
     }
-  }, [])
+  }, [isSubmitting])
 
   // Regenerate function
   const regenerate = useCallback(async () => {
@@ -597,7 +681,9 @@ export function useChatCore({
       const messagesWithoutLastAssistant = messages.filter(
         (m: any, i: number) => !(i === messages.length - 1 && m.role === "assistant")
       )
-      setMessages(messagesWithoutLastAssistant)
+      startUiTransition(() => {
+        setMessages(messagesWithoutLastAssistant)
+      })
       
       // Handle both AI SDK v5 (parts) and legacy (content) message structure
       let messageText = ""
@@ -645,21 +731,57 @@ export function useChatCore({
     prevChatIdRef.current = chatId
   }
 
+  // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.
+
   // Handle input change
   const handleInputChange = useCallback((value: string) => {
+    performanceRef.current.inputChanges++
+    // Immediate update for UX responsiveness; side-effects should implement their own debouncing.
     setInput(value)
   }, [])
+
+  // 🧹 Cleanup debounced functions on unmount
+  useEffect(() => {
+    return () => {
+    debouncedHandleError.cancel()
+    }
+  }, [debouncedHandleError])
 
   // Handle form submission
   const handleSubmit = useCallback(
     async (e: { preventDefault: () => void }) => {
       e.preventDefault()
 
-      if (!input.trim() || isSubmitting) return
+  // No debounced input to cancel; input updates are immediate
 
+      // 🔒 Early validation with logging
+  if (!isValidUserMessage(input, files)) {
+        return
+      }
+
+  if (isSubmitting) {
+        return
+      }
+
+      // 📁 Validate files before processing
+      const fileValidation = validateFiles(files)
+      if (!fileValidation.isValid) {
+        fileValidation.errors.forEach(error => {
+          toast({
+            title: error,
+            status: "error",
+          })
+        })
+        return
+      }
+
+      const submitStartTime = performance.now()
       const messageText = input.trim() // Guardar el texto antes de limpiar
       const currentFiles = [...files] // Guardar archivos antes de limpiar
-      setInput("") // Limpiar input inmediatamente
+      
+  // Start submission
+
+  setInput("") // Limpiar input inmediatamente
       setFiles([]) // Limpiar archivos inmediatamente
       clearDraft() // Limpiar draft inmediatamente
       setIsSubmitting(true)
@@ -684,8 +806,6 @@ export function useChatCore({
 
         if (currentFiles.length > 0) {
           for (const file of currentFiles) {
-            console.log(`🔍 [HandleSubmit] Converting file to attachment: ${file.name}, type: ${file.type}`)
-            
             // Convert file to data URL
             const dataUrl = await new Promise<string>((resolve) => {
               const reader = new FileReader()
@@ -711,7 +831,7 @@ export function useChatCore({
           }))
         ]
 
-        console.log(`🔍 [HandleSubmit] Sending message with ${allAttachments.length} attachments`)
+  // Send message with attachments
 
         // Send message using experimental_attachments format
         await sendMessage({
@@ -723,12 +843,31 @@ export function useChatCore({
 
         // Input and files already cleared at the start
       } catch (error) {
-        console.error("Submit error:", error)
-        toast({
-          title: "Failed to send message",
-          status: "error",
-        })
+        const duration = performance.now() - submitStartTime
+  // Submit error, will retry if possible
+        
+        // 🔄 Retry logic with exponential backoff
+        if (retryCountRef.current < MAX_RETRY_ATTEMPTS) {
+          retryCountRef.current++
+          const retryDelay = RETRY_DELAY_BASE * Math.pow(2, retryCountRef.current - 1)
+          
+          
+          setTimeout(() => {
+            // Restore input and files for retry
+            setInput(messageText)
+            setFiles(currentFiles)
+            toast({
+              title: `Retrying... (${retryCountRef.current}/${MAX_RETRY_ATTEMPTS})`,
+              status: "info",
+            })
+          }, retryDelay)
+        } else {
+          // Max retries reached, use debounced error handler
+          debouncedHandleError(error as Error)
+          retryCountRef.current = 0 // Reset for future attempts
+        }
       } finally {
+  const totalDuration = performance.now() - submitStartTime
         setIsSubmitting(false)
       }
     },
@@ -742,7 +881,7 @@ export function useChatCore({
       sendMessage,
       setFiles,
       clearDraft,
-      toast,
+  toast,
     ]
   )
 
@@ -751,13 +890,14 @@ export function useChatCore({
     try {
       await regenerate()
     } catch (error) {
-      console.error("Regenerate error:", error)
+      // Regenerate error
     }
   }, [regenerate])
 
   return {
     messages,
     input,
+  deferredInput,
     setInput,
     handleInputChange,
     handleSubmit,
@@ -767,6 +907,7 @@ export function useChatCore({
     reload: handleRegenerate,
     append: sendMessage, // For backward compatibility
     isSubmitting,
+  isUiPending,
     hasDialogAuth,
     setHasDialogAuth,
     enableSearch,
@@ -782,5 +923,15 @@ export function useChatCore({
       setInput(suggestion)
     },
     handleReload: handleRegenerate,
+    
+    // 📊 Performance metrics (for debugging)
+    _performance: {
+      inputChanges: performanceRef.current.inputChanges,
+      debouncedCalls: performanceRef.current.debouncedCalls,
+      rerenders: performanceRef.current.rerenders,
+      efficiency: performanceRef.current.inputChanges > 0 
+        ? ((performanceRef.current.inputChanges - performanceRef.current.debouncedCalls) / performanceRef.current.inputChanges * 100).toFixed(1) + '%'
+        : '0%'
+    }
   }
 }

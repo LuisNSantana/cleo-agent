@@ -58,7 +58,6 @@ export function MessageAssistant({
   let cleanedContent = children
   
   if (typeof children === 'string') {
-    console.log('🔍 Debug: Processing message content:', children.substring(0, 200))
     
     // Try to extract <thinking> tags first
     if (children.includes('<thinking>')) {
@@ -66,7 +65,6 @@ export function MessageAssistant({
       if (thinkingMatch) {
         extractedThinking = thinkingMatch[1].trim()
         cleanedContent = children.replace(/<thinking>[\s\S]*?<\/thinking>\s*/, '').trim()
-        console.log('✅ Extracted thinking from tags:', extractedThinking.substring(0, 100))
       } else {
         // Handle streaming case where thinking tag is not yet closed
         const thinkingStart = children.indexOf('<thinking>')
@@ -75,7 +73,6 @@ export function MessageAssistant({
           if (thinkingContent.length > 0) {
             extractedThinking = thinkingContent
             cleanedContent = children.substring(0, thinkingStart).trim()
-            console.log('🔄 Streaming thinking from tags:', extractedThinking.substring(0, 100))
           }
         }
       }
@@ -88,12 +85,8 @@ export function MessageAssistant({
       if (thoughtMatch && contentMatch) {
         extractedThinking = thoughtMatch[1].trim()
         cleanedContent = contentMatch[1].trim()
-        console.log('✅ Extracted thinking from thought/content format:', extractedThinking.substring(0, 100))
-        console.log('✅ Cleaned content from format:', cleanedContent.substring(0, 100))
       }
-    } else {
-      console.log('❌ No thinking tags or thought/content format found in content')
-    }
+  }
   }
   // Decide which reasoning text to show: prefer SDK parts if non-empty, else fallback to extracted <thinking>
   const effectiveReasoningText = (reasoningTextFromParts && reasoningTextFromParts.trim().length > 0)
@@ -120,19 +113,7 @@ export function MessageAssistant({
           : []
       ) ?? []
 
-  // Debug log parts
-  console.log('🔍 Message parts:', parts?.map(p => ({ 
-    type: (p as any).type, 
-    hasText: !!(p as any).text,
-    text: (p as any).text ? (p as any).text.substring(0, 100) + '...' : null,
-    keys: Object.keys(p as any)
-  })))
-  console.log('🔍 Reasoning parts found:', reasoningParts?.length || 0)
-  if (reasoningParts && reasoningParts.length > 0) {
-    console.log('🧠 Reasoning content:', reasoningParts.map(p => (p as any).text?.substring(0, 200)))
-  }
-  console.log('🔍 Extracted thinking:', extractedThinking ? extractedThinking.substring(0, 200) : 'none')
-  console.log('✅ Effective reasoning used:', effectiveReasoningText.substring(0, 160))
+  // Debug logs removed for production cleanliness
 
   return (
     <Message
