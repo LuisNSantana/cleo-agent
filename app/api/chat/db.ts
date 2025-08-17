@@ -11,7 +11,8 @@ export async function saveFinalAssistantMessage(
   messages: Message[],
   message_group_id?: string,
   model?: string,
-  userId?: string
+  userId?: string,
+  opts?: { inputTokens?: number; outputTokens?: number; responseTimeMs?: number }
 ) {
   const parts: ContentPart[] = []
   const toolMap = new Map<string, ContentPart>()
@@ -84,6 +85,9 @@ export async function saveFinalAssistantMessage(
     message_group_id,
   model,
   user_id: userId,
+    input_tokens: opts?.inputTokens ?? null,
+    output_tokens: opts?.outputTokens ?? null,
+    response_time_ms: opts?.responseTimeMs ?? null,
   } as const
 
   const { error } = await supabase.from("messages").insert(row)

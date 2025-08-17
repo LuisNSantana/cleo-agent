@@ -553,6 +553,13 @@ ${documentContent}`
           if (retrieved.length) {
             ragSystemAddon = buildContextBlock(retrieved)
             console.log('[RAG] Retrieved', retrieved.length, 'chunks. Top similarity:', retrieved[0]?.similarity)
+            // Feature analytics: RAG retrieval used
+            try {
+              if (supabase && realUserId) {
+                const { trackFeatureUsage } = await import('@/lib/analytics')
+                await trackFeatureUsage(realUserId, 'rag.retrieve', { delta: 1 })
+              }
+            } catch {}
             // DEBUG: Log what documents we're getting
             console.log('[RAG] DEBUG - Retrieved document titles:', retrieved.map(r => r.metadata?.title || r.metadata?.filename || 'No title').slice(0, 3))
             // DEBUG: Show actual context being sent to model
@@ -675,7 +682,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       (globalThis as any).__requestId = `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
     }
 
-    // Configure tools and provider options per model
+  // Configure tools and provider options per model
     // For xAI (grok-3-mini), ALWAYS drop the generic webSearch tool; use native Live Search when enabled
     let toolsForRun = tools as typeof tools
     let providerOptions: Record<string, any> | undefined
@@ -703,7 +710,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     }
 
     // Prepare additional parameters for reasoning models
-    const additionalParams: any = {
+  const additionalParams: any = {
       // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
       system: finalSystemPrompt,
@@ -723,6 +730,39 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         delete (globalThis as any).__requestId
         
         if (supabase) {
+          // Estimate tokens
+          const est = (s: string) => Math.ceil((s || '').length / 4)
+          const inputText = [finalSystemPrompt, ...convertedMessages.map((m) => {
+            if (typeof m.content === 'string') return m.content
+            if (Array.isArray(m.content)) {
+              return m.content
+                .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
+                .map((p: any) => p.text || p.content || '')
+                .join('\n\n')
+            }
+            return ''
+          })].join('\n\n')
+          const outputText = (() => {
+            try {
+              const msgs = response?.messages ?? []
+              const last = [...msgs].reverse().find((m: any) => m.role === 'assistant')
+              if (!last) return ''
+              if (typeof last.content === 'string') return last.content
+              if (Array.isArray(last.content)) {
+                return last.content
+                  .filter((p: any) => p && typeof p === 'object' && (
+                    p.type === 'text' || p.type === 'reasoning'
+                  ))
+                  .map((p: any) => p.text || p.reasoning || '')
+                  .join('\n\n')
+              }
+              return ''
+            } catch { return '' }
+          })()
+          const inputTokens = est(inputText)
+          const outputTokens = est(outputText)
+          const responseTimeMs = Math.max(0, Date.now() - resultStart)
+
           await storeAssistantMessage({
             supabase,
             chatId,
@@ -731,7 +771,18 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
             message_group_id,
             model,
             userId: realUserId,
+            inputTokens,
+            outputTokens,
+            responseTimeMs,
           })
+
+          // Best-effort: update model usage analytics via RPC, ignore errors
+          try {
+            const { analytics } = await import('@/lib/supabase/analytics-helpers')
+            await analytics.updateModelUsage(realUserId, model, inputTokens, outputTokens, responseTimeMs, true, 0)
+          } catch (e) {
+            console.log('[Analytics] updateModelUsage skipped', (e as any)?.message)
+          }
         }
       },
   }
@@ -765,7 +816,16 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       console.log('[ChatAPI] Provider options applied:', JSON.stringify(providerOptions))
     }
 
-    const result = streamText(additionalParams)
+    // Record feature intent when search is enabled (non xAI live search)
+    try {
+      if (enableSearch && model !== 'grok-3-mini' && realUserId) {
+        const { trackFeatureUsage } = await import('@/lib/analytics')
+        await trackFeatureUsage(realUserId, 'feature.webSearch', { delta: 1 })
+      }
+    } catch {}
+
+  const resultStart = Date.now()
+  const result = streamText(additionalParams)
 
     // For document opening queries, disable sending reasoning to prevent content in expandable
   // Hide reasoning to avoid exposing internal planning; UI can add toggles later if desired
@@ -773,7 +833,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
     return result.toUIMessageStreamResponse({
       sendReasoning, // Disable reasoning stream for doc opens to avoid content in expandable
-      onError: (error: unknown) => {
+  onError: (error: unknown) => {
         // Clean up global context on error
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel
@@ -792,7 +852,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         console.error(error)
         return "Ocurrió un error procesando tu solicitud. Si subiste un archivo grande, intenta con uno más pequeño."
       },
-    })
+  })
   } catch (err: unknown) {
     // Clean up global context on exception
     delete (globalThis as any).__currentUserId

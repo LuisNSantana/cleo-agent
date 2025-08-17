@@ -15,6 +15,7 @@ export type DashboardData = {
     models_used?: number | null
     total_input_tokens?: number | null
     total_output_tokens?: number | null
+  avg_response_time_ms?: number | null
   }>
   modelUsage: Array<{
     model_name: string
@@ -42,6 +43,8 @@ export type DashboardData = {
     inputTokens: number
     outputTokens: number
     activeDays: number
+  avgResponseMs: number
+  costUsd: number
   }
 }
 
@@ -75,6 +78,7 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
     models_used: d.models_used ?? null,
     total_input_tokens: d.total_input_tokens ?? null,
     total_output_tokens: d.total_output_tokens ?? null,
+  avg_response_time_ms: (d as any).avg_response_time_ms ?? null,
   }))
 
   // Model usage (table): model_usage_analytics (fallback: aggregate messages)
@@ -192,14 +196,50 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
   // Totals from daily
   const totals = daily.reduce(
     (acc, d) => {
-      acc.messages += d.messages_sent + d.messages_received
+      const dayMsgs = d.messages_sent + d.messages_received
+      const assistMsgs = d.messages_received
+      acc.messages += dayMsgs
       acc.inputTokens += Number(d.total_input_tokens ?? 0)
       acc.outputTokens += Number(d.total_output_tokens ?? 0)
       acc.activeDays += 1
+      // Weighted latency by assistant messages if available
+      const lat = Number((d as any).avg_response_time_ms ?? 0)
+      if (assistMsgs > 0 && lat > 0) {
+        acc._latTotal += lat * assistMsgs
+        acc._latWeight += assistMsgs
+      }
       return acc
     },
-    { messages: 0, inputTokens: 0, outputTokens: 0, activeDays: 0 }
-  )
+    { messages: 0, inputTokens: 0, outputTokens: 0, activeDays: 0, _latTotal: 0, _latWeight: 0 } as any
+  ) as { messages: number; inputTokens: number; outputTokens: number; activeDays: number; _latTotal?: number; _latWeight?: number }
 
-  return { rangeDays, daily, modelUsage, featureUsage, toolUsage, totals }
+  // Estimated cost using simple per-1k pricing map
+  const costPerK: Record<string, { in: number; out: number }> = {
+    'gpt-4': { in: 0.03, out: 0.06 },
+    'gpt-4o': { in: 0.005, out: 0.015 },
+    'gpt-3.5-turbo': { in: 0.001, out: 0.002 },
+    'gpt-5-mini-2025-08-07': { in: 0.002, out: 0.006 },
+    'grok-3-mini': { in: 0.0005, out: 0.0005 },
+    'claude-3': { in: 0.015, out: 0.075 },
+    'llama-70b': { in: 0.0009, out: 0.0009 },
+  }
+  const estimateModelCost = (model: string, inTok: number, outTok: number) => {
+    const key = Object.keys(costPerK).find(k => model.toLowerCase().includes(k.split('-')[0]))
+    const rate = key ? costPerK[key] : costPerK['gpt-3.5-turbo']
+    return (inTok / 1000) * rate.in + (outTok / 1000) * rate.out
+  }
+  const totalCost = (modelUsage ?? []).reduce((sum, m) => sum + estimateModelCost(m.model_name || '', Number(m.total_input_tokens ?? 0), Number(m.total_output_tokens ?? 0)), 0)
+
+  const avgResponseMs = totals._latWeight && totals._latWeight > 0 ? Math.round((totals._latTotal! / totals._latWeight!)) : 0
+
+  const finalTotals = {
+    messages: totals.messages,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    activeDays: totals.activeDays,
+    avgResponseMs,
+    costUsd: Number(totalCost.toFixed(2)),
+  }
+
+  return { rangeDays, daily, modelUsage, featureUsage, toolUsage, totals: finalTotals }
 }

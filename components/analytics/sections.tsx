@@ -4,22 +4,49 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { BarChart, KpiCard, Sparkline } from './charts'
 import { ChartPieSlice, RocketLaunch, GearSix, PuzzlePiece, Timer } from '@phosphor-icons/react'
 
-export function ActivitySection({ daily }: { daily: Array<{ usage_date: string; messages_sent: number; messages_received: number }> }) {
+export function ActivitySection({ daily }: { daily: Array<{ usage_date: string; messages_sent: number; messages_received: number; total_input_tokens?: number | null; total_output_tokens?: number | null; avg_response_time_ms?: number | null }> }) {
   const series = daily.map(d => d.messages_sent + d.messages_received)
+  const hasTokenData = daily.some(d => typeof d.total_input_tokens === 'number' || typeof d.total_output_tokens === 'number')
+  const inputSeries = daily.map(d => Number(d.total_input_tokens ?? 0))
+  const outputSeries = daily.map(d => Number(d.total_output_tokens ?? 0))
+  const hasLatency = daily.some(d => typeof d.avg_response_time_ms === 'number' && Number(d.avg_response_time_ms) > 0)
+  const latencySeries = daily.map(d => Number(d.avg_response_time_ms ?? 0))
   return (
     <Card className="col-span-3">
       <CardHeader>
         <div className="flex items-center gap-2">
           <RocketLaunch className="size-4 text-primary" />
-          <CardTitle>Actividad reciente</CardTitle>
+          <CardTitle>Recent activity</CardTitle>
         </div>
-        <CardDescription>Mensajes por día (últimos {daily.length} días)</CardDescription>
+        <CardDescription>
+          Messages per day{hasTokenData ? ' • tokens' : ''}{hasLatency ? ' • latency' : ''} (last {daily.length} days)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {series.length ? (
-          <Sparkline data={series} className="w-full" />
+          <div className="space-y-4">
+            <Sparkline data={series} className="w-full" />
+            {hasTokenData && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="mb-1 text-xs text-muted-foreground">Input tokens</div>
+                  <Sparkline data={inputSeries} className="w-full" />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs text-muted-foreground">Output tokens</div>
+                  <Sparkline data={outputSeries} className="w-full" />
+                </div>
+              </div>
+            )}
+            {hasLatency && (
+              <div>
+                <div className="mb-1 text-xs text-muted-foreground">Avg response time (ms)</div>
+                <Sparkline data={latencySeries} className="w-full" />
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="text-muted-foreground text-sm">Sin datos disponibles.</div>
+          <div className="text-muted-foreground text-sm">No data available.</div>
         )}
       </CardContent>
     </Card>
@@ -33,12 +60,12 @@ export function ModelsSection({ modelUsage }: { modelUsage: Array<{ model_name: 
       <CardHeader>
         <div className="flex items-center gap-2">
           <ChartPieSlice className="size-4 text-primary" />
-          <CardTitle>Modelos más usados</CardTitle>
+          <CardTitle>Top models</CardTitle>
         </div>
-        <CardDescription>Mensajes por modelo</CardDescription>
+        <CardDescription>Messages by model</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">Sin datos.</div>}
+  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">No data.</div>}
       </CardContent>
     </Card>
   )
@@ -51,12 +78,12 @@ export function FeaturesSection({ features }: { features: Array<{ feature_name: 
       <CardHeader>
         <div className="flex items-center gap-2">
           <GearSix className="size-4 text-primary" />
-          <CardTitle>Features destacadas</CardTitle>
+          <CardTitle>Featured features</CardTitle>
         </div>
-        <CardDescription>Top interacciones</CardDescription>
+        <CardDescription>Top interactions</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">Sin datos.</div>}
+  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">No data.</div>}
       </CardContent>
     </Card>
   )
@@ -69,27 +96,29 @@ export function ToolsSection({ tools }: { tools: Array<{ tool_name: string; usag
       <CardHeader>
         <div className="flex items-center gap-2">
           <PuzzlePiece className="size-4 text-primary" />
-          <CardTitle>Herramientas más usadas</CardTitle>
+          <CardTitle>Most used tools</CardTitle>
         </div>
-        <CardDescription>Invocaciones por herramienta</CardDescription>
+        <CardDescription>Tool invocations</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">Sin datos.</div>}
+  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">No data.</div>}
       </CardContent>
     </Card>
   )
 }
 
-export function QuickStats({ totals, days }: { totals: { messages: number; inputTokens: number; outputTokens: number; activeDays: number }; days: number }) {
+export function QuickStats({ totals, days }: { totals: { messages: number; inputTokens: number; outputTokens: number; activeDays: number; avgResponseMs?: number; costUsd?: number }; days: number }) {
   const avgMsgs = totals.activeDays ? Math.round(totals.messages / totals.activeDays) : 0
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-  <KpiCard title={`Mensajes (${days} días)`} value={totals.messages} />
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+  <KpiCard title={`Messages (${days} days)`} value={totals.messages} />
   <KpiCard title="Tokens (input)" value={totals.inputTokens} />
   <KpiCard title="Tokens (output)" value={totals.outputTokens} />
-  <KpiCard title="Promedio diario" value={avgMsgs} delta={`${totals.activeDays} días activos`}>
+  <KpiCard title="Daily average" value={avgMsgs} delta={`${totals.activeDays} active days`}>
         <Timer className="size-4 text-muted-foreground" />
       </KpiCard>
+      <KpiCard title="Avg latency (ms)" value={Math.max(0, Math.round(totals.avgResponseMs || 0))} />
+      <KpiCard title="Est. cost (USD)" value={(totals.costUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
     </div>
   )
 }

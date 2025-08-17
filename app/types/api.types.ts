@@ -53,6 +53,10 @@ export interface StoreAssistantMessageParams {
   message_group_id?: string
   model?: string
   userId: string
+  // Optional analytics
+  inputTokens?: number
+  outputTokens?: number
+  responseTimeMs?: number
 }
 
 export interface ApiErrorResponse {

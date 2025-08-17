@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { DateTime } from 'luxon'  // Nueva dep: yarn add luxon (para mejor handling de dates/timezones)
+import { trackToolUsage } from '@/lib/analytics'
 
 // Cache simple para tokens (in-memory, exp 5min)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
@@ -129,6 +130,7 @@ export const listCalendarEventsTool = tool({
     console.log('[GCal List] Execution:', { userId, model, params: { maxResults, timeMin, timeMax, timeZone } })
     
     try {
+      const started = Date.now()
       if (!userId) return { success: false, message: 'Auth required', events: [], total: 0 }
 
       const accessToken = await getGoogleCalendarAccessToken(userId)
@@ -192,16 +194,22 @@ export const listCalendarEventsTool = tool({
         )
       }
 
-      return {
+      const result = {
         success: true,
         message: `Found ${events.length} events in ${timeZone}`,
         events,
         total_count: events.length,
         timeRange: `${formatDate(finalMin, timeZone)} to ${formatDate(finalMax, timeZone)}`
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleCalendar.listEvents', { ok: true, execMs: Date.now() - started, params: { maxResults, timeZone, singleEvents } })
+      }
+      return result
     } catch (error) {
       console.error('[GCal List Error]:', error)
       const msg = error instanceof Error ? error.message : String(error)
+      const userId = (globalThis as any).__currentUserId as string | undefined
+      if (userId) await trackToolUsage(userId, 'googleCalendar.listEvents', { ok: false, execMs: 0, errorType: 'list_error' })
       return { success: false, message: `Failed: ${msg}`, events: [], total_count: 0 }
     }
   },
@@ -241,6 +249,7 @@ export const createCalendarEventTool = tool({
     const userId = (globalThis as any).__currentUserId
     
     try {
+      const started = Date.now()
       if (!userId) return { success: false, message: 'Auth required' }
 
       const accessToken = await getGoogleCalendarAccessToken(userId)
@@ -279,7 +288,7 @@ export const createCalendarEventTool = tool({
         }
       )
 
-      return {
+      const result = {
         success: true,
         message: `Created "${summary}"`,
         event: {
@@ -295,9 +304,15 @@ export const createCalendarEventTool = tool({
           hangoutLink: data.hangoutsLink || data.conferenceData?.entryPoints?.[0]?.uri
         }
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: true, execMs: Date.now() - started, params: { timeZone, attendees: attendees?.length ?? 0 } })
+      }
+      return result
     } catch (error) {
       console.error('[GCal Create Error]:', error)
       const message = error instanceof Error ? error.message : String(error)
+      const userId = (globalThis as any).__currentUserId as string | undefined
+      if (userId) await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: false, execMs: 0, errorType: 'create_error' })
       return { success: false, message: `Failed: ${message}` }
     }
   },

@@ -1,6 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { detectLanguage } from '@/lib/language-detection'
+import { trackToolUsage } from '@/lib/analytics'
 
 // Enhanced types for Brave Search response (added summarizer and goggles support)
 interface BraveSearchResult {
@@ -211,8 +212,10 @@ export const webSearchTool = tool({
   onInputAvailable: ({ input, toolCallId }: { input: { query: string }, toolCallId?: string }) => {
     console.log('🔍 Search query ready:', input.query, toolCallId);
   },
-  execute: async ({ query, count = 15, freshness, language = 'en', goggles_id, use_summarizer = true, primary = 'brave' }: { query: string, count?: number, freshness?: string, language?: 'es' | 'en', goggles_id?: string, use_summarizer?: boolean, primary?: 'brave' | 'tavily' }) => {
+  execute: async ({ query, count = 15, freshness, language = 'en', goggles_id, use_summarizer = true, primary = 'tavily' }: { query: string, count?: number, freshness?: string, language?: 'es' | 'en', goggles_id?: string, use_summarizer?: boolean, primary?: 'brave' | 'tavily' }) => {
     try {
+      const started = Date.now()
+      const userId = (globalThis as any).__currentUserId as string | undefined
       // Auto-translate to English if es and en preferred
       const detected = detectLanguage(query)
       let effectiveQuery = query
@@ -376,7 +379,7 @@ export const webSearchTool = tool({
         }
       }
 
-      if (results.length === 0) {
+  if (results.length === 0) {
         return {
           success: false,
           message: language === 'es' ? 'No resultados en Brave ni Tavily' : 'No results from Brave or Tavily',
@@ -434,10 +437,18 @@ export const webSearchTool = tool({
       }
       searchCache.set(key, { data: payload as any, expiry: now + cacheDuration })
       console.log(`[WebSearch] Success: ${deduped.length} results from ${source} (clusters: ${clusters.length}, AI summary: ${!!ai_summary})`)
+      // Track tool usage success
+      if (userId) {
+        await trackToolUsage(userId, 'webSearch', { ok: true, execMs: Date.now() - started, params: { primary, count, freshness, language, goggles_id } })
+      }
       return payload
 
     } catch (error) {
       console.error('[WebSearch] Failed:', error)
+      const userId = (globalThis as any).__currentUserId as string | undefined
+      if (userId) {
+        await trackToolUsage(userId, 'webSearch', { ok: false, execMs: 0, errorType: 'search_error' })
+      }
       return {
         success: false,
         message: `Search error: ${error instanceof Error ? error.message : 'Unknown'}`,

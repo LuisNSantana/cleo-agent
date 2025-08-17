@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { trackFeatureUsage } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Dashboard</CardTitle>
-            <CardDescription>Supabase no está configurado. Configura las variables de entorno para habilitar analytics.</CardDescription>
+            <CardDescription>Supabase is not configured. Set environment variables to enable analytics.</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -40,12 +41,12 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Dashboard</CardTitle>
-            <CardDescription>Inicia sesión para ver tus métricas.</CardDescription>
+            <CardDescription>Sign in to view your metrics.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">
               <Link href="/"> 
-                <ArrowLeft className="mr-2 size-4" /> Volver al chat
+                <ArrowLeft className="mr-2 size-4" /> Back to chat
               </Link>
             </Button>
           </CardContent>
@@ -60,6 +61,8 @@ export default async function DashboardPage() {
   const range = rangeStr ? Number(rangeStr) : 30
   const rangeDays = [7, 30, 90].includes(range) ? range : 30
   const data = await getDashboardData(userId, rangeDays)
+  // Record feature usage: dashboard view
+  await trackFeatureUsage(userId, 'dashboard.view', { delta: 1 })
 
   return (
     <div className="relative mx-auto w-full max-w-6xl space-y-6 p-4">
@@ -73,12 +76,12 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-3">
           <Button asChild variant="outline" size="sm">
             <Link href="/">
-              <ArrowLeft className="mr-2 size-4" /> Volver al inicio
+              <ArrowLeft className="mr-2 size-4" /> Back home
             </Link>
           </Button>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground text-sm">Tu actividad en Cleo en los últimos {data.rangeDays} días</p>
+            <p className="text-muted-foreground text-sm">Your activity in Cleo over the last {data.rangeDays} days</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -110,13 +113,13 @@ export default async function DashboardPage() {
 
       <QuickStats totals={data.totals} days={data.rangeDays} />
 
-      {data.daily.length ? (
+    {data.daily.length ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-6">
           <ActivitySection daily={data.daily} />
         </div>
       ) : (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">Sin actividad aún. Chatea con Cleo para ver métricas aquí.</CardContent>
+      <CardContent className="py-10 text-center text-sm text-muted-foreground">No activity yet. Chat with Cleo to see metrics here.</CardContent>
         </Card>
       )}
 

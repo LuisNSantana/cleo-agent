@@ -1,6 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { trackToolUsage } from '@/lib/analytics'
 
 async function getGoogleDriveAccessToken(userId: string): Promise<string | null> {
   console.log('🔍 Getting Google Drive access token for user:', userId)
@@ -155,6 +156,7 @@ export const listDriveFilesTool = tool({
     })
     
     try {
+      const started = Date.now()
       if (!userId) {
         return {
           success: false,
@@ -219,15 +221,21 @@ export const listDriveFilesTool = tool({
         isFolder: file.mimeType === 'application/vnd.google-apps.folder'
       })) || []
 
-      return {
+      const result = {
         success: true,
         message: `Found ${files.length} files${query ? ` matching "${query}"` : ''}`,
         files,
         total_count: files.length,
         query: query || 'all files'
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleDrive.listFiles', { ok: true, execMs: Date.now() - started, params: { maxResults } })
+      }
+      return result
     } catch (error) {
       console.error('Error listing Drive files:', error)
+      const userId = (globalThis as any).__currentUserId as string | undefined
+      if (userId) await trackToolUsage(userId, 'googleDrive.listFiles', { ok: false, execMs: 0, errorType: 'list_error' })
       return {
         success: false,
         message: `Failed to fetch Drive files: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -254,6 +262,7 @@ export const searchDriveFilesTool = tool({
     const userId = (globalThis as any).__currentUserId
     
     try {
+      const started = Date.now()
       if (!userId) {
         return {
           success: false,
@@ -329,7 +338,7 @@ export const searchDriveFilesTool = tool({
         isFolder: file.mimeType === 'application/vnd.google-apps.folder'
       })) || []
 
-      return {
+      const result = {
         success: true,
         message: `Found ${files.length} files matching "${searchTerm}"${fileType ? ` (${fileType} files)` : ''}`,
         files,
@@ -337,8 +346,14 @@ export const searchDriveFilesTool = tool({
         searchTerm,
         searchQuery
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleDrive.searchFiles', { ok: true, execMs: Date.now() - started, params: { maxResults, includeContent } })
+      }
+      return result
     } catch (error) {
       console.error('Error searching Drive files:', error)
+      const userId = (globalThis as any).__currentUserId as string | undefined
+      if (userId) await trackToolUsage(userId, 'googleDrive.searchFiles', { ok: false, execMs: 0, errorType: 'search_error' })
       return {
         success: false,
         message: `Failed to search Drive files: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -422,13 +437,18 @@ export const getDriveFileDetailsTool = tool({
         })) : undefined
       }
 
-      return {
+      const result = {
         success: true,
         message: `Retrieved details for "${file.name}"`,
         file: fileDetails
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleDrive.getFileDetails', { ok: true, execMs: 0, params: { includePermissions } })
+      }
+      return result
     } catch (error) {
       console.error('Error getting Drive file details:', error)
+      if (userId) await trackToolUsage(userId, 'googleDrive.getFileDetails', { ok: false, execMs: 0, errorType: 'details_error' })
       return {
         success: false,
         message: `Failed to get file details: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -475,6 +495,7 @@ export const createDriveFolderTool = tool({
         parents: parentFolderId ? [parentFolderId] : undefined
       }
 
+      const started = Date.now()
       const folder = await makeGoogleDriveRequest(
         accessToken,
         'files',
@@ -484,7 +505,7 @@ export const createDriveFolderTool = tool({
         }
       )
 
-      return {
+      const result = {
         success: true,
         message: `Successfully created folder "${name}"`,
         folder: {
@@ -495,8 +516,13 @@ export const createDriveFolderTool = tool({
           parents: folder.parents || []
         }
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleDrive.createFolder', { ok: true, execMs: Date.now() - started, params: { hasParent: !!parentFolderId } })
+      }
+      return result
     } catch (error) {
       console.error('Error creating Drive folder:', error)
+      if (userId) await trackToolUsage(userId, 'googleDrive.createFolder', { ok: false, execMs: 0, errorType: 'create_folder_error' })
       return {
         success: false,
         message: `Failed to create folder: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -518,6 +544,7 @@ export const uploadFileToDriveTool = tool({
   execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
     const userId = (globalThis as any).__currentUserId
     try {
+  const started = Date.now()
       if (!userId) {
         return {
           success: false,
@@ -574,6 +601,7 @@ export const uploadFileToDriveTool = tool({
 
       if (!res.ok) {
         const details = await res.text().catch(() => '')
+        if (userId) await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: false, execMs: 0, errorType: 'upload_error' })
         return {
           success: false,
           message: `Drive upload failed (${res.status}). ${details || 'Please reconnect Google Drive and try again.'}`,
@@ -582,7 +610,7 @@ export const uploadFileToDriveTool = tool({
       }
 
       const data = await res.json()
-      return {
+      const result = {
         success: true,
         message: `Uploaded "${data.name}" to Google Drive successfully`,
         file: {
@@ -598,8 +626,13 @@ export const uploadFileToDriveTool = tool({
           thumbnailLink: data.thumbnailLink,
         },
       }
+      if (userId) {
+        await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: true, execMs: Date.now() - started, params: { hasFolder: !!folderId, mimeType } })
+      }
+      return result
     } catch (error) {
       console.error('Error uploading file to Drive:', error)
+      if (userId) await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: false, execMs: 0, errorType: 'upload_error' })
       return {
         success: false,
         message: `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
