@@ -158,10 +158,10 @@ export class AnalyticsService {
     cachedInputTokens: number = 0
   ): number {
     const costPerMillionTokens: Record<string, { input: number; output: number; cachedInput?: number }> = {
-      // xAI grok-3-mini pricing
-      'grok-3-mini': { input: 0.30, output: 0.50, cachedInput: 0.075 },
-      // OpenAI GPT-5 mini pricing
-      'gpt-5-mini-2025-08-07': { input: 0.25, output: 2.0, cachedInput: 0.025 },
+      // xAI grok-3-mini pricing (requested)
+      'grok-3-mini': { input: 0.40, output: 0.40, cachedInput: 0.10 },
+      // OpenAI GPT-5 mini pricing (requested)
+      'gpt-5-mini-2025-08-07': { input: 2.0, output: 2.0, cachedInput: 2.0 },
       // Defaults/others (kept for compatibility; cached not defined)
       'gpt-5-nano': { input: 2.0, output: 2.0 },
       'gpt-4o': { input: 5.0, output: 15.0 },
@@ -426,8 +426,8 @@ export function calculateTokenCost(
 ): number {
   // Cost per million tokens - updated with latest pricing
   const costsPerMillion: Record<string, { input: number; output: number; cachedInput?: number }> = {
-    'grok-3-mini': { input: 0.30, output: 0.50, cachedInput: 0.075 },
-    'gpt-5-mini-2025-08-07': { input: 0.25, output: 2.0, cachedInput: 0.025 },
+    'grok-3-mini': { input: 0.40, output: 0.40, cachedInput: 0.10 },
+    'gpt-5-mini-2025-08-07': { input: 2.0, output: 2.0, cachedInput: 2.0 },
     'gpt-5-nano': { input: 2.0, output: 2.0 },
     'gpt-4o': { input: 5.0, output: 15.0 },
     'gpt-4o-mini': { input: 0.15, output: 0.6 },

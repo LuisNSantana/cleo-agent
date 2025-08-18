@@ -61,6 +61,7 @@ export async function GET(
     switch (service) {
       case "google-calendar":
       case "google-drive":
+      case "gmail":
   tokenData = await exchangeGoogleCode(code, service, baseUrl)
         console.log('About to get Google user info with token:', tokenData.access_token ? 'present' : 'missing')
         accountInfo = await getGoogleUserInfo(tokenData.access_token)

@@ -60,6 +60,16 @@ const NotionIcon = ({ className }: { className?: string }) => (
   />
 )
 
+const GmailIcon = ({ className }: { className?: string }) => (
+  <Image 
+    src="/icons/gmail-icon.svg" 
+    alt="Gmail"
+    width={16}
+    height={16}
+    className={className}
+  />
+)
+
 export function ConnectionStatus() {
   const [services, setServices] = useState<ServiceConnection[]>([
     {
@@ -72,6 +82,12 @@ export function ConnectionStatus() {
       id: "google-drive", 
       name: "Google Drive",
       icon: GoogleDriveIcon,
+      status: "disconnected"
+    },
+    {
+      id: "gmail",
+      name: "Gmail",
+      icon: GmailIcon,
       status: "disconnected"
     },
     {
@@ -410,7 +426,7 @@ export function ConnectionStatus() {
             </p>
             {connectedCount > 0 && (
               <p className="text-xs text-green-600 dark:text-green-400">
-                💡 Try asking: "Show my recent files" or "What's on my calendar today?"
+                💡 Try asking: "Show my unread emails", "Show my recent files", or "What's on my calendar today?"
               </p>
             )}
           </div>

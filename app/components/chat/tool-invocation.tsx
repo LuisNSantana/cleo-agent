@@ -15,6 +15,7 @@ import { useMemo, useState } from "react"
 import { getToolIcon } from "@/components/icons/tool-icons"
 import { DocumentToolDisplay } from "@/components/chat/document-tool-display"
 import { OpenDocumentToolDisplay } from "@/components/chat/open-document-tool-display"
+import { GmailMessages, type GmailListItem } from "@/app/components/chat/gmail-messages"
 
 // Define the tool invocation types based on how they're used in the codebase
 interface ToolInvocation {
@@ -295,6 +296,30 @@ function SingleToolCard({
     // Handle openDocumentTool specifically
     if (toolName === "openDocument" && parsedResult) {
       return <OpenDocumentToolDisplay result={parsedResult} />
+    }
+
+    // Gmail: render nicer list for listGmailMessages results
+    if (
+      toolName === "listGmailMessages" &&
+      (
+        // Case A: tool returned a raw array of items
+        (Array.isArray(parsedResult) &&
+          parsedResult.length > 0 &&
+          typeof parsedResult[0] === "object" &&
+          parsedResult[0] !== null &&
+          "from" in parsedResult[0] &&
+          "subject" in parsedResult[0]) ||
+        // Case B: tool returned an object with a messages array
+        (typeof parsedResult === "object" &&
+          parsedResult !== null &&
+          Array.isArray((parsedResult as any).messages) &&
+          (parsedResult as any).messages.length > 0)
+      )
+    ) {
+      const items = Array.isArray(parsedResult)
+        ? (parsedResult as GmailListItem[])
+        : (((parsedResult as any).messages ?? []) as GmailListItem[])
+      return <GmailMessages items={items} />
     }
 
     // Handle array of items with url, title, and snippet (like search results)

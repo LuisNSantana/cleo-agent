@@ -47,6 +47,16 @@ const NotionIcon = ({ className }: { className?: string }) => (
   />
 )
 
+const GmailIcon = ({ className }: { className?: string }) => (
+  <Image 
+    src="/icons/gmail-icon.svg" 
+    alt="Gmail"
+    width={24}
+    height={24}
+    className={className}
+  />
+)
+
 interface ServiceConnection {
   id: string
   name: string
@@ -74,6 +84,14 @@ export function ServiceConnections() {
       icon: GoogleDriveIcon,
       status: "disconnected",
       scopes: ["drive.readonly", "drive.file"]
+    },
+    {
+      id: "gmail",
+      name: "Gmail",
+      description: "Read, label, and send emails from your Gmail account",
+      icon: GmailIcon,
+      status: "disconnected",
+      scopes: ["gmail.readonly", "gmail.modify", "gmail.send"]
     },
     {
       id: "notion",

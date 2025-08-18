@@ -20,8 +20,15 @@ const grokModels: ModelConfig[] = [
     providerId: "xai",
     modelFamily: "Grok",
     baseProviderId: "xai",
-    description:
+  description:
       "Lightning-fast Grok-3 Mini for low-latency tasks with tool calling and basic vision support.",
+  // Grok has native Live Search. Mark as webSearch-capable so the UI toggle appears,
+  // but the backend will route to xAI native search instead of the generic webSearch tool.
+  webSearch: true,
+  // Pricing: $0.4 per 1M tokens (both input and output)
+  inputCost: 0.4,
+  outputCost: 0.4,
+  priceUnit: "per 1M tokens",
     tags: [
       "fast",
       "tools",

@@ -14,9 +14,10 @@ const openaiModels: ModelConfig[] = [
       "Smart, capable GPT-5 mini with strong reasoning, vision, and tool use.",
     tags: ["smart", "reasoning", "vision", "tools"],
     contextWindow: 400000,
-    inputCost: 0.25,
-    outputCost: 2.0,
-    priceUnit: "per 1M tokens",
+  // Pricing: $2 per 1M tokens for both input and output (requested)
+  inputCost: 2.0,
+  outputCost: 2.0,
+  priceUnit: "per 1M tokens",
     vision: true,
     tools: true,
     audio: false,

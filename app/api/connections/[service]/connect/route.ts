@@ -50,6 +50,16 @@ export async function POST(
           "https://www.googleapis.com/auth/drive.file"
         ], statePayload)
         break
+      case "gmail":
+        authUrl = generateGoogleOAuthUrl(redirectUri, [
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          // Gmail scopes: read, modify labels, and send
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/gmail.send",
+        ], statePayload)
+        break
       case "notion":
         authUrl = generateNotionOAuthUrl(redirectUri, statePayload)
         break

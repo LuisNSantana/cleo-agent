@@ -683,7 +683,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     }
 
   // Configure tools and provider options per model
-    // For xAI (grok-3-mini), ALWAYS drop the generic webSearch tool; use native Live Search when enabled
+    // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
     let toolsForRun = tools as typeof tools
     let providerOptions: Record<string, any> | undefined
     let activeTools: string[] | undefined
@@ -696,17 +696,17 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       }
       // Restrict active tools to the filtered set, preventing accidental calls to removed tools
       activeTools = Object.keys(toolsForRun)
-
-      // Force-enable native Live Search to validate end-to-end and avoid Brave tool
+      // Configure xAI native Live Search based on UI toggle
+      // - enableSearch true  -> mode 'auto' (model decides when to search)
+      // - enableSearch false -> mode 'off'  (never search)
       providerOptions = {
         xai: {
           searchParameters: {
-            mode: 'on',
-            returnCitations: true,
+            mode: enableSearch ? 'auto' : 'off',
+            returnCitations: enableSearch ? true : false,
           },
         },
       }
-      console.log('[xAI] Live Search FORCED ENABLE for grok-3-mini')
     }
 
     // Prepare additional parameters for reasoning models
@@ -718,8 +718,8 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       tools: toolsForRun,
   ...(providerOptions ? { providerOptions } : {}),
   ...(activeTools ? { activeTools } : {}),
-      // Avoid step cap when using xAI native Live Search to prevent early termination mid-search
-      ...(!(model === 'grok-3-mini' && enableSearch) ? { stopWhen: stepCountIs(8) } : {}),
+  // Avoid step cap when using xAI native Live Search to prevent early termination mid-search
+  ...(!(model === 'grok-3-mini' && enableSearch) ? { stopWhen: stepCountIs(8) } : {}),
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
       },

@@ -1,7 +1,7 @@
 # Connection Status Feature
 
 ## Overview
-Se ha agregado un botón de estado de conexiones en el input del chat que permite a los usuarios ver y gestionar sus conexiones de servicios (Google Drive, Google Calendar, Notion) de forma intuitiva sin tener que navegar a Settings.
+Se ha agregado un botón de estado de conexiones en el input del chat que permite a los usuarios ver y gestionar sus conexiones de servicios (Google Drive, Google Calendar, Gmail, Notion) de forma intuitiva sin tener que navegar a Settings.
 
 ## Features
 
@@ -43,6 +43,7 @@ Se ha agregado un botón de estado de conexiones en el input del chat que permit
 - `GET /api/connections/{service}/status` - Check connection status
 - `POST /api/connections/{service}/connect` - Initiate OAuth flow
 - `POST /api/connections/cleanup` - Clean stale connections
+- `GET /api/debug/gmail` - Depurar conexión de Gmail (tokens, scopes, expiración)
 
 ### State Management
 - Local state para servicios y estados de conexión
@@ -63,6 +64,7 @@ Se ha agregado un botón de estado de conexiones en el input del chat que permit
 3. **Usar herramientas**: Una vez conectado, usar comandos como:
    - "List my recent files"
    - "What's on my calendar today?"
+  - "Show my unread emails"
    - "Create a meeting for tomorrow"
 
 ### For Developers

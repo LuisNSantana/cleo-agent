@@ -220,13 +220,15 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
     { messages: 0, inputTokens: 0, outputTokens: 0, activeDays: 0, _latTotal: 0, _latWeight: 0 } as any
   ) as { messages: number; inputTokens: number; outputTokens: number; activeDays: number; _latTotal?: number; _latWeight?: number }
 
-  // Estimated cost using simple per-1k pricing map (updated with latest pricing)
+  // Estimated cost using simple per-1k pricing map (updated with requested pricing)
   const costPerK: Record<string, { in: number; out: number }> = {
     'gpt-4': { in: 0.03, out: 0.06 },
     'gpt-4o': { in: 0.005, out: 0.015 },
     'gpt-3.5-turbo': { in: 0.001, out: 0.002 },
-    'gpt-5-mini-2025-08-07': { in: 0.00025, out: 0.002 }, // $0.25/1M input, $2.0/1M output
-    'grok-3-mini': { in: 0.0003, out: 0.0005 }, // $0.30/1M input, $0.50/1M output
+    // GPT-5 mini: $2.00 per 1M (input and output)
+    'gpt-5-mini-2025-08-07': { in: 0.002, out: 0.002 },
+    // Grok-3 mini: $0.40 per 1M (input and output)
+    'grok-3-mini': { in: 0.0004, out: 0.0004 },
     'claude-3': { in: 0.015, out: 0.075 },
     'llama-70b': { in: 0.0009, out: 0.0009 },
   }

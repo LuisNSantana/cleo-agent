@@ -6,6 +6,7 @@ import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, crea
 import { createDocumentTool } from './create-document';
 import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
+import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -300,6 +301,13 @@ export const tools = {
   getDriveFileDetails: getDriveFileDetailsTool,
   createDriveFolder: createDriveFolderTool,
   uploadFileToDrive: uploadFileToDriveTool,
+
+  // Google Tools - Gmail
+  listGmailMessages: listGmailMessagesTool,
+  getGmailMessage: getGmailMessageTool,
+  sendGmailMessage: sendGmailMessageTool,
+  trashGmailMessage: trashGmailMessageTool,
+  modifyGmailLabels: modifyGmailLabelsTool,
   
   // Memory Tools
   memoryAddNote: memoryAddNoteTool,

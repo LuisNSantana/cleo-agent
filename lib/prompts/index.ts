@@ -69,7 +69,8 @@ const TOOLS_INTEGRATION = `TOOLS
 - Do not describe tools or their schemas. Present only the results.
 - Citations: If a tool or model response includes source URLs/domains, append a short “Sources” section with up to 3 items. Never invent sources.
 - If no sources are available, omit the section.
-- For create/update/delete operations, ask for explicit confirmation before executing.`;
+- For create/update/delete operations, ask for explicit confirmation before executing.
+- Email safety: Before sending any email via Gmail, always draft the message content first and ask the user to approve or edit. Do NOT call send until the user explicitly confirms (e.g., “sí, envíalo” / “yes, send it”).`;
 
 // ============================================================================
 // ENGAGEMENT AND COMPLETENESS MODULE
