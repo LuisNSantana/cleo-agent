@@ -1,7 +1,10 @@
 // Server-side dashboard data assembler
 // Gathers per-user analytics for the dashboard in one call
 
-import { createGuestServerClient } from '@/lib/supabase/server-guest'
+// IMPORTANT: Use the authenticated server client so views that depend on auth.uid()
+// (e.g., user_daily_summary) return rows for the current user. The service-role
+// guest client bypasses auth and would make those views empty.
+import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Tables } from '@/app/types/database.types'
 
@@ -49,12 +52,14 @@ export type DashboardData = {
 }
 
 async function getClient() {
-  const sb = await createGuestServerClient()
+  const sb = await createServerSupabase()
   if (!sb) throw new Error('Supabase disabled')
   return sb as unknown as SupabaseClient<Database>
 }
 
 export async function getDashboardData(userId: string, rangeDays: number = 30): Promise<DashboardData> {
+  console.log(`[Dashboard] Getting data for userId: ${userId}, rangeDays: ${rangeDays}`)
+  
   const sb = await getClient()
   const fromDate = new Date()
   fromDate.setDate(fromDate.getDate() - rangeDays + 1)
@@ -84,11 +89,13 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
   // Model usage (table): model_usage_analytics (fallback: aggregate messages)
   let modelUsage: DashboardData['modelUsage'] = []
   {
+    console.log(`[Dashboard] Querying model_usage_analytics for userId: ${userId}, from: ${from}`)
     const { data, error } = await sb
       .from('model_usage_analytics')
       .select('model_name,message_count,total_input_tokens,total_output_tokens,successful_requests,failed_requests,usage_date')
       .eq('user_id', userId)
       .gte('usage_date', from)
+    console.log(`[Dashboard] Model usage query result:`, { dataLength: data?.length, error })
     if (!error && data) {
       const aggregate: Record<string, DashboardData['modelUsage'][number]> = {}
       for (const r of data as Tables<'model_usage_analytics'>[]) {
@@ -213,24 +220,52 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
     { messages: 0, inputTokens: 0, outputTokens: 0, activeDays: 0, _latTotal: 0, _latWeight: 0 } as any
   ) as { messages: number; inputTokens: number; outputTokens: number; activeDays: number; _latTotal?: number; _latWeight?: number }
 
-  // Estimated cost using simple per-1k pricing map
+  // Estimated cost using simple per-1k pricing map (updated with latest pricing)
   const costPerK: Record<string, { in: number; out: number }> = {
     'gpt-4': { in: 0.03, out: 0.06 },
     'gpt-4o': { in: 0.005, out: 0.015 },
     'gpt-3.5-turbo': { in: 0.001, out: 0.002 },
-    'gpt-5-mini-2025-08-07': { in: 0.002, out: 0.006 },
-    'grok-3-mini': { in: 0.0005, out: 0.0005 },
+    'gpt-5-mini-2025-08-07': { in: 0.00025, out: 0.002 }, // $0.25/1M input, $2.0/1M output
+    'grok-3-mini': { in: 0.0003, out: 0.0005 }, // $0.30/1M input, $0.50/1M output
     'claude-3': { in: 0.015, out: 0.075 },
     'llama-70b': { in: 0.0009, out: 0.0009 },
   }
   const estimateModelCost = (model: string, inTok: number, outTok: number) => {
-    const key = Object.keys(costPerK).find(k => model.toLowerCase().includes(k.split('-')[0]))
-    const rate = key ? costPerK[key] : costPerK['gpt-3.5-turbo']
+    const m = model.toLowerCase()
+    // 1) Exact match first
+    let matchKey = Object.keys(costPerK).find(k => k.toLowerCase() === m)
+    // 2) Longest partial match (prefer more specific like gpt-5-mini over generic gpt)
+    if (!matchKey) {
+      const candidates = Object.keys(costPerK)
+        .filter(k => m.includes(k.toLowerCase()) || k.toLowerCase().includes(m))
+        .sort((a, b) => b.length - a.length)
+      matchKey = candidates[0]
+    }
+    const rate = matchKey ? costPerK[matchKey] : costPerK['gpt-3.5-turbo']
     return (inTok / 1000) * rate.in + (outTok / 1000) * rate.out
   }
   const totalCost = (modelUsage ?? []).reduce((sum, m) => sum + estimateModelCost(m.model_name || '', Number(m.total_input_tokens ?? 0), Number(m.total_output_tokens ?? 0)), 0)
 
   const avgResponseMs = totals._latWeight && totals._latWeight > 0 ? Math.round((totals._latTotal! / totals._latWeight!)) : 0
+
+  // Fallback: if daily view returned nothing (or zero tokens), derive totals from modelUsage
+  if ((daily?.length ?? 0) === 0 || (totals.inputTokens === 0 && totals.outputTokens === 0)) {
+    const fromModels = (modelUsage ?? []).reduce(
+      (acc, m) => {
+        acc.messages += Number(m.message_count ?? 0)
+        acc.inputTokens += Number(m.total_input_tokens ?? 0)
+        acc.outputTokens += Number(m.total_output_tokens ?? 0)
+        return acc
+      },
+      { messages: 0, inputTokens: 0, outputTokens: 0 }
+    )
+    // Only override if we actually have some data from models
+    if (fromModels.messages > 0 || fromModels.inputTokens > 0 || fromModels.outputTokens > 0) {
+      totals.messages = fromModels.messages
+      totals.inputTokens = fromModels.inputTokens
+      totals.outputTokens = fromModels.outputTokens
+    }
+  }
 
   const finalTotals = {
     messages: totals.messages,

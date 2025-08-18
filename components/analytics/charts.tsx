@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useId } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { motion } from 'motion/react'
@@ -8,26 +8,47 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 // Lightweight SVG chart primitives to avoid heavy deps
 
+// Accessible, colorblind-friendly palette (9 colors)
+export const CHART_PALETTE: string[] = [
+  '#4f46e5', // indigo-600
+  '#06b6d4', // cyan-500
+  '#22c55e', // emerald-500
+  '#f59e0b', // amber-500
+  '#ef4444', // red-500
+  '#a78bfa', // violet-400
+  '#14b8a6', // teal-500
+  '#f97316', // orange-500
+  '#60a5fa', // blue-400
+]
+
 type SparklineProps = {
   data: number[]
   width?: number
   height?: number
   className?: string
   showDots?: boolean
+  color?: string
 }
 
-export function Sparkline({ data, width = 240, height = 48, className, showDots = true }: SparklineProps) {
+export function Sparkline({ data, width = 240, height = 48, className, showDots = true, color }: SparklineProps) {
+  const uid = useId()
+  const gradId = `spark-grad-${uid}`
   const path = useMemo(() => {
     if (!data.length) return ''
-    const max = Math.max(...data)
-    const min = Math.min(...data)
+    // Sanitize incoming values to avoid NaN
+    const vals = data.map((v) => (Number.isFinite(v) ? Number(v) : 0))
+    const n = vals.length
+    const max = Math.max(...vals)
+    const min = Math.min(...vals)
     const range = Math.max(1, max - min)
-    const step = width / (data.length - 1)
-    return data
+    const step = n > 1 ? width / (n - 1) : 0
+    return vals
       .map((v, i) => {
-        const x = i * step
+        const x = n > 1 ? i * step : width / 2
         const y = height - ((v - min) / range) * height
-        return `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`
+        const sx = Number.isFinite(x) ? x : 0
+        const sy = Number.isFinite(y) ? y : height
+        return `${i === 0 ? 'M' : 'L'}${sx.toFixed(2)},${sy.toFixed(2)}`
       })
       .join(' ')
   }, [data, width, height])
@@ -35,13 +56,17 @@ export function Sparkline({ data, width = 240, height = 48, className, showDots 
   // Calculate points for optional dots
   const points = useMemo(() => {
     if (!data.length) return [] as { x: number; y: number; v: number }[]
-    const max = Math.max(...data)
-    const min = Math.min(...data)
+    const vals = data.map((v) => (Number.isFinite(v) ? Number(v) : 0))
+    const n = vals.length
+    const max = Math.max(...vals)
+    const min = Math.min(...vals)
     const range = Math.max(1, max - min)
-    const step = width / (data.length - 1)
-    return data.map((v, i) => {
-      const x = i * step
-      const y = height - ((v - min) / range) * height
+    const step = n > 1 ? width / (n - 1) : 0
+    return vals.map((v, i) => {
+      const xRaw = n > 1 ? i * step : width / 2
+      const yRaw = height - ((v - min) / range) * height
+      const x = Number.isFinite(xRaw) ? xRaw : 0
+      const y = Number.isFinite(yRaw) ? yRaw : height
       return { x, y, v }
     })
   }, [data, width, height])
@@ -49,16 +74,16 @@ export function Sparkline({ data, width = 240, height = 48, className, showDots 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className={cn('text-primary/80', className)}>
       <defs>
-        <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color || 'currentColor'} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color || 'currentColor'} stopOpacity="0" />
         </linearGradient>
       </defs>
       {/* Animated line */}
       <motion.path
         d={path}
         fill="none"
-        stroke="currentColor"
+        stroke={color || 'currentColor'}
         strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -66,12 +91,12 @@ export function Sparkline({ data, width = 240, height = 48, className, showDots 
         animate={{ pathLength: 1 }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
       />
-      {/* Soft area fill */}
-      {path && (
-        <path d={`${path} L ${width},${height} L 0,${height} Z`} fill="url(#spark-grad)" />
+  {/* Soft area fill (only when there are 2+ points to avoid odd polygons) */}
+      {data.length > 1 && path && (
+        <path d={`${path} L ${width},${height} L 0,${height} Z`} fill={`url(#${gradId})`} />
       )}
       {showDots && points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2} className="fill-primary/70" />
+        <circle key={i} cx={p.x} cy={p.y} r={2} style={{ fill: color || 'currentColor', opacity: 0.7 }} />
       ))}
     </svg>
   )
@@ -81,9 +106,10 @@ type BarChartProps = {
   data: Array<{ label: string; value: number }>
   height?: number
   className?: string
+  colors?: string[]
 }
 
-export function BarChart({ data, height = 140, className }: BarChartProps) {
+export function BarChart({ data, height = 140, className, colors = CHART_PALETTE }: BarChartProps) {
   const max = Math.max(1, ...data.map(d => d.value))
   const barWidth = Math.max(8, Math.floor(280 / Math.max(1, data.length)))
 
@@ -95,11 +121,12 @@ export function BarChart({ data, height = 140, className }: BarChartProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <motion.div
-                  className="bg-primary/80 rounded-t-md transition-colors group-hover:bg-primary"
+                  className="rounded-t-md shadow-sm transition-[filter,transform] will-change-transform group-hover:brightness-110 group-hover:contrast-110"
                   initial={{ height: 0 }}
                   animate={{ height: (d.value / max) * (height - 20) }}
                   transition={{ type: 'spring', stiffness: 110, damping: 18, mass: 0.5, delay: i * 0.03 }}
-                  style={{ width: barWidth }}
+                  style={{ width: barWidth, backgroundColor: colors[i % colors.length] }}
+                  aria-label={`${d.label}: ${d.value}`}
                 />
               </TooltipTrigger>
               <TooltipContent sideOffset={6}>{`${d.label}: ${d.value}`}</TooltipContent>
@@ -130,12 +157,13 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
     raf.current = requestAnimationFrame(step)
     return () => { if (raf.current) cancelAnimationFrame(raf.current) }
   }, [value])
-  return <span className={className}>{display.toLocaleString()}</span>
+  // Use a deterministic format to prevent SSR/CSR locale mismatches
+  return <span className={className}>{display.toString()}</span>
 }
 
 export function KpiCard({ title, value, delta, children }: { title: string; value: string | number; delta?: string; children?: React.ReactNode }) {
   return (
-    <Card>
+  <Card className="bg-gradient-to-b from-white/[0.03] to-transparent dark:from-white/[0.04]">
       <CardHeader>
         <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
       </CardHeader>

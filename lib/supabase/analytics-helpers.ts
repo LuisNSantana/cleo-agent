@@ -150,27 +150,82 @@ export class AnalyticsService {
     return query.order('usage_date', { ascending: false })
   }
 
+  // Calculate cost based on model and token usage
+  private calculateModelCost(
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number,
+    cachedInputTokens: number = 0
+  ): number {
+    const costPerMillionTokens: Record<string, { input: number; output: number; cachedInput?: number }> = {
+      // xAI grok-3-mini pricing
+      'grok-3-mini': { input: 0.30, output: 0.50, cachedInput: 0.075 },
+      // OpenAI GPT-5 mini pricing
+      'gpt-5-mini-2025-08-07': { input: 0.25, output: 2.0, cachedInput: 0.025 },
+      // Defaults/others (kept for compatibility; cached not defined)
+      'gpt-5-nano': { input: 2.0, output: 2.0 },
+      'gpt-4o': { input: 5.0, output: 15.0 },
+      'gpt-4o-mini': { input: 0.15, output: 0.6 },
+      'claude-3-5-sonnet-20241022': { input: 3.0, output: 15.0 },
+      'claude-3-5-haiku-20241022': { input: 1.0, output: 5.0 },
+      'llama-3.1-405b-reasoning': { input: 3.0, output: 3.0 },
+      'llama-3.1-70b-versatile': { input: 0.59, output: 0.79 },
+      'llama-3.1-8b-instant': { input: 0.05, output: 0.08 }
+    }
+
+    // Default pricing for unknown models
+    const defaultPricing = { input: 1.0, output: 1.0 }
+    
+    // Find pricing (case insensitive, partial match)
+  const modelPricing = (Object.entries(costPerMillionTokens).find(([key]) => 
+      modelName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(modelName.toLowerCase())
+  )?.[1] as { input: number; output: number; cachedInput?: number } | undefined) || (defaultPricing as { input: number; output: number; cachedInput?: number })
+
+  const inputCost = (inputTokens / 1_000_000) * modelPricing.input
+  const cachedInputCost = (cachedInputTokens / 1_000_000) * (modelPricing.cachedInput ?? modelPricing.input)
+  const outputCost = (outputTokens / 1_000_000) * modelPricing.output
+    
+  return Number((inputCost + cachedInputCost + outputCost).toFixed(6))
+  }
+
   async updateModelUsage(
     userId: string,
     modelName: string,
     inputTokens: number,
     outputTokens: number,
-    responseTime: number,
-    success: boolean = true,
-    cost: number = 0
+  responseTime: number,
+  success: boolean = true,
+  cachedInputTokens: number = 0
   ) {
     const today = new Date().toISOString().split('T')[0]
 
-  const supabase = this.supabase
-  if (!supabase) return { data: null, error: new Error('Supabase disabled') } as const
+    // Calculate cost based on model and tokens
+  const cost = this.calculateModelCost(modelName, inputTokens || 0, outputTokens || 0, cachedInputTokens || 0)
 
-  // Cast function name to any to satisfy type system for RPC
-  return (supabase as any).rpc('fn_update_model_analytics', {
+  console.log(`[Analytics] Updating model usage: ${modelName}, tokens: ${inputTokens}/${outputTokens} (cached_in:${cachedInputTokens || 0}), cost: $${cost}`)
+
+    // Try to use admin client for RPC operations
+    let supabase = this.supabase
+    try {
+      const { createGuestServerClient } = await import('@/lib/supabase/server-guest')
+      const adminClient = await createGuestServerClient()
+      if (adminClient) {
+        supabase = adminClient as any
+        console.log('[Analytics] Using admin client for RPC')
+      }
+    } catch (e) {
+      console.log('[Analytics] Admin client not available, using regular client')
+    }
+
+    if (!supabase) return { data: null, error: new Error('Supabase disabled') } as const
+
+    // Cast function name to any to satisfy type system for RPC
+    return (supabase as any).rpc('fn_update_model_analytics', {
       p_user_id: userId,
       p_model_name: modelName,
-      p_input_tokens: inputTokens,
-      p_output_tokens: outputTokens,
-      p_response_time_ms: responseTime,
+      p_input_tokens: inputTokens || 0,
+      p_output_tokens: outputTokens || 0,
+      p_response_time_ms: responseTime || 0,
       p_success: success,
       p_cost_usd: cost
     })
@@ -366,18 +421,39 @@ export function formatAnalyticsDate(date: Date): string {
 export function calculateTokenCost(
   inputTokens: number,
   outputTokens: number,
-  modelName: string
+  modelName: string,
+  cachedInputTokens: number = 0
 ): number {
-  // Basic cost calculation - you should update these rates
-  const costs: Record<string, { input: number; output: number }> = {
-    'gpt-4': { input: 0.03 / 1000, output: 0.06 / 1000 },
-    'gpt-3.5-turbo': { input: 0.001 / 1000, output: 0.002 / 1000 },
-    'claude-3': { input: 0.015 / 1000, output: 0.075 / 1000 },
-    'llama-70b': { input: 0.0009 / 1000, output: 0.0009 / 1000 }
+  // Cost per million tokens - updated with latest pricing
+  const costsPerMillion: Record<string, { input: number; output: number; cachedInput?: number }> = {
+    'grok-3-mini': { input: 0.30, output: 0.50, cachedInput: 0.075 },
+    'gpt-5-mini-2025-08-07': { input: 0.25, output: 2.0, cachedInput: 0.025 },
+    'gpt-5-nano': { input: 2.0, output: 2.0 },
+    'gpt-4o': { input: 5.0, output: 15.0 },
+    'gpt-4o-mini': { input: 0.15, output: 0.6 },
+    'claude-3-5-sonnet-20241022': { input: 3.0, output: 15.0 },
+    'claude-3-5-haiku-20241022': { input: 1.0, output: 5.0 },
+    'llama-3.1-405b-reasoning': { input: 3.0, output: 3.0 },
+    'llama-3.1-70b-versatile': { input: 0.59, output: 0.79 },
+    'llama-3.1-8b-instant': { input: 0.05, output: 0.08 },
+    // Legacy models
+    'gpt-4': { input: 30.0, output: 60.0 },
+    'gpt-3.5-turbo': { input: 1.0, output: 2.0 },
+    'claude-3': { input: 15.0, output: 75.0 },
+    'llama-70b': { input: 0.9, output: 0.9 }
   }
 
-  const modelCost = costs[modelName] || costs['gpt-3.5-turbo']
-  return (inputTokens * modelCost.input) + (outputTokens * modelCost.output)
+  // Find pricing (case insensitive, partial match)
+  const modelPricing = (Object.entries(costsPerMillion).find(([key]) => 
+    modelName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(modelName.toLowerCase())
+  )?.[1] as { input: number; output: number; cachedInput?: number } | undefined) || { input: 1.0, output: 1.0 } // Default pricing
+
+  // Convert per million tokens to per token and calculate cost
+  const inputCost = (inputTokens / 1_000_000) * modelPricing.input
+  const cachedInputCost = (cachedInputTokens / 1_000_000) * (modelPricing.cachedInput ?? modelPricing.input)
+  const outputCost = (outputTokens / 1_000_000) * modelPricing.output
+  
+  return Number((inputCost + cachedInputCost + outputCost).toFixed(6))
 }
 
 export function getDeviceType(userAgent: string): string {

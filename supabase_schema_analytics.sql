@@ -213,7 +213,7 @@ AFTER INSERT ON messages
 FOR EACH ROW EXECUTE FUNCTION fn_model_usage_upsert();
 
 -- =========================
--- VIEWS
+-- VIEWS (Security INVOKER - user-scoped)
 -- =========================
 CREATE OR REPLACE VIEW user_daily_summary AS
 SELECT 
@@ -229,8 +229,9 @@ SELECT
   SUM(COALESCE(m.output_tokens, 0)) as total_output_tokens,
   AVG(COALESCE(m.response_time_ms, 0)) as avg_response_time_ms
 FROM users u
-LEFT JOIN messages m ON u.id = m.user_id
+LEFT JOIN messages m ON u.id = m.user_id AND u.id = auth.uid()
 LEFT JOIN chats c ON m.chat_id = c.id
+WHERE u.id = auth.uid()
 GROUP BY u.id, u.display_name, u.email, DATE(m.created_at);
 
 CREATE OR REPLACE VIEW model_performance_summary AS
@@ -243,7 +244,7 @@ SELECT
   SUM(COALESCE(output_tokens, 0)) as total_output_tokens,
   DATE_TRUNC('day', created_at) as usage_date
 FROM messages 
-WHERE role = 'assistant' AND model IS NOT NULL
+WHERE role = 'assistant' AND model IS NOT NULL AND user_id = auth.uid()
 GROUP BY model, DATE_TRUNC('day', created_at)
 ORDER BY usage_date DESC, total_messages DESC;
 
@@ -255,8 +256,62 @@ SELECT
   AVG(success_rate) as avg_success_rate,
   SUM(total_time_spent_minutes) as total_time_minutes
 FROM feature_usage_analytics
+WHERE user_id = auth.uid()
 GROUP BY feature_name
 ORDER BY total_usage DESC;
+
+-- =========================
+-- RPC: fn_update_model_analytics (used by server code)
+-- =========================
+CREATE OR REPLACE FUNCTION fn_update_model_analytics(
+  p_user_id UUID,
+  p_model_name TEXT,
+  p_input_tokens INTEGER,
+  p_output_tokens INTEGER,
+  p_response_time_ms INTEGER,
+  p_success BOOLEAN DEFAULT TRUE,
+  p_cost_usd NUMERIC DEFAULT 0
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO model_usage_analytics (
+    user_id, model_name, usage_date, message_count,
+    total_input_tokens, total_output_tokens,
+    average_response_time_ms, successful_requests, failed_requests,
+    total_cost_estimate, updated_at
+  ) VALUES (
+    p_user_id, p_model_name, CURRENT_DATE, 1,
+    COALESCE(p_input_tokens, 0), COALESCE(p_output_tokens, 0),
+    COALESCE(p_response_time_ms, 0),
+    CASE WHEN p_success THEN 1 ELSE 0 END,
+    CASE WHEN p_success THEN 0 ELSE 1 END,
+    COALESCE(p_cost_usd, 0), NOW()
+  )
+  ON CONFLICT (user_id, model_name, usage_date) DO UPDATE
+  SET message_count = model_usage_analytics.message_count + 1,
+      total_input_tokens = model_usage_analytics.total_input_tokens + COALESCE(EXCLUDED.total_input_tokens, 0),
+      total_output_tokens = model_usage_analytics.total_output_tokens + COALESCE(EXCLUDED.total_output_tokens, 0),
+      average_response_time_ms = CASE
+        WHEN model_usage_analytics.message_count <= 1 THEN COALESCE(EXCLUDED.average_response_time_ms, 0)
+        ELSE ((model_usage_analytics.average_response_time_ms * (model_usage_analytics.message_count - 1)) + COALESCE(EXCLUDED.average_response_time_ms, 0)) / model_usage_analytics.message_count
+      END,
+      successful_requests = model_usage_analytics.successful_requests + CASE WHEN p_success THEN 1 ELSE 0 END,
+      failed_requests = model_usage_analytics.failed_requests + CASE WHEN p_success THEN 0 ELSE 1 END,
+      total_cost_estimate = model_usage_analytics.total_cost_estimate + COALESCE(p_cost_usd, 0),
+      updated_at = NOW();
+END;
+$$;
+
+-- Grants for RPC execution
+DO $$ BEGIN
+  GRANT EXECUTE ON FUNCTION public.fn_update_model_analytics(UUID, TEXT, INTEGER, INTEGER, INTEGER, BOOLEAN, NUMERIC) TO authenticated;
+  GRANT EXECUTE ON FUNCTION public.fn_update_model_analytics(UUID, TEXT, INTEGER, INTEGER, INTEGER, BOOLEAN, NUMERIC) TO service_role;
+EXCEPTION WHEN OTHERS THEN
+  -- Ignore if roles not present in local environments
+  NULL;
+END $$;
 
 -- =========================
 -- RLS POLICIES

@@ -113,21 +113,16 @@ export default async function DashboardPage() {
 
       <QuickStats totals={data.totals} days={data.rangeDays} />
 
-    {data.daily.length ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-6">
+      {/* Main content in a responsive 2x2 grid on large screens */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {data.daily.length ? (
           <ActivitySection daily={data.daily} />
-        </div>
-      ) : (
-        <Card>
-      <CardContent className="py-10 text-center text-sm text-muted-foreground">No activity yet. Chat with Cleo to see metrics here.</CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-6">
+        ) : (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">No activity yet. Chat with Cleo to see metrics here.</CardContent>
+          </Card>
+        )}
         <ModelsSection modelUsage={data.modelUsage} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <FeaturesSection features={data.featureUsage} />
         <ToolsSection tools={data.toolUsage} />
       </div>

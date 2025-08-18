@@ -1,4 +1,4 @@
-import { createGuestServerClient } from './supabase/server-guest'
+ import { createGuestServerClient } from './supabase/server-guest'
 import type { Database } from '@/app/types/database.types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 

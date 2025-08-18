@@ -723,44 +723,62 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
       },
-      onFinish: async ({ response }: { response: any }) => {
+      onFinish: async ({ response, usage }: { response: any, usage?: any }) => {
         // Clean up global context
         delete (globalThis as any).__currentUserId
         delete (globalThis as any).__currentModel
         delete (globalThis as any).__requestId
         
         if (supabase) {
-          // Estimate tokens
-          const est = (s: string) => Math.ceil((s || '').length / 4)
-          const inputText = [finalSystemPrompt, ...convertedMessages.map((m) => {
-            if (typeof m.content === 'string') return m.content
-            if (Array.isArray(m.content)) {
-              return m.content
-                .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
-                .map((p: any) => p.text || p.content || '')
-                .join('\n\n')
+          // Use real tokens from AI SDK if available, fallback to estimation
+          let inputTokens: number
+          let outputTokens: number
+          let cachedInputTokens: number = 0
+          
+          if (usage?.promptTokens && usage?.completionTokens) {
+            // Use real tokens from AI SDK
+            inputTokens = usage.promptTokens
+            outputTokens = usage.completionTokens
+            // Some providers expose cached prompt tokens
+            const maybeCached = (usage as any)?.cachedPromptTokens || (usage as any)?.promptTokensDetails?.cached || 0
+            if (typeof maybeCached === 'number' && maybeCached > 0) {
+              cachedInputTokens = maybeCached
             }
-            return ''
-          })].join('\n\n')
-          const outputText = (() => {
-            try {
-              const msgs = response?.messages ?? []
-              const last = [...msgs].reverse().find((m: any) => m.role === 'assistant')
-              if (!last) return ''
-              if (typeof last.content === 'string') return last.content
-              if (Array.isArray(last.content)) {
-                return last.content
-                  .filter((p: any) => p && typeof p === 'object' && (
-                    p.type === 'text' || p.type === 'reasoning'
-                  ))
-                  .map((p: any) => p.text || p.reasoning || '')
+            console.log(`[Chat] Using real tokens - Input: ${inputTokens}, Output: ${outputTokens}${cachedInputTokens ? `, CachedIn: ${cachedInputTokens}` : ''}`)
+          } else {
+            // Fallback: Estimate tokens using character count
+            const est = (s: string) => Math.ceil((s || '').length / 4)
+            const inputText = [finalSystemPrompt, ...convertedMessages.map((m) => {
+              if (typeof m.content === 'string') return m.content
+              if (Array.isArray(m.content)) {
+                return m.content
+                  .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
+                  .map((p: any) => p.text || p.content || '')
                   .join('\n\n')
               }
               return ''
-            } catch { return '' }
-          })()
-          const inputTokens = est(inputText)
-          const outputTokens = est(outputText)
+            })].join('\n\n')
+            const outputText = (() => {
+              try {
+                const msgs = response?.messages ?? []
+                const last = [...msgs].reverse().find((m: any) => m.role === 'assistant')
+                if (!last) return ''
+                if (typeof last.content === 'string') return last.content
+                if (Array.isArray(last.content)) {
+                  return last.content
+                    .filter((p: any) => p && typeof p === 'object' && (
+                      p.type === 'text' || p.type === 'reasoning'
+                    ))
+                    .map((p: any) => p.text || p.reasoning || '')
+                    .join('\n\n')
+                }
+                return ''
+              } catch { return '' }
+            })()
+            inputTokens = est(inputText)
+            outputTokens = est(outputText)
+            console.log(`[Chat] Using estimated tokens - Input: ${inputTokens}, Output: ${outputTokens}`)
+          }
           const responseTimeMs = Math.max(0, Date.now() - resultStart)
 
           await storeAssistantMessage({
@@ -779,9 +797,15 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
           // Best-effort: update model usage analytics via RPC, ignore errors
           try {
             const { analytics } = await import('@/lib/supabase/analytics-helpers')
-            await analytics.updateModelUsage(realUserId, model, inputTokens, outputTokens, responseTimeMs, true, 0)
+            console.log(`[Analytics] Calling updateModelUsage with userId: ${realUserId}, model: ${model}, tokens: ${inputTokens}/${outputTokens}${cachedInputTokens ? ` (cached_in:${cachedInputTokens})` : ''}`)
+            const result = await analytics.updateModelUsage(realUserId, model, inputTokens, outputTokens, responseTimeMs, true, cachedInputTokens)
+            if (result.error) {
+              console.error('[Analytics] updateModelUsage RPC error:', result.error)
+            } else {
+              console.log('[Analytics] updateModelUsage successful')
+            }
           } catch (e) {
-            console.log('[Analytics] updateModelUsage skipped', (e as any)?.message)
+            console.log('[Analytics] updateModelUsage error:', (e as any)?.message)
           }
         }
       },
