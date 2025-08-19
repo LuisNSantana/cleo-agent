@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { detectLanguage } from '@/lib/language-detection'
 import { trackToolUsage } from '@/lib/analytics'
+import { getCurrentUserId, getCurrentRequestId } from '@/lib/server/request-context'
 
 // Enhanced types for Brave Search response (added summarizer and goggles support)
 interface BraveSearchResult {
@@ -215,7 +216,7 @@ export const webSearchTool = tool({
   execute: async ({ query, count = 15, freshness, language = 'en', goggles_id, use_summarizer = true, primary = 'tavily' }: { query: string, count?: number, freshness?: string, language?: 'es' | 'en', goggles_id?: string, use_summarizer?: boolean, primary?: 'brave' | 'tavily' }) => {
     try {
       const started = Date.now()
-      const userId = (globalThis as any).__currentUserId as string | undefined
+  const userId = getCurrentUserId()
       // Auto-translate to English if es and en preferred
       const detected = detectLanguage(query)
       let effectiveQuery = query
@@ -228,7 +229,7 @@ export const webSearchTool = tool({
       }
 
       // Throttling/deduplication (NON-BLOCKING)
-      const reqId = (globalThis as any).__requestId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? (crypto as any).randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const reqId = getCurrentRequestId() || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? (crypto as any).randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const store = (globalThis as any).__webSearchPerReq || ((globalThis as any).__webSearchPerReq = {})
       const entry: { count: number; queries: Set<string> } = store[reqId] || (store[reqId] = { count: 0, queries: new Set() })
       const normalized = `${effectiveQuery.trim().toLowerCase()}::${freshness || 'none'}::${goggles_id || 'none'}::${primary}`
@@ -445,7 +446,7 @@ export const webSearchTool = tool({
 
     } catch (error) {
       console.error('[WebSearch] Failed:', error)
-      const userId = (globalThis as any).__currentUserId as string | undefined
+      const userId = getCurrentUserId()
       if (userId) {
         await trackToolUsage(userId, 'webSearch', { ok: false, execMs: 0, errorType: 'search_error' })
       }

@@ -16,11 +16,17 @@ export async function middleware(request: NextRequest) {
   const response = await updateSession(request)
 
   // CSRF protection for state-changing requests
-  if (["POST", "PUT", "DELETE"].includes(request.method)) {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
+    // Only enforce CSRF for same-site navigations or credentialed requests
     const csrfCookie = request.cookies.get("csrf_token")?.value
-    const headerToken = request.headers.get("x-csrf-token")
+    const headerToken = request.headers.get("x-csrf-token") || undefined
+    // Double-submit: header token must be valid and match cookie prefix (raw part)
+    const cookieRaw = csrfCookie?.split(":")[0]
+    const headerRaw = headerToken?.split(":")[0]
+    const valid = !!headerToken && validateCsrfToken(headerToken)
+    const matches = !!cookieRaw && !!headerRaw && cookieRaw === headerRaw
 
-    if (!csrfCookie || !headerToken || !validateCsrfToken(headerToken)) {
+    if (!valid || !matches) {
       return new NextResponse("Invalid CSRF token", { status: 403 })
     }
   }

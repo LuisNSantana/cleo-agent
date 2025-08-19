@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackToolUsage } from '@/lib/analytics'
+import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Simple in-memory token cache (5 min)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
@@ -123,7 +124,7 @@ export const listGmailMessagesTool = tool({
     includeSpamTrash: z.boolean().optional().default(false),
   }),
   execute: async ({ q, labelIds, maxResults = 25, includeSpamTrash = false }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     try {
       const started = Date.now()
       if (!userId) return { success: false, message: 'Auth required', messages: [], total_count: 0 }
@@ -163,8 +164,8 @@ export const listGmailMessagesTool = tool({
       return result
     } catch (error) {
       console.error('[Gmail] list error:', error)
-      const userIdStr = (globalThis as any).__currentUserId as string | undefined
-      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.listMessages', { ok: false, execMs: 0, errorType: 'list_error' })
+  const userIdStr = getCurrentUserId()
+  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.listMessages', { ok: false, execMs: 0, errorType: 'list_error' })
       return { success: false, message: 'Failed to list messages', messages: [], total_count: 0 }
     }
   }
@@ -177,7 +178,7 @@ export const getGmailMessageTool = tool({
     messageId: z.string().describe('Gmail message ID'),
   }),
   execute: async ({ messageId }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     try {
       const started = Date.now()
       if (!userId) return { success: false, message: 'Auth required' }
@@ -224,8 +225,8 @@ export const getGmailMessageTool = tool({
       return result
     } catch (error) {
       console.error('[Gmail] get error:', error)
-      const userIdStr = (globalThis as any).__currentUserId as string | undefined
-      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.getMessage', { ok: false, execMs: 0, errorType: 'get_error' })
+  const userIdStr = getCurrentUserId()
+  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.getMessage', { ok: false, execMs: 0, errorType: 'get_error' })
       return { success: false, message: 'Failed to get message' }
     }
   }
@@ -249,7 +250,7 @@ export const sendGmailMessageTool = tool({
     references: z.string().optional(),
   }).refine((data) => !!data.text || !!data.html, { message: 'Either text or html body is required', path: ['text'] }),
   execute: async ({ to, subject = '(No subject)', text, html, cc, bcc, replyTo, threadId, inReplyTo, references }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     try {
       const started = Date.now()
       if (!userId) return { success: false, message: 'Auth required' }
@@ -297,8 +298,8 @@ export const sendGmailMessageTool = tool({
       return { success: true, message: 'Email sent', id: res.id, threadId: res.threadId }
     } catch (error) {
       console.error('[Gmail] send error:', error)
-      const userIdStr = (globalThis as any).__currentUserId as string | undefined
-      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
+  const userIdStr = getCurrentUserId()
+  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
       return { success: false, message: 'Failed to send email' }
     }
   }
@@ -309,7 +310,7 @@ export const trashGmailMessageTool = tool({
   description: '🗑️ Move a Gmail message to Trash by ID.',
   inputSchema: z.object({ messageId: z.string() }),
   execute: async ({ messageId }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     try {
       if (!userId) return { success: false, message: 'Auth required' }
       const token = await getGmailAccessToken(userId)
@@ -318,8 +319,8 @@ export const trashGmailMessageTool = tool({
       await trackToolUsage(userId, 'gmail.trashMessage', { ok: true, execMs: 1 })
       return { success: true, message: 'Moved to Trash', id: res.id }
     } catch (error) {
-      const userIdStr = (globalThis as any).__currentUserId as string | undefined
-      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.trashMessage', { ok: false, execMs: 0, errorType: 'trash_error' })
+  const userIdStr = getCurrentUserId()
+  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.trashMessage', { ok: false, execMs: 0, errorType: 'trash_error' })
       return { success: false, message: 'Failed to trash message' }
     }
   }
@@ -334,7 +335,7 @@ export const modifyGmailLabelsTool = tool({
     removeLabelIds: z.array(z.string()).optional(),
   }),
   execute: async ({ messageId, addLabelIds, removeLabelIds }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     try {
       if (!userId) return { success: false, message: 'Auth required' }
       const token = await getGmailAccessToken(userId)
@@ -346,8 +347,8 @@ export const modifyGmailLabelsTool = tool({
       await trackToolUsage(userId, 'gmail.modifyLabels', { ok: true, execMs: 1 })
       return { success: true, message: 'Labels updated', id: res.id, labelIds: res.labelIds }
     } catch (error) {
-      const userIdStr = (globalThis as any).__currentUserId as string | undefined
-      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.modifyLabels', { ok: false, execMs: 0, errorType: 'modify_error' })
+  const userIdStr = getCurrentUserId()
+  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.modifyLabels', { ok: false, execMs: 0, errorType: 'modify_error' })
       return { success: false, message: 'Failed to modify labels' }
     }
   }

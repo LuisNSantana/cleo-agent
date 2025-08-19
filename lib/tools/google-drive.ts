@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackToolUsage } from '@/lib/analytics'
+import { getCurrentModel, getCurrentUserId } from '@/lib/server/request-context'
 
 async function getGoogleDriveAccessToken(userId: string): Promise<string | null> {
   console.log('🔍 Getting Google Drive access token for user:', userId)
@@ -137,9 +138,9 @@ export const listDriveFilesTool = tool({
     spaces: z.string().optional().default('drive').describe('Spaces to search: "drive" (main Drive), "appDataFolder", or "photos"'),
   }),
   execute: async ({ maxResults = 50, query, orderBy = 'modifiedTime desc', includeItemsFromAllDrives = false, spaces = 'drive' }) => {
-    // Get userId and model from global context (injected by chat handler)
-    const userId = (globalThis as any).__currentUserId
-    const currentModel = (globalThis as any).__currentModel
+    // Get userId and model from request-scoped context (with safe fallbacks inside helpers)
+    const userId = getCurrentUserId()
+    const currentModel = getCurrentModel()
     
     // Debug logging
     console.log('🔧 [Google Drive] Tool execution started:', {
@@ -234,7 +235,7 @@ export const listDriveFilesTool = tool({
       return result
     } catch (error) {
       console.error('Error listing Drive files:', error)
-      const userId = (globalThis as any).__currentUserId as string | undefined
+      const userId = getCurrentUserId()
       if (userId) await trackToolUsage(userId, 'googleDrive.listFiles', { ok: false, execMs: 0, errorType: 'list_error' })
       return {
         success: false,
@@ -258,8 +259,8 @@ export const searchDriveFilesTool = tool({
     sharedWithMe: z.boolean().optional().default(false).describe('Only search files shared with me'),
   }),
   execute: async ({ searchTerm, fileType, maxResults = 25, includeContent = false, modifiedAfter, sharedWithMe = false }) => {
-    // Get userId from global context
-    const userId = (globalThis as any).__currentUserId
+    // Get userId from request-scoped context
+    const userId = getCurrentUserId()
     
     try {
       const started = Date.now()
@@ -352,7 +353,7 @@ export const searchDriveFilesTool = tool({
       return result
     } catch (error) {
       console.error('Error searching Drive files:', error)
-      const userId = (globalThis as any).__currentUserId as string | undefined
+      const userId = getCurrentUserId()
       if (userId) await trackToolUsage(userId, 'googleDrive.searchFiles', { ok: false, execMs: 0, errorType: 'search_error' })
       return {
         success: false,
@@ -372,8 +373,8 @@ export const getDriveFileDetailsTool = tool({
     includePermissions: z.boolean().optional().default(false).describe('Include detailed sharing permissions information'),
   }),
   execute: async ({ fileId, includePermissions = false }) => {
-    // Get userId from global context
-    const userId = (globalThis as any).__currentUserId
+    // Get userId from request-scoped context
+    const userId = getCurrentUserId()
     
     try {
       if (!userId) {
@@ -446,7 +447,7 @@ export const getDriveFileDetailsTool = tool({
         await trackToolUsage(userId, 'googleDrive.getFileDetails', { ok: true, execMs: 0, params: { includePermissions } })
       }
       return result
-    } catch (error) {
+  } catch (error) {
       console.error('Error getting Drive file details:', error)
       if (userId) await trackToolUsage(userId, 'googleDrive.getFileDetails', { ok: false, execMs: 0, errorType: 'details_error' })
       return {
@@ -467,8 +468,8 @@ export const createDriveFolderTool = tool({
     description: z.string().optional().describe('Optional description for the folder'),
   }),
   execute: async ({ name, parentFolderId, description }) => {
-    // Get userId from global context
-    const userId = (globalThis as any).__currentUserId
+    // Get userId from request-scoped context
+    const userId = getCurrentUserId()
     
     try {
       if (!userId) {
@@ -520,7 +521,7 @@ export const createDriveFolderTool = tool({
         await trackToolUsage(userId, 'googleDrive.createFolder', { ok: true, execMs: Date.now() - started, params: { hasParent: !!parentFolderId } })
       }
       return result
-    } catch (error) {
+  } catch (error) {
       console.error('Error creating Drive folder:', error)
       if (userId) await trackToolUsage(userId, 'googleDrive.createFolder', { ok: false, execMs: 0, errorType: 'create_folder_error' })
       return {
@@ -542,7 +543,7 @@ export const uploadFileToDriveTool = tool({
     folderId: z.string().optional().describe('Optional destination folder ID in Drive'),
   }),
   execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
-    const userId = (globalThis as any).__currentUserId
+    const userId = getCurrentUserId()
     try {
   const started = Date.now()
       if (!userId) {
@@ -630,7 +631,7 @@ export const uploadFileToDriveTool = tool({
         await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: true, execMs: Date.now() - started, params: { hasFolder: !!folderId, mimeType } })
       }
       return result
-    } catch (error) {
+  } catch (error) {
       console.error('Error uploading file to Drive:', error)
       if (userId) await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: false, execMs: 0, errorType: 'upload_error' })
       return {

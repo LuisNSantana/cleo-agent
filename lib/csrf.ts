@@ -23,9 +23,13 @@ export function validateCsrfToken(fullToken: string): boolean {
 export async function setCsrfCookie() {
   const cookieStore = await cookies()
   const token = generateCsrfToken()
+  const isProd = process.env.NODE_ENV === "production"
   cookieStore.set("csrf_token", token, {
+    // Double-submit cookie pattern requires client JS access
     httpOnly: false,
-    secure: true,
+    secure: isProd,
+    sameSite: "lax",
     path: "/",
+    maxAge: 60 * 60 * 2, // 2h
   })
 }

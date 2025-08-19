@@ -13,6 +13,8 @@ export interface RetrieveOptions {
   useReranking?: boolean
   vectorWeight?: number
   textWeight?: number
+  // Optional prompt budgeting inputs
+  maxContextChars?: number // approximate max characters to allocate for context
 }
 
 export interface RetrievedChunk {
@@ -43,13 +45,20 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   if (!query.trim()) return []
   
-  // Usar configuración estándar para el retrieval
-  const dynamicTopK = opts.topK || 10
-  const chunkLimit = 10 // Reducido para dejar más espacio de salida
+  // Adaptive sizing: derive topK and chunkLimit from query size and budget
+  const approxQueryTokens = Math.ceil(query.length / 4)
+  const budgetChars = opts.maxContextChars ?? 6000
+  // Heuristic: average chunk ~ 450 chars; leave some headroom for formatting
+  const estPerChunk = 450
+  const allowedByBudget = Math.max(3, Math.floor(budgetChars / estPerChunk))
+  // Base topK scale with shorter queries getting a bit more breadth
+  const baseTopK = approxQueryTokens < 150 ? 12 : approxQueryTokens < 600 ? 10 : 8
+  const dynamicTopK = Math.min(opts.topK || baseTopK, allowedByBudget)
+  const chunkLimit = Math.min(allowedByBudget, dynamicTopK)
   
   // DEBUG: Log the search query being used
   console.log('[RAG] DEBUG - Search query:', JSON.stringify(query.slice(0, 200)))
-  const queryTokens = Math.ceil(query.length / 4)
+  console.log('[RAG] DEBUG - Adaptive sizing:', { approxQueryTokens, budgetChars, dynamicTopK, chunkLimit })
   
   const supabase = await createClient()
   if (!supabase) return []

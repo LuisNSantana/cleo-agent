@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { DateTime } from 'luxon'  // Nueva dep: yarn add luxon (para mejor handling de dates/timezones)
 import { trackToolUsage } from '@/lib/analytics'
+import { getCurrentModel, getCurrentUserId } from '@/lib/server/request-context'
 
 // Cache simple para tokens (in-memory, exp 5min)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
@@ -124,8 +125,8 @@ export const listCalendarEventsTool = tool({
     singleEvents: z.boolean().optional().default(true).describe('Expand recurring events.')
   }),
   execute: async ({ maxResults = 50, timeMin, timeMax, timeZone = 'Europe/Madrid', calendarId = 'primary', filterKeyword, singleEvents = true }) => {
-    const userId = (globalThis as any).__currentUserId
-    const model = (globalThis as any).__currentModel
+  const userId = getCurrentUserId()
+  const model = getCurrentModel() || ''
     
     console.log('[GCal List] Execution:', { userId, model, params: { maxResults, timeMin, timeMax, timeZone } })
     
@@ -208,7 +209,7 @@ export const listCalendarEventsTool = tool({
     } catch (error) {
       console.error('[GCal List Error]:', error)
       const msg = error instanceof Error ? error.message : String(error)
-      const userId = (globalThis as any).__currentUserId as string | undefined
+  const userId = getCurrentUserId()
       if (userId) await trackToolUsage(userId, 'googleCalendar.listEvents', { ok: false, execMs: 0, errorType: 'list_error' })
       return { success: false, message: `Failed: ${msg}`, events: [], total_count: 0 }
     }
@@ -246,7 +247,7 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-    const userId = (globalThis as any).__currentUserId
+  const userId = getCurrentUserId()
     
     try {
       const started = Date.now()
@@ -311,7 +312,7 @@ export const createCalendarEventTool = tool({
     } catch (error) {
       console.error('[GCal Create Error]:', error)
       const message = error instanceof Error ? error.message : String(error)
-      const userId = (globalThis as any).__currentUserId as string | undefined
+  const userId = getCurrentUserId()
       if (userId) await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: false, execMs: 0, errorType: 'create_error' })
       return { success: false, message: `Failed: ${message}` }
     }

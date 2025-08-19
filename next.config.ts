@@ -6,6 +6,10 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 
 const isProd = process.env.NODE_ENV === "production"
 
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
+  : undefined
+
 const nextConfig: NextConfig = withBundleAnalyzer({
   // Only use standalone in production builds, not in development
   ...(isProd && { output: "standalone" }),
@@ -29,12 +33,17 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     : {}),
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-        port: "",
-        pathname: "/storage/v1/object/public/**",
-      },
+      // Supabase public storage
+      ...(supabaseHost
+        ? [
+            {
+              protocol: "https",
+              hostname: supabaseHost,
+              port: "",
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
       // Avatars and favicons used in Gmail list UI
       {
         protocol: "https",

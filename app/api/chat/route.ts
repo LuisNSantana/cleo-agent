@@ -8,6 +8,8 @@ import { filterImagesForModel, MODEL_IMAGE_LIMITS } from "@/lib/image-management
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { stepCountIs, streamText } from "ai"
 import type { CoreMessage } from "ai"
+import { z } from "zod"
+import { withRequestContext } from "@/lib/server/request-context"
 import {
   incrementMessageCount,
   logUserMessage,
@@ -36,6 +38,27 @@ type ChatRequest = {
 
 export async function POST(req: Request) {
   try {
+    const ChatRequestSchema = z.object({
+      messages: z.array(z.any()).min(1),
+      chatId: z.string().min(1),
+      userId: z.string().min(1),
+      model: z.string().min(1),
+      isAuthenticated: z.boolean(),
+      systemPrompt: z.string().optional().default(""),
+      enableSearch: z.boolean().optional().default(false),
+      message_group_id: z.string().optional(),
+      documentId: z.string().optional(),
+      debugRag: z.boolean().optional(),
+    })
+
+    const parsed = ChatRequestSchema.safeParse(await req.json())
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: "Invalid payload", details: parsed.error.flatten() }),
+        { status: 400 }
+      )
+    }
+
     const {
       messages,
       chatId,
@@ -47,7 +70,7 @@ export async function POST(req: Request) {
       message_group_id,
       documentId,
       debugRag,
-    } = (await req.json()) as ChatRequest
+    } = parsed.data as ChatRequest
 
     // Auto-enable RAG for personalized responses - always try to retrieve user context
     const autoRagEnabled = true
@@ -73,7 +96,7 @@ export async function POST(req: Request) {
 
     const userMessage = messages[messages.length - 1]
 
-    if (supabase && userMessage?.role === "user") {
+  if (supabase && userMessage?.role === "user") {
       // Process the content to create a clean summary for database storage
       let contentForDB = ""
 
@@ -147,7 +170,7 @@ export async function POST(req: Request) {
         contentForDB = "Mensaje del usuario"
       }
 
-      await logUserMessage({
+  await logUserMessage({
         supabase,
         userId,
         chatId,
@@ -266,7 +289,7 @@ export async function POST(req: Request) {
 
                   // Extract content from data URL
                   let documentContent = ""
-                  try {
+      try {
                     if (typedPart.url.startsWith("data:")) {
                       const base64Data = typedPart.url.split(",")[1]
                       if (base64Data) {
@@ -277,7 +300,7 @@ export async function POST(req: Request) {
                           fileType.includes("json") ||
                           fileType.includes("csv")
                         ) {
-                          documentContent = atob(base64Data)
+        documentContent = Buffer.from(base64Data, "base64").toString("utf8")
                         } else if (fileType === "application/pdf") {
                           // Use the new PDF processing function for better extraction
                           try {
@@ -495,8 +518,8 @@ ${documentContent}`
       }
     }
 
-    // Inject userId and model into global context for tools that need it
-    // Get the real Supabase user ID instead of the frontend userId
+  // Inject userId and model into request-scoped context (and legacy globalThis for now)
+  // Get the real Supabase user ID instead of the frontend userId
     let realUserId = userId
     if (supabase && isAuthenticated) {
       const { data: userData, error: userError } = await supabase.auth.getUser()
@@ -505,8 +528,8 @@ ${documentContent}`
         console.log('🔍 Using real Supabase user ID for tools:', realUserId)
       }
     }
-    ;(globalThis as any).__currentUserId = realUserId
-    ;(globalThis as any).__currentModel = model
+  ;(globalThis as any).__currentUserId = realUserId
+  ;(globalThis as any).__currentModel = model
 
     // RAG retrieval when enableSearch flag is true
     // We'll collect context chunks here and later add them as their own system message block
@@ -535,9 +558,8 @@ ${documentContent}`
               .order('created_at', { ascending: false })
               .limit(5)
             
-            if (!docsError && userDocs) {
-              console.log('[RAG] DEBUG - User has', userDocs.length, 'documents:')
-              userDocs.forEach((doc: any) => console.log(`  - ${doc.title || doc.filename} (${doc.id})`))
+            if (process.env.NODE_ENV !== 'production' && !docsError && userDocs) {
+              console.log('[RAG] DEBUG - User has', userDocs.length, 'documents')
             }
 
             const { data: userChunks, error: chunksError } = await (supabase as any)
@@ -546,9 +568,8 @@ ${documentContent}`
               .eq('user_id', realUserId)
               .limit(3)
             
-            if (!chunksError && userChunks) {
+            if (process.env.NODE_ENV !== 'production' && !chunksError && userChunks) {
               console.log('[RAG] DEBUG - User has', userChunks.length, 'total chunks')
-              userChunks.forEach((chunk: any, i: number) => console.log(`  - Chunk ${i + 1}: "${chunk.content.slice(0, 100)}..."`))
             }
           } catch (e: any) {
             console.log('[RAG] DEBUG - Failed to list user documents:', e.message)
@@ -573,12 +594,9 @@ ${documentContent}`
               }
             } catch {}
             // DEBUG: Log what documents we're getting
-            console.log('[RAG] DEBUG - Retrieved document titles:', retrieved.map(r => r.metadata?.title || r.metadata?.filename || 'No title').slice(0, 3))
-            // DEBUG: Show actual context being sent to model
-            console.log('[RAG] DEBUG - Context preview being sent to model:')
-            console.log('=== RAG CONTEXT START ===')
-            console.log(ragSystemAddon.slice(0, 1000))
-            console.log('=== RAG CONTEXT END ===')
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[RAG] DEBUG - Retrieved docs (count):', Math.min(retrieved.length, 3))
+            }
             if (debugRag) {
               console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0,400))
             }
@@ -688,11 +706,13 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     }
 
     // Attach a per-request id so tools (like webSearch) can throttle sanely per request
+    let reqId: string
     try {
-      (globalThis as any).__requestId = crypto.randomUUID?.() ?? `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      reqId = crypto.randomUUID?.() ?? `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
     } catch {
-      (globalThis as any).__requestId = `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      reqId = `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
     }
+    ;(globalThis as any).__requestId = reqId
 
   // Configure tools and provider options per model
     // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
@@ -865,7 +885,9 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     } catch {}
 
   const resultStart = Date.now()
-  const result = streamText(additionalParams)
+  const result = await withRequestContext({ userId: realUserId, model, requestId: reqId }, async () => {
+    return streamText(additionalParams)
+  })
 
     // For document opening queries, disable sending reasoning to prevent content in expandable
   // Hide reasoning to avoid exposing internal planning; UI can add toggles later if desired
