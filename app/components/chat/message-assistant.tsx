@@ -14,6 +14,7 @@ import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
 import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
+import { OpenDocumentToolDisplay } from '@/components/chat/open-document-tool-display'
 
 type MessageAssistantProps = {
   children: string
@@ -48,6 +49,42 @@ export function MessageAssistant({
   const toolInvocationParts = parts?.filter(
     (part: any) => part.type === "tool-invocation"
   )
+
+  // Extract openDocument result so we can render the document card inline in the assistant message
+  const openDocumentResult = (() => {
+    try {
+      const openDocPart = toolInvocationParts?.find(
+        (part: any) =>
+          part.type === 'tool-invocation' &&
+          part.toolInvocation?.state === 'result' &&
+          part.toolInvocation?.toolName === 'openDocument' &&
+          part.toolInvocation?.result
+      ) as any
+
+      if (!openDocPart) return null
+      const result = openDocPart.toolInvocation?.result
+
+      // Result can be a raw object or an object with AI-SDK style { content: [{ type: 'text', text }] }
+      if (Array.isArray(result)) return null
+
+      if (result && typeof result === 'object' && 'content' in result) {
+        const textItem = (result as any).content?.find?.((i: any) => i?.type === 'text')
+        if (textItem?.text) {
+          try {
+            return JSON.parse(textItem.text)
+          } catch {
+            // If not JSON, ignore to avoid rendering incorrect shape
+            return null
+          }
+        }
+      }
+
+      // Otherwise assume it's already the structured result
+      return result ?? null
+    } catch {
+      return null
+    }
+  })()
   
   // Handle AI SDK v5 reasoning parts
   const reasoningParts = parts?.filter((part: any) => part.type === "reasoning")
@@ -141,6 +178,13 @@ export function MessageAssistant({
         {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
         )}
+
+        {/* Show the openDocument card inline in the assistant body for better UX */}
+        {openDocumentResult ? (
+          <div className="mb-3">
+            <OpenDocumentToolDisplay result={openDocumentResult as any} />
+          </div>
+        ) : null}
 
         {contentNullOrEmpty ? null : (
           <AssistantMessageWithFiles 

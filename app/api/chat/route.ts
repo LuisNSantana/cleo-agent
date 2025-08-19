@@ -295,6 +295,11 @@ export async function POST(req: Request) {
     let toolsForRun = tools as typeof tools
   let providerOptions: Record<string, any> | undefined
     let activeTools: string[] | undefined
+  // Detect explicit document intent in the last user message
+  const lastUserContent = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
+  const docIntentRegex = /\b(open|abrir|mostrar|ver|view|edit|editar|work on|continuar|colaborar)\b.*\b(doc|document|documento|archivo|file)\b/i
+  const explicitDocIntent = docIntentRegex.test(lastUserContent)
+
   if (model === 'grok-3-mini') {
       try {
         const { webSearch, ...rest } = tools as any
@@ -315,6 +320,15 @@ export async function POST(req: Request) {
           },
         },
       }
+    }
+
+    // Additional safety: prevent openDocument calls unless explicit doc intent detected
+    if (!explicitDocIntent) {
+      try {
+        const { openDocument, ...rest } = toolsForRun as any
+        toolsForRun = rest
+        activeTools = Object.keys(toolsForRun)
+      } catch {}
     }
 
   // Note: For OpenRouter we set headers on the provider itself in its model config

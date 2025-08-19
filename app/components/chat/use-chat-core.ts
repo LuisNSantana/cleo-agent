@@ -482,6 +482,44 @@ export function useChatCore({
                     if (toolPart) {
                       toolPart.toolInvocation.state = "result"
                       toolPart.toolInvocation.result = data.output
+
+                      // If this is (or looks like) the openDocument tool, surface the document content
+                      try {
+                        const toolName = toolPart?.toolInvocation?.toolName
+                        const output = data.output
+                        // Detect document-shaped result even if toolName differs
+                        const docContent: string =
+                          (output && typeof output === 'object' && (
+                            output.documentContent ||
+                            output.document?.fullContent ||
+                            output.canvasEditorAction?.content
+                          )) || ''
+                        const docTitle: string | undefined =
+                          (output && typeof output === 'object' && (output.document?.title || output.document?.filename)) || undefined
+
+                        // Avoid duplicate surfacing if already done for this tool call
+                        const alreadySurfaced = Boolean(toolPart?.toolInvocation?.resultSurfaced)
+                        const isDocumentTool = toolName === 'openDocument' || (!!docContent && docContent.length > 0)
+
+                        if (!alreadySurfaced && isDocumentTool && typeof docContent === 'string' && docContent.trim().length > 0) {
+                          const header = docTitle ? `Contenido de ${docTitle}:\n\n` : ''
+
+                          // Mark as surfaced to prevent duplicates
+                          try { (toolPart.toolInvocation as any).resultSurfaced = true } catch {}
+
+                          // Push as a text part so it appears in the assistant message directly
+                          assistantMessageObj.parts.push({
+                            type: 'text',
+                            text: `${header}${docContent}`,
+                          })
+
+                          // Update concatenated content for backward compatibility
+                          assistantMessageObj.content = assistantMessageObj.parts
+                            .filter((p) => p.type === 'text')
+                            .map((p: any) => (p.type === 'text' ? p.text : ''))
+                            .join('')
+                        }
+                      } catch {}
                     }
                     break
                   }

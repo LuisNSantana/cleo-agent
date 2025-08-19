@@ -26,14 +26,14 @@ function CodeBlock({ children, className, ...props }: CodeBlockProps) {
 }
 
 export type CodeBlockCodeProps = {
-  code: string
+  code?: string
   language?: string
   theme?: string
   className?: string
 } & React.HTMLProps<HTMLDivElement>
 
 function CodeBlockCode({
-  code,
+  code = "",
   language = "tsx",
   theme = "github-light",
   className,
@@ -44,11 +44,17 @@ function CodeBlockCode({
 
   useEffect(() => {
     async function highlight() {
-      const html = await codeToHtml(code, {
-        lang: language,
-        theme: appTheme === "dark" ? "github-dark" : "github-light",
-      })
-      setHighlightedHtml(html)
+      try {
+        const safeCode = typeof code === 'string' ? code : String(code ?? '')
+        const html = await codeToHtml(safeCode, {
+          lang: language || "tsx",
+          theme: appTheme === "dark" ? "github-dark" : (theme || "github-light"),
+        })
+        setHighlightedHtml(html)
+      } catch {
+        // If Shiki fails (e.g., bad input), fall back to plain rendering
+        setHighlightedHtml(null)
+      }
     }
     highlight()
   }, [code, language, appTheme])

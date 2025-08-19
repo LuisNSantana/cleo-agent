@@ -57,10 +57,13 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           }
         } catch {}
 
+        // Dynamic sizing: faster models get smaller budgets for speed
+        const fastModel = model === 'grok-3-mini'
+        const topK = fastModel ? 4 : 6
         let retrieved = await retrieveRelevant({
           userId: realUserId!,
           query: userPlain,
-          topK: 6,
+          topK,
           documentId,
           useHybrid: true,
           useReranking: true,
@@ -70,7 +73,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           ragSystemAddon = buildContextBlock(retrieved)
           if (debugRag) console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0, 400))
         } else {
-          if (!documentId && supabase) {
+          if (!documentId && supabase && !fastModel) {
             try {
               const { data: docs } = await (supabase as any)
                 .from('documents')
@@ -92,7 +95,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                 retrieved = await retrieveRelevant({
                   userId: realUserId!,
                   query: userPlain,
-                  topK: 6,
+                  topK,
                   useHybrid: true,
                   useReranking: true,
                 })
@@ -102,7 +105,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           }
         }
 
-        if (ragSystemAddon && ragSystemAddon.trim().length > 0) {
+  if (!fastModel && ragSystemAddon && ragSystemAddon.trim().length > 0) {
           const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
           if (currentChunkCount < 3) {
             try {
@@ -110,7 +113,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
               const extra = await retrieveRelevant({
                 userId: realUserId!,
                 query: profileQuery,
-                topK: 6,
+    topK,
                 documentId,
                 useHybrid: true,
                 useReranking: true,
