@@ -70,7 +70,7 @@ const GmailIcon = ({ className }: { className?: string }) => (
   />
 )
 
-export function ConnectionStatus() {
+export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
   const [services, setServices] = useState<ServiceConnection[]>([
     {
       id: "google-calendar",
@@ -296,6 +296,89 @@ export function ConnectionStatus() {
     }
   }
 
+  const panelContent = (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium text-sm">Service Integrations</h3>
+        <Badge variant="outline" className="text-xs">
+          {connectedCount}/{totalCount} active
+        </Badge>
+      </div>
+      
+      <div className="space-y-3">
+        {services.map((service) => {
+          const IconComponent = service.icon
+          const isConnected = service.status === "connected"
+          const isConnecting = service.status === "connecting"
+          
+          return (
+            <div key={service.id} className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex-shrink-0">
+                  <IconComponent className="size-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {service.name}
+                  </div>
+                  {service.connectedAccount && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      {service.connectedAccount}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className={`flex items-center gap-1 ${getStatusColor(service.status)}`}>
+                  {getStatusIcon(service.status)}
+                  <span className="text-xs">
+                    {service.status === "connected" ? "Active" : 
+                     service.status === "connecting" ? "Connecting..." : "Inactive"}
+                  </span>
+                </div>
+                {!isConnected && !isConnecting && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => handleConnect(service.id)}
+                  >
+                    Connect
+                  </Button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      
+      <div className="mt-4 pt-3 border-t">
+        <p className="text-xs text-muted-foreground mb-2">
+          {connectedCount === 0 
+            ? "Connect services to unlock powerful integrations with your data."
+            : connectedCount === totalCount 
+              ? "🎉 All integrations active! Your data is fully connected."
+              : `${connectedCount} of ${totalCount} integrations connected. Connect more for full functionality.`
+          }
+        </p>
+        {connectedCount > 0 && (
+          <p className="text-xs text-green-600 dark:text-green-400">
+            💡 Try asking: "Show my unread emails", "Show my recent files", or "What's on my calendar today?"
+          </p>
+        )}
+      </div>
+    </div>
+  )
+
+  if (asPanel) {
+    return (
+      <div className="w-full">
+        {panelContent}
+      </div>
+    )
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={(open) => {
       setIsOpen(open)
@@ -358,79 +441,7 @@ export function ConnectionStatus() {
         side="top"
         sideOffset={8}
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-sm">Service Integrations</h3>
-            <Badge variant="outline" className="text-xs">
-              {connectedCount}/{totalCount} active
-            </Badge>
-          </div>
-          
-          <div className="space-y-3">
-            {services.map((service) => {
-              const IconComponent = service.icon
-              const isConnected = service.status === "connected"
-              const isConnecting = service.status === "connecting"
-              
-              return (
-                <div key={service.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="flex-shrink-0">
-                      <IconComponent className="size-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {service.name}
-                      </div>
-                      {service.connectedAccount && (
-                        <div className="text-xs text-muted-foreground truncate">
-                          {service.connectedAccount}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className={`flex items-center gap-1 ${getStatusColor(service.status)}`}>
-                      {getStatusIcon(service.status)}
-                      <span className="text-xs">
-                        {service.status === "connected" ? "Active" : 
-                         service.status === "connecting" ? "Connecting..." : "Inactive"}
-                      </span>
-                    </div>
-                    
-                    {!isConnected && !isConnecting && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => handleConnect(service.id)}
-                      >
-                        Connect
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          
-          <div className="mt-4 pt-3 border-t">
-            <p className="text-xs text-muted-foreground mb-2">
-              {connectedCount === 0 
-                ? "Connect services to unlock powerful integrations with your data."
-                : connectedCount === totalCount 
-                  ? "🎉 All integrations active! Your data is fully connected."
-                  : `${connectedCount} of ${totalCount} integrations connected. Connect more for full functionality.`
-              }
-            </p>
-            {connectedCount > 0 && (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                💡 Try asking: "Show my unread emails", "Show my recent files", or "What's on my calendar today?"
-              </p>
-            )}
-          </div>
-        </div>
+        {panelContent}
       </PopoverContent>
     </Popover>
   )

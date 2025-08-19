@@ -117,6 +117,7 @@ export type XaiModel =
   | "grok-beta"
 
 export type OpenRouterModel =
+  | "openrouter:meta-llama/llama-4-scout"
   | "openrouter:deepseek/deepseek-r1:free"
   | "openrouter:anthropic/claude-3.7-sonnet:thinking"
   | "openrouter:google/gemini-2.5-pro-preview"

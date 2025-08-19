@@ -8,8 +8,9 @@ import {
   PromptInputTextarea,
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, StopIcon, CircleNotch } from "@phosphor-icons/react"
+import { ArrowUpIcon, CircleNotch, CirclesFour } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -21,7 +22,7 @@ import { isImageFile } from "@/lib/image-utils"
 import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
-import Image from "next/image"
+import { PencilSimple } from "@phosphor-icons/react"
 
 type ChatInputProps = {
   value: string
@@ -218,17 +219,19 @@ export function ChatInput({
   }, [hasSearchSupport, enableSearch, setEnableSearchAction])
 
   const deferredValue = useDeferredValue(value)
+  const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false)
+  const showPromptSystem = hasSuggestions && (!value || value.trim().length === 0)
 
   return (
     <div className="relative flex w-full flex-col gap-4">
-      {hasSuggestions && (
+      {showPromptSystem && (
         <PromptSystem
           onValueChangeAction={onValueChangeAction}
           onSuggestionAction={onSuggestionAction}
           value={deferredValue}
         />
       )}
-      <div className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1">
+      <div className="order-2 md:order-1 sticky bottom-0 z-40 border-t bg-background/80 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <PromptInput
           className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
           maxHeight={200}
@@ -283,7 +286,7 @@ export function ChatInput({
                 isUserAuthenticated={isUserAuthenticated}
                 model={selectedModel}
               />
-              {isUserAuthenticated && <ConnectionStatus />}
+              {isUserAuthenticated && <div className="hidden sm:block"><ConnectionStatus /></div>}
               <ModelSelector
                 selectedModelId={selectedModel}
                 setSelectedModelId={onSelectModelAction}
@@ -299,14 +302,31 @@ export function ChatInput({
                   className="size-9 p-0 rounded-full"
                   aria-label="Open Drawing Canvas"
                 >
-                  <Image
-                    src="/logocleo.png"
-                    alt="Draw"
-                    width={16}
-                    height={16}
-                    className="object-contain brightness-0 dark:invert"
-                  />
+                  <PencilSimple className="size-4" />
                 </Button>
+              )}
+              {/* Mobile Integrations Drawer Trigger */}
+              {isMobile && isUserAuthenticated && (
+                <Drawer open={isIntegrationsOpen} onOpenChange={setIsIntegrationsOpen} direction="bottom">
+                  <DrawerTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="size-9 p-0 rounded-full"
+                      aria-label="Service integrations"
+                    >
+                      <CirclesFour className="size-4" />
+                    </Button>
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <DrawerHeader>
+                      <DrawerTitle>Integrations</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="max-h-[70vh] overflow-y-auto">
+                      <ConnectionStatus asPanel />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
               )}
               {hasSearchSupport ? (
                 <ButtonSearch

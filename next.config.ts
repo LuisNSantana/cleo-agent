@@ -4,20 +4,29 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 })
 
+const isProd = process.env.NODE_ENV === "production"
+
 const nextConfig: NextConfig = withBundleAnalyzer({
   // Only use standalone in production builds, not in development
-  ...(process.env.NODE_ENV === "production" && { output: "standalone" }),
+  ...(isProd && { output: "standalone" }),
   experimental: {
-    optimizePackageImports: ["@phosphor-icons/react"],
+    // Speed up import resolution for large UI/icon libs
+    optimizePackageImports: ["@phosphor-icons/react", "lucide-react"],
   },
-  serverExternalPackages: ["shiki", "vscode-oniguruma"],
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
-    // Handle canvas module for konva/react-konva in server-side builds
-    if (isServer) {
-      config.externals = [...(config.externals || []), 'canvas']
-    }
-    return config
-  },
+  // Ensure server bundles don't try to include native/heavy packages
+  serverExternalPackages: ["shiki", "vscode-oniguruma", "canvas", "jsdom"],
+  // Keep Webpack customization only for production builds to avoid Turbopack warnings in dev
+  ...(isProd
+    ? {
+        webpack: (config: any, { isServer }: { isServer: boolean }) => {
+          // Handle canvas module for konva/react-konva in server-side builds
+          if (isServer) {
+            config.externals = [...(config.externals || []), "canvas"]
+          }
+          return config
+        },
+      }
+    : {}),
   images: {
     remotePatterns: [
       {

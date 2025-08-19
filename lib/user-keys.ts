@@ -1,5 +1,4 @@
 import { decryptKey } from "./encryption"
-import { env } from "./openproviders/env"
 import { Provider } from "./openproviders/types"
 import { createClient } from "./supabase/server"
 
@@ -40,15 +39,17 @@ export async function getEffectiveApiKey(
     if (userKey) return userKey
   }
 
+  // Read env at runtime with dynamic access to avoid build-time inlining
+  const getEnv = (name: string) => process.env[name]
   const envKeyMap: Record<ProviderWithoutOllama, string | undefined> = {
-    openai: env.OPENAI_API_KEY,
-    mistral: env.MISTRAL_API_KEY,
-    perplexity: env.PERPLEXITY_API_KEY,
-    google: env.GOOGLE_GENERATIVE_AI_API_KEY,
-    anthropic: env.ANTHROPIC_API_KEY,
-    xai: env.XAI_API_KEY,
-    openrouter: env.OPENROUTER_API_KEY,
+    openai: getEnv("OPENAI_API_KEY"),
+    mistral: getEnv("MISTRAL_API_KEY"),
+    perplexity: getEnv("PERPLEXITY_API_KEY"),
+    google: getEnv("GOOGLE_GENERATIVE_AI_API_KEY"),
+    anthropic: getEnv("ANTHROPIC_API_KEY"),
+    xai: getEnv("XAI_API_KEY"),
+    openrouter: getEnv("OPENROUTER_API_KEY"),
   }
 
-  return envKeyMap[provider] || null
+  return envKeyMap[provider] ?? null
 }

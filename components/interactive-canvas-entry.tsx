@@ -14,6 +14,7 @@ import { ContextAwarePromptGenerator, type DrawingContextType } from '@/lib/canv
 import { useUserDrawingContext, generateRAGContextHints, DrawingInteractionHistory } from '@/lib/canvas/user-context-integration'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { PencilSimple } from '@phosphor-icons/react'
 import dynamic from 'next/dynamic'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
@@ -272,7 +273,7 @@ function InteractiveCanvasModal({ mounted }: { mounted: boolean }) {
               transition={{ duration: 0.3, repeat: showSuccessMessage ? 1 : 0 }}
               className={isMobile ? 'hidden' : 'block'}
             >
-              <Button
+        <Button
                 onClick={openCanvas}
                 size="icon"
                 className={`
@@ -294,13 +295,7 @@ function InteractiveCanvasModal({ mounted }: { mounted: boolean }) {
                     ✓
                   </motion.div>
                 ) : (
-                  <Image
-                    src="/logocleo.png"
-                    alt="Cleo"
-                    width={28}
-                    height={28}
-                    className="object-contain sm:w-8 sm:h-8 brightness-0 invert"
-                  />
+          <PencilSimple className="h-6 w-6 sm:h-7 sm:w-7 text-white" weight="bold" />
                 )}
               </Button>
             </motion.div>
@@ -325,17 +320,11 @@ function InteractiveCanvasModal({ mounted }: { mounted: boolean }) {
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <div className="relative w-7 h-7 rounded-md bg-slate-900 flex items-center justify-center ring-1 ring-slate-800/70">
-                  <Image
-                    src="/logocleo.png"
-                    alt="Cleo"
-                    width={22}
-                    height={22}
-                    className="object-contain brightness-0 invert"
-                  />
+                  <PencilSimple className="h-4 w-4 text-white" weight="bold" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">Drawing Canvas</h3>
-                  <p className="text-sm text-muted-foreground">Sketch. Tap the Cleo button to share.</p>
+                  <p className="text-sm text-muted-foreground">Sketch. Tap the share button to send to chat.</p>
                 </div>
               </div>
               <Button

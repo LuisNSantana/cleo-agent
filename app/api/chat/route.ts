@@ -474,13 +474,25 @@ ${documentContent}`
     if (convertedMultimodal.length > 0) {
     }
 
+    // Resolve an API key for the selected provider. For unauthenticated users,
+    // fall back to environment keys so models like OpenRouter work in demos.
     let apiKey: string | undefined
-    if (isAuthenticated && userId) {
+    {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
       const provider = getProviderForModel(model)
-      apiKey =
-        (await getEffectiveApiKey(userId, provider as ProviderWithoutOllama)) ||
-        undefined
+      const maybeKey = await getEffectiveApiKey(
+        isAuthenticated && userId ? userId : null,
+        provider as ProviderWithoutOllama
+      )
+      apiKey = maybeKey || undefined
+      // Lightweight debug (no secrets): confirm whether a key was resolved
+      if (provider === 'openrouter') {
+        const hasKey = Boolean(apiKey || process.env.OPENROUTER_API_KEY)
+        console.log('[ChatAPI] OpenRouter key present?', hasKey)
+        if (!hasKey) {
+          console.error('[ChatAPI] Missing OpenRouter API key. Set OPENROUTER_API_KEY in env or add a user key.')
+        }
+      }
     }
 
     // Inject userId and model into global context for tools that need it
@@ -685,7 +697,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   // Configure tools and provider options per model
     // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
     let toolsForRun = tools as typeof tools
-    let providerOptions: Record<string, any> | undefined
+  let providerOptions: Record<string, any> | undefined
     let activeTools: string[] | undefined
   if (model === 'grok-3-mini') {
       try {
@@ -708,6 +720,10 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         },
       }
     }
+
+  // Note: For OpenRouter we set headers on the provider itself in its model config
+  // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
+  // leaking into the request body.
 
     // Prepare additional parameters for reasoning models
   const additionalParams: any = {

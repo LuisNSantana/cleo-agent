@@ -2,6 +2,7 @@ import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { grokModels } from "./data/grok"
 import { ModelConfig } from "./types"
 import { openaiModels } from "./data/openai.clean"
+import { openrouterModels } from "./data/openrouter"
 
 /**
  * Cleo Agent Models
@@ -17,6 +18,8 @@ import { openaiModels } from "./data/openai.clean"
 const STATIC_MODELS: ModelConfig[] = [
   ...grokModels, // Faster (Grok-3 Mini)
   ...openaiModels, // Smarter (GPT-5 mini)
+  // Add a single OpenRouter option for testing: Llama 4 Scout
+  ...openrouterModels.filter((m) => m.id === "openrouter:meta-llama/llama-4-scout"),
 ]
 
 // Debug: Log available models
