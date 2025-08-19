@@ -1,6 +1,6 @@
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
-import { retrieveRelevant, buildContextBlock } from '@/lib/rag/retrieve'
-import { indexDocument } from '@/lib/rag/index-document'
+// RAG prompt construction is now centralized in lib/chat/prompt
+import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import { tools } from "@/lib/tools"
@@ -17,40 +17,18 @@ import {
   validateAndTrackUsage,
 } from "./api"
 import { createErrorResponse } from "./utils"
+import { ChatRequest, ChatRequestSchema } from "./schema"
+import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
+import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
+import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
 
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
 export const runtime = "nodejs"
 
 export const maxDuration = 60
 
-type ChatRequest = {
-  messages: CoreMessage[]
-  chatId: string
-  userId: string
-  model: string
-  isAuthenticated: boolean
-  systemPrompt: string
-  enableSearch: boolean
-  message_group_id?: string
-  documentId?: string // optional: restrict RAG retrieval to a single document
-  debugRag?: boolean // optional: extra logging / echo
-}
-
 export async function POST(req: Request) {
   try {
-    const ChatRequestSchema = z.object({
-      messages: z.array(z.any()).min(1),
-      chatId: z.string().min(1),
-      userId: z.string().min(1),
-      model: z.string().min(1),
-      isAuthenticated: z.boolean(),
-      systemPrompt: z.string().optional().default(""),
-      enableSearch: z.boolean().optional().default(false),
-      message_group_id: z.string().optional(),
-      documentId: z.string().optional(),
-      debugRag: z.boolean().optional(),
-    })
-
     const parsed = ChatRequestSchema.safeParse(await req.json())
     if (!parsed.success) {
       return new Response(
@@ -72,9 +50,9 @@ export async function POST(req: Request) {
       debugRag,
     } = parsed.data as ChatRequest
 
-    // Auto-enable RAG for personalized responses - always try to retrieve user context
-    const autoRagEnabled = true
-    const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
+  // Auto-enable RAG for personalized responses - always try to retrieve user context
+  const autoRagEnabled = true
+  const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
 
     if (!messages || !chatId || !userId) {
       return new Response(
@@ -170,7 +148,7 @@ export async function POST(req: Request) {
         contentForDB = "Mensaje del usuario"
       }
 
-  await logUserMessage({
+      await logUserMessage({
         supabase,
         userId,
         chatId,
@@ -182,6 +160,7 @@ export async function POST(req: Request) {
       })
     }
 
+    // Resolve model config and establish effective system prompt
     const allModels = await getAllModels()
     const modelConfig = allModels.find((m) => m.id === model)
 
@@ -189,15 +168,15 @@ export async function POST(req: Request) {
       throw new Error(`Model ${model} not found`)
     }
 
-    // Use reasoning-optimized prompt for GPT-5 models
+    // Use reasoning-optimized prompt for GPT-5 models when no custom prompt
     let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
     if (model.startsWith('gpt-5') && !systemPrompt) {
       const { getCleoPrompt } = await import("@/lib/prompts")
       baseSystemPrompt = getCleoPrompt(model, 'reasoning')
       console.log(`[GPT-5] Using reasoning-optimized prompt for ${model}`)
     }
-    
     const effectiveSystemPrompt = baseSystemPrompt
+
     // Attempt to parse personality type from system prompt for observability
     try {
       const match = effectiveSystemPrompt.match(/Type:\s*(empathetic|playful|professional|creative|analytical|friendly)/i)
@@ -212,289 +191,33 @@ export async function POST(req: Request) {
     }
 
     // Convert multimodal messages to correct format for the model
-    const convertedMessages = await Promise.all(
-      messages.map(async (msg) => {
-        // Only process user messages with multimodal content
-        if (msg.role === "user" && Array.isArray(msg.content)) {
-          const convertedContent = await Promise.all(
-            msg.content
-              .filter(
-                (part: unknown) =>
-                  part &&
-                  typeof part === "object" &&
-                  "type" in part &&
-                  ((part as { type: string }).type === "text" ||
-                    (part as { type: string }).type === "file")
-              )
-              .map(async (part: unknown) => {
-                const typedPart = part as {
-                  type: string
-                  mediaType?: string
-                  url?: string
-                  name?: string
-                  text?: string
-                  content?: string
-                }
-                // Convert image file parts to standard AI SDK v5 image format
-                if (
-                  typedPart.type === "file" &&
-                  typedPart.mediaType?.startsWith("image/") &&
-                  typedPart.url
-                ) {
-                  // Verify model supports vision
-                  if (!modelConfig.vision) {
-                    return {
-                      type: "text" as const,
-                      text: `[IMAGEN: ${typedPart.name || "imagen.jpg"}] - El modelo ${model} no soporta análisis de imágenes. Para analizar imágenes, selecciona Faster o Smarter que tienen capacidades de visión avanzadas.`,
-                    }
-                  }
-
-                  console.log(
-                    `Processing image: ${typedPart.name}, model: ${model}, vision support: ${modelConfig.vision}`
-                  )
-
-                  return {
-                    type: "image" as const,
-                    image: typedPart.url, // Data URL from frontend
-                  }
-                }
-                // Convert document file parts to text with actual content
-                if (
-                  typedPart.type === "file" &&
-                  !typedPart.mediaType?.startsWith("image/") &&
-                  typedPart.url
-                ) {
-                  const fileName = typedPart.name || "document"
-                  let fileType = typedPart.mediaType || "unknown"
-
-                  // Normalize MIME type based on file extension if generic
-                  if (
-                    fileType === "application/octet-stream" ||
-                    fileType === "unknown"
-                  ) {
-                    const extension = fileName.toLowerCase().split(".").pop()
-                    const extensionToMime: { [key: string]: string } = {
-                      md: "text/markdown",
-                      txt: "text/plain",
-                      csv: "text/csv",
-                      json: "application/json",
-                      pdf: "application/pdf",
-                      doc: "application/msword",
-                      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    }
-                    if (extension && extensionToMime[extension]) {
-                      fileType = extensionToMime[extension]
-                    }
-                  }
-
-                  // Extract content from data URL
-                  let documentContent = ""
-      try {
-                    if (typedPart.url.startsWith("data:")) {
-                      const base64Data = typedPart.url.split(",")[1]
-                      if (base64Data) {
-                        // For text-based files, decode as text
-                        if (
-                          fileType.startsWith("text/") ||
-                          fileType.includes("markdown") ||
-                          fileType.includes("json") ||
-                          fileType.includes("csv")
-                        ) {
-        documentContent = Buffer.from(base64Data, "base64").toString("utf8")
-                        } else if (fileType === "application/pdf") {
-                          // Use the new PDF processing function for better extraction
-                          try {
-                            const pdfBuffer = Buffer.from(base64Data, "base64")
-                            const { extractPdfText } = await import(
-                              "@/lib/file-processing"
-                            )
-                            const extractedText =
-                              await extractPdfText(pdfBuffer)
-                            documentContent = extractedText
-                          } catch (error) {
-                            console.error(
-                              `Error extracting PDF content from ${fileName}:`,
-                              error
-                            )
-                            // Fallback for PDF processing errors with more specific guidance
-                            if (
-                              model === "grok-3-mini" ||
-                              model === "gpt-5-mini-2025-08-07"
-                            ) {
-                              documentContent = `[ARCHIVO PDF - ${fileName}]
-
-⚠️ El PDF es demasiado grande para procesar automáticamente.
-
-**Opciones disponibles:**
-1. **Pregunta específica:** Describe qué información necesitas del documento
-2. **Capturas de pantalla:** Toma fotos de las páginas relevantes - Los modelos Faster y Smarter pueden analizar imágenes
-3. **Archivo más pequeño:** Usa un PDF de menos de 20 páginas
-4. **Texto directo:** Copia y pega las secciones específicas que necesitas
-
-💡 **Tip:** Las imágenes del documento funcionan muy bien con estos modelos.`
-                            } else {
-                              documentContent = `[PDF Document: ${fileName}] - Documento muy grande. Usa Faster o Smarter para mejor análisis de documentos, o convierte a texto/imágenes.`
-                            }
-                          }
-                        } else {
-                          // For other binary files, indicate that content extraction is needed
-                          documentContent = `[Archivo binario: ${fileName}. Tipo: ${fileType}]
-                      
-Este archivo requiere procesamiento especializado. Para mejor análisis:
-1. Para imágenes: usa Faster o Smarter 
-2. Para documentos Office: convierte a PDF o texto
-3. Para texto específico: copia y pega directamente
-
-¿Puedes proporcionar más contexto sobre qué tipo de análisis necesitas de este archivo?`
-                        }
-                      }
-                    }
-                  } catch (error) {
-                    console.error(
-                      `Error decoding document content for ${fileName}:`,
-                      error
-                    )
-                    documentContent = `[Error leyendo el contenido del documento ${fileName}. Por favor, intenta subir el archivo nuevamente o proporciona el contenido como texto.]`
-                  }
-
-                  const finalText = `📄 [${fileName}]
-
-${documentContent}`
-
-                  return {
-                    type: "text" as const,
-                    text: finalText,
-                  }
-                }
-                // Ensure text parts have the correct structure
-                if (
-                  typedPart.type === "text" &&
-                  (typedPart.text || typedPart.content)
-                ) {
-                  return {
-                    type: "text" as const,
-                    text: typedPart.text || typedPart.content || "",
-                  }
-                }
-                // Return a default text part for invalid content
-                return {
-                  type: "text" as const,
-                  text: "",
-                }
-              })
-          )
-
-          const filteredContent = convertedContent.filter(
-            (part) =>
-              (part.type === "text" && part.text !== "") ||
-              part.type === "image"
-          ) // Remove empty text parts
-
-          // If no valid content, convert to simple text message
-          if (filteredContent.length === 0) {
-            return {
-              ...msg,
-              content: typeof msg.content === "string" ? msg.content : "",
-            }
-          }
-
-          return { ...msg, content: filteredContent }
-        }
-
-        // For non-user messages or simple string content, return as-is
-        return msg
-      })
+    let convertedMessages = await convertUserMultimodalMessages(
+      messages,
+      model,
+      Boolean(modelConfig.vision)
     )
 
     // Log conversion summary and count images
     const convertedMultimodal = convertedMessages.filter((msg) =>
       Array.isArray(msg.content)
     )
-    
+
     // Apply intelligent image filtering to prevent API errors
     const imageLimit = MODEL_IMAGE_LIMITS[model]?.maxImages || MODEL_IMAGE_LIMITS.default.maxImages
-    
-    // Count total images in the conversation
-    let totalImages = 0
-    convertedMessages.forEach(msg => {
-      if (Array.isArray(msg.content)) {
-        totalImages += msg.content.filter(part => part.type === 'image').length
-      }
-    })
-    
+
+    // Intelligent image filtering by model limits
+    const totalImages = convertedMessages.reduce(
+      (acc, m) => acc + (Array.isArray(m.content) ? m.content.filter((p: any) => p.type === 'image').length : 0),
+      0
+    )
     console.log(`[IMAGE MGMT] Model ${model}: ${totalImages} images found, limit: ${imageLimit}`)
-    
-    // If too many images, apply intelligent filtering
     if (totalImages > imageLimit) {
-      console.log(`[IMAGE MGMT] Applying intelligent image filtering`)
-      
-      // Collect all images with priority scoring
-      const imageRefs: Array<{
-        msgIdx: number
-        partIdx: number
-        priority: number
-        isCanvas: boolean
-      }> = []
-      
-      convertedMessages.forEach((msg, msgIdx) => {
-        if (Array.isArray(msg.content)) {
-          msg.content.forEach((part, partIdx) => {
-            if (part.type === 'image') {
-              const isCanvas = typeof part.image === 'string' && part.image.includes('data:image') && msg.role === 'user'
-              const isRecent = msgIdx >= convertedMessages.length - 3
-              
-              let priority = 0
-              if (isCanvas) priority += 100 // Canvas drawings get highest priority
-              if (isRecent) priority += 50 // Recent messages
-              priority += msgIdx * 10 // More recent = higher priority
-              
-              imageRefs.push({
-                msgIdx,
-                partIdx,
-                priority,
-                isCanvas
-              })
-            }
-          })
-        }
-      })
-      
-      // Sort by priority and keep top images
-      const keepImages = imageRefs
-        .sort((a, b) => b.priority - a.priority)
-        .slice(0, imageLimit)
-        .map(ref => `${ref.msgIdx}-${ref.partIdx}`)
-      
-      // Filter messages
-      for (let i = 0; i < convertedMessages.length; i++) {
-        const msg = convertedMessages[i]
-        if (Array.isArray(msg.content)) {
-          const filteredContent: any[] = []
-          
-          msg.content.forEach((part, partIdx) => {
-            if (part.type === 'image') {
-              const key = `${i}-${partIdx}`
-              if (keepImages.includes(key)) {
-                filteredContent.push(part)
-              } else {
-                filteredContent.push({
-                  type: 'text' as const,
-                  text: '[Image removed due to model limit - Canvas drawings are prioritized]'
-                })
-              }
-            } else {
-              filteredContent.push(part)
-            }
-          })
-          
-          ;(convertedMessages[i] as any).content = filteredContent
-        }
-      }
-      
+      convertedMessages = filterImagesByModelLimit(convertedMessages, model) as any
       console.log(`[IMAGE MGMT] Filtered to ${imageLimit} images with intelligent prioritization`)
     }
-    
+
     if (convertedMultimodal.length > 0) {
+      // reserved for future per-image diagnostics
     }
 
     // Resolve an API key for the selected provider. For unauthenticated users,
@@ -531,173 +254,26 @@ ${documentContent}`
   ;(globalThis as any).__currentUserId = realUserId
   ;(globalThis as any).__currentModel = model
 
-    // RAG retrieval when enableSearch flag is true
-    // We'll collect context chunks here and later add them as their own system message block
-    let ragSystemAddon = ''
-    if (retrievalRequested) {
+      // Build final system prompt using centralized prompt builder (handles RAG, personalization, and search guidance)
+      const { finalSystemPrompt, usedContext } = await buildFinalSystemPrompt({
+        baseSystemPrompt: effectiveSystemPrompt,
+        model,
+        messages,
+        supabase,
+        realUserId,
+        enableSearch,
+        documentId,
+        debugRag,
+      })
+
+      console.log('[RAG] Using context?', usedContext, 'Final system prompt length:', finalSystemPrompt.length)
+      // Feature analytics: RAG retrieval used
       try {
-        const lastUser = messages.slice().reverse().find(m => m.role === 'user')
-        let userPlain = ''
-        if (lastUser) {
-          if (typeof lastUser.content === 'string') userPlain = lastUser.content
-          else if (Array.isArray(lastUser.content)) {
-            userPlain = lastUser.content
-              .filter((p: any) => p?.type === 'text')
-              .map((p: any) => p.text || p.content || '')
-              .join('\n')
-          }
+        if (usedContext && supabase && realUserId) {
+          const { trackFeatureUsage } = await import('@/lib/analytics')
+          await trackFeatureUsage(realUserId, 'rag.retrieve', { delta: 1 })
         }
-        if (userPlain.trim()) {
-          // Essential RAG logging only
-          // DEBUG: List user's documents and chunks
-          try {
-            const { data: userDocs, error: docsError } = await (supabase as any)
-              .from('documents')
-              .select('id, title, filename, created_at')
-              .eq('user_id', realUserId)
-              .order('created_at', { ascending: false })
-              .limit(5)
-            
-            if (process.env.NODE_ENV !== 'production' && !docsError && userDocs) {
-              console.log('[RAG] DEBUG - User has', userDocs.length, 'documents')
-            }
-
-            const { data: userChunks, error: chunksError } = await (supabase as any)
-              .from('document_chunks')
-              .select('document_id, content')
-              .eq('user_id', realUserId)
-              .limit(3)
-            
-            if (process.env.NODE_ENV !== 'production' && !chunksError && userChunks) {
-              console.log('[RAG] DEBUG - User has', userChunks.length, 'total chunks')
-            }
-          } catch (e: any) {
-            console.log('[RAG] DEBUG - Failed to list user documents:', e.message)
-          }
-          
-          let retrieved = await retrieveRelevant({ 
-            userId: realUserId, 
-            query: userPlain, 
-            topK: 6, 
-            documentId,
-            useHybrid: true,
-            useReranking: true
-          })
-          if (retrieved.length) {
-            ragSystemAddon = buildContextBlock(retrieved)
-            console.log('[RAG] Retrieved', retrieved.length, 'chunks. Top similarity:', retrieved[0]?.similarity)
-            // Feature analytics: RAG retrieval used
-            try {
-              if (supabase && realUserId) {
-                const { trackFeatureUsage } = await import('@/lib/analytics')
-                await trackFeatureUsage(realUserId, 'rag.retrieve', { delta: 1 })
-              }
-            } catch {}
-            // DEBUG: Log what documents we're getting
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('[RAG] DEBUG - Retrieved docs (count):', Math.min(retrieved.length, 3))
-            }
-            if (debugRag) {
-              console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0,400))
-            }
-          } else {
-            console.log('[RAG] No chunks retrieved initially. Attempting auto-index of recent docs...')
-            if (!documentId) {
-              // fetch last 3 documents and ensure chunks exist; index if missing
-              try {
-                if (supabase) {
-                  const { data: docs } = await (supabase as any).from('documents').select('id, updated_at').eq('user_id', realUserId).order('updated_at', { ascending: false }).limit(3)
-                  if (docs?.length) {
-                    for (const d of docs) {
-                      const { count } = await (supabase as any).from('document_chunks').select('id', { count: 'exact', head: true }).eq('document_id', d.id)
-                      if (!count || count === 0) {
-                        console.log('[RAG] Auto-indexing doc', d.id)
-                        try { await indexDocument(d.id, { force: true }) } catch (e:any){ console.error('[RAG] Auto-index doc failed', d.id, e.message) }
-                      }
-                    }
-                    // retry retrieval once
-                    retrieved = await retrieveRelevant({ 
-                      userId: realUserId, 
-                      query: userPlain, 
-                      topK: 6,
-                      useHybrid: true,
-                      useReranking: true
-                    })
-                    if (retrieved.length) {
-                      ragSystemAddon = buildContextBlock(retrieved)
-                      console.log('[RAG] Retrieved after auto-index', retrieved.length)
-                    } else {
-                      console.log('[RAG] Still no chunks after auto-index.')
-                    }
-                  }
-                }
-              } catch (e:any) {
-                console.error('[RAG] Auto-index attempt failed', e.message)
-              }
-            } else {
-              console.log('[RAG] No chunks for specified document.')
-            }
-          }
-
-          // Multi-pass personalization retrieval: if we have <3 chunks, run a synthetic profile query to pull user profile info
-          if (ragSystemAddon && ragSystemAddon.trim().length > 0) {
-            const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
-            if (currentChunkCount < 3) {
-              try {
-                // Try secondary profile retrieval for personalization
-                const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales';
-                const extra = await retrieveRelevant({ 
-                  userId: realUserId, 
-                  query: profileQuery, 
-                  topK: 6, 
-                  documentId,
-                  useHybrid: true,
-                  useReranking: true
-                })
-                // Merge unique extra chunks not already present
-                const existingIds = new Set((ragSystemAddon.match(/doc:([0-9a-fA-F-]{8})/g) || []))
-                const merged = [...extra]
-                if (extra.length) {
-                  const extraBlock = buildContextBlock(extra)
-                  if (extraBlock && extraBlock.length > 0) {
-                    ragSystemAddon += '\n' + extraBlock
-                  }
-                }
-              } catch (e:any) {
-                // Secondary profile retrieval failed
-              }
-            }
-          }
-
-          // If still nothing, surface hint (only when debug)
-          if (!ragSystemAddon && debugRag) {
-            console.log('[RAG] Diagnostic: No context. Possible reasons: (1) documentos sin chunks (2) embeddings fallaron (3) user_id mismatch (4) texto muy corto. Recomendado: crear un documento "perfil_usuario.md" con lineas: Nombre:, Comida favorita:, Intereses:, Hobbies:, Objetivos:, Estilo de comunicación:')
-          }
-        }
-      } catch (e) {
-        console.error('RAG retrieval failed', e)
-      }
-    }
-
-  // Build final system prompt. We PREPEND the context so it has higher salience for the model.
-    const personalizationInstruction = `IMPORTANT: ALWAYS use information from the CONTEXT to respond. This includes:
-- Personal information (name, interests, favorite food, hobbies, communication style)  
-- Work documents, stories, projects, notes that the user has uploaded
-- Any content the user has shared previously
-
-If the user asks about something that is in the CONTEXT, use it directly to respond. DO NOT say you don't have information if it's available in the context.
-
-SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate", "expand", "continue", "review" a document found in the context, ALWAYS suggest opening the document in the Canvas Editor. Use phrases like: "Would you like me to open [document name] in the collaborative editor so we can work on it together?"`
-    // Model-specific search guidance (avoid generic webSearch tool for xAI native live search)
-    const searchGuidance = (model === 'grok-3-mini' && enableSearch)
-      ? `\n\nSEARCH MODE: For Faster (grok-3-mini), use native Live Search (built into the model). Do NOT call the webSearch tool. Include citations when available.`
-      : ''
-
-    const finalSystemPrompt = ragSystemAddon
-      ? `${ragSystemAddon}\n\n${personalizationInstruction}${searchGuidance}\n\n${effectiveSystemPrompt}`
-      : `${effectiveSystemPrompt}${searchGuidance}`
-
-    console.log('[RAG] Using context?', !!ragSystemAddon, 'Final system prompt length:', finalSystemPrompt.length)
+      } catch {}
 
   // Safe env diagnostics (no secrets)
     const hasGroqKey = !!process.env.GROQ_API_KEY
@@ -746,6 +322,18 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   // leaking into the request body.
 
     // Prepare additional parameters for reasoning models
+  const resultStart = Date.now()
+  const { onError, onFinish } = makeStreamHandlers({
+    supabase,
+    chatId,
+    message_group_id,
+    model,
+    realUserId,
+    finalSystemPrompt,
+    convertedMessages,
+    resultStart,
+  })
+
   const additionalParams: any = {
       // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
       model: modelConfig.apiSdk(apiKey, { enableSearch }),
@@ -756,95 +344,8 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   ...(activeTools ? { activeTools } : {}),
   // Avoid step cap when using xAI native Live Search to prevent early termination mid-search
   ...(!(model === 'grok-3-mini' && enableSearch) ? { stopWhen: stepCountIs(8) } : {}),
-      onError: (err: unknown) => {
-        console.error("Streaming error occurred:", err)
-      },
-      onFinish: async ({ response, usage }: { response: any, usage?: any }) => {
-        // Clean up global context
-        delete (globalThis as any).__currentUserId
-        delete (globalThis as any).__currentModel
-        delete (globalThis as any).__requestId
-        
-        if (supabase) {
-          // Use real tokens from AI SDK if available, fallback to estimation
-          let inputTokens: number
-          let outputTokens: number
-          let cachedInputTokens: number = 0
-          
-          if (usage?.promptTokens && usage?.completionTokens) {
-            // Use real tokens from AI SDK
-            inputTokens = usage.promptTokens
-            outputTokens = usage.completionTokens
-            // Some providers expose cached prompt tokens
-            const maybeCached = (usage as any)?.cachedPromptTokens || (usage as any)?.promptTokensDetails?.cached || 0
-            if (typeof maybeCached === 'number' && maybeCached > 0) {
-              cachedInputTokens = maybeCached
-            }
-            console.log(`[Chat] Using real tokens - Input: ${inputTokens}, Output: ${outputTokens}${cachedInputTokens ? `, CachedIn: ${cachedInputTokens}` : ''}`)
-          } else {
-            // Fallback: Estimate tokens using character count
-            const est = (s: string) => Math.ceil((s || '').length / 4)
-            const inputText = [finalSystemPrompt, ...convertedMessages.map((m) => {
-              if (typeof m.content === 'string') return m.content
-              if (Array.isArray(m.content)) {
-                return m.content
-                  .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
-                  .map((p: any) => p.text || p.content || '')
-                  .join('\n\n')
-              }
-              return ''
-            })].join('\n\n')
-            const outputText = (() => {
-              try {
-                const msgs = response?.messages ?? []
-                const last = [...msgs].reverse().find((m: any) => m.role === 'assistant')
-                if (!last) return ''
-                if (typeof last.content === 'string') return last.content
-                if (Array.isArray(last.content)) {
-                  return last.content
-                    .filter((p: any) => p && typeof p === 'object' && (
-                      p.type === 'text' || p.type === 'reasoning'
-                    ))
-                    .map((p: any) => p.text || p.reasoning || '')
-                    .join('\n\n')
-                }
-                return ''
-              } catch { return '' }
-            })()
-            inputTokens = est(inputText)
-            outputTokens = est(outputText)
-            console.log(`[Chat] Using estimated tokens - Input: ${inputTokens}, Output: ${outputTokens}`)
-          }
-          const responseTimeMs = Math.max(0, Date.now() - resultStart)
-
-          await storeAssistantMessage({
-            supabase,
-            chatId,
-            messages:
-              response.messages as unknown as import("@/app/types/api.types").Message[],
-            message_group_id,
-            model,
-            userId: realUserId,
-            inputTokens,
-            outputTokens,
-            responseTimeMs,
-          })
-
-          // Best-effort: update model usage analytics via RPC, ignore errors
-          try {
-            const { analytics } = await import('@/lib/supabase/analytics-helpers')
-            console.log(`[Analytics] Calling updateModelUsage with userId: ${realUserId}, model: ${model}, tokens: ${inputTokens}/${outputTokens}${cachedInputTokens ? ` (cached_in:${cachedInputTokens})` : ''}`)
-            const result = await analytics.updateModelUsage(realUserId, model, inputTokens, outputTokens, responseTimeMs, true, cachedInputTokens)
-            if (result.error) {
-              console.error('[Analytics] updateModelUsage RPC error:', result.error)
-            } else {
-              console.log('[Analytics] updateModelUsage successful')
-            }
-          } catch (e) {
-            console.log('[Analytics] updateModelUsage error:', (e as any)?.message)
-          }
-        }
-      },
+      onError,
+      onFinish,
   }
 
     // Apply model-specific default params when available
@@ -884,7 +385,6 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
       }
     } catch {}
 
-  const resultStart = Date.now()
   const result = await withRequestContext({ userId: realUserId, model, requestId: reqId }, async () => {
     return streamText(additionalParams)
   })

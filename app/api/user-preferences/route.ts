@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { indexDocument } from "@/lib/rag/index-document"
 import { NextRequest, NextResponse } from "next/server"
+import { UserPreferencesUpdateSchema } from "./schema"
 
 export async function GET() {
   try {
@@ -116,8 +117,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Parse the request body
-    const body = await request.json()
+    // Parse and validate the request body
+    const json = await request.json()
+    const parsed = UserPreferencesUpdateSchema.safeParse(json)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
     const {
       layout,
       prompt_suggestions,
@@ -126,28 +134,13 @@ export async function PUT(request: NextRequest) {
       multi_model_enabled,
       hidden_models,
       personality_settings,
-    } = body
+    } = parsed.data
 
     if (personality_settings?.personalityType) {
       console.log('[Prefs][PUT] Incoming update', {
         userId: user.id,
         personalityType: personality_settings.personalityType,
       })
-    }
-
-    // Validate the data types
-    if (layout && typeof layout !== "string") {
-      return NextResponse.json(
-        { error: "layout must be a string" },
-        { status: 400 }
-      )
-    }
-
-    if (hidden_models && !Array.isArray(hidden_models)) {
-      return NextResponse.json(
-        { error: "hidden_models must be an array" },
-        { status: 400 }
-      )
     }
 
     // Prepare update object with only provided fields
