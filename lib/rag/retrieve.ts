@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { defaultEmbeddingProvider } from './embeddings'
 import { defaultReranker } from './reranking'
+import { detectLanguage, type SupportedLanguage } from '@/lib/language-detection'
+import { translateQuery } from './translate'
 
 export interface RetrieveOptions {
   userId: string
@@ -62,43 +64,61 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   const supabase = await createClient()
   if (!supabase) return []
-  
-  const embedding = (await defaultEmbeddingProvider.embed([query]))[0]
+
+  // Multilingual support: expand query if user/doc language likely differs
+  const detected: SupportedLanguage = detectLanguage(query)
+  const altTarget: SupportedLanguage = detected === 'es' ? 'en' : 'es'
+  const translated = await translateQuery(query, altTarget)
+  const uniqueQueries = Array.from(new Set([query, translated].map(q => q.trim()).filter(Boolean)))
+  const [embedding] = await defaultEmbeddingProvider.embed([query])
   if (!embedding) return []
 
   let results: RetrievedChunk[] = []
 
   if (useHybrid) {
     // Use hybrid search (vector + full-text)
-    const { data, error } = await (supabase as any).rpc('hybrid_search_document_chunks', {
-      p_user_id: userId,
-      p_query_embedding: embedding,
-      p_query_text: query,
-      p_match_count: useReranking ? dynamicTopK * 2 : dynamicTopK, // Get more for reranking
-      p_document_id: documentId || null,
-      p_project_id: projectId || null,
-      p_min_similarity: minSimilarity,
-      p_vector_weight: vectorWeight,
-      p_text_weight: textWeight,
-    })
+    const perQueryMatch = useReranking ? dynamicTopK * 2 : dynamicTopK
+    const hybridResults: RetrievedChunk[] = []
+    for (const q of uniqueQueries) {
+      const [qEmbedding] = await defaultEmbeddingProvider.embed([q])
+      const { data, error } = await (supabase as any).rpc('hybrid_search_document_chunks', {
+        p_user_id: userId,
+        p_query_embedding: qEmbedding,
+        p_query_text: q,
+        p_match_count: perQueryMatch,
+        p_document_id: documentId || null,
+        p_project_id: projectId || null,
+        p_min_similarity: minSimilarity,
+        p_vector_weight: vectorWeight,
+        p_text_weight: textWeight,
+      })
+  
+      if (error) {
+        console.error('hybrid_search_document_chunks error', error)
+        continue
+      }
 
-    if (error) {
-      console.error('hybrid_search_document_chunks error', error)
-      // Fallback to vector-only search
-      return retrieveVectorOnly(opts)
+      const mapped = (data || []).map((item: any) => ({
+        document_id: item.document_id,
+        chunk_id: item.chunk_id,
+        content: item.content,
+        chunk_index: item.chunk_index,
+        similarity: item.hybrid_score,
+        vector_similarity: item.vector_similarity,
+        text_rank: item.text_rank,
+        hybrid_score: item.hybrid_score,
+        metadata: item.metadata
+      }))
+      hybridResults.push(...mapped)
     }
 
-    results = (data || []).map((item: any) => ({
-      document_id: item.document_id,
-      chunk_id: item.chunk_id,
-      content: item.content,
-      chunk_index: item.chunk_index,
-      similarity: item.hybrid_score, // Use hybrid score as main similarity
-      vector_similarity: item.vector_similarity,
-      text_rank: item.text_rank,
-      hybrid_score: item.hybrid_score,
-      metadata: item.metadata
-    }))
+    // Merge & dedupe by chunk_id, keep highest similarity
+    const dedupMap = new Map<string, RetrievedChunk>()
+    for (const r of hybridResults) {
+      const prev = dedupMap.get(r.chunk_id)
+      if (!prev || (r.similarity > prev.similarity)) dedupMap.set(r.chunk_id, r)
+    }
+    results = Array.from(dedupMap.values())
 
       // Keep only essential hybrid search logging
       if (results.length > 0) {
@@ -113,6 +133,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   if (useReranking && results.length > 1) {
     try {
       const documents = results.map(chunk => chunk.content)
+      // Use the original query for reranking to keep intent, but this already contains multilingual candidates
       const rerankResults = await defaultReranker.rerank(query, documents, { 
         topK: dynamicTopK, 
         minScore: 0.1 

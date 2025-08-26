@@ -1,24 +1,106 @@
-# Cleo
 
-**Cleo is an emotionally intelligent AI assistant created by Huminary Labs.**
+# Cleo v1.5 – The Community-Driven Hybrid AI Agent
 
-Cleo is designed to make your daily life easier through empathetic AI interactions, powered by advanced language models like Grok-4 and Llama 4 Maverick.
+**Cleo by Huminary Labs is a next-generation, emotionally intelligent AI assistant built for everyone.**
 
 ![cleo cover](./public/logocleo.png)
 
-## Features
+---
 
-- **Multi-model support**: Powered by Grok-4 (xAI) and Llama 4 Maverick (Groq)
-- **Emotionally Intelligent**: Designed to understand and respond with empathy and warmth
-- **RAG System**: Advanced Retrieval-Augmented Generation for personalized responses using your documents
-- **No API Keys Required**: Ready to use without BYOK (Bring Your Own Key)
-- **Daily Task Assistant**: Specialized in making your everyday life easier
-- **Clean, Modern UI**: Responsive design with light/dark themes
-- **Real-time Streaming**: Fast, streaming responses for better UX
-- **Guest Mode**: Use without authentication for quick interactions
-- **Chat History**: Save and manage your conversations
-- **File Uploads**: Share documents and files with Cleo
-- **Built with Modern Stack**: Next.js, TypeScript, Tailwind CSS, Supabase
+## 🚀 Why Cleo?
+
+- **Hybrid AI Architecture:** Cleo combines local models (Ollama, HuminaryLabs) and cloud models (OpenAI, Groq, Gemini, Anthropic, Perplexity) for the best speed, privacy, and cost.
+- **LangChain Orchestration:** Cleo uses LangChain to route every task to the optimal model, balancing cost, context, and intelligence automatically.
+- **Local-First, Cloud-Ready:** Run Cleo 100% locally (RTX 3080+ recommended) or leverage the cloud for advanced tasks. No vendor lock-in.
+- **NotebookLM-Ready Docs:** All documentation is structured for Google NotebookLM, so you can use Cleo’s knowledge base for research, learning, and custom workflows.
+- **Archon Integration:** Advanced task management, knowledge tracking, and extensibility for power users and teams.
+- **Community Focus:** Open source, transparent, and designed for collaboration. Join, contribute, and help Cleo grow smarter!
+
+---
+
+## 🧠 Key Technologies
+
+- **LangChain**: Multi-model routing, tool calling, and context management.
+- **Ollama**: Local model runner (recommended: `llama3.1:8b` for best local experience).
+- **HuminaryLabs Models**: Custom local models for privacy and speed.
+- **Cloud Providers**: OpenAI (GPT-5-mini), Groq (GPT-OSS-120B), Gemini, Anthropic, Perplexity.
+- **Archon**: Task-driven workflow, knowledge management, and project orchestration.
+- **Supabase**: Secure, scalable backend for chat, files, and analytics.
+
+---
+
+## ⚡ Performance Modes
+
+| Mode              | Primary Model           | Use Case                | Context | Cost/1M tokens |
+|-------------------|------------------------|-------------------------|---------|---------------|
+| Balanced+Local    | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
+| Balanced          | openai:gpt-5-mini      | Reasoning, analysis     | 131k    | $1.5-4.0      |
+| Fast              | groq:gpt-oss-120b      | Speed, bulk tasks       | 131k    | $0.1-0.3      |
+
+---
+
+## � Features
+
+- **Multi-model orchestration** (LangChain)
+- **Local + cloud hybrid** (Ollama, HuminaryLabs, OpenAI, Groq, etc.)
+- **Emotionally intelligent chat**
+- **Advanced RAG (Retrieval-Augmented Generation)**
+- **Tool calling and automation**
+- **NotebookLM-compatible docs**
+- **Archon-powered project management**
+- **Real-time streaming (SSE/WebSocket)**
+- **Modern UI (Next.js, Tailwind, TypeScript)**
+- **Guest mode, chat history, file uploads**
+
+---
+
+## 🏡 Local Setup (Recommended)
+
+1. **Install [Ollama](https://ollama.com/download)** on your machine.
+2. Download the recommended model: `ollama pull llama3.1:8b`
+3. Set `OLLAMA_BASE_URL` in `.env.local` (see example).
+4. Start Cleo: `pnpm dev`
+5. Enjoy private, fast AI with zero cloud cost!
+
+---
+
+## 📚 NotebookLM Integration
+
+- All docs in `/docs` are Markdown and ready for NotebookLM.
+- Upload Cleo’s docs to [NotebookLM](https://notebooklm.google.com/) for research, Q&A, and custom workflows.
+- Use up to 50 sources, 500k words each. Mix Cleo docs with your own for powerful knowledge graphs.
+
+---
+
+## 🤝 Community & Contribution
+
+- **Open Source:** Fork, contribute, and help Cleo grow smarter.
+- **Discord & GitHub:** Join the community, share feedback, and build together.
+- **Extensible:** Add new models, tools, and workflows easily.
+
+---
+
+## 📝 Documentation & Guides
+
+- See `/docs/cleo-notebooklm-guide.md` for a full English guide to Cleo’s architecture, models, and NotebookLM usage.
+- See `/docs/langchain-integration.md` for technical details on LangChain orchestration.
+- All docs are NotebookLM-ready for easy import and Q&A.
+
+---
+
+## 💡 Why Cleo?
+
+- **Privacy-first:** Run locally, keep your data private.
+- **Cost-efficient:** Use local models for free, cloud only when needed.
+- **Flexible:** Switch between local and cloud seamlessly.
+- **Community-driven:** Built for and by users.
+- **Research-ready:** NotebookLM integration for advanced workflows.
+
+---
+
+## License
+
+MIT
 
 ## Quick Start
 

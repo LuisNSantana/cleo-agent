@@ -335,6 +335,98 @@ export async function POST(req: Request) {
   // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
   // leaking into the request body.
 
+    // If using LangChain orchestration models, forward to multi-model endpoint and pipe SSE
+    if (model && model.startsWith('langchain:')) {
+      try {
+        // Build message payload for /api/multi-model-chat
+        const lastMsg: any = messages[messages.length - 1] || {}
+        let lcMessage: any = ''
+        let isMultimodal = false
+        if (Array.isArray(lastMsg.content)) {
+          lcMessage = lastMsg.content
+          isMultimodal = lcMessage.some((p: any) => p?.type === 'file')
+        } else if (Array.isArray(lastMsg.parts)) {
+          lcMessage = lastMsg.parts.map((p: any) =>
+            p?.type === 'file'
+              ? { type: 'file', name: p.name, mediaType: p.mimeType || p.mediaType || p.contentType, url: p.url }
+              : { type: 'text', text: p.text || p.content || '' }
+          )
+          isMultimodal = lcMessage.some((p: any) => p?.type === 'file')
+        } else if (typeof lastMsg.content === 'string') {
+          lcMessage = lastMsg.content
+        } else {
+          lcMessage = typeof lastMsg?.content === 'string' ? lastMsg.content : ''
+        }
+
+        // Determine explicit document open intent to restrict openDocument by default
+        const lastUserContent = (typeof lastMsg.content === 'string')
+          ? lastMsg.content
+          : (Array.isArray(lastMsg.parts)
+            ? (lastMsg.parts.find((p: any) => p.type === 'text')?.text || '')
+            : '')
+        const docIntentRegex = /\b(open|abrir|mostrar|ver|view|edit|editar|work on|continuar|colaborar)\b.*\b(doc|document|documento|archivo|file)\b/i
+        const explicitDocIntent = docIntentRegex.test(lastUserContent || '')
+
+        // Compute allowed tools (remove openDocument unless explicit intent)
+        let allowedTools: string[] | undefined = undefined
+        try {
+          const allToolNames = Object.keys(tools)
+          allowedTools = explicitDocIntent ? allToolNames : allToolNames.filter(n => n !== 'openDocument')
+        } catch {}
+
+        const baseUrl = new URL('/api/multi-model-chat', req.url)
+        const forwardBody = {
+          message: lcMessage,
+          type: isMultimodal ? 'multimodal' : 'text',
+          options: { enableSearch },
+          metadata: {
+            chatId,
+            userId: realUserId,
+            isAuthenticated,
+            systemPrompt: effectiveSystemPrompt,
+            originalModel: model,
+            message_group_id,
+            documentId,
+            debugRag,
+            // Ensure RAG toggle is respected by multi-model endpoint
+            useRAG: enableSearch,
+            // Allowlist tools for safety
+            allowedTools,
+            // Extract router type from langchain model ID for proper routing
+            routerType: model?.replace('langchain:', '').replace('-router', ''),
+          },
+        }
+
+        // Forward auth context (cookies, authorization) so Supabase in the downstream
+        // endpoint can read the session and satisfy RLS during tool execution
+        const originalCookie = req.headers.get('cookie') || ''
+        const originalAuth = req.headers.get('authorization') || undefined
+        const fRes = await fetch(baseUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(originalCookie ? { cookie: originalCookie } : {}),
+            ...(originalAuth ? { authorization: originalAuth } : {}),
+          },
+          body: JSON.stringify(forwardBody),
+        })
+
+        // Pipe SSE back to client
+        const contentType = fRes.headers.get('Content-Type') || 'text/event-stream; charset=utf-8'
+        return new Response(fRes.body, {
+          status: fRes.status,
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': fRes.headers.get('Cache-Control') || 'no-cache, no-transform',
+            'Connection': fRes.headers.get('Connection') || 'keep-alive',
+          },
+        })
+      } catch (e) {
+        console.error('[ChatAPI] Forward to /api/multi-model-chat failed:', e)
+        return new Response(JSON.stringify({ error: 'Failed to route LangChain model' }), { status: 500 })
+      }
+    }
+
     // Prepare additional parameters for reasoning models
   const resultStart = Date.now()
   const { onError, onFinish } = makeStreamHandlers({

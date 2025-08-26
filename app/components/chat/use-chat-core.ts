@@ -440,6 +440,53 @@ export function useChatCore({
                 
                 // Handle different types of streaming data
                 switch (data.type) {
+                  case "tool-invocation": {
+                    // New SSE shape from /api/multi-model-chat: surface tool call/result in real time
+                    try {
+                      const ti = (data as any).toolInvocation as {
+                        state: "partial-call" | "call" | "result"
+                        toolName: string
+                        toolCallId: string
+                        args?: any
+                        result?: any
+                      }
+                      if (!ti || !ti.toolCallId) break
+
+                      ensureParts(assistantMessageObj)
+
+                      // Find existing tool part by call id
+                      let toolPart = assistantMessageObj.parts!.find(
+                        (p: any) =>
+                          p.type === "tool-invocation" &&
+                          p.toolInvocation?.toolCallId === ti.toolCallId
+                      ) as any
+
+                      if (!toolPart) {
+                        // Create a new tool invocation part
+                        toolPart = {
+                          type: "tool-invocation",
+                          toolInvocation: {
+                            state: ti.state || "call",
+                            toolName: ti.toolName || "tool",
+                            toolCallId: ti.toolCallId,
+                            ...(ti.args !== undefined ? { args: ti.args } : {}),
+                            ...(ti.result !== undefined ? { result: ti.result } : {}),
+                          },
+                        }
+                        assistantMessageObj.parts!.push(toolPart)
+                      } else {
+                        // Update existing invocation state/args/result
+                        try { toolPart.toolInvocation.state = ti.state || toolPart.toolInvocation.state } catch {}
+                        if (ti.args !== undefined) {
+                          try { toolPart.toolInvocation.args = ti.args } catch {}
+                        }
+                        if (ti.result !== undefined) {
+                          try { toolPart.toolInvocation.result = ti.result } catch {}
+                        }
+                      }
+                    } catch {}
+                    break
+                  }
                   case "tool-input-start": {
                     // Add tool invocation part in partial-call state
                     if (!assistantMessageObj.parts) {

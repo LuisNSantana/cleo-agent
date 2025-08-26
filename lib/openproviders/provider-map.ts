@@ -123,6 +123,15 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "grok-vision-beta": "xai",
   "grok-beta": "xai",
 
+  // LangChain Multi-Model Orchestration
+  "langchain:multi-model-smart": "langchain" as Provider,
+  "langchain:multi-model-balanced": "langchain" as Provider,
+  "langchain:multi-model-performance": "langchain" as Provider,
+  // New optimized LangChain configurations
+  "langchain:balanced-local": "langchain" as Provider,
+  "langchain:balanced": "langchain" as Provider,
+  "langchain:fast": "langchain" as Provider,
+
   // Static Ollama models
   "llama3.2:latest": "ollama",
   "qwen2.5-coder:latest": "ollama",

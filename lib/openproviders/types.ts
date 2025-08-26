@@ -132,6 +132,14 @@ export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"
 // Dynamic Ollama model type - allows any string for auto-detected models
 export type OllamaModel = StaticOllamaModel | (string & {})
 
+export type LangChainModel =
+  | "langchain:multi-model-smart"
+  | "langchain:multi-model-balanced" 
+  | "langchain:multi-model-performance"
+  | "langchain:balanced-local"
+  | "langchain:balanced"
+  | "langchain:fast"
+
 export type Provider =
   | "openai"
   | "mistral"
@@ -141,6 +149,7 @@ export type Provider =
   | "xai"
   | "ollama"
   | "openrouter"
+  | "langchain"
 
 export type SupportedModel =
   | OpenAIModel
@@ -151,3 +160,4 @@ export type SupportedModel =
   | XaiModel
   | OllamaModel
   | OpenRouterModel
+  | LangChainModel

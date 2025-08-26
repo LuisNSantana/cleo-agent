@@ -4,6 +4,7 @@ import DeepSeek from "@/components/icons/deepseek"
 import Gemini from "@/components/icons/gemini"
 import Google from "@/components/icons/google"
 import Grok from "@/components/icons/grok"
+import LangChain from "@/components/icons/langchain"
 import Meta from "@/components/icons/meta"
 import Mistral from "@/components/icons/mistral"
 import Ollama from "@/components/icons/ollama"
@@ -98,5 +99,10 @@ export const PROVIDERS: Provider[] = [
     id: "perplexity",
     name: "Perplexity",
     icon: Preplexity,
+  },
+  {
+    id: "langchain",
+    name: "LangChain",
+    icon: LangChain,
   },
 ] as Provider[]

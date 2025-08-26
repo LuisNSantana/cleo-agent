@@ -15,10 +15,22 @@ export const DAILY_FILE_UPLOAD_LIMIT = 5
 export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (solo Llama)
-export const NON_AUTH_ALLOWED_MODELS = ["grok-3-mini", "gpt-5-mini-2025-08-07"]
+export const NON_AUTH_ALLOWED_MODELS = [
+  "grok-3-mini", 
+  "gpt-5-mini-2025-08-07",
+  "langchain:multi-model-smart",
+  "langchain:multi-model-balanced",
+  "langchain:multi-model-performance"
+]
 
-// Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS)
-export const FREE_MODELS_IDS = ["grok-3-mini", "gpt-5-mini-2025-08-07"]
+// Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS + LangChain)
+export const FREE_MODELS_IDS = [
+  "grok-3-mini", 
+  "gpt-5-mini-2025-08-07",
+  "langchain:multi-model-smart",
+  "langchain:multi-model-balanced", 
+  "langchain:multi-model-performance"
+]
 
 export const MODEL_DEFAULT = "gpt-5-mini-2025-08-07" // Smarter by default
 
