@@ -5,6 +5,7 @@ import { AppSidebar } from "@/app/components/layout/sidebar/app-sidebar"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useCanvasEditorStore } from "@/lib/canvas-editor/store"
 import { CanvasEditorShell } from "@/components/canvas-editor/canvas-editor-shell"
+import { VideoBackground } from "@/app/components/ui/video-background"
 import { useState, useEffect, useCallback } from "react"
 import { PencilSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
@@ -102,9 +103,18 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   }, [isResizing, handleDividerMove, stopDividerResize])
 
   return (
-    <div className="bg-background flex h-dvh w-full overflow-hidden">
-      {hasSidebar && <AppSidebar />}
-      <div className="flex flex-1 h-dvh relative">
+    <div className="bg-background flex h-dvh w-full overflow-hidden relative">
+      {/* Mobile-only video background */}
+      <div className="block md:hidden">
+        <VideoBackground src="/cleo_agent_video.mp4" overlayOpacity={0.7} />
+      </div>
+      {/* Foreground app chrome */}
+      {hasSidebar && (
+        <div className="relative z-10">
+          <AppSidebar />
+        </div>
+      )}
+      <div className="flex flex-1 h-dvh relative z-10">
         <main 
           className="@container relative h-dvh overflow-y-auto transition-all duration-300 ease-in-out"
           style={{ 

@@ -32,9 +32,12 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
             <div className="flex flex-1 items-center gap-2">
               <Link
                 href="/"
-                className="pointer-events-auto inline-flex items-center text-xl font-medium tracking-tight"
+                className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
               >
-                <CleoIcon size={48} className="" />
+                <CleoIcon size={56} src="/logocleo4.png" className="" />
+                <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
+                  Cleo
+                </span>
               </Link>
               {hasSidebar && isMobile && <HeaderSidebarTrigger />}
             </div>
@@ -73,6 +76,23 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           )}
         </div>
       </div>
+      {/* One-time premium pop-in animation for brand text */}
+      <style jsx>{`
+        .brand-text {
+          animation: brand-pop-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+          will-change: transform, opacity;
+          display: inline-block;
+        }
+        @keyframes brand-pop-in {
+          0% { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(2px); }
+          40% { opacity: 1; transform: translateY(-6px) scale(1.03); filter: blur(0); }
+          70% { transform: translateY(3px) scale(0.998); }
+          100% { transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .brand-text { animation: none; opacity: 1; transform: none; }
+        }
+      `}</style>
     </header>
   )
 }

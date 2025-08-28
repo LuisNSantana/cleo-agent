@@ -146,7 +146,9 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+  /* Keep background transparent so video underneath is visible; main container provides fallback */
+  background-color: transparent;
+  @apply text-foreground;
   }
 }
 

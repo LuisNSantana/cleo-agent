@@ -27,7 +27,7 @@ export function UserMenu() {
 
   if (!user) return null
 
-  const handleSettingsOpenChange = (isOpen: boolean) => {
+  const handleSettingsOpenChangeAction = (isOpen: boolean) => {
     setSettingsOpen(isOpen)
     if (!isOpen) {
       setMenuOpen(false)
@@ -68,7 +68,7 @@ export function UserMenu() {
           </span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <SettingsTrigger onOpenChange={handleSettingsOpenChange} />
+  <SettingsTrigger onOpenChangeAction={handleSettingsOpenChangeAction} />
         <FeedbackTrigger />
         <AppInfoTrigger />
         <DropdownMenuSeparator />

@@ -6,11 +6,13 @@ interface CleoIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'
   width?: number;
   height?: number;
   size?: number;
+  src?: string;
 }
 
-export function CleoIcon({ width, height, size = 24, className = "" }: CleoIconProps) {
+export function CleoIcon({ width, height, size = 24, className = "", src }: CleoIconProps) {
   const iconWidth = width ?? size;
   const iconHeight = height ?? size;
+  const imageSrc = src ?? "/logocleo.png";
   
   return (
     <div 
@@ -23,7 +25,7 @@ export function CleoIcon({ width, height, size = 24, className = "" }: CleoIconP
       }}
     >
       <Image
-        src="/logocleo.png"
+        src={imageSrc}
         alt="Cleo"
         width={iconWidth}
         height={iconHeight}

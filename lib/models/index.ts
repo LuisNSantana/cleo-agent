@@ -42,15 +42,11 @@ export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
   const models = await getAllModels()
 
   const freeModels = models
-    .filter(
-      (model) => {
-        const isInFreeList = FREE_MODELS_IDS.includes(model.id)
-        const isMetaProvider = model.providerId === "meta"
-        const shouldInclude = isInFreeList || isMetaProvider
-        console.log(`🔍 Model ${model.id}: inFreeList=${isInFreeList}, isMeta=${isMetaProvider}, shouldInclude=${shouldInclude}`)
-        return shouldInclude
-      }
-    )
+    .filter((model) => {
+      const isInFreeList = FREE_MODELS_IDS.includes(model.id)
+      console.log(`🔍 Model ${model.id}: inFreeList=${isInFreeList}`)
+      return isInFreeList
+    })
     .map((model) => ({
       ...model,
       accessible: true,

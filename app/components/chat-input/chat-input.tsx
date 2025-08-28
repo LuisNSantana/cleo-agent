@@ -231,9 +231,11 @@ export function ChatInput({
           value={deferredValue}
         />
       )}
-      <div className="order-2 md:order-1 sticky bottom-0 z-40 border-t bg-background/80 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    {/* Transparent container on mobile to avoid tinted background around the input */}
+    <div className="order-2 md:order-1 sticky bottom-0 z-40 border-t border-transparent bg-transparent px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)] supports-[backdrop-filter]:bg-transparent">
         <PromptInput
-          className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
+      /* Frosted-glass input: lighter and blurrier on mobile; keep original on md+ */
+      className="relative z-10 p-0 pt-1 shadow-lg backdrop-blur-lg bg-white/70 dark:bg-zinc-900/50 ring-1 ring-white/30 dark:ring-white/10 md:bg-popover md:backdrop-blur-xl md:ring-0 md:shadow-xs"
           maxHeight={200}
           value={value}
           onValueChange={onValueChangeAction}
@@ -289,7 +291,7 @@ export function ChatInput({
               {isUserAuthenticated && <div className="hidden sm:block"><ConnectionStatus /></div>}
               <ModelSelector
                 selectedModelId={selectedModel}
-                setSelectedModelId={onSelectModelAction}
+                setSelectedModelIdAction={onSelectModelAction}
                 isUserAuthenticated={isUserAuthenticated}
                 className="rounded-full"
               />

@@ -238,7 +238,7 @@ export function MessageUser({
           
           {/* Render text content */}
           <MessageContent
-            className="bg-accent relative max-w-[70%] rounded-3xl px-5 py-2.5"
+            className="bg-blue-800 text-white relative max-w-[70%] rounded-3xl px-5 py-2.5 shadow-lg backdrop-blur-sm"
             markdown={false}
             ref={contentRef}
           >

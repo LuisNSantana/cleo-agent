@@ -16,23 +16,17 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (solo Llama)
 export const NON_AUTH_ALLOWED_MODELS = [
-  "grok-3-mini", 
-  "gpt-5-mini-2025-08-07",
-  "langchain:multi-model-smart",
-  "langchain:multi-model-balanced",
-  "langchain:multi-model-performance"
+  // Guest mode: only allow LangChain Fast
+  "langchain:fast",
 ]
 
 // Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS + LangChain)
 export const FREE_MODELS_IDS = [
-  "grok-3-mini", 
-  "gpt-5-mini-2025-08-07",
-  "langchain:multi-model-smart",
-  "langchain:multi-model-balanced", 
-  "langchain:multi-model-performance"
+  // Free tier: only LangChain Fast is usable
+  "langchain:fast",
 ]
 
-export const MODEL_DEFAULT = "gpt-5-mini-2025-08-07" // Smarter by default
+export const MODEL_DEFAULT = "langchain:fast" // Default to LangChain Fast
 
 export const APP_NAME = "Cleo"
 export const APP_DOMAIN = "https://zola.chat"

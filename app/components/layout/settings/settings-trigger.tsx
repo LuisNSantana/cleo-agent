@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { User } from "@phosphor-icons/react"
 import type React from "react"
@@ -16,16 +16,16 @@ import { useState } from "react"
 import { SettingsContent } from "./settings-content"
 
 type SettingsTriggerProps = {
-  onOpenChange: (open: boolean) => void
+  onOpenChangeAction: (open: boolean) => void
 }
 
-export function SettingsTrigger({ onOpenChange }: SettingsTriggerProps) {
+export function SettingsTrigger({ onOpenChangeAction }: SettingsTriggerProps) {
   const [open, setOpen] = useState(false)
   const isMobile = useBreakpoint(768)
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
-    onOpenChange(isOpen)
+    onOpenChangeAction(isOpen)
   }
 
   const trigger = (
@@ -40,6 +40,10 @@ export function SettingsTrigger({ onOpenChange }: SettingsTriggerProps) {
       <Drawer open={open} onOpenChange={handleOpenChange}>
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
         <DrawerContent>
+          {/* Accessibility: DrawerContent requires a DrawerTitle. Hide visually but keep for screen readers. */}
+          <DrawerHeader className="sr-only">
+            <DrawerTitle>Settings</DrawerTitle>
+          </DrawerHeader>
           <SettingsContent isDrawer />
         </DrawerContent>
       </Drawer>

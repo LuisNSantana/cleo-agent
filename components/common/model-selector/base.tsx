@@ -41,14 +41,14 @@ import { SubMenu } from "./sub-menu"
 
 type ModelSelectorProps = {
   selectedModelId: string
-  setSelectedModelId: (modelId: string) => void
+  setSelectedModelIdAction: (modelId: string) => void
   className?: string
   isUserAuthenticated?: boolean
 }
 
 export function ModelSelector({
   selectedModelId,
-  setSelectedModelId,
+  setSelectedModelIdAction,
   className,
   isUserAuthenticated = true,
 }: ModelSelectorProps) {
@@ -100,7 +100,7 @@ export function ModelSelector({
             return
           }
 
-          setSelectedModelId(model.id)
+          setSelectedModelIdAction(model.id)
           if (isMobile) {
             setIsDrawerOpen(false)
           } else {
@@ -138,14 +138,17 @@ export function ModelSelector({
     <Button
       variant="outline"
       className={cn(
-        "dark:bg-secondary justify-between",
-        isMobile ? "size-9 p-0" : "",
+        "dark:bg-secondary",
+        // Mobile: perfect circle, center content, icon fills circle
+        isMobile ? "size-9 p-0 rounded-full flex items-center justify-center" : "justify-between",
         className
       )}
       disabled={isLoadingModels}
     >
-      <div className="flex items-center gap-2">
-        {currentProvider?.icon && <currentProvider.icon className="size-5" />}
+      <div className={cn("flex items-center gap-2", isMobile && "justify-center w-full")}> 
+        {currentProvider?.icon && (
+          <currentProvider.icon className={cn(isMobile ? "size-6" : "size-5")} />
+        )}
         {!isMobile && <span>{currentModel?.name || "Select model"}</span>}
       </div>
       {!isMobile && <CaretDownIcon className="size-4 opacity-50" />}
@@ -322,7 +325,7 @@ export function ModelSelector({
                           return
                         }
 
-                        setSelectedModelId(model.id)
+                        setSelectedModelIdAction(model.id)
                         setIsDropdownOpen(false)
                       }}
                       onFocus={() => {

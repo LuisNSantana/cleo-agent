@@ -15,24 +15,32 @@ export function CleoMascot() {
   
   // Prevent hydration mismatch by using fallback until mounted
   const isDark = mounted ? theme === 'dark' : true; // Default to dark
+  const source = "/cleo_agent_video.mp4";
   
   return (
     <motion.div
-      className="flex justify-center" style={{ transformOrigin: "bottom center" }}
-
-
+      className="flex justify-center"
+      style={{ transformOrigin: "bottom center" }}
     >
       <video
-        src={mounted ? (isDark ? "/cleo_test3.mov" : "/cleo_light.mov") : "/cleo_test3.mov"}
-        width={120}
-        height={120}
+        src={source}
+        width={180}
+        height={180}
         autoPlay
         loop
         muted
         playsInline
-        className="mix-blend-darken dark:mix-blend-screen"
+        preload="auto"
+        className="pointer-events-none select-none"
         style={{
-          filter: 'contrast(1.2) brightness(1.1) hue-rotate(0deg)',
+          // Make dark backgrounds treat black as transparent (screen),
+          // and light backgrounds treat white as transparent (multiply)
+          mixBlendMode: isDark ? 'screen' : 'multiply',
+          // Feather the edges so it feels composited, not boxed
+          WebkitMaskImage: 'radial-gradient(white, transparent 70%)',
+          maskImage: 'radial-gradient(white, transparent 70%)',
+          // Gentle pop without blowing highlights
+          filter: 'contrast(1.15) brightness(1.12) saturate(1.05)',
           backgroundColor: 'transparent'
         }}
       />
