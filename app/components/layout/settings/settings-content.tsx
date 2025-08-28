@@ -14,6 +14,7 @@ import {
   XIcon,
   ChartLineUpIcon,
   ArrowSquareOutIcon,
+  UsersIcon,
 } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useState } from "react"
@@ -35,7 +36,7 @@ type SettingsContentProps = {
   isDrawer?: boolean
 }
 
-type TabType = "general" | "appearance" | "models" | "connections" | "files" | "dashboard"
+type TabType = "general" | "appearance" | "models" | "connections" | "files" | "agents"
 
 export function SettingsContent({
   isDrawer = false,
@@ -116,6 +117,13 @@ export function SettingsContent({
                   <FileTextIcon className="size-4" />
                   <span>Files</span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="agents"
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <UsersIcon className="size-4" />
+                  <span>Agentes</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -164,6 +172,21 @@ export function SettingsContent({
             </TabsContent>
             <TabsContent value="files" className="space-y-6 px-6">
               <FilesSection />
+            </TabsContent>
+            <TabsContent value="agents" className="space-y-6 px-6">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <UsersIcon className="size-16 text-blue-600 mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Sistema Multi-Agente</h3>
+                <p className="text-muted-foreground mb-6 max-w-md">
+                  Visualiza y gestiona la arquitectura de LangChain/LangGraph con nuestros agentes especializados
+                </p>
+                <Link href="/agents">
+                  <Button className="flex items-center gap-2">
+                    <UsersIcon className="size-4" />
+                    Ir al Sistema de Agentes
+                  </Button>
+                </Link>
+              </div>
             </TabsContent>
           </div>
         ) : (
@@ -229,6 +252,15 @@ export function SettingsContent({
                     <span>Files</span>
                   </div>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="agents"
+                  className="w-full justify-start rounded-md px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <UsersIcon className="size-4" />
+                    <span>Agentes</span>
+                  </div>
+                </TabsTrigger>
               </div>
             </TabsList>
 
@@ -277,6 +309,21 @@ export function SettingsContent({
               </TabsContent>
               <TabsContent value="files" className="mt-0 space-y-6">
                 <FilesSection />
+              </TabsContent>
+              <TabsContent value="agents" className="mt-0 space-y-6">
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <UsersIcon className="size-16 text-blue-600 mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Sistema Multi-Agente</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md">
+                    Visualiza y gestiona la arquitectura de LangChain/LangGraph con nuestros agentes especializados
+                  </p>
+                  <Link href="/agents">
+                    <Button className="flex items-center gap-2">
+                      <UsersIcon className="size-4" />
+                      Ir al Sistema de Agentes
+                    </Button>
+                  </Link>
+                </div>
               </TabsContent>
               </div>
             </div>

@@ -18,8 +18,8 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     optimizePackageImports: ["@phosphor-icons/react", "lucide-react"],
   },
   // Ensure server bundles don't try to include native/heavy packages
-  serverExternalPackages: ["shiki", "vscode-oniguruma", "canvas", "jsdom"],
-  // Keep Webpack customization only for production builds to avoid Turbopack warnings in dev
+  serverExternalPackages: ["shiki", "vscode-oniguruma", "canvas", "jsdom", "@langchain/langgraph", "@langchain/core"],
+    // Keep Webpack customization only for production builds to avoid Turbopack warnings in dev
   ...(isProd
     ? {
         webpack: (config: any, { isServer }: { isServer: boolean }) => {
@@ -30,7 +30,15 @@ const nextConfig: NextConfig = withBundleAnalyzer({
           return config
         },
       }
-    : {}),
+    : {
+        webpack: (config: any, { isServer }: { isServer: boolean }) => {
+          // Exclude LangGraph from client-side bundles to prevent Node.js module issues
+          if (!isServer) {
+            config.externals = [...(config.externals || []), "@langchain/langgraph", "@langchain/core"]
+          }
+          return config
+        },
+      }),
   images: {
     remotePatterns: [
       // Supabase public storage
