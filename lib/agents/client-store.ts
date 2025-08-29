@@ -27,9 +27,17 @@ interface ClientAgentStore {
   metrics: SystemMetrics
   isLoading: boolean
   error: string | null
+  delegationEvents: Array<{
+    from: string
+    to: string
+    reason: string
+    query: string
+    timestamp: string
+  }>
 
   // Actions
-  initializeAgents: () => void
+  initializeAgents: () => Promise<void>
+  syncAgents: () => Promise<void>
   executeAgent: (input: string, agentId?: string) => Promise<void>
   selectAgent: (agent: AgentConfig | null) => void
   updateGraphData: () => void
@@ -38,6 +46,9 @@ interface ClientAgentStore {
   addExecution: (execution: AgentExecution) => void
   updateMetrics: (metrics: Partial<SystemMetrics>) => void
   pollExecutionStatus: (executionId: string) => Promise<void>
+  addAgent: (agent: AgentConfig) => void
+  addDelegationEvent: (event: any) => void
+  resetGraph: () => void
 }
 
 export const useClientAgentStore = create<ClientAgentStore>()(
@@ -59,12 +70,35 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     },
     isLoading: false,
     error: null,
+    delegationEvents: [],
 
     // Actions
-    initializeAgents: () => {
-      const agents = getAllAgents()
-      set({ agents })
-      get().updateGraphData()
+    initializeAgents: async () => {
+      // Start with built-ins, then merge with server runtime agents
+      const builtIns = getAllAgents()
+      set({ agents: builtIns })
+      try {
+        await get().syncAgents()
+      } catch (e) {
+        // keep built-ins if sync fails
+        get().updateGraphData()
+      }
+    },
+
+    syncAgents: async () => {
+      try {
+        const res = await fetch('/api/agents/sync', { method: 'GET' })
+        if (!res.ok) throw new Error('Failed to fetch agents from server')
+        const data = await res.json()
+        const builtIns = getAllAgents()
+        const runtime = (data.agents || []).filter((a: AgentConfig) => /^custom_\d+$/.test(a.id))
+        const merged: AgentConfig[] = [...builtIns, ...runtime]
+        set({ agents: merged })
+        get().updateGraphData()
+      } catch (err) {
+        console.warn('Agent sync failed, showing built-ins only:', err)
+        get().updateGraphData()
+      }
     },
 
     executeAgent: async (input: string, agentId?: string) => {
@@ -121,24 +155,30 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       const { agents, executions } = get()
       
       // Create nodes from agents
-      const nodes: AgentNode[] = agents.map((agent, index) => ({
-        id: agent.id,
-        type: 'agent',
-        position: {
-          x: (index % 2) * 300 + 100,
-          y: Math.floor(index / 2) * 200 + 100
-        },
-        data: {
-          label: agent.name,
-          agent,
-          status: 'pending',
-          executionCount: executions.filter(e => e.agentId === agent.id).length,
-          lastExecution: executions
-            .filter(e => e.agentId === agent.id)
-            .sort((a, b) => new Date(b.startTime as any).getTime() - new Date(a.startTime as any).getTime())[0]?.startTime as any,
-          connections: [] as string[]
+      const nodes: AgentNode[] = agents.map((agent, index) => {
+        const sortedForAgent = executions
+          .filter(e => e.agentId === agent.id)
+          .sort((a, b) => new Date(b.startTime as any).getTime() - new Date(a.startTime as any).getTime())
+        const last = sortedForAgent[0]
+        const lastExecDate = last ? new Date(last.startTime as any) : undefined
+
+        return {
+          id: agent.id,
+          type: 'agent',
+          position: {
+            x: (index % 2) * 300 + 100,
+            y: Math.floor(index / 2) * 200 + 100
+          },
+          data: {
+            label: agent.name,
+            agent,
+            status: 'pending',
+            executionCount: sortedForAgent.length,
+            lastExecution: lastExecDate as any,
+            connections: [] as string[]
+          }
         }
-      }))
+      })
 
       // Create edges from handoffs (simplified for client)
       const edges: AgentEdge[] = []
@@ -239,8 +279,40 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         }
       }, 1000) // Poll every second
     }
+
+    ,
+
+    addAgent: (agent: AgentConfig) => {
+      set((state) => ({ agents: [...state.agents, agent] }))
+      // Rebuild graph and metrics after adding
+      get().updateGraphData()
+      get().updateMetrics({
+        totalExecutions: get().executions.length,
+        activeAgents: get().agents.filter(a => a.role === 'supervisor' || a.role === 'specialist').length
+      })
+    },
+
+    addDelegationEvent: (event: any) => {
+      set((state) => ({
+        delegationEvents: [...state.delegationEvents.slice(-9), event] // Keep last 10 events
+      }))
+    },
+
+    // Reset graph visual state: clear current execution and local history so nodes return to idle
+    resetGraph: () => {
+      set({ currentExecution: null, executions: [] })
+      get().updateGraphData()
+    }
   }))
 )
 
 // Initialize agents on store creation
 useClientAgentStore.getState().initializeAgents()
+
+// Listen for delegation events from the orchestrator
+if (typeof window !== 'undefined') {
+  window.addEventListener('agent-delegation', (event: any) => {
+    console.log('🎯 UI received delegation event:', event.detail)
+    useClientAgentStore.getState().addDelegationEvent(event.detail)
+  })
+}

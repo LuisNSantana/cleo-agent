@@ -18,6 +18,14 @@ export interface AgentConfig {
   prompt: string
   color: string
   icon: string
+  // Optional LangChain / LangGraph specific fields
+  objective?: string // High-level objective for the agent (what it should achieve)
+  customInstructions?: string // Extra system/user instructions or constraints
+  memoryEnabled?: boolean
+  memoryType?: 'short_term' | 'long_term' | 'none'
+  stopConditions?: string[] // e.g. stop tokens or patterns
+  toolSchemas?: Record<string, any> // Optional JSON schemas for tool inputs
+  tags?: string[] // capabilities or categories
 }
 
 export type AgentRole =
@@ -180,6 +188,13 @@ export interface CreateAgentRequest {
   model: string
   tools: string[]
   prompt: string
+  // additional fields to support richer agent creation
+  objective?: string
+  customInstructions?: string
+  memoryEnabled?: boolean
+  memoryType?: 'short_term' | 'long_term' | 'none'
+  stopConditions?: string[]
+  toolSchemas?: Record<string, any>
 }
 
 export interface ExecuteAgentRequest {

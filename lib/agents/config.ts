@@ -49,6 +49,7 @@ export const TOBY_AGENT: AgentConfig = {
   temperature: 0.3,
   maxTokens: 8192,
   tools: ['webSearch', 'complete_task'],
+  tags: ['técnico', 'investigación', 'datos', 'análisis'],
   prompt: `Eres Toby, el especialista técnico del equipo. Tu expertise incluye:
 
 **Especialidades:**
@@ -86,6 +87,7 @@ export const AMI_AGENT: AgentConfig = {
   temperature: 0.9,
   maxTokens: 6144,
   tools: ['randomFact', 'complete_task'],
+  tags: ['creativo', 'creatividad', 'diseño', 'contenido', 'arte', 'narrativa', 'brainstorming', 'innovador'],
   prompt: `Eres Ami, la especialista creativa del equipo. Tu expertise incluye:
 
 **Especialidades:**
@@ -123,6 +125,7 @@ export const PETER_AGENT: AgentConfig = {
   temperature: 0.1,
   maxTokens: 8192,
   tools: ['calculator', 'complete_task'],
+  tags: ['lógico', 'lógica', 'matemáticas', 'matemático', 'problema', 'cálculo', 'algoritmo', 'estructurado'],
   prompt: `Eres Peter, el especialista lógico del equipo. Tu expertise incluye:
 
 **Especialidades:**

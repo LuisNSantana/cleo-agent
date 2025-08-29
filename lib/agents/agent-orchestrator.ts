@@ -6,6 +6,7 @@
 import { StateGraph, MessagesAnnotation, Command, START, END } from '@langchain/langgraph'
 import { createReactAgent } from '@langchain/langgraph/prebuilt'
 import { ChatOpenAI } from '@langchain/openai'
+import { ChatOllama } from '@langchain/community/chat_models/ollama'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
@@ -26,14 +27,21 @@ import { AGENT_SYSTEM_CONFIG, getAgentById } from './config'
 import { buildToolRuntime } from '@/lib/langchain/tooling'
 
 export class AgentOrchestrator {
+  // Bump when behavior/logging changes to force singleton refresh across hot reloads
+  public readonly __version = '2025-08-29-3'
+  public readonly __id!: string
   private graph: any = null
   private graphBuilt: boolean = false
   private agents: Map<string, any> = new Map()
+  private agentConfigs: Map<string, AgentConfig> = new Map()
+  // Track effective model info for agents for debugging/QA logs
+  private agentModelInfo: Map<string, { provider: string; modelName: string; configured: string }> = new Map()
   private executions: Map<string, AgentExecution> = new Map()
   private eventListeners: ((event: AgentActivity) => void)[] = []
 
   constructor(config: LangGraphConfig = AGENT_SYSTEM_CONFIG) {
     console.log('🏗️ Creating new AgentOrchestrator instance')
+  ;(this as any).__id = `orc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     this.initializeAgents(config)
     if (!this.graphBuilt) {
       try {
@@ -43,6 +51,59 @@ export class AgentOrchestrator {
         this.handleGraphError(error, config)
       }
     }
+  }
+
+    // Register a new AgentConfig at runtime and add it to agents and agentConfigs
+  registerRuntimeAgent(agentConfig: AgentConfig) {
+    console.log(`� Registering runtime agent: ${agentConfig.id}`)
+    
+  // Store the agent config
+    this.agentConfigs.set(agentConfig.id, agentConfig)
+  // Track the configured model for this runtime agent (effective may differ at finalize)
+  this.agentModelInfo.set(agentConfig.id, this.resolveModelInfo(agentConfig))
+    
+    // Create a lightweight LLM-backed runtime agent that uses the selected model
+  const self = this
+  this.agents.set(agentConfig.id, {
+      id: agentConfig.id,
+      config: agentConfig,
+      async invoke(state: any) {
+    // Use orchestrator's model factory (not the agent object itself)
+    const model = (self as any).createModelForAgent(agentConfig)
+        const system = new SystemMessage(
+          agentConfig.prompt || `Eres ${agentConfig.name}. Responde de forma clara y concisa.`
+        )
+        const prior = Array.isArray(state?.messages) ? state.messages : []
+        try {
+          const result = await model.invoke([system, ...prior])
+          const content = (result as any)?.content || String(result)
+          return { messages: [new AIMessage({ content, additional_kwargs: { sender: agentConfig.id } })] }
+        } catch (err) {
+          console.error(`[Runtime Agent Error] ${agentConfig.id}:`, err)
+          return { messages: [new AIMessage({ content: 'No pude procesar esta solicitud ahora mismo.', additional_kwargs: { sender: agentConfig.id, error: 'runtime_agent_llm_failed' } })] }
+        }
+      }
+    })
+    
+    // Rebuild the graph to include this new agent
+    this.buildGraph(AGENT_SYSTEM_CONFIG)
+    console.log(`🔁 Graph rebuilt to include runtime agent: ${agentConfig.id}`)
+  }
+
+  // Get agent configs (for sync API)
+  getAgentConfigs(): Map<string, AgentConfig> {
+    return this.agentConfigs
+  }
+
+  // Remove runtime agent
+  removeRuntimeAgent(agentId: string): boolean {
+    const removed = this.agentConfigs.delete(agentId) && this.agents.delete(agentId)
+    if (removed) {
+      console.log(`�️ Removed runtime agent: ${agentId}`)
+      // Rebuild graph without the removed agent
+      this.buildGraph(AGENT_SYSTEM_CONFIG)
+    }
+    return removed
   }
 
   // Add execution step for real-time visualization
@@ -76,6 +137,9 @@ export class AgentOrchestrator {
   startAgentExecution(input: string, agentId?: string): AgentExecution {
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const startTime = new Date()
+
+    // Clean up old runtime agents before starting execution
+    this.cleanupRuntimeAgents()
 
     const execution: AgentExecution = {
       id: executionId,
@@ -133,7 +197,13 @@ export class AgentOrchestrator {
           progress: 30
         })
 
-        const initialMessage = new HumanMessage(input)
+        const initialMessage = new HumanMessage({
+          content: input,
+          additional_kwargs: {
+            execution_id: executionId,
+            requested_agent_id: agentId || 'cleo-supervisor'
+          }
+        })
         console.log(`📤 Invoking graph with message: "${input.substring(0, 50)}..."`)
         
   let result = await this.graph.invoke({ messages: [initialMessage] })
@@ -233,7 +303,13 @@ export class AgentOrchestrator {
     const allAgents = [config.supervisorAgent, ...config.specialistAgents]
 
     for (const agentConfig of allAgents) {
+  // Keep a copy of the AgentConfig for runtime routing decisions
+  this.agentConfigs.set(agentConfig.id, agentConfig)
+
       const model = this.createModelForAgent(agentConfig)
+  // Record effective model info for QA
+  const info = this.resolveModelInfo(agentConfig)
+  this.agentModelInfo.set(agentConfig.id, info)
       const tools = this.createToolsForAgent(agentConfig, config.handoffTools)
 
       const agent = createReactAgent({
@@ -255,26 +331,53 @@ export class AgentOrchestrator {
 
   private createModelForAgent(agentConfig: AgentConfig) {
     // Map model names to actual model instances
+  const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_URL || 'http://localhost:11434'
+
+    // Generic support for any Ollama model id following the chat selector convention: "ollama:<model>"
+    if (agentConfig.model?.startsWith('ollama:')) {
+      const modelId = agentConfig.model.slice('ollama:'.length)
+      return new ChatOllama({
+        baseUrl: OLLAMA_BASE_URL,
+        model: modelId,
+        temperature: agentConfig.temperature
+      })
+    }
     const modelMap: Record<string, any> = {
       'langchain:balanced': new ChatOpenAI({
-        modelName: 'gpt-4o-mini',
+        model: 'gpt-4o-mini',
+        temperature: agentConfig.temperature,
+        maxTokens: agentConfig.maxTokens
+      }),
+      'gpt-5-mini': new ChatOpenAI({
+        model: 'gpt-5-mini',
+        temperature: agentConfig.temperature,
+        maxTokens: agentConfig.maxTokens
+      }),
+      'gpt-4o': new ChatOpenAI({
+        model: 'gpt-4o',
         temperature: agentConfig.temperature,
         maxTokens: agentConfig.maxTokens
       }),
       'gpt-4o-mini': new ChatOpenAI({
-        modelName: 'gpt-4o-mini',
+        model: 'gpt-4o-mini',
         temperature: agentConfig.temperature,
         maxTokens: agentConfig.maxTokens
       }),
       'langchain:fast': new ChatAnthropic({
-        modelName: 'claude-3-haiku-20240307',
+        model: 'claude-3-haiku-20240307',
         temperature: agentConfig.temperature,
         maxTokens: agentConfig.maxTokens
       }),
-      'langchain:balanced-local': new ChatOpenAI({
-        modelName: 'gpt-3.5-turbo',
-        temperature: agentConfig.temperature,
-        maxTokens: agentConfig.maxTokens
+      // Balanced + Local should hit local Ollama by default (same as guest chat)
+      'langchain:balanced-local': new ChatOllama({
+        baseUrl: OLLAMA_BASE_URL,
+        model: 'llama3.1:8b',
+        temperature: agentConfig.temperature
+      }),
+      'cleo-llama-38b': new ChatOllama({
+        baseUrl: OLLAMA_BASE_URL,
+        model: 'cleo-llama-38b',
+        temperature: agentConfig.temperature
       })
     }
 
@@ -364,13 +467,95 @@ export class AgentOrchestrator {
     return tools
   }
 
+  // Resolve provider/model used for a given agent config (must mirror createModelForAgent mapping)
+  private resolveModelInfo(agentConfig: AgentConfig) {
+    // Defaults
+    let provider = 'openai'
+    let modelName = 'gpt-4o-mini'
+    const configured = agentConfig.model
+
+    // Generic Ollama prefix support (aligns with chat selector ids like "ollama:llama3.1:8b")
+    if (configured?.startsWith('ollama:')) {
+      provider = 'ollama'
+      modelName = configured.slice('ollama:'.length)
+      return { provider, modelName, configured }
+    }
+
+    switch (agentConfig.model) {
+      case 'langchain:balanced':
+        provider = 'openai'; modelName = 'gpt-4o-mini'; break
+      case 'gpt-5-mini':
+        provider = 'openai'; modelName = 'gpt-5-mini'; break
+      case 'gpt-4o':
+        provider = 'openai'; modelName = 'gpt-4o'; break
+      case 'gpt-4o-mini':
+        provider = 'openai'; modelName = 'gpt-4o-mini'; break
+      case 'langchain:fast':
+        provider = 'anthropic'; modelName = 'claude-3-haiku-20240307'; break
+      case 'langchain:balanced-local':
+        provider = 'ollama'; modelName = 'llama3.1:8b'; break
+      case 'cleo-llama-38b':
+        provider = 'ollama'; modelName = 'cleo-llama-38b'; break
+      case 'ollama:llama3.1:8b':
+        provider = 'ollama'; modelName = 'llama3.1:8b'; break
+      default:
+        // Fallback to balanced mapping
+        provider = 'openai'; modelName = 'gpt-4o-mini'; break
+    }
+
+    return { provider, modelName, configured }
+  }
+
+  // Public: expose model info for logging/QA
+  getModelInfo(agentId?: string) {
+    const targetId = agentId && this.agentModelInfo.has(agentId)
+      ? agentId
+      : 'cleo-supervisor'
+    const info = this.agentModelInfo.get(targetId) || this.resolveModelInfo(this.agentConfigs.get('cleo-supervisor')!)
+    return { agentId: targetId, ...info, timestamp: new Date().toISOString() }
+  }
+
+  private cleanupRuntimeAgents() {
+    const currentTime = Date.now()
+    const AGENT_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+
+    // Get runtime agents (those with custom_ prefix)
+    const runtimeAgents = Array.from(this.agentConfigs.keys()).filter(id => id.startsWith('custom_'))
+    
+    // Check if agents were created too long ago or are inactive
+    let cleanedCount = 0
+    for (const agentId of runtimeAgents) {
+      const timestamp = this.extractTimestamp(agentId)
+      if (timestamp && (currentTime - timestamp) > AGENT_TIMEOUT) {
+        console.log(`🧹 Cleaning up old runtime agent: ${agentId}`)
+        this.agentConfigs.delete(agentId)
+        this.agents.delete(agentId)
+        cleanedCount++
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`🧹 Cleaned up ${cleanedCount} old runtime agents`)
+      // Rebuild graph if we cleaned agents
+      this.buildGraph(AGENT_SYSTEM_CONFIG)
+    }
+  }
+
+  private extractTimestamp(agentId: string): number | null {
+    // Extract timestamp from agent ID like 'custom_1756440140428'
+    const match = agentId.match(/custom_(\d+)/)
+    return match ? parseInt(match[1], 10) : null
+  }
+
   private buildGraph(config: LangGraphConfig) {
     try {
       console.log('🏗️ Building agent graph...', {
         availableAgents: Array.from(this.agents.keys())
       })
 
-      const graphBuilder = new StateGraph(MessagesAnnotation)
+  const graphBuilder = new StateGraph(MessagesAnnotation)
+  // Precompute possible ends (destinations) so nodes that may Command->goto are considered valid
+  const possibleEnds = Array.from(this.agents.keys()).filter(id => id !== 'cleo-supervisor').concat(['router', 'finalize'])
 
       // Add ALL agent nodes (including specialists) to ensure they're reachable
       for (const [agentId, agent] of this.agents) {
@@ -384,6 +569,10 @@ export class AgentOrchestrator {
               .find(exec => exec.status === 'running')
 
             console.log(`🎯 Agent ${agentId} executing...`)
+            const info = this.agentModelInfo.get(agentId)
+            if (info) {
+              console.log('[Agent] Configured model:', { agentId, provider: info.provider, modelName: info.modelName, configured: info.configured, timestamp: new Date().toISOString() })
+            }
             
             if (currentExecution) {
               // Add execution step for this agent
@@ -404,8 +593,22 @@ export class AgentOrchestrator {
               })
             }
 
-            // Execute the actual agent
-            const result = await agent.invoke(state)
+            // Execute the actual agent with guardrails
+            let result: any
+            try {
+              result = await agent.invoke(state)
+            } catch (err) {
+              console.error(`❌ Agent node failed during invoke: ${agentId}`, err)
+              // Return a minimal AI message to keep the graph flowing
+              result = {
+                messages: [
+                  new AIMessage({
+                    content: `Hubo un problema ejecutando ${agentId}. Paso a la síntesis final.`,
+                    additional_kwargs: { sender: agentId, error: 'agent_invoke_failed' }
+                  })
+                ]
+              }
+            }
 
             if (currentExecution) {
               // Add completion step
@@ -429,6 +632,7 @@ export class AgentOrchestrator {
             return result
           }
 
+          // Add node without ends parameter - LangGraph will determine reachability from edges
           graphBuilder.addNode(agentId as any, wrappedAgent)
           console.log(`✅ Added wrapped node: ${agentId}`)
         } else {
@@ -454,51 +658,20 @@ export class AgentOrchestrator {
         
         const last = state.messages[state.messages.length - 1]
         const content = typeof last?.content === 'string' ? (last.content as string) : ''
-        const lc = content.toLowerCase()
-
-  let target: string = 'finalize' // Default to finalize
-
-        // Route to specialists based on content analysis
-        if (lc.includes('técnico') || lc.includes('technical') || lc.includes('datos') || lc.includes('investigación') || lc.includes('research')) {
-          if (this.agents.has('toby-technical')) {
-            target = 'toby-technical'
-            console.log('👨‍💻 Router delegating to Toby (technical)')
-          }
-        } else if (lc.includes('creativo') || lc.includes('creative') || lc.includes('diseño') || lc.includes('contenido') || lc.includes('design')) {
-          if (this.agents.has('ami-creative')) {
-            target = 'ami-creative'
-            console.log('🎨 Router delegating to Ami (creative)')
-          }
-        } else if (lc.includes('lógico') || lc.includes('logical') || lc.includes('matemático') || lc.includes('math') || lc.includes('problema') || lc.includes('suma') || lc.includes('multiplicación') || lc.includes('multiplicacion') || lc.includes('cálculo') || lc.includes('calculo') || lc.includes('operación') || lc.includes('operacion')) {
-          if (this.agents.has('peter-logical')) {
-            target = 'peter-logical'
-            console.log('🧮 Router delegating to Peter (logical)')
-          }
-        } else {
-          console.log('💬 Router handling directly, going to finalize')
+        // If the incoming message specifies a requested target, honor it when present
+        const requested = (last?.additional_kwargs as any)?.requested_agent_id
+        console.log('🧭 Checking message metadata:', {
+          hasAdditionalKwargs: !!last?.additional_kwargs,
+          requestedAgentId: requested,
+          availableAgents: Array.from(this.agents.keys())
+        })
+        if (requested && requested !== 'cleo-supervisor' && this.agents.has(requested)) {
+          console.log(`🧭 Router honoring requested agent from message: ${requested}`)
+          return requested
         }
 
-        if (target !== 'finalize') {
-          if (currentExecution) {
-            this.addExecutionStep(currentExecution.id, {
-              agent: 'cleo-supervisor',
-              action: 'delegating',
-              content: `Delegando a ${target}: ${content.substring(0, 100)}...`,
-              progress: 50,
-              metadata: { delegatedTo: target }
-            })
-          }
-
-          // Emit UI event for delegation visualization
-          this.emitEvent({
-            agentId: 'cleo-supervisor',
-            type: 'handoff',
-            timestamp: new Date(),
-            data: { toAgent: target, task: content.substring(0, 140) }
-          })
-        }
-
-        // Router node should pass through the messages for conditional routing to work
+        // Router node just passes through messages - conditional edges will decide the destination
+        console.log('� Router node: passing through to conditional edges for routing decision')
         return { messages: state.messages }
       })
 
@@ -506,6 +679,13 @@ export class AgentOrchestrator {
       graphBuilder.addConditionalEdges(
         'router' as any,
         async (state: any) => {
+          // If the current execution explicitly targets an agent, honor it
+          const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+          if (currentExecution && currentExecution.agentId && currentExecution.agentId !== 'cleo-supervisor' && this.agents.has(currentExecution.agentId)) {
+            console.log(`🔀 Router: honoring requested agent ${currentExecution.agentId}`)
+            return currentExecution.agentId
+          }
+
           const last = state.messages[state.messages.length - 1]
           const content = typeof last?.content === 'string' ? (last.content as string) : ''
           const lc = content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
@@ -513,44 +693,106 @@ export class AgentOrchestrator {
           console.log(`🔀 Router conditional check: "${content.substring(0, 50)}..."`)
           console.log(`🔀 Router lowercase: "${lc.substring(0, 50)}..."`)
 
-          // Math/Logical keywords with better Spanish detection
-          const mathKeywords = ['logico', 'logical', 'matematico', 'math', 'problema', 'suma', 'multiplicacion', 'calculo', 'operacion', 'cuanto es', 'cuanto', 'cuánto', 'calcular', 'resolver', '\\+', '\\-', '\\*', '/', '=', 'dividir', 'multiplicar', 'sumar', 'restar']
-          const hasMathKeyword = mathKeywords.some(keyword => {
-            if (keyword.includes('\\')) {
-              return new RegExp(keyword).test(lc)
+          // Tokenize content for scoring
+          const tokens = lc.split(/[^a-z0-9áéíóúñ]+/i).filter(t => t && t.length >= 3)
+          if (tokens.length === 0) {
+            console.log('🔀 Router: No meaningful tokens, going to finalize')
+            return 'finalize'
+          }
+
+          // Score agents by token/tag matches
+          const candidates = Array.from(this.agentConfigs.entries()).filter(([id]) => id !== 'cleo-supervisor')
+          console.log(`🧮 Scoring ${candidates.length} candidate agents:`, candidates.map(([id, cfg]) => `${id} (${cfg.tags?.join(',') || 'no-tags'})`))
+          console.log('🗄️ Available agent configs:', Array.from(this.agentConfigs.keys()))
+          console.log('🤖 Available agent instances:', Array.from(this.agents.keys()))
+          let bestId: string | null = null
+          let bestScore = 0
+          for (const [id, cfg] of candidates) {
+            const hay = `${(cfg.objective || '')} ${(cfg.name || '')} ${(cfg.description || '')} ${(cfg.tags || []).join(' ')}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            let score = 0
+            for (const tk of tokens) {
+              if (!tk || tk.length < 3) continue
+              if (hay.includes(tk)) score += 1
             }
-            return lc.includes(keyword)
-          })
-
-          if (hasMathKeyword && this.agents.has('peter-logical')) {
-            console.log('🔀 Router: Going to peter-logical')
-            return 'peter-logical'
+            // Boost exact tag matches
+            for (const tag of cfg.tags || []) {
+              const norm = tag.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              if (tokens.includes(norm)) score += 2
+            }
+            console.log(`🎯 Agent ${id} scored ${score} (hay: "${hay.substring(0, 100)}...")`)
+            if (score > bestScore) {
+              bestScore = score
+              bestId = id
+            }
+          }
+          if (bestId && bestScore > 0) {
+            console.log(`🔀 Router: Selected best match ${bestId} with score ${bestScore}`)
+            // Emit UI event for delegation
+            if (typeof globalThis !== 'undefined' && globalThis.dispatchEvent) {
+              const event = new CustomEvent('agent-delegation', {
+                detail: {
+                  from: 'cleo-supervisor',
+                  to: bestId,
+                  reason: `Best match with score ${bestScore}`,
+                  query: content,
+                  timestamp: new Date().toISOString()
+                }
+              })
+              globalThis.dispatchEvent(event)
+            }
+            return bestId
           }
 
-          if ((lc.includes('tecnico') || lc.includes('technical') || lc.includes('datos') || lc.includes('investigacion') || lc.includes('research')) && this.agents.has('toby-technical')) {
-            console.log('🔀 Router: Going to toby-technical')
-            return 'toby-technical'
-          }
-          if ((lc.includes('creativo') || lc.includes('creative') || lc.includes('diseno') || lc.includes('contenido') || lc.includes('design')) && this.agents.has('ami-creative')) {
-            console.log('🔀 Router: Going to ami-creative')
-            return 'ami-creative'
-          }
           console.log('🔀 Router: Going to finalize (default)')
+          // Emit UI event for fallback
+          if (typeof globalThis !== 'undefined' && globalThis.dispatchEvent) {
+            const event = new CustomEvent('agent-delegation', {
+              detail: {
+                from: 'cleo-supervisor',
+                to: 'finalize',
+                reason: `No suitable agent found (best score: ${bestScore})`,
+                query: content,
+                timestamp: new Date().toISOString()
+              }
+            })
+            globalThis.dispatchEvent(event)
+          }
           return 'finalize'
         },
-        {
-          'toby-technical': 'toby-technical' as any,
-          'ami-creative': 'ami-creative' as any,
-          'peter-logical': 'peter-logical' as any,
-          'finalize': 'finalize' as any
-        }
+        // Build dynamic mapping for conditional edges so runtime agents are included
+        (() => {
+          const map: Record<string, any> = {}
+          const availableAgents = Array.from(this.agents.keys())
+          console.log('🗺️ Building conditional map for agents:', availableAgents)
+          for (const id of availableAgents) {
+            if (id !== 'cleo-supervisor') {
+              map[id] = id as any
+              console.log(`🔗 Added conditional route: ${id} -> ${id}`)
+            }
+          }
+          map['finalize'] = 'finalize' as any
+          console.log('🗺️ Final conditional map keys:', Object.keys(map))
+          return map
+        })()
       )
 
-      // Finalizer node: Cleo provides final response via LLM (no hardcoded examples)
+      // Finalizer node: Prefer pass-through of specialist output if present; otherwise Cleo synthesizes
       graphBuilder.addNode('finalize' as any, async (state: any) => {
         console.log('🏁 *** FINALIZE NODE EXECUTING ***')
         console.log('🏁 Finalizing execution with Cleo response')
         console.log('🏁 State messages count:', state.messages?.length || 0)
+
+        const msgs = Array.isArray(state.messages) ? state.messages : []
+        const last = msgs[msgs.length - 1]
+        // If the last message is from a specialist/runtime agent and no error flag, pass it through verbatim
+        if (last instanceof AIMessage) {
+          const sender = (last.additional_kwargs as any)?.sender
+          const hasError = Boolean((last.additional_kwargs as any)?.error)
+          if (sender && sender !== 'cleo-supervisor' && !hasError) {
+            console.log('🏁 Finalize pass-through: returning specialist output without rewrite', { sender })
+            return { messages: [last] }
+          }
+        }
 
         // Add a visualization step for UI
         const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
@@ -564,9 +806,11 @@ export class AgentOrchestrator {
           })
         }
 
-        // Build a final answer using supervisor model and full context
-        const supervisorCfg = getAgentById('cleo-supervisor')
-        const finalModel = this.createModelForAgent(supervisorCfg!)
+  // Build a final answer using supervisor model and full context (fallback or synthesis)
+  const supervisorCfg = getAgentById('cleo-supervisor')
+  const finalModel = this.createModelForAgent(supervisorCfg!)
+  const finfo = this.resolveModelInfo(supervisorCfg!)
+  console.log('[Finalize] Model selection:', { agentId: 'cleo-supervisor', ...finfo, timestamp: new Date().toISOString() })
 
         const system = new SystemMessage(
           `${supervisorCfg?.prompt || 'Eres un asistente.'}
@@ -616,11 +860,14 @@ Reglas:
       // Entry: start at router
       graphBuilder.addEdge(START, 'router' as any)
 
-      // All specialist agents route to finalizer when done
-      for (const specialistId of ['toby-technical', 'ami-creative', 'peter-logical']) {
-        if (this.agents.has(specialistId)) {
+      // All specialist agents (including runtime ones) route to finalizer when done
+      for (const specialistId of Array.from(this.agents.keys())) {
+        if (specialistId === 'cleo-supervisor') continue
+        try {
           graphBuilder.addEdge(specialistId as any, 'finalize' as any)
           console.log(`✅ Added edge: ${specialistId} -> finalize`)
+        } catch (e) {
+          console.warn('Could not add edge to finalize for', specialistId, e)
         }
       }
 
@@ -714,7 +961,13 @@ Reglas:
       
       await new Promise(resolve => setTimeout(resolve, processingTime))
       
-      const initialMessage = new HumanMessage(input)
+      const initialMessage = new HumanMessage({
+        content: input,
+        additional_kwargs: {
+          execution_id: executionId,
+          requested_agent_id: agentId || 'cleo-supervisor'
+        }
+      })
       const result = await this.graph.invoke({
         messages: [initialMessage]
       })
@@ -854,7 +1107,14 @@ export function getAgentOrchestrator(): AgentOrchestrator {
     __cleoOrchestrator?: AgentOrchestrator
   }
 
-  if (!g.__cleoOrchestrator) {
+  const desiredVersion = '2025-08-29-3'
+  if (!g.__cleoOrchestrator || (g.__cleoOrchestrator as any).__version !== desiredVersion) {
+    if (g.__cleoOrchestrator) {
+      console.warn('♻️ Orchestrator version mismatch or missing. Recreating...', {
+        current: (g.__cleoOrchestrator as any).__version,
+        desired: desiredVersion
+      })
+    }
     console.log('🔄 Creating orchestrator in globalThis')
     g.__cleoOrchestrator = new AgentOrchestrator()
   } else {
@@ -888,4 +1148,14 @@ export function recreateAgentOrchestrator(): AgentOrchestrator {
   console.log('🔄 Force recreating orchestrator instance')
   resetAgentOrchestrator()
   return getAgentOrchestrator()
+}
+
+// Convenience wrapper to avoid method-binding issues across module boundaries
+export function registerRuntimeAgent(agentConfig: AgentConfig) {
+  const orchestrator = getAgentOrchestrator()
+  if (typeof (orchestrator as any).registerRuntimeAgent === 'function') {
+    ;(orchestrator as any).registerRuntimeAgent(agentConfig)
+    return true
+  }
+  throw new Error('registerRuntimeAgent not available on orchestrator instance')
 }

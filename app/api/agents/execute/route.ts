@@ -24,6 +24,13 @@ export async function POST(request: NextRequest) {
   const orchestrator = getAgentOrchestrator()
   // Debug instance identity
   console.log('[API/execute] Orchestrator instance id:', (orchestrator as any)["__id"] || (globalThis as any).__cleoOrchestrator ? 'global' : 'local')
+  // Log configured/effective model for requested agent and for supervisor finalize
+  try {
+    const targetInfo = (orchestrator as any).getModelInfo?.(agentId)
+    console.log('[API/execute] Target agent model:', targetInfo)
+    const supInfo = (orchestrator as any).getModelInfo?.('cleo-supervisor')
+    console.log('[API/execute] Finalize (supervisor) model:', supInfo)
+  } catch {}
 
     try {
   // Start execution non-blocking to enable live UI updates

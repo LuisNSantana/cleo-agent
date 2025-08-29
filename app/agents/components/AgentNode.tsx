@@ -97,10 +97,10 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
       
       <Card className={`w-64 shadow-lg border-2 transition-all duration-500 relative ${
         isCurrentlyActive 
-          ? 'border-blue-400 shadow-blue-200 shadow-lg scale-105 bg-gradient-to-r from-blue-50 to-purple-50' 
+          ? 'border-blue-400 shadow-blue-200 shadow-lg scale-105 bg-blue-700/10 dark:bg-blue-700/20 backdrop-blur'
           : status === 'trail'
-          ? 'border-purple-300 shadow-purple-200 shadow-md bg-gradient-to-r from-purple-50 to-blue-50'
-          : ''
+          ? 'border-purple-300 shadow-purple-200 shadow-md bg-purple-700/10 dark:bg-purple-700/20 backdrop-blur'
+          : 'bg-background'
       }`} style={{ 
         borderColor: isCurrentlyActive ? '#3b82f6' : status === 'trail' ? '#a855f7' : agent.color + '40' 
       }}>
@@ -125,7 +125,7 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-lg">{getRoleIcon(agent.role)}</span>
-            <h3 className="font-semibold text-sm">{agent.name}</h3>
+            <h3 className="font-semibold text-sm text-foreground">{agent.name}</h3>
           </div>
           <div className={`w-3 h-3 rounded-full ${getStatusColor(status)} ${
             isCurrentlyActive ? 'animate-pulse' : ''
@@ -133,7 +133,7 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
         </div>
 
         {/* Description */}
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
           {agent.description}
         </p>
 
@@ -144,7 +144,9 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
           </Badge>
           {lastExecution && (
             <span className="text-xs text-muted-foreground">
-              {lastExecution.toLocaleTimeString()}
+              {lastExecution instanceof Date
+                ? lastExecution.toLocaleTimeString()
+                : new Date(lastExecution as any).toLocaleTimeString()}
             </span>
           )}
         </div>
@@ -194,8 +196,8 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
         {/* Action Button */}
         <Button
           size="sm"
-          className="w-full text-xs flex items-center gap-1"
-          style={{ backgroundColor: agent.color }}
+          className="w-full text-xs flex items-center gap-1 text-white hover:opacity-90"
+          style={{ backgroundColor: agent.color || '#64748B' }}
           onClick={handleExecute}
         >
           <Play className="size-3" />

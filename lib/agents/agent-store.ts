@@ -20,12 +20,14 @@ import { getAllAgents } from './config'
 
 interface AgentStoreState extends AgentStoreType {
   // Actions
-  initializeAgents: () => void
+  initializeAgents: () => Promise<void>
   executeAgent: (input: string, agentId?: string) => Promise<AgentExecution>
   getExecution: (executionId: string) => AgentExecution | undefined
   updateGraphData: () => void
   subscribeToEvents: () => void
   unsubscribeFromEvents: () => void
+  syncAgents: () => Promise<void>
+  cleanupStaleAgents: () => Promise<void>
 }
 
 export const useAgentStore = create<AgentStoreState>()(
@@ -50,10 +52,32 @@ export const useAgentStore = create<AgentStoreState>()(
     error: null,
 
     // Actions
-    initializeAgents: () => {
-      const agents = getAllAgents()
-      set({ agents })
-      get().updateGraphData()
+    initializeAgents: async () => {
+      try {
+        // Get built-in agents
+        const builtInAgents = getAllAgents()
+        
+        // Get runtime agents from orchestrator
+        const { getAgentOrchestrator } = await import('./agent-orchestrator')
+        const orchestrator = getAgentOrchestrator()
+        const agentConfigs = orchestrator.getAgentConfigs()
+        const runtimeAgents = Array.from(agentConfigs.values()).filter(config => {
+          // Runtime agents have ID pattern: custom_{timestamp}
+          return /^custom_\d+$/.test(config.id)
+        })
+        
+        // Combine both built-in and runtime agents
+        const allAgents = [...builtInAgents, ...runtimeAgents]
+        
+        set({ agents: allAgents })
+        get().updateGraphData()
+      } catch (error) {
+        console.error('Error initializing agents:', error)
+        // Fallback to built-in agents only
+        const agents = getAllAgents()
+        set({ agents })
+        get().updateGraphData()
+      }
     },
 
     executeAgent: async (input: string, agentId?: string) => {
@@ -211,12 +235,80 @@ export const useAgentStore = create<AgentStoreState>()(
       // Note: In a real implementation, you'd want to pass the specific listener
       // For now, we'll clear all listeners
       orchestrator.cleanup()
+    },
+
+    syncAgents: async () => {
+      try {
+        console.log('🔄 Starting agent synchronization...')
+        
+        // First, get agent configs from server orchestrator
+        const response = await fetch('/api/agents/sync', {
+          method: 'GET',
+        })
+
+        if (!response.ok) {
+          console.error('Failed to sync agents with server')
+          return
+        }
+
+        const result = await response.json()
+        console.log(`🔄 Agent sync completed: ${result.message || 'Sync successful'}`)
+        console.log(`📋 Server agents:`, result.agents)
+
+        // Get built-in agents
+        const builtInAgents = getAllAgents()
+        
+        // Get runtime agents from server response
+        const runtimeAgents = result.agents?.filter((config: AgentConfig) => {
+          // Runtime agents have ID pattern: custom_{timestamp}
+          return /^custom_\d+$/.test(config.id)
+        }) || []
+        
+        // Combine both built-in and runtime agents
+        const allAgents = [...builtInAgents, ...runtimeAgents]
+        
+        console.log(`🎯 Total agents after sync: ${allAgents.length} (${builtInAgents.length} built-in + ${runtimeAgents.length} runtime)`)
+        
+        // Update store with all agents
+        set({ agents: allAgents })
+        get().updateGraphData()
+        
+      } catch (error) {
+        console.error('Error syncing agents:', error)
+        // Fallback to just initialize agents normally
+        get().initializeAgents()
+      }
+    },
+
+    cleanupStaleAgents: async () => {
+      try {
+        const response = await fetch('/api/agents/sync', {
+          method: 'GET',
+        })
+
+        if (!response.ok) {
+          console.error('Failed to cleanup stale agents')
+          return
+        }
+
+        const result = await response.json()
+        console.log(`🧹 Agent cleanup completed: ${result.message}`)
+
+        // Refresh agents and graph data
+        get().initializeAgents()
+      } catch (error) {
+        console.error('Error cleaning up agents:', error)
+      }
     }
   }))
 )
 
-// Initialize agents on store creation
-useAgentStore.getState().initializeAgents()
+// Initialize agents on store creation (async)
+if (typeof window !== 'undefined') {
+  // Only run in browser to avoid SSR issues
+  // First initialize with built-in agents, then sync runtime agents
+  useAgentStore.getState().syncAgents()
+}
 // Note: subscribeToEvents is now async, so we don't call it here
 // It will be called when needed in the components
 
@@ -224,5 +316,11 @@ useAgentStore.getState().initializeAgents()
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     useAgentStore.getState().unsubscribeFromEvents()
+  })
+  
+  // Auto-sync agents on page load/refresh
+  window.addEventListener('DOMContentLoaded', async () => {
+    console.log('🔄 Auto-syncing agents on page load...')
+    await useAgentStore.getState().syncAgents()
   })
 }
