@@ -4,12 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import html2canvas from "html2canvas";
 
-const Tldraw = dynamic(() => import("@tldraw/tldraw").then((m) => (m as any).Tldraw), {
+const Tldraw = dynamic(() => import("@tldraw/tldraw").then((m) => m.Tldraw), {
   ssr: false,
+  loading: () => <div className="flex items-center justify-center h-full">Cargando editor...</div>
 });
-
-// Cast the dynamic component to a generic React component so we can pass props without type errors
-const TldrawAny = Tldraw as unknown as React.ComponentType<any>;
 
 export default function TldrawWrapper({
   autosave = true,
@@ -22,10 +20,12 @@ export default function TldrawWrapper({
   const appRef = useRef<any>(null);
   const [docState, setDocState] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  // Note: we avoid UA-based mobile detection; Tldraw handles pointer events.
 
   // onMount handler from tldraw
-  function handleMount(app: any) {
-    appRef.current = app;
+  function handleMount(editor: any) {
+    appRef.current = editor;
+    console.log('[TldrawWrapper] Tldraw editor mounted successfully');
   }
 
   // onChange handler — tldraw calls this with the latest state; keep as `any` to avoid strict typing issues
@@ -96,6 +96,19 @@ export default function TldrawWrapper({
     return () => clearTimeout(id);
   }, [docState, autosave, autosaveDebounce]);
 
+  // Ensure the container accepts pointer/touch events on mobile
+  useEffect(() => {
+    const el = containerRef.current as HTMLDivElement | null;
+    if (!el) return;
+    
+    // Apply styles to ensure touch works properly
+    el.style.touchAction = "none";
+    el.style.width = "100%";
+    el.style.height = "100%";
+    
+    console.log('[TldrawWrapper] Container configured for touch');
+  }, []);
+
   // Listen for external export requests (allow parent to trigger PNG/JSON analysis)
   useEffect(() => {
     const onExportPng = () => {
@@ -136,14 +149,27 @@ export default function TldrawWrapper({
         <div style={{ marginLeft: "auto" }}>{saving ? "Saving..." : ""}</div>
       </div>
 
-      <div ref={containerRef} style={{ flex: 1, position: "relative", minHeight: 400 }}>
-        <TldrawAny
-          onMount={handleMount}
-          onChange={handleChange}
-          showMiniMap={false}
-          // eslint-disable-next-line react/jsx-no-bind
-          // ...you can pass more props here to customize behavior
-        />
+  <div ref={containerRef} data-vaul-drawer-ignore style={{ 
+        flex: 1, 
+        position: "relative", 
+        minHeight: 400, 
+        display: 'flex', 
+        flexDirection: 'column',
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none'
+      }}>
+        <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+          <Tldraw
+            onMount={handleMount}
+            onChange={handleChange}
+            // Ensure the tldraw component takes all available space and receives pointer events
+            style={{ width: '100%', height: '100%', touchAction: 'none' }}
+            // eslint-disable-next-line react/jsx-no-bind
+            // ...you can pass more props here to customize behavior
+          />
+        </div>
       </div>
     </div>
   );

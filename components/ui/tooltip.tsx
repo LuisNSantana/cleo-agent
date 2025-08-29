@@ -4,30 +4,31 @@ import { cn } from "@/lib/utils"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import * as React from "react"
 
-function TooltipProvider({
-  delayDuration = 0,
-  skipDelayDuration = 300,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+const TooltipIdContext = React.createContext<string | null>(null)
+
+function TooltipProvider({ children, delayDuration = 0, skipDelayDuration = 300, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  const id = React.useId()
   return (
-    <TooltipPrimitive.Provider
-      delayDuration={delayDuration}
-      skipDelayDuration={skipDelayDuration}
-      {...props}
-    />
+    <TooltipIdContext.Provider value={id}>
+      <TooltipPrimitive.Provider
+        delayDuration={delayDuration}
+        skipDelayDuration={skipDelayDuration}
+        {...props}
+      >
+        {children}
+      </TooltipPrimitive.Provider>
+    </TooltipIdContext.Provider>
   )
 }
 
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
-function TooltipTrigger({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  const ctx = React.useContext(TooltipIdContext)
+  const contentId = ctx ? `tooltip-content-${ctx}` : undefined
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" aria-controls={contentId} {...props} />
 }
 
 function TooltipContent({
@@ -39,6 +40,7 @@ function TooltipContent({
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
+        id={React.useContext(TooltipIdContext) ? `tooltip-content-${React.useContext(TooltipIdContext)}` : undefined}
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(

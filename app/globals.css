@@ -3,6 +3,24 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* Tldraw CSS - Required for drawing functionality */
+@import '@tldraw/tldraw/tldraw.css';
+
+/* Tldraw mobile fixes (minimal + compatible with iOS Safari) */
+@media (max-width: 768px) {
+  .tldraw-wrapper {
+    overflow: hidden;
+  }
+  .tl-container {
+    /* Prevent browser gestures from hijacking drawing */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {

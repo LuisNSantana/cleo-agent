@@ -20,7 +20,7 @@ export interface TaskInput {
   // Vision input (first image URL)
   imageUrl?: string
   // Prompt customization
-  systemPromptVariant?: 'default' | 'journalism' | 'developer' | 'reasoning' | 'minimal' | 'debug'
+  systemPromptVariant?: 'default' | 'journalism' | 'developer' | 'reasoning' | 'minimal' | 'debug' | 'local' | 'llama31' | 'cybersecurity'
   systemPromptOverride?: string
   // Resolved RAG context (set by pipeline)
   ragContext?: string

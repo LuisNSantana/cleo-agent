@@ -194,6 +194,11 @@ export async function POST(req: NextRequest) {
 		// Build final system prompt (personalization + RAG context) similar to main chat endpoint
 		let finalSystemPrompt: string | undefined
 		try {
+			console.log('🔍 Building final system prompt with:', {
+				originalModel: metadata.originalModel,
+				systemPrompt: metadata.systemPrompt ? 'present' : 'not present',
+				systemPromptLength: metadata.systemPrompt?.length || 0,
+			})
 			finalSystemPrompt = (
 				await buildFinalSystemPrompt({
 					baseSystemPrompt: metadata.systemPrompt,

@@ -6,8 +6,10 @@ import { Attachment } from "@/lib/file-handling"
 import { isImageFile } from "@/lib/image-utils"
 import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
+import { getModelInfo } from "@/lib/models"
+import { MODEL_DEFAULT } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
-import { API_ROUTE_CHAT } from "@/lib/routes"
+import { API_ROUTE_CHAT, API_ROUTE_CHAT_GUEST } from "@/lib/routes"
 import type { UserProfile } from "@/lib/user/types"
 import type { UIMessage } from "ai"
 import { useSearchParams } from "next/navigation"
@@ -230,13 +232,24 @@ export function useChatCore({
       // Get current model name for logging
       const currentModelName = sanitizeModelName(selectedModel || "unknown-model")
 
+      // Determine the appropriate prompt variant based on the model
+      let promptVariant: 'default' | 'local' | 'llama31' | 'cybersecurity' = 'default'
+      
+      if (currentModelName.includes('llama3.1') || currentModelName.includes('llama-3.1')) {
+        promptVariant = 'llama31' // Use optimized Llama 3.1 prompt
+      } else if (currentModelName.startsWith('ollama:') || currentModelName.includes('local')) {
+        promptVariant = 'local' // Use local optimized prompt for other local models
+      }
+
       // Build the base Cleo prompt (personality-aware if available)
       let basePrompt: string
       if (preferences.personalitySettings) {
         basePrompt = generatePersonalizedPrompt(currentModelName, preferences.personalitySettings)
       } else {
-        basePrompt = getCleoPrompt(currentModelName, "default")
+        basePrompt = getCleoPrompt(currentModelName, promptVariant)
       }
+
+      console.log(`🎯 Frontend using prompt variant: ${promptVariant} for model: ${currentModelName}`)
 
       // If the user has a custom system prompt, append it as an addendum instead of replacing
       if (user?.system_prompt && user.system_prompt.trim().length > 0) {
@@ -375,20 +388,30 @@ export function useChatCore({
           throw new Error('Unable to create or locate a chat session')
         }
 
-        const response = await fetch(API_ROUTE_CHAT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: effectiveUserId,
-            chatId: effectiveChatId,
-            model: selectedModel,
-            isAuthenticated,
-            systemPrompt,
-            enableSearch,
-            messages: [...messages, userMessage].map(convertToMessageAISDK),
-          }),
-          signal: abortControllerRef.current.signal,
-        })
+  const endpoint = isAuthenticated ? API_ROUTE_CHAT : API_ROUTE_CHAT_GUEST
+
+  // Validate selected model before sending. If the frontend has an unknown model id
+  // (for example from legacy favorites or stale cached chats), fall back to the
+  // application default model to avoid server-side 'Model not found' errors.
+  const resolvedModel = getModelInfo(selectedModel) ? selectedModel : MODEL_DEFAULT
+  if (resolvedModel !== selectedModel) {
+    console.warn(`[ChatAPI] Invalid model requested: ${selectedModel}. Falling back to ${resolvedModel}`)
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: effectiveUserId,
+      chatId: effectiveChatId,
+      model: resolvedModel,
+      isAuthenticated,
+      systemPrompt,
+      enableSearch,
+      messages: [...messages, userMessage].map(convertToMessageAISDK),
+    }),
+    signal: abortControllerRef.current.signal,
+  })
 
   // Sending chat request
 

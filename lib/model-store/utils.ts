@@ -1,4 +1,4 @@
-import { FREE_MODELS_IDS } from "@/lib/config"
+import { DISABLED_MODEL_IDS, FREE_MODELS_IDS } from "@/lib/config"
 import { ModelConfig } from "@/lib/models/types"
 
 /**
@@ -15,7 +15,9 @@ export function filterAndSortModels(
   searchQuery: string,
   isModelHidden: (modelId: string) => boolean
 ): ModelConfig[] {
-  const availableModels = models.filter((model) => !isModelHidden(model.id))
+  const availableModels = models
+    .filter((model) => !isModelHidden(model.id))
+    .filter((model) => !DISABLED_MODEL_IDS.includes(model.id))
   
   // Check if any favorite models actually exist in the available models
   const validFavorites = favoriteModels?.filter(fav => 

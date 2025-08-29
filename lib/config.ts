@@ -16,17 +16,27 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (solo Llama)
 export const NON_AUTH_ALLOWED_MODELS = [
-  // Guest mode: only allow LangChain Fast
-  "langchain:fast",
+  // Guest mode: only allow Balanced + Local
+  "langchain:balanced-local",
 ]
 
 // Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS + LangChain)
 export const FREE_MODELS_IDS = [
-  // Free tier: only LangChain Fast is usable
+  // Free tier: allow Balanced + Local and Fast
+  "langchain:balanced-local",
   "langchain:fast",
 ]
 
-export const MODEL_DEFAULT = "langchain:fast" // Default to LangChain Fast
+// Default authenticated model: use the local Cleo Llama model
+export const MODEL_DEFAULT = "langchain:balanced-local"
+
+// Modelo predeterminado para invitados (guest)
+export const MODEL_DEFAULT_GUEST = "langchain:balanced-local"
+
+// Globally disabled model IDs (hidden from selectors and not selectable)
+export const DISABLED_MODEL_IDS: string[] = [
+  // none
+]
 
 export const APP_NAME = "Cleo"
 export const APP_DOMAIN = "https://zola.chat"

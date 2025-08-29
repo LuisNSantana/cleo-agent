@@ -41,7 +41,7 @@ export default async function RootLayout({
   const userProfile = await getUserProfile()
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="dark">
       {isOfficialDeployment ? (
         <Script
           defer
@@ -68,7 +68,7 @@ export default async function RootLayout({
                     >
                       <ThemeProvider
                         attribute="class"
-                        defaultTheme="light"
+                        defaultTheme="dark"
                         enableSystem
                         disableTransitionOnChange
                       >
@@ -82,8 +82,8 @@ export default async function RootLayout({
                 </ChatSessionProvider>
               </ChatsProvider>
             </ModelProvider>
-          </UserProvider>
-        </TanstackQueryProvider>
+      </UserProvider>
+    </TanstackQueryProvider>
       </body>
     </html>
   )

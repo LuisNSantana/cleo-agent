@@ -540,9 +540,13 @@ export class OllamaAgent extends BaseAgent {
     })
     try {
       // Keep system prompt concise for local models to improve latency
+      // Use 'local' variant by default for Ollama agents to get the more flexible, cybersecurity-aware prompt
+      const defaultVariant = 'local'
       const base = input.metadata?.systemPromptOverride ||
-        getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || 'default')
-      const sysPromptBase = base.length > 2000 ? base.slice(0, 2000) + '\n\n[Context trimmed for local model]' : base
+        getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || defaultVariant)
+      // Keep identity header intact by trimming from the end if too long
+      const MAX_PROMPT = 1800
+      const sysPromptBase = base.length > MAX_PROMPT ? base.slice(0, MAX_PROMPT) + '\n\n[Context trimmed for local model]' : base
       const langHint = /[ñáéíóúü]|\b(gracias|hola|por favor|necesito|quiero)\b/i.test(input.content)
         ? 'Responde en el mismo idioma del usuario (español) salvo que se solicite explícitamente otro.'
         : 'Respond in the same language as the user (English) unless another is explicitly requested.'

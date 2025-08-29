@@ -1,5 +1,5 @@
 import { createGuestServerClient } from "@/lib/supabase/server-guest"
-import { MODEL_DEFAULT } from "@/lib/config"
+import { MODEL_DEFAULT_GUEST } from "@/lib/config"
 
 export async function POST(request: Request) {
   try {
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
           message_count: 0,
           premium: false,
           created_at: new Date().toISOString(),
-          favorite_models: [MODEL_DEFAULT, "grok-3-mini", "gpt-5-mini-2025-08-07"],
+          favorite_models: [MODEL_DEFAULT_GUEST, "grok-3-mini", "gpt-5-mini-2025-08-07"],
         })
         .select("*")
         .single()

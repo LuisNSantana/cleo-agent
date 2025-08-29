@@ -326,15 +326,37 @@ export class ModelRouter {
 
   private requiresFunctionCalling(input: TaskInput): boolean {
     const text = input.content.toLowerCase()
+
+    // More specific keywords that clearly indicate tool usage intent
     const functionKeywords = [
-      // English intents
-      'search', 'web search', 'google', 'calculate', 'compute', 'weather', 'forecast', 'price', 'prices', 'crypto',
-      'calendar', 'schedule', 'event', 'book', 'reserve', 'email', 'gmail', 'drive', 'file', 'document', 'open', 'create',
-      // Spanish intents
-      'buscar en la web', 'buscar', 'busca', 'búscame', 'buscame', 'búsqueda', 'buscarme', 'googlear', 'calcular', 'cálculo', 'clima', 'tiempo', 'pronóstico', 'precio', 'precios', 'cripto', 'criptomoneda', 'noticias', 'últimas noticias', 'ultimas noticias',
-      'calendario', 'evento', 'agenda', 'reservar', 'correo', 'gmail', 'drive', 'archivo', 'documento', 'abrir', 'crear'
+      // Explicit tool requests
+      'use tool', 'call tool', 'execute tool', 'run tool',
+      'search the web', 'web search for', 'google search',
+      'calculate this', 'compute this', 'what is the calculation',
+      'check weather', 'weather in', 'forecast for',
+      'crypto price', 'bitcoin price', 'check price of',
+      'create calendar event', 'schedule meeting', 'add to calendar',
+      'send email', 'email to', 'gmail message',
+      'open document', 'create file', 'upload file',
+      'list files', 'search drive', 'drive files',
+      'current time', 'what time is it', 'time now',
+      'random fact', 'tell me a fact',
+
+      // Spanish explicit requests
+      'usa herramienta', 'ejecuta herramienta', 'corre herramienta',
+      'busca en internet', 'búsqueda web', 'google busca',
+      'calcula esto', 'haz el cálculo', 'cuál es el cálculo',
+      'revisa el clima', 'clima en', 'pronóstico del',
+      'precio de cripto', 'precio bitcoin', 'revisa precio',
+      'crea evento calendario', 'agenda reunión', 'agrega al calendario',
+      'envía email', 'correo a', 'mensaje gmail',
+      'abre documento', 'crea archivo', 'sube archivo',
+      'lista archivos', 'busca en drive', 'archivos drive',
+      'hora actual', 'qué hora es', 'hora ahora',
+      'dato aleatorio', 'dime un hecho'
     ]
 
+    // Only trigger if it contains specific tool request patterns
     return functionKeywords.some(keyword => text.includes(keyword))
   }
 

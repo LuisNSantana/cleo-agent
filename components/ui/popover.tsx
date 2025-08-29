@@ -4,16 +4,23 @@ import { cn } from "@/lib/utils"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 import * as React from "react"
 
-function Popover({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+const PopoverIdContext = React.createContext<string | null>(null)
+
+function Popover({ children, ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+  const id = React.useId()
+  return (
+    <PopoverIdContext.Provider value={id}>
+      <PopoverPrimitive.Root data-slot="popover" {...props}>
+        {children}
+      </PopoverPrimitive.Root>
+    </PopoverIdContext.Provider>
+  )
 }
 
-function PopoverTrigger({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
+  const ctx = React.useContext(PopoverIdContext)
+  const contentId = ctx ? `popover-content-${ctx}` : undefined
+  return <PopoverPrimitive.Trigger data-slot="popover-trigger" aria-controls={contentId} {...props} />
 }
 
 function PopoverContent({
@@ -25,6 +32,7 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        id={React.useContext(PopoverIdContext) ? `popover-content-${React.useContext(PopoverIdContext)}` : undefined}
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}

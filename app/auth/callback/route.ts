@@ -64,6 +64,32 @@ export async function GET(request: Request) {
     console.error("Unexpected user insert error:", err)
   }
 
+  // Ensure existing users also have MODEL_DEFAULT in their favorites (prepend if missing)
+  try {
+    const { data: existingUser, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("favorite_models")
+      .eq("id", user.id)
+      .single()
+
+    if (!fetchError && existingUser) {
+      const favs: string[] = existingUser.favorite_models || []
+      if (!favs.includes(MODEL_DEFAULT)) {
+        const updated = [MODEL_DEFAULT, ...favs]
+        const { error: updateError } = await supabaseAdmin
+          .from("users")
+          .update({ favorite_models: updated })
+          .eq("id", user.id)
+
+        if (updateError) {
+          console.error("Failed to update favorite_models for user:", updateError)
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error ensuring MODEL_DEFAULT in favorites:", err)
+  }
+
   const host = request.headers.get("host")
   const protocol = host?.includes("localhost") ? "http" : "https"
 

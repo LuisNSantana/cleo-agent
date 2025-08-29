@@ -71,7 +71,8 @@ export function SettingsContent({
       >
         {isDrawer ? (
           // Mobile version - tabs on top
-          <div className="w-full items-start justify-start overflow-hidden py-4">
+          // Allow vertical scrolling inside the drawer and enable smooth touch scrolling on mobile
+          <div className="w-full items-start justify-start overflow-y-auto overflow-x-hidden py-4 touch-auto -webkit-overflow-scrolling:touch">
             <div>
               <TabsList className="mb-4 flex w-full min-w-0 flex-nowrap items-center justify-start overflow-x-auto bg-transparent px-0">
                 <TabsTrigger
@@ -128,7 +129,7 @@ export function SettingsContent({
             </div>
 
             {/* Mobile tabs content */}
-            <TabsContent value="general" className="space-y-6 px-6">
+            <TabsContent value="general" className="space-y-6 px-6 overflow-y-auto">
               <UserProfile />
               {isSupabaseEnabled && (
                 <>
@@ -137,7 +138,7 @@ export function SettingsContent({
               )}
             </TabsContent>
 
-            <TabsContent value="dashboard" className="space-y-6 px-6">
+            <TabsContent value="dashboard" className="space-y-6 px-6 overflow-y-auto">
               <div className="text-sm text-muted-foreground">
                 The analytics dashboard lives in a dedicated page due to the amount of information.
               </div>
@@ -150,7 +151,7 @@ export function SettingsContent({
               </div>
             </TabsContent>
 
-            <TabsContent value="appearance" className="space-y-6 px-6">
+            <TabsContent value="appearance" className="space-y-6 px-6 overflow-y-auto">
               <ThemeSelection />
               <LayoutSettings />
               <InteractionPreferences />
@@ -158,22 +159,22 @@ export function SettingsContent({
 
 
 
-            <TabsContent value="models" className="px-6">
+            <TabsContent value="models" className="px-6 overflow-y-auto">
               <SimpleModelsInfo />
               <div className="mt-8">
                 <CleoPersonalitySettings />
               </div>
             </TabsContent>
 
-            <TabsContent value="connections" className="space-y-6 px-6">
+            <TabsContent value="connections" className="space-y-6 px-6 overflow-y-auto">
               <ServiceConnections />
               {/* {isDev && <OllamaSection />} */} {/* Disabled for now */}
               {/* {isDev && <DeveloperTools />} */} {/* Disabled for now */}
             </TabsContent>
-            <TabsContent value="files" className="space-y-6 px-6">
+            <TabsContent value="files" className="space-y-6 px-6 overflow-y-auto">
               <FilesSection />
             </TabsContent>
-            <TabsContent value="agents" className="space-y-6 px-6">
+            <TabsContent value="agents" className="space-y-6 px-6 overflow-y-auto">
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <UsersIcon className="size-16 text-blue-600 mb-4" />
                 <h3 className="text-xl font-semibold mb-2">Sistema Multi-Agente</h3>

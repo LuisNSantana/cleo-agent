@@ -33,7 +33,7 @@
 
 | Mode              | Primary Model           | Use Case                | Context | Cost/1M tokens |
 |-------------------|------------------------|-------------------------|---------|---------------|
-| Balanced+Local    | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
+| Cleo v1 (llama3 8B)    | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
 | Balanced          | openai:gpt-5-mini      | Reasoning, analysis     | 131k    | $1.5-4.0      |
 | Fast              | groq:gpt-oss-120b      | Speed, bulk tasks       | 131k    | $0.1-0.3      |
 

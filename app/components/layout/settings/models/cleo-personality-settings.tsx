@@ -25,7 +25,7 @@ import {
   GraduationCapIcon,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { debounce } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { generatePersonalizedPrompt } from "@/lib/prompts/personality"

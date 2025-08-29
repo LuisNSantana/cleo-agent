@@ -50,6 +50,8 @@ export async function POST(req: Request) {
       debugRag,
     } = parsed.data as ChatRequest
 
+  console.log('[ChatAPI] Incoming model:', model, 'isAuthenticated:', isAuthenticated)
+
   // Auto-enable RAG for personalized responses - always try to retrieve user context
   const autoRagEnabled = true
   const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
@@ -375,6 +377,13 @@ export async function POST(req: Request) {
         } catch {}
 
         const baseUrl = new URL('/api/multi-model-chat', req.url)
+        // If running under a dev tunnel (ngrok) or mismatched protocol, prefer http for localhost
+        try {
+          const host = baseUrl.hostname
+          if (host === 'localhost' || host === '127.0.0.1') {
+            baseUrl.protocol = 'http:'
+          }
+        } catch {}
         const forwardBody = {
           message: lcMessage,
           type: isMultimodal ? 'multimodal' : 'text',

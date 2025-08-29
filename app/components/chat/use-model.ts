@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/toast"
 import { Chats } from "@/lib/chat-store/types"
-import { MODEL_DEFAULT } from "@/lib/config"
+import { MODEL_DEFAULT, MODEL_DEFAULT_GUEST } from "@/lib/config"
 import type { UserProfile } from "@/lib/user/types"
 import { useCallback, useState } from "react"
 
@@ -27,10 +27,16 @@ export function useModel({
   chatId,
 }: UseModelProps) {
   // Calculate the effective model based on priority: chat model > default > first favorite model
-  const getEffectiveModel = useCallback(() => {
+  const getEffectiveModel = useCallback((): string => {
     const firstFavoriteModel = user?.favorite_models?.[0]
-    return currentChat?.model || MODEL_DEFAULT || firstFavoriteModel
-  }, [currentChat?.model, user?.favorite_models])
+    // If no authenticated user, use guest default
+    if (!user) {
+      return (currentChat?.model ?? MODEL_DEFAULT_GUEST) as string
+    }
+  // Authenticated user: prefer the app's default model (MODEL_DEFAULT) before user's favorites
+  // This ensures logged-in users see Cleo (local model) by default unless the chat has an explicit model
+  return (currentChat?.model ?? MODEL_DEFAULT ?? firstFavoriteModel) as string
+  }, [currentChat?.model, user?.favorite_models, user])
 
   // Use local state only for temporary overrides, derive base value from props
   const [localSelectedModel, setLocalSelectedModel] = useState<string | null>(
@@ -38,7 +44,7 @@ export function useModel({
   )
 
   // The actual selected model: local override or computed effective model
-  const selectedModel = localSelectedModel || getEffectiveModel()
+  const selectedModel: string = localSelectedModel ?? getEffectiveModel()
 
   // Function to handle model changes with proper validation and error handling
   const handleModelChange = useCallback(
@@ -80,7 +86,7 @@ export function useModel({
   )
 
   return {
-    selectedModel,
+  selectedModel,
     handleModelChange,
   }
 }

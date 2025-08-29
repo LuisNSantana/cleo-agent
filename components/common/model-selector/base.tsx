@@ -35,7 +35,7 @@ import {
   MagnifyingGlassIcon,
   StarIcon,
 } from "@phosphor-icons/react"
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { ProModelDialog } from "./pro-dialog"
 import { SubMenu } from "./sub-menu"
 
@@ -60,6 +60,16 @@ export function ModelSelector({
     (provider) => provider.id === currentModel?.icon
   )
   const isMobile = useBreakpoint(768)
+  
+  // Prevent hydration mismatch by deferring mobile layout until after mount
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+  
+  // En modo guest, siempre mostrar el botón completo para evitar hidratación y mejor UX
+  // Ahora también para usuarios autenticados para optimizar espacio y consistencia
+  const shouldShowFullButton = true
 
   const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -139,19 +149,19 @@ export function ModelSelector({
       variant="outline"
       className={cn(
         "dark:bg-secondary",
-        // Mobile: perfect circle, center content, icon fills circle
-        isMobile ? "size-9 p-0 rounded-full flex items-center justify-center" : "justify-between",
+        // Guest users y desktop: botón completo. Mobile autenticado: círculo
+        shouldShowFullButton ? "justify-between" : "size-9 p-0 rounded-full flex items-center justify-center",
         className
       )}
       disabled={isLoadingModels}
     >
-      <div className={cn("flex items-center gap-2", isMobile && "justify-center w-full")}> 
+      <div className={cn("flex items-center gap-2", !shouldShowFullButton && "justify-center w-full")}> 
         {currentProvider?.icon && (
-          <currentProvider.icon className={cn(isMobile ? "size-6" : "size-5")} />
+          <currentProvider.icon className={cn(shouldShowFullButton ? "size-5" : "size-6")} />
         )}
-        {!isMobile && <span>{currentModel?.name || "Select model"}</span>}
+        {shouldShowFullButton && <span>{currentModel?.name || "Select model"}</span>}
       </div>
-      {!isMobile && <CaretDownIcon className="size-4 opacity-50" />}
+      {shouldShowFullButton && <CaretDownIcon className="size-4 opacity-50" />}
     </Button>
   )
 
@@ -172,17 +182,18 @@ export function ModelSelector({
                 size="sm"
                 variant="secondary"
                 className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent",
-                  isMobile ? "w-9 p-0" : "w-auto",
+                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent justify-between",
                   className
                 )}
                 type="button"
               >
-                {currentProvider?.icon && (
-                  <currentProvider.icon className="size-5" />
-                )}
-                {!isMobile && currentModel?.name}
-                {!isMobile && <CaretDownIcon className="size-4" />}
+                <div className="flex items-center gap-2">
+                  {currentProvider?.icon && (
+                    <currentProvider.icon className="size-5" />
+                  )}
+                  <span>{currentModel?.name || "Select model"}</span>
+                </div>
+                <CaretDownIcon className="size-4" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>

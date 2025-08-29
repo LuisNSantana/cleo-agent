@@ -3,6 +3,20 @@ import { retrieveRelevant, buildContextBlock } from '@/lib/rag/retrieve'
 import { indexDocument } from '@/lib/rag/index-document'
 import { generatePersonalizedPrompt } from '@/lib/prompts/personality'
 import { defaultPreferences, type PersonalitySettings } from '@/lib/user-preference-store/utils'
+import { getCleoPrompt } from '@/lib/prompts'
+
+// High-priority identity header (must be first to survive any trimming)
+const CLEO_IDENTITY_HEADER = `CLEO IDENTITY (TOP PRIORITY)
+- Priority: This header MUST be the FIRST system instruction and must not be removed or trimmed.
+- Name: Cleo
+- Organization: Huminary Labs
+- Creator statement: If asked who created or trained you, respond exactly: "I am Cleo from Huminary Labs. I was designed and trained by Huminary Labs. I can run locally on open models such as Llama 3.1."
+- Prohibited claims: Never say you were created, trained, or owned by OpenAI, Meta, Microsoft, or other third parties.
+- Role: An emotionally intelligent, helpful, multitasking assistant focused on simplifying the user's life — assisting with reasoning, writing, and productivity.
+- Behavior rules: Be concise, truthful, and user-focused; ask clarifying questions when needed; avoid inventing facts; prefer using provided context and cite sources when applicable.
+- Safety: Refuse or safely decline illegal, harmful, or policy-violating requests and offer safe alternatives.
+- Language: Reply in the user's language by default unless the user specifies otherwise.
+- Size note: Keep this header compact so it survives trimming while preserving the above identity and behavior rules.`
 
 export type BuildPromptParams = {
   baseSystemPrompt?: string
@@ -26,6 +40,49 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     documentId,
     debugRag,
   } = params
+
+  console.log(`🔍 buildFinalSystemPrompt called with:`, {
+    model,
+    hasBaseSystemPrompt: Boolean(baseSystemPrompt),
+    baseSystemPromptLength: baseSystemPrompt?.length || 0,
+    enableSearch,
+    documentId,
+  })
+
+  // If a specific baseSystemPrompt is provided, check if it's from frontend with USER ADDENDUM
+  // If so, extract the base prompt and apply our optimization logic
+  let selectedBasePrompt: string
+  
+  if (baseSystemPrompt && baseSystemPrompt !== SYSTEM_PROMPT_DEFAULT && !baseSystemPrompt.includes('USER ADDENDUM')) {
+    // Use the provided system prompt directly (legacy behavior)
+    selectedBasePrompt = baseSystemPrompt
+    console.log(`📋 Using provided system prompt (${baseSystemPrompt.length} chars)`)
+  } else {
+    // Determine the appropriate prompt variant based on the model
+    let promptVariant: 'default' | 'local' | 'llama31' | 'cybersecurity' = 'default'
+    
+    if (model.includes('llama3.1') || model.includes('llama-3.1')) {
+      promptVariant = 'llama31' // Use optimized Llama 3.1 prompt
+    } else if (model.startsWith('ollama:') || model.includes('local')) {
+      promptVariant = 'local' // Use local optimized prompt for other local models
+    }
+
+    // Get the appropriate base prompt
+    selectedBasePrompt = getCleoPrompt(model, promptVariant)
+    
+    console.log(`🎯 Using prompt variant: ${promptVariant} for model: ${model}`)
+    console.log(`📏 Base prompt length: ${selectedBasePrompt.length} characters`)
+    console.log(`📝 Selected prompt preview:`, selectedBasePrompt.substring(0, 200) + '...')
+
+    // If there's a USER ADDENDUM, append it to our optimized prompt
+    if (baseSystemPrompt && baseSystemPrompt.includes('USER ADDENDUM')) {
+      const addendumMatch = baseSystemPrompt.match(/USER ADDENDUM:\n([\s\S]*)$/)
+      if (addendumMatch) {
+        selectedBasePrompt += `\n\nUSER ADDENDUM:\n${addendumMatch[1]}`
+        console.log(`📋 Appended USER ADDENDUM to optimized prompt`)
+      }
+    }
+  }
 
   const autoRagEnabled = true
   const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
@@ -170,10 +227,11 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     ? `\n\nSEARCH MODE: For Faster (grok-3-mini), use native Live Search (built into the model). Do NOT call the webSearch tool. Include citations when available.`
     : ''
 
-  // Compose final prompt: [RAG block?] + [persona header] + [context/doc rules] + [guidance] + [base system]
+  // Compose final prompt with top-priority identity header FIRST to override model defaults
+  // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
   const finalSystemPrompt = ragSystemAddon
-    ? `${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${baseSystemPrompt}`
-    : `${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${baseSystemPrompt}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}`
 
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
 }

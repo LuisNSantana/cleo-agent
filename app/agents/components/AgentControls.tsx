@@ -154,7 +154,6 @@ export function AgentControls({ selectedAgent, onAgentUpdate }: AgentControlsPro
               <SelectContent>
                 <SelectItem value="langchain:balanced">Balanced</SelectItem>
                 <SelectItem value="langchain:fast">Fast</SelectItem>
-                <SelectItem value="langchain:balanced-local">Balanced Local</SelectItem>
               </SelectContent>
               </Select>
             </div>

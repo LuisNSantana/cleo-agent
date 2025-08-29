@@ -64,6 +64,9 @@ export function MultiModelSelector({
     selectedModelIds.includes(model.id)
   )
   const isMobile = useBreakpoint(768)
+  
+  // Siempre mostrar el botón completo para consistencia con ModelSelector
+  const shouldShowFullButton = true
 
   const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)

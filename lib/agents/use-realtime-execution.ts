@@ -153,3 +153,6 @@ export function useRealTimeExecution() {
       .slice(0, 10)
   }
 }
+
+// Re-export ExecutionStep type for convenience
+export type { ExecutionStep } from './types'

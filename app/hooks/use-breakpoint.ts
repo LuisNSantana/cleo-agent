@@ -6,6 +6,9 @@ export function useBreakpoint(breakpoint: number) {
   >(undefined)
 
   React.useEffect(() => {
+    // Add safety check for window object
+    if (typeof window === 'undefined') return
+
     const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
     const onChange = () => {
       setIsBelowBreakpoint(window.innerWidth < breakpoint)

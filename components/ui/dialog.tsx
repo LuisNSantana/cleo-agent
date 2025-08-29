@@ -5,16 +5,36 @@ import { X } from "@phosphor-icons/react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import * as React from "react"
 
+// Simple context to share a stable id between trigger and content to avoid
+// hydration mismatches when Radix auto-generates ids differently on server/client.
+const DialogIdContext = React.createContext<string | null>(null)
+
 function Dialog({
+  children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const id = React.useId()
+  return (
+    <DialogIdContext.Provider value={id}>
+      <DialogPrimitive.Root data-slot="dialog" {...props}>
+        {children}
+      </DialogPrimitive.Root>
+    </DialogIdContext.Provider>
+  )
 }
 
 function DialogTrigger({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+  const ctx = React.useContext(DialogIdContext)
+  const contentId = ctx ? `dialog-content-${ctx}` : undefined
+  return (
+    <DialogPrimitive.Trigger
+      data-slot="dialog-trigger"
+      aria-controls={contentId}
+      {...props}
+    />
+  )
 }
 
 function DialogPortal({
@@ -53,10 +73,14 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   hasCloseButton?: boolean
 }) {
+  const ctx = React.useContext(DialogIdContext)
+  const myId = ctx ? `dialog-content-${ctx}` : undefined
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        id={myId}
         data-slot="dialog-content"
         className={cn(
           "bg-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border p-6 backdrop-blur-xl duration-200 sm:max-w-lg",

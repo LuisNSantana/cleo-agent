@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Intelligent Router for Multi-Model Selection
  * 
@@ -106,6 +107,10 @@ export class ModelRouter {
       }
     }
     
+    // Default when no explicit routing is provided
+    return this.getDefaultRoute()
+  }
+
   /**
    * Route for balanced-local configuration
    * Primary: ollama:llama3.1:8b, Fallback: groq:gpt-oss-120b, Vision: openai:gpt-4o-mini

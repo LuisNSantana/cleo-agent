@@ -63,8 +63,10 @@ export function DrawDrawer({ open, onOpenChange, onSendToChat }: {
         <div className="h-[calc(85vh-56px)] grid grid-cols-1 md:grid-cols-2">
           <div className="relative border-r">
             {/* Modern editor */}
-            <div className="p-3 h-full">
-              <TldrawWrapper autosave={autoAnalyze} autosaveDebounce={1200} />
+            <div className="p-3 h-full" data-vaul-drawer-ignore style={{ touchAction: 'none', WebkitUserSelect: 'none', msTouchAction: 'none' }}>
+              <div style={{ width: '100%', height: '100%', touchAction: 'none' }}>
+                <TldrawWrapper autosave={autoAnalyze} autosaveDebounce={1200} />
+              </div>
             </div>
           </div>
           {/* Right panel */}

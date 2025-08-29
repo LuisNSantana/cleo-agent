@@ -293,7 +293,6 @@ export function ChatInput({
                 selectedModelId={selectedModel}
                 setSelectedModelIdAction={onSelectModelAction}
                 isUserAuthenticated={isUserAuthenticated}
-                className="rounded-full"
               />
               {/* Mobile Draw Button */}
               {isMobile && (
