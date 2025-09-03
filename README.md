@@ -1,20 +1,61 @@
 
-# Cleo v1.5 – The Community-Driven Hybrid AI Agent
+# Cleo v3.0 – Multi-Agent AI Assistant with Emma E-commerce Integration
 
-**Cleo by Huminary Labs is a next-generation, emotionally intelligent AI assistant built for everyone.**
+**Cleo by Huminary Labs is a next-generation, emotionally intelligent AI assistant with specialized multi-agent capabilities.**
 
 ![cleo cover](./public/logocleo.png)
 
 ---
 
-## 🚀 Why Cleo?
+## 🚀 What's New in v3.0
 
-- **Hybrid AI Architecture:** Cleo combines local models (Ollama, HuminaryLabs) and cloud models (OpenAI, Groq, Gemini, Anthropic, Perplexity) for the best speed, privacy, and cost.
-- **LangChain Orchestration:** Cleo uses LangChain to route every task to the optimal model, balancing cost, context, and intelligence automatically.
-- **Local-First, Cloud-Ready:** Run Cleo 100% locally (RTX 3080+ recommended) or leverage the cloud for advanced tasks. No vendor lock-in.
-- **NotebookLM-Ready Docs:** All documentation is structured for Google NotebookLM, so you can use Cleo’s knowledge base for research, learning, and custom workflows.
-- **Archon Integration:** Advanced task management, knowledge tracking, and extensibility for power users and teams.
-- **Community Focus:** Open source, transparent, and designed for collaboration. Join, contribute, and help Cleo grow smarter!
+- **Multi-Agent Architecture:** Cleo coordinates with specialized agents (Toby, Ami, Peter, Emma) for different domains
+- **Emma E-commerce Agent:** Shopify specialist with per-user credential management and sales analytics
+- **Database-Native Agents:** Real-time agent persistence with Supabase backend
+- **Delegation System:** Cleo automatically delegates tasks to the best specialist agent
+- **Universal Agent Modal:** Rich agent details with tools, use cases, and configurations
+- **Protected Default Agents:** Cleo (supervisor) cannot be deleted, ensuring system stability
+
+---
+
+## 🤖 Meet the Team
+
+### Cleo (Supervisor)
+- **Role**: Emotional intelligence coordinator and task delegator
+- **Specialty**: Human conversation, empathy, task routing
+- **Tools**: Emotion analysis, support provision, delegation to specialists
+
+### Toby (Technical Specialist) 
+- **Role**: Technical analysis and data processing
+- **Specialty**: Research, metrics, information synthesis  
+- **Tools**: Web search, data analysis, technical reports
+
+### Ami (Creative Specialist)
+- **Role**: Creative content and design
+- **Specialty**: Brainstorming, artistic concepts, innovation
+- **Tools**: Creative ideation, narrative creation, design thinking
+
+### Peter (Logic Specialist)
+- **Role**: Mathematical and logical problem solving
+- **Specialty**: Structured reasoning, calculations, optimization
+- **Tools**: Calculator, logical analysis, systematic problem solving
+
+### Emma (E-commerce Specialist) 🆕
+- **Role**: Shopify management and sales analytics
+- **Specialty**: Product catalogs, order processing, customer insights
+- **Tools**: Shopify API integration, sales analytics, inventory management
+
+---
+
+## 🧠 Key Technologies
+
+- **Multi-Agent System**: LangGraph orchestration with specialized agents
+- **Supabase Backend**: Real-time agent persistence, RLS security, analytics
+- **LangChain**: Multi-model routing, tool calling, and context management
+- **Ollama**: Local model runner (recommended: `llama3.1:8b` for best local experience)
+- **HuminaryLabs Models**: Custom local models for privacy and speed
+- **Cloud Providers**: OpenAI (GPT-4o-mini), Groq, Gemini, Anthropic, Perplexity
+- **Shopify Integration**: Per-user credential management and e-commerce analytics
 
 ---
 
@@ -33,10 +74,24 @@
 
 | Mode              | Primary Model           | Use Case                | Context | Cost/1M tokens |
 |-------------------|------------------------|-------------------------|---------|---------------|
-| Cleo v1 (llama3 8B)    | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
-| Balanced          | openai:gpt-5-mini      | Reasoning, analysis     | 131k    | $1.5-4.0      |
-| Fast              | groq:gpt-oss-120b      | Speed, bulk tasks       | 131k    | $0.1-0.3      |
+| Cleo v3 (llama3.1 8B)   | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
+| Balanced          | openai:gpt-4o-mini     | Reasoning, analysis     | 131k    | $1.5-4.0      |
+| Fast              | groq:llama3.1-70b      | Speed, bulk tasks       | 131k    | $0.1-0.3      |
 
+---
+
+## ✨ Features
+
+- **Multi-agent orchestration** with specialized expertise
+- **Real-time agent management** with database persistence
+- **Emma E-commerce agent** with Shopify integration
+- **Per-user credential management** for secure API access
+- **Local + cloud hybrid** (Ollama, HuminaryLabs, OpenAI, Groq, etc.)
+- **Emotionally intelligent chat** with delegation capabilities
+- **Advanced RAG (Retrieval-Augmented Generation)**
+- **Tool calling and automation** across all agents
+- **Protected supervisor agent** (Cleo cannot be deleted)
+- **Universal agent details modal** with comprehensive information
 ---
 
 ## � Features

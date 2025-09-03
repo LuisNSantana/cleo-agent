@@ -4,6 +4,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
+import ShopifyCredentialsManager from '@/components/shopify/ShopifyCredentialsManager'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { PlusIcon, RobotIcon } from '@phosphor-icons/react'
 
@@ -17,6 +18,7 @@ export default function AgentsManagePage() {
     <div className="py-6">
       {/* Main Content */}
       <div className="space-y-8">
+        {/* Agent Management Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -49,6 +51,15 @@ export default function AgentsManagePage() {
               console.log('Delete agent:', id)
             }}
           />
+        </motion.div>
+
+        {/* Shopify Credentials Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <ShopifyCredentialsManager />
         </motion.div>
 
         {/* Empty State */}

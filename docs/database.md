@@ -1,14 +1,16 @@
-# Database Guide (Supabase + Postgres + pgvector)
+# Database Guide (Supabase + Postgres + pgvector) - v3.0
 
-This guide explains the database structure, recent changes (RLS, functions, extensions), and how to configure Supabase to run the project securely.
+This guide explains the database structure, agent management system, recent changes (RLS, functions, extensions), and how to configure Supabase to run the project securely.
 
 ## Quick summary
 - Engine: Postgres (Supabase)
 - Schemas: `public` (primary) and `auth` (managed by Supabase)
 - Extensions: `pgcrypto`, `uuid-ossp`, `vector` (pgvector) — installed in `public`
-- Security: RLS enabled on all user tables. Access restricted using `auth.uid()` (per-user multitenancy).
-- RAG: `vector` columns and hybrid + exact search functions.
-- Analytics: metrics tables per model, tool, session, and conversation.
+- Security: RLS enabled on all user tables. Access restricted using `auth.uid()` (per-user multitenancy)
+- **Agent Management**: Real-time agent persistence with delegation system and default agent initialization
+- **Emma E-commerce Agent**: Shopify specialist with per-user credential management
+- RAG: `vector` columns and hybrid + exact search functions
+- Analytics: metrics tables per model, tool, session, and conversation
 
 ---
 
@@ -31,6 +33,19 @@ Important note about pgvector:
 ## Main tables (public)
 
 Below is a functional map of the most relevant tables. All have RLS enabled and are linked to the user via `user_id` and/or relationships.
+
+### Agent Management System (v3.0)
+- `agents`
+  - Real-time agent configurations per user. Fields: `id (uuid)`, `user_id (uuid)`, `name`, `description`, `role`, `model`, `temperature`, `max_tokens`, `tools (text[])`, `system_prompt`, `color`, `icon`, `tags (text[])`, `is_default (bool)`, `is_active (bool)`, `priority (int)`, `can_delegate (bool)`, `delegated_by (uuid[])`.
+  - FK: `user_id -> users.id`.
+  - **Cleo Protection**: Cleo agent cannot be deleted (role: supervisor).
+  - **Delegation System**: Automatic delegation setup from Cleo to specialists.
+- `default_agent_templates` 
+  - Template configurations for default agents (Cleo, Toby, Ami, Peter, Emma).
+  - Used by initialization function to create default agents for new users.
+- `user_service_connections`
+  - Extended to support Emma's Shopify credentials per user.
+  - Fields include encrypted Shopify tokens, store domain, access scopes.
 
 ### Conversations and messages
 - `chats`
@@ -110,6 +125,15 @@ Primary functions:
 - `public.hybrid_search_document_chunks(p_user_id uuid, p_query_embedding vector, p_query_text text, p_match_count int, p_document_id uuid default null, p_project_id uuid default null, p_min_similarity double precision default 0, p_vector_weight double precision default 0.7, p_text_weight double precision default 0.3)`
   - Combines vector similarity and text ranking (`ts_rank`), returns `hybrid_score`.
   - `search_path = 'public'`.
+
+### Agent Management Functions (v3.0)
+- `public.initialize_user_default_agents(target_user_id uuid)`
+  - Automatically creates default agents (Cleo, Toby, Ami, Peter, Emma) for new users.
+  - Sets up delegation relationships: Cleo can delegate to all specialists.
+  - Called automatically on user registration or manually for existing users.
+- Trigger: `on_agents_insert_update_delegation()`
+  - Automatically maintains delegation relationships when agents are created/updated.
+  - Ensures Cleo can delegate to new agents and specialists can receive from Cleo.
 
 pgvector requirements:
 - `vector` type available in `public`.

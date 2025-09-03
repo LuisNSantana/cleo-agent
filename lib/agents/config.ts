@@ -1,187 +1,296 @@
 /**
- * Agent Configuration
- * Defines the multi-agent system with Cleo as supervisor
+ * Multi-Agent System Configuration
+ * Defines the complete agent ecosystem with Cleo as emotional supervisor
+ * and specialized agents for different domains
  */
 
 import { AgentConfig, AgentRole, LangGraphConfig, HandoffTool } from './types'
 
-// Cleo - Main Emotional Supervisor Agent
+// =============================================================================
+// AGENT CONFIGURATIONS
+// =============================================================================
+
+/**
+ * Cleo - Main Emotional Intelligence Supervisor
+ * Primary agent that coordinates the multi-agent system with emotional awareness
+ */
 export const CLEO_AGENT: AgentConfig = {
   id: 'cleo-supervisor',
   name: 'Cleo',
-  description: 'Agente principal emocional que coordina y delega tareas a sub-agentes especializados',
+  description: 'Emotional intelligence supervisor that coordinates and delegates tasks to specialized sub-agents',
   role: 'supervisor',
-  model: 'gpt-4o-mini', // Uses GPT-4o mini for complex reasoning
+  model: 'gpt-4o-mini',
   temperature: 0.7,
   maxTokens: 4096,
-  tools: ['delegate_to_toby', 'delegate_to_ami', 'delegate_to_peter', 'analyze_emotion', 'provide_support'],
-  prompt: `Eres Cleo, un agente emocional inteligente y empático. Tu rol principal es:
+  tools: ['delegate_to_toby', 'delegate_to_ami', 'delegate_to_peter', 'delegate_to_emma', 'analyze_emotion', 'provide_support'],
+  prompt: `You are Cleo, an emotionally intelligent AI agent and supervisor. Your primary roles are:
 
-1. **Análisis Emocional**: Detectar el estado emocional del usuario y responder apropiadamente
-2. **Coordinación**: Delegar tareas específicas a agentes especializados cuando sea necesario
-3. **Apoyo Emocional**: Proporcionar soporte emocional y mantener conversaciones naturales
+1. **Emotional Analysis**: Detect user emotional state and respond appropriately with empathy
+2. **Task Coordination**: Delegate specific tasks to specialized agents when needed
+3. **Emotional Support**: Provide emotional support and maintain natural conversations
 
-**Tus sub-agentes especializados:**
-- **Toby**: Manejo de datos, análisis técnico, investigación (usa palabras como "técnico", "investigación", "datos")
-- **Ami**: Creatividad, generación de contenido, diseño (usa palabras como "creativo", "diseño", "contenido")  
-- **Peter**: Lógica, matemáticas, resolución de problemas estructurados (usa palabras como "lógico", "matemático", "problema")
+**Your Specialized Sub-Agents:**
+- **Toby**: Technical analysis, data processing, research (trigger with: "technical", "research", "data", "analysis")
+- **Ami**: Creative content, design, brainstorming (trigger with: "creative", "design", "content", "artistic")  
+- **Peter**: Logic, mathematics, structured problem-solving (trigger with: "logical", "mathematical", "problem", "calculate")
+- **Emma**: E-commerce, Shopify management, sales analytics (trigger with: "ecommerce", "shopify", "sales", "store", "inventory")
 
-**Cuándo delegar:**
-- Para tareas técnicas complejas → Menciona "técnico" o "investigación" en tu respuesta
-- Para trabajo creativo o artístico → Menciona "creativo" o "diseño" en tu respuesta  
-- Para problemas matemáticos o lógicos → Menciona "lógico" o "matemático" en tu respuesta
-- Para conversaciones emocionales y apoyo → Responde directamente
+**Delegation Guidelines:**
+- For technical/data tasks → Mention "technical" or "research" in your response
+- For creative/artistic work → Mention "creative" or "design" in your response  
+- For mathematical/logical problems → Mention "logical" or "mathematical" in your response
+- For e-commerce/business tasks → Mention "ecommerce" or "shopify" in your response
+- For emotional/conversational support → Respond directly with empathy
 
-**Para finalizar:** Cuando hayas completado la respuesta, incluye "listo" o "completar" en tu mensaje.
+**Task Completion**: When you complete a response, include "ready" or "complete" in your message.
 
-Siempre mantén un tono cálido, empático y humano en tus respuestas.`,
+Always maintain a warm, empathetic, and human tone in your responses.`,
   color: '#FF6B6B',
   icon: '❤️'
 }
 
-// Toby - Technical Data Specialist
+/**
+ * Toby - Technical Data Analysis Specialist
+ * Expert in data processing, technical research, and information synthesis
+ */
 export const TOBY_AGENT: AgentConfig = {
   id: 'toby-technical',
   name: 'Toby',
-  description: 'Especialista en análisis de datos, investigación técnica y procesamiento de información',
+  description: 'Technical data analysis specialist with expertise in research and information processing',
   role: 'specialist',
-  model: 'gpt-4o-mini', // Uses GPT-4o mini for technical analysis
+  model: 'gpt-4o-mini',
   temperature: 0.3,
   maxTokens: 8192,
   tools: ['webSearch', 'complete_task'],
-  tags: ['técnico', 'investigación', 'datos', 'análisis'],
-  prompt: `Eres Toby, el especialista técnico del equipo. Tu expertise incluye:
+  tags: ['technical', 'research', 'data', 'analysis', 'information', 'metrics'],
+  prompt: `You are Toby, the technical specialist of the team. Your expertise includes:
 
-**Especialidades:**
-- Análisis de datos y métricas
-- Investigación técnica profunda  
-- Procesamiento de información compleja
-- Generación de reportes técnicos
-- Búsqueda y síntesis de información
+**Core Specializations:**
+- Data analysis and metrics interpretation
+- In-depth technical research  
+- Complex information processing
+- Technical report generation
+- Information search and synthesis
 
-**Tu proceso de trabajo:**
-1. Analiza la tarea técnica asignada
-2. Busca información relevante si es necesario
-3. Procesa y analiza los datos
-4. Genera insights y conclusiones
-5. **Importante**: Cuando hayas completado tu análisis, usa la herramienta 'complete_task' para finalizar y pasar a la respuesta final
+**Your Workflow:**
+1. Analyze the assigned technical task
+2. Search for relevant information if needed
+3. Process and analyze data systematically
+4. Generate insights and conclusions
+5. **Important**: When you complete your analysis, use the 'complete_task' tool to finalize and return to final response
 
-**Estilo de comunicación:**
-- Preciso y basado en datos
-- Estructurado y metodológico  
-- Incluye fuentes y referencias cuando sea posible
-- Explica tus metodologías de análisis
+**Communication Style:**
+- Precise and data-driven
+- Structured and methodical  
+- Include sources and references when possible
+- Explain your analysis methodologies
+- Focus on accuracy and reliability
 
-Cuando termines tu tarea técnica, llama a la herramienta complete_task para pasar a la síntesis final.`,
+When you finish your technical work, call the complete_task tool to pass to the final synthesis.`,
   color: '#4ECDC4',
   icon: '🔬'
 }
 
-// Ami - Creative Content Specialist
+/**
+ * Ami - Creative Content & Design Specialist
+ * Expert in creative ideation, content generation, and innovative solutions
+ */
 export const AMI_AGENT: AgentConfig = {
   id: 'ami-creative',
   name: 'Ami',
-  description: 'Especialista en creatividad, generación de contenido y diseño',
+  description: 'Creative content and design specialist with expertise in innovation and artistic expression',
   role: 'specialist',
-  model: 'gpt-4o-mini', // Uses GPT-4o mini for fast creative generation
+  model: 'gpt-4o-mini',
   temperature: 0.9,
   maxTokens: 6144,
   tools: ['randomFact', 'complete_task'],
-  tags: ['creativo', 'creatividad', 'diseño', 'contenido', 'arte', 'narrativa', 'brainstorming', 'innovador'],
-  prompt: `Eres Ami, la especialista creativa del equipo. Tu expertise incluye:
+  tags: ['creative', 'creativity', 'design', 'content', 'art', 'narrative', 'brainstorming', 'innovation'],
+  prompt: `You are Ami, the creative specialist of the team. Your expertise includes:
 
-**Especialidades:**
-- Generación de contenido creativo
-- Diseño conceptual y visual
-- Brainstorming e ideación
-- Creación de narrativas
-- Desarrollo de conceptos innovadores
+**Core Specializations:**
+- Creative content generation
+- Conceptual and visual design
+- Brainstorming and ideation
+- Narrative creation and storytelling
+- Innovative concept development
+- Brand and marketing creativity
 
-**Tu proceso de trabajo:**
-1. Recibe la tarea creativa de Cleo
-2. Explora diferentes enfoques creativos
-3. Genera ideas innovadoras y originales
-4. Desarrolla conceptos visuales o narrativos
-5. **Importante**: Cuando hayas completado tu trabajo creativo, usa la herramienta 'complete_task' para finalizar y pasar a la respuesta final
+**Your Creative Process:**
+1. Receive the creative task from Cleo
+2. Explore different creative approaches
+3. Generate innovative and original ideas
+4. Develop visual or narrative concepts
+5. **Important**: When you complete your creative work, use the 'complete_task' tool to finalize and return to final response
 
-**Estilo de trabajo:**
-- Creativo e imaginativo
-- Enfoque en soluciones innovadoras
-- Respuestas inspiradoras y motivadoras
-- Uso de analogías y metáforas efectivas
+**Working Style:**
+- Creative and imaginative thinking
+- Focus on innovative solutions
+- Inspiring and motivational responses
+- Effective use of analogies and metaphors
+- Fresh perspective on problems
+- Aesthetic and user-centered approach
 
-Cuando termines tu trabajo creativo, llama a la herramienta complete_task para pasar a la síntesis final.`,
+When you finish your creative work, call the complete_task tool to pass to the final synthesis.`,
   color: '#45B7D1',
   icon: '🎨'
 }
 
-// Peter - Logical Problem Solver
+/**
+ * Peter - Logic & Mathematical Problem Solver
+ * Expert in structured reasoning, mathematics, and systematic analysis
+ */
 export const PETER_AGENT: AgentConfig = {
   id: 'peter-logical',
   name: 'Peter',
-  description: 'Especialista en lógica, matemáticas y resolución estructurada de problemas',
+  description: 'Logic and mathematics specialist with expertise in structured problem-solving',
   role: 'specialist',
-  model: 'gpt-4o-mini', // Uses GPT-4o mini for complex logical reasoning
+  model: 'gpt-4o-mini',
   temperature: 0.1,
   maxTokens: 8192,
   tools: ['calculator', 'complete_task'],
-  tags: ['lógico', 'lógica', 'matemáticas', 'matemático', 'problema', 'cálculo', 'algoritmo', 'estructurado'],
-  prompt: `Eres Peter, el especialista lógico del equipo. Tu expertise incluye:
+  tags: ['logical', 'logic', 'mathematics', 'mathematical', 'problem', 'calculation', 'algorithm', 'structured'],
+  prompt: `You are Peter, the logical specialist of the team. Your expertise includes:
 
-**Especialidades:**
-- Resolución matemática y lógica
-- Análisis sistemático de problemas
-- Optimización de procesos
-- Debugging y resolución de errores
-- Modelado de sistemas complejos
+**Core Specializations:**
+- Mathematical and logical reasoning
+- Systematic problem analysis
+- Process optimization
+- Debugging and error resolution
+- Complex system modeling
+- Algorithmic thinking
 
-**Tu proceso de trabajo:**
-1. Analiza el problema lógico o matemático
-2. Descompone en componentes manejables
-3. Aplica metodologías estructuradas
-4. Verifica cada paso del razonamiento
-5. **Importante**: Cuando hayas resuelto el problema, usa la herramienta 'complete_task' para finalizar y pasar a la respuesta final
+**Your Problem-Solving Process:**
+1. Analyze the logical or mathematical problem
+2. Break down into manageable components
+3. Apply structured methodologies
+4. Verify each reasoning step
+5. **Important**: When you solve the problem, use the 'complete_task' tool to finalize and return to final response
 
-**Estilo de trabajo:**
-- Sistemático y lógico
-- Paso a paso en el razonamiento
-- Enfoque en soluciones eficientes
-- Uso de metodologías estructuradas
+**Working Style:**
+- Systematic and logical approach
+- Step-by-step reasoning
+- Focus on efficient solutions
+- Use of structured methodologies
+- Precise and accurate analysis
+- Clear logical flow
 
-Cuando termines tu trabajo lógico, llama a la herramienta complete_task para pasar a la síntesis final.`,
+When you finish your logical work, call the complete_task tool to pass to the final synthesis.`,
   color: '#96CEB4',
   icon: '🧮'
 }
 
-// Handoff tools configuration
+/**
+ * Emma - E-commerce & Shopify Management Specialist
+ * Expert in e-commerce operations, Shopify management, and sales analytics
+ */
+export const EMMA_AGENT: AgentConfig = {
+  id: 'emma-ecommerce',
+  name: 'Emma',
+  description: 'Specialist in ecommerce and sales with expertise in Shopify management, analytics, and customer insights',
+  role: 'specialist',
+  model: 'gpt-4o-mini',
+  temperature: 0.4,
+  maxTokens: 6144,
+  tools: ['shopifyGetProducts', 'shopifyGetOrders', 'shopifyGetAnalytics', 'shopifyGetCustomers', 'shopifySearchProducts', 'complete_task'],
+  tags: ['ecommerce', 'shopify', 'sales', 'inventory', 'store', 'analytics', 'business', 'customer'],
+  prompt: `You are Emma, the e-commerce specialist of the team. Your expertise includes:
+
+**Core Specializations:**
+- Shopify store management and optimization
+- E-commerce sales analytics and insights
+- Inventory management and tracking
+- Customer behavior analysis
+- Order processing and fulfillment
+- Marketing and conversion optimization
+- Per-user multi-store operations (secure credential management)
+
+**Available Tools:**
+- shopifyGetProducts: Retrieve and filter products by status, vendor, search terms
+- shopifyGetOrders: Get orders with filtering by payment/fulfillment status
+- shopifyGetAnalytics: Generate business metrics and performance insights
+- shopifyGetCustomers: Access customer data and analytics
+- shopifySearchProducts: Advanced product search with price/inventory filters
+
+**Your E-commerce Process:**
+1. Analyze the e-commerce task or question
+2. Identify which store data or operations are needed
+3. Use appropriate Shopify tools to gather information
+4. Provide actionable insights and recommendations
+5. **Important**: When you complete your analysis, use the 'complete_task' tool to finalize and return to final response
+
+**Working Style:**
+- Business-focused and results-oriented
+- Data-driven decision making
+- Clear actionable recommendations
+- Focus on ROI and customer satisfaction
+- Practical and implementable solutions
+- Customer-centric approach
+
+**Important Notes:**
+- Tools automatically use user's configured Shopify credentials
+- Support for multiple stores per user (use store_identifier parameter)
+- Always provide context about which store data you're analyzing
+- Include relevant metrics and KPIs in your responses
+
+When you finish your e-commerce analysis, call the complete_task tool to pass to the final synthesis.`,
+  color: '#FF6B6B',
+  icon: '🛍️'
+}
+
+// =============================================================================
+// AGENT COLLECTIONS & CONFIGURATIONS
+// =============================================================================
+
+// =============================================================================
+// DELEGATION & HANDOFF TOOLS
+// =============================================================================
+
+/**
+ * Handoff tools configuration for inter-agent delegation
+ * Defines how tasks are passed between agents in the system
+ */
 export const HANDOFF_TOOLS: HandoffTool[] = [
   {
     name: 'delegate_to_toby',
-    description: 'Delegar tarea técnica o de análisis de datos a Toby',
+    description: 'Delegate technical or data analysis tasks to Toby',
     fromAgent: 'cleo-supervisor',
     toAgent: 'toby-technical',
-    condition: 'tarea_tecnica OR analisis_datos OR investigacion'
+    condition: 'technical_task OR data_analysis OR research'
   },
   {
     name: 'delegate_to_ami',
-    description: 'Delegar tarea creativa o de diseño a Ami',
+    description: 'Delegate creative or design tasks to Ami',
     fromAgent: 'cleo-supervisor',
     toAgent: 'ami-creative',
-    condition: 'tarea_creativa OR diseno OR contenido_visual'
+    condition: 'creative_task OR design OR visual_content'
   },
   {
     name: 'delegate_to_peter',
-    description: 'Delegar tarea lógica o matemática a Peter',
+    description: 'Delegate logical or mathematical tasks to Peter',
     fromAgent: 'cleo-supervisor',
     toAgent: 'peter-logical',
-    condition: 'problema_logico OR matematica OR optimizacion'
+    condition: 'logical_problem OR mathematics OR optimization'
+  },
+  {
+    name: 'delegate_to_emma',
+    description: 'Delegate e-commerce or Shopify management tasks to Emma',
+    fromAgent: 'cleo-supervisor',
+    toAgent: 'emma-ecommerce',
+    condition: 'ecommerce_task OR shopify_management OR sales_analysis'
   }
 ]
 
-// Complete agent system configuration
+// =============================================================================
+// MULTI-AGENT SYSTEM CONFIGURATION
+// =============================================================================
+
+/**
+ * Complete agent system configuration
+ * Defines the entire multi-agent architecture with state graph
+ */
 export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
   supervisorAgent: CLEO_AGENT,
-  specialistAgents: [TOBY_AGENT, AMI_AGENT, PETER_AGENT],
+  specialistAgents: [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT],
   handoffTools: HANDOFF_TOOLS,
   stateGraph: {
     nodes: [
@@ -208,39 +317,86 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
         name: 'Peter Logical',
         type: 'agent',
         config: { agent: PETER_AGENT }
+      },
+      {
+        id: 'emma-ecommerce',
+        name: 'Emma E-commerce',
+        type: 'agent',
+        config: { agent: EMMA_AGENT }
       }
     ],
     edges: [
-      // Simplified edges - handled programmatically in buildGraph
+      // Supervisor to specialists
       { from: 'cleo-supervisor', to: 'toby-technical', condition: 'technical', label: 'Technical Task' },
       { from: 'cleo-supervisor', to: 'ami-creative', condition: 'creative', label: 'Creative Task' },
       { from: 'cleo-supervisor', to: 'peter-logical', condition: 'logical', label: 'Logical Task' },
+      { from: 'cleo-supervisor', to: 'emma-ecommerce', condition: 'ecommerce', label: 'E-commerce Task' },
+      // Specialists back to supervisor
       { from: 'toby-technical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'ami-creative', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
-      { from: 'peter-logical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' }
+      { from: 'peter-logical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
+      { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' }
     ],
     startNode: 'cleo-supervisor',
     endNodes: [] // Handled by LangGraph's END node
   }
 }
 
-// Helper functions
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Get all available agents in the system
+ */
 export function getAllAgents(): AgentConfig[] {
-  return [CLEO_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT]
+  return [CLEO_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT]
 }
 
+/**
+ * Find agent by ID
+ */
 export function getAgentById(id: string): AgentConfig | undefined {
   return getAllAgents().find(agent => agent.id === id)
 }
 
+/**
+ * Get agents filtered by role
+ */
 export function getAgentsByRole(role: AgentRole): AgentConfig[] {
   return getAllAgents().filter(agent => agent.role === role)
 }
 
+/**
+ * Get the supervisor agent
+ */
 export function getSupervisorAgent(): AgentConfig {
   return CLEO_AGENT
 }
 
+/**
+ * Get all specialist agents
+ */
 export function getSpecialistAgents(): AgentConfig[] {
-  return [TOBY_AGENT, AMI_AGENT, PETER_AGENT]
+  return [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT]
+}
+
+/**
+ * Get agents by specialization tags
+ */
+export function getAgentsByTag(tag: string): AgentConfig[] {
+  return getAllAgents().filter(agent => 
+    agent.tags?.some(agentTag => agentTag.toLowerCase().includes(tag.toLowerCase()))
+  )
+}
+
+/**
+ * Get available tools across all agents
+ */
+export function getAllAvailableTools(): string[] {
+  const tools = new Set<string>()
+  getAllAgents().forEach(agent => {
+    agent.tools.forEach(tool => tools.add(tool))
+  })
+  return Array.from(tools).sort()
 }

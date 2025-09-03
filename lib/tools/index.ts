@@ -7,6 +7,7 @@ import { createDocumentTool } from './create-document';
 import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
 import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail';
+import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool } from './shopify';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -277,24 +278,32 @@ export const randomFactTool = tool({
 
 // Export all tools as a collection with categories for modularity
 export const tools = {
-  // Utility Tools
-  weather: weatherTool,
-  time: timeTool,
-  calculator: calculatorTool,
-  cryptoPrice: cryptoPriceTool,
-  randomFact: randomFactTool,
-  
-  // Search Tools
+  // Core Web Search
   webSearch: webSearchTool,
   
+  // Date/Time
+  getCurrentDateTime: timeTool,
+  
+  // Weather
+  weatherInfo: weatherTool,
+  
+  // Math
+  calculator: calculatorTool,
+  
+  // Crypto
+  cryptoPrices: cryptoPriceTool,
+  
+  // Random Fun
+  randomFact: randomFactTool,
+
   // Document Tools
   createDocument: createDocumentTool,
   openDocument: openDocumentTool,
-  
+
   // Google Tools - Calendar
   listCalendarEvents: listCalendarEventsTool,
   createCalendarEvent: createCalendarEventTool,
-  
+
   // Google Tools - Drive
   listDriveFiles: listDriveFilesTool,
   searchDriveFiles: searchDriveFilesTool,
@@ -311,6 +320,13 @@ export const tools = {
   
   // Memory Tools
   memoryAddNote: memoryAddNoteTool,
+
+  // Shopify Tools - E-commerce
+  shopifyGetProducts: shopifyGetProductsTool,
+  shopifyGetOrders: shopifyGetOrdersTool,
+  shopifyGetAnalytics: shopifyGetAnalyticsTool,
+  shopifyGetCustomers: shopifyGetCustomersTool,
+  shopifySearchProducts: shopifySearchProductsTool,
 };
 
 export type ToolName = keyof typeof tools;

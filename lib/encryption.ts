@@ -35,12 +35,72 @@ export function encryptKey(plaintext: string): {
 }
 
 export function decryptKey(encryptedData: string, ivHex: string): string {
-  const [encrypted, authTagHex] = (encryptedData || '').split(":")
-  if (!encrypted || !authTagHex || !ivHex) {
+  console.log('🔓 Debug - decrypting token:', {
+    encrypted_data_length: encryptedData?.length || 0,
+    iv_hex_length: ivHex?.length || 0,
+    encrypted_preview: encryptedData?.substring(0, 50) + '...',
+    iv_preview: ivHex?.substring(0, 20) + '...'
+  })
+
+  const rawParts = (encryptedData || '').split(":")
+  const parts = rawParts.filter(p => p !== undefined && p !== null && p !== '')
+  console.log('🔓 Debug - decrypt parts:', { raw_parts: rawParts.length, parts_after_filter: parts.length })
+  let encrypted = ''
+  let authTagHex = ''
+  let actualIvHex = ''
+
+  if (parts.length === 3) {
+    // Format: encrypted:authTag:iv
+    ;[encrypted, authTagHex, actualIvHex] = parts
+  } else if (parts.length === 2) {
+    // Format: encrypted:authTag with IV provided separately
+    ;[encrypted, authTagHex] = parts
+    actualIvHex = ivHex || ''
+  } else if (parts.length > 3) {
+    // Defensive: if somehow there are extra colons, assume last is iv, previous is tag, rest is encrypted
+    actualIvHex = parts.pop() || ''
+    authTagHex = parts.pop() || ''
+    encrypted = parts.join(':')
+  } else {
+    // Not enough parts to proceed
+    console.error('🚨 Decryption failed - unexpected payload structure:', {
+      parts_count: parts.length,
+      full_payload: encryptedData
+    })
     throw new Error('Invalid encrypted payload for decryptKey')
   }
-  const iv = Buffer.from(ivHex, "hex")
-  const authTag = Buffer.from(authTagHex, "hex")
+
+  if (!encrypted || !authTagHex || !actualIvHex) {
+    console.error('🚨 Decryption failed - missing parts:', {
+      has_encrypted: !!encrypted,
+      has_authTag: !!authTagHex,
+      has_iv: !!actualIvHex,
+      iv_from_param: !!ivHex,
+      iv_from_payload: parts.length >= 3,
+      full_payload: encryptedData
+    })
+    throw new Error('Invalid encrypted payload for decryptKey')
+  }
+
+  const trimmedIvHex = (actualIvHex || '').trim()
+  const trimmedTagHex = (authTagHex || '').trim()
+  if (!/^[0-9a-fA-F]+$/.test(trimmedIvHex) || trimmedIvHex.length % 2 !== 0) {
+    console.error('🚨 Decryption failed - IV not valid hex:', {
+      iv_length: trimmedIvHex.length,
+      iv_preview: trimmedIvHex.substring(0, 8) + '...'
+    })
+    throw new Error('Invalid IV format')
+  }
+  if (!/^[0-9a-fA-F]+$/.test(trimmedTagHex) || trimmedTagHex.length % 2 !== 0) {
+    console.error('🚨 Decryption failed - AuthTag not valid hex:', {
+      tag_length: trimmedTagHex.length,
+      tag_preview: trimmedTagHex.substring(0, 8) + '...'
+    })
+    throw new Error('Invalid auth tag format')
+  }
+
+  const iv = Buffer.from(trimmedIvHex, "hex")
+  const authTag = Buffer.from(trimmedTagHex, "hex")
 
   const decipher = createDecipheriv(ALGORITHM, getKey(), iv)
   decipher.setAuthTag(authTag)

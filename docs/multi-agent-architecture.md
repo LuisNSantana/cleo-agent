@@ -1,4 +1,15 @@
-# Cleo Multi-Agent Architecture Guide - v2.0
+# Cleo Multi-Agent Architecture Guide - v3.0
+
+This guide describes Cleo's multi-agent system end-to-end: backend architecture, modular UI, explainable routing, real-time agent management, and fully integrated database persistence.
+
+## 🚀 Key changes in v3.0
+
+- **Database-Driven Agents**: Full Supabase integration with real-time persistence
+- **Emma E-commerce Agent**: Shopify specialist with per-user credential management
+- **Delegation System**: Cleo as protected supervisor with automatic task delegation
+- **Enhanced UI**: Agent details modal with vibrant design and tool descriptions
+- **Bulletproof Persistence**: All agent changes persist in real-time with RLS security
+- **Protected Default Agents**: Cleo cannot be deleted; Emma auto-initialized for all usersti-Agent Architecture Guide - v2.0
 
 This guide describes Cleo’s multi-agent system end-to-end: backend architecture, modular UI, explainable routing, real-time agent management, and planned database integration.
 
@@ -38,7 +49,7 @@ This guide describes Cleo’s multi-agent system end-to-end: backend architectur
   "runtime": "Node.js 18+",
   "language": "TypeScript 5.0+",
   "orchestration": "LangChain + LangGraph",
-  "state": "In-memory (testing) → Supabase (production)",
+  "state": "Supabase PostgreSQL with real-time persistence",
   "package_manager": "pnpm",
   "model_providers": "Provider-agnostic wiring"
 }
@@ -53,40 +64,45 @@ This guide describes Cleo’s multi-agent system end-to-end: backend architectur
   "components": "ShadCN UI (customized)",
   "animations": "Framer Motion 10+",
   "icons": "Phosphor Icons React",
-  "forms": "React Hook Form + Zod (planned)",
-  "charts": "Recharts (planned)"
+  "forms": "React Hook Form + Zod",
+  "charts": "Recharts (analytics)",
+  "modals": "Universal modal system with agent details"
 }
 ```
 
-### Database (planned)
+### Database (Production Ready)
 ```json
 {
   "database": "Supabase (PostgreSQL 15+)",
   "extensions": ["pgvector", "uuid-ossp", "pgcrypto"],
-  "auth": "Supabase Auth (RLS)",
+  "auth": "Supabase Auth with RLS policies",
   "storage": "Supabase Storage",
-  "realtime": "Supabase Realtime"
+  "realtime": "Supabase Realtime subscriptions",
+  "tables": ["agents", "users", "user_service_connections", "projects", "chats", "messages"]
 }
 ```
 
-### Tools & integrations
+### Tools & Integrations
 ```json
 {
   "rag": "pgvector + embeddings",
   "search": "Built-in + external APIs",
-  "monitoring": "Built-in logging + metrics",
+  "ecommerce": "Shopify API integration per-user",
+  "credentials": "Encrypted storage with user isolation",
+  "monitoring": "Built-in logging + analytics",
   "deployment": "Docker + Docker Compose",
-  "ci_cd": "GitHub Actions (planned)"
+  "ci_cd": "GitHub Actions"
 }
 ```
 
 ---
 
-## Executive summary
+## Executive Summary
 
-- Supervisor-first design: a supervisor agent (Cleo) coordinates specialists
-- Dynamic graph orchestration: the graph is rebuilt automatically when agents are added
-- Deterministic routing: token/tag scoring selects the best agent
+- **Database-Native Architecture**: All agents persist in Supabase with real-time updates
+- **Supervisor-Specialist Pattern**: Cleo (protected supervisor) coordinates specialist agents
+- **Dynamic Graph Orchestration**: Agent graph rebuilds automatically when agents are modified
+- **Delegation System**: Automatic task delegation from Cleo to specialists
 - Premium modular UI: four specialized modules with responsive design
 - Full observability: structured logs and UI events
 - Extensibility: users can register new agents without redeploying
@@ -154,11 +170,13 @@ Orchestrator (`lib/agents/agent-orchestrator.ts`)
 - Provides API-safe methods for runtime registration and graph rebuilds
 
 Built-in agents (`lib/agents/config.ts`)
-- `cleo-supervisor` (role: supervisor)
-- `toby-technical` (role: specialist) — technical/history specialist
-- `ami-creative` (role: specialist) — creative/content specialist
-- `peter-logical` (role: specialist) — logical/mathematics specialist
-- Include descriptive prompts and tags used by the router
+- `cleo-supervisor` (role: supervisor) — emotional intelligence coordinator with task delegation
+- `toby-technical` (role: specialist) — technical analysis and data processing specialist  
+- `ami-creative` (role: specialist) — creative content and design specialist
+- `peter-logical` (role: specialist) — logical and mathematical problem-solving specialist
+- `emma-ecommerce` (role: specialist) — e-commerce and Shopify management specialist
+- All agents include descriptive prompts and tags used by the router
+- Emma includes Shopify tools and per-user credential management
 
 Runtime agents (created from the UI)
 - Registered via `POST /api/agents/register`
