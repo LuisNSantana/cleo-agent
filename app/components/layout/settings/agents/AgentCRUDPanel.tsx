@@ -20,6 +20,7 @@ import {
 } from '@phosphor-icons/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AgentConfig, AgentRole } from '@/lib/agents/types'
+import Image from 'next/image'
 import { useModel } from '@/lib/model-store/provider'
 
 interface AgentCRUDPanelProps {
@@ -337,37 +338,51 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
             >
-              <Card className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group">
+              <Card className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden">
+                {/* Enhanced background gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                <div className="relative z-10">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-12 w-12 rounded-xl">
-                        {getAgentAvatar(agent.name) ? (
-                          <AvatarImage src={getAgentAvatar(agent.name)!} alt={agent.name} />
-                        ) : null}
-                        <AvatarFallback className="rounded-xl" style={{ backgroundColor: agent.color }}>
-                          <BrainIcon className="w-6 h-6 text-white" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <CardTitle className="text-lg text-white">{agent.name}</CardTitle>
-                        <div className="mt-1">
+                    <div className="flex items-center space-x-4">
+                      {/* Enhanced Avatar with better resolution */}
+                      <div className="relative group">
+                        <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
+                          {getAgentAvatar(agent.name) ? (
+                            <AvatarImage 
+                              src={getAgentAvatar(agent.name)!} 
+                              alt={agent.name}
+                              className="object-cover rounded-xl"
+                            />
+                          ) : null}
+                          <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: agent.color }}>
+                            <BrainIcon className="w-8 h-8 text-white" />
+                          </AvatarFallback>
+                        </Avatar>
+                        {/* Subtle glow effect on hover */}
+                        <div 
+                          className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl"
+                          style={{ backgroundColor: agent.color }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
+                        <div className="mb-2">
                           {(() => { const info = getSpecificRoleLabel(agent); return (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
                               {info.label}
                             </span>
                           )})()}
                         </div>
+                        {agent.description && (
+                          <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
+                        )}
                       </div>
                     </div>
                   </div>
                 </CardHeader>
                 
                 <CardContent className="space-y-4">
-                  {agent.description && (
-                    <p className="text-sm text-slate-300 line-clamp-2">{agent.description}</p>
-                  )}
-                  
                   {agent.tags && agent.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
                       {agent.tags.slice(0, 3).map((tag, index) => (
@@ -409,6 +424,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     </div>
                   </div>
                 </CardContent>
+                </div> {/* Close relative z-10 wrapper */}
               </Card>
             </motion.div>
           ))}

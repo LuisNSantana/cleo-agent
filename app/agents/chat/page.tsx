@@ -279,9 +279,9 @@ export default function AgentsChatPage() {
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
+                            <Avatar className="h-12 w-12 ring-1 ring-slate-600/50 hover:ring-violet-400/50 transition-all duration-200">
                               {getAgentAvatar(agent) ? (
-                                <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} />
+                                <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover" />
                               ) : null}
                               <AvatarFallback className="rounded-lg" style={{ backgroundColor: agent.color }}>
                                 {getAgentIcon(agent)}
@@ -313,9 +313,9 @@ export default function AgentsChatPage() {
                 <>
                   {/* Chat Header with avatar */}
                   <div className="sticky top-0 z-10 flex items-center gap-3 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 border-b border-slate-700/60 bg-slate-800/70 backdrop-blur">
-                    <Avatar className="h-8 w-8 rounded-lg">
+                    <Avatar className="h-10 w-10 rounded-lg ring-1 ring-slate-600/50">
                       {getAgentAvatar(selectedAgent) ? (
-                        <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} />
+                        <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} className="object-cover" />
                       ) : null}
                       <AvatarFallback className="rounded-lg" style={{ backgroundColor: selectedAgent.color }}>
                         {getAgentIcon(selectedAgent)}
@@ -345,14 +345,21 @@ export default function AgentsChatPage() {
                           animate={{ opacity: 1 }}
                           className="flex flex-col items-center justify-center h-full text-center"
                         >
-                          <Avatar className="w-16 h-16 rounded-2xl mb-4">
-                            {getAgentAvatar(selectedAgent) ? (
-                              <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} />
-                            ) : null}
-                            <AvatarFallback className="rounded-2xl" style={{ backgroundColor: selectedAgent.color }}>
-                              {getAgentIcon(selectedAgent)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className="relative">
+                            <Avatar className="w-20 h-20 rounded-2xl mb-4 ring-2 ring-slate-600/30 shadow-xl">
+                              {getAgentAvatar(selectedAgent) ? (
+                                <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} className="object-cover rounded-2xl" />
+                              ) : null}
+                              <AvatarFallback className="rounded-2xl text-2xl" style={{ backgroundColor: selectedAgent.color }}>
+                                {getAgentIcon(selectedAgent)}
+                              </AvatarFallback>
+                            </Avatar>
+                            {/* Subtle glow effect */}
+                            <div 
+                              className="absolute inset-0 w-20 h-20 rounded-2xl opacity-20 blur-xl mb-4"
+                              style={{ backgroundColor: selectedAgent.color }}
+                            />
+                          </div>
                           <h3 className="text-xl font-semibold text-white mb-2">Hi! I'm {selectedAgent.name}</h3>
                           <p className="text-slate-400 max-w-md">{selectedAgent.description || `I'm a ${selectedAgent.role} here to help.`}</p>
                         </motion.div>
@@ -508,9 +515,9 @@ export default function AgentsChatPage() {
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
+                      <Avatar className="h-11 w-11 ring-1 ring-slate-600/50">
                         {getAgentAvatar(agent) ? (
-                          <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} />
+                          <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover" />
                         ) : null}
                         <AvatarFallback className="rounded-lg" style={{ backgroundColor: agent.color }}>
                           {getAgentIcon(agent)}
