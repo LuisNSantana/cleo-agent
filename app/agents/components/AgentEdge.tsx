@@ -16,6 +16,7 @@ interface AgentEdgeData {
   isActive?: boolean
   taskPreview?: string
   onOpen?: () => void
+  minimal?: boolean
 }
 
 interface AgentEdgeProps extends EdgeProps {
@@ -42,7 +43,7 @@ export function AgentEdgeComponent({
     targetPosition,
   })
 
-  const { messageCount = 0, lastMessage, errorCount = 0, isActive = false, taskPreview, onOpen, /* extended */ wasUsed = false } = (data as any) || {}
+  const { messageCount = 0, lastMessage, errorCount = 0, isActive = false, taskPreview, onOpen, /* extended */ wasUsed = false, minimal = false } = (data as any) || {}
 
   // Prefer style provided by graph; fallback by state
   const stroke = (style as any)?.stroke || (isActive ? '#22c55e' : (wasUsed ? '#8b5cf6' : '#64748B'))
@@ -56,39 +57,41 @@ export function AgentEdgeComponent({
       <BaseEdge path={edgePath} style={{ stroke, strokeWidth, opacity, strokeDasharray }} />
 
       {/* Edge Label */}
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            fontSize: 10,
-            pointerEvents: 'all',
-          }}
-          className="nodrag nopan"
-        >
-          <div 
-            className="bg-white/90 backdrop-blur-sm rounded px-2 py-1 shadow-sm border text-xs flex items-center gap-1 cursor-pointer hover:bg-white"
-            onClick={() => onOpen?.()}
+      {!minimal && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              fontSize: 10,
+              pointerEvents: 'all',
+            }}
+            className="nodrag nopan"
           >
-            <span className="text-blue-600">📨</span>
-            <span>{messageCount}</span>
-            {errorCount > 0 && (
-              <span className="text-red-500">({errorCount} err)</span>
-            )}
-      {lastMessage && (
-              <span className="text-muted-foreground">
-        {new Date(lastMessage as any).toLocaleTimeString()}
-              </span>
-            )}
-            {taskPreview && (
-              <span className="text-gray-600 max-w-[200px] truncate">{taskPreview}</span>
-            )}
+            <div 
+              className="bg-white/90 backdrop-blur-sm rounded px-2 py-1 shadow-sm border text-xs flex items-center gap-1 cursor-pointer hover:bg-white"
+              onClick={() => onOpen?.()}
+            >
+              <span className="text-blue-600">📨</span>
+              <span>{messageCount}</span>
+              {errorCount > 0 && (
+                <span className="text-red-500">({errorCount} err)</span>
+              )}
+        {lastMessage && (
+                <span className="text-muted-foreground">
+          {new Date(lastMessage as any).toLocaleTimeString()}
+                </span>
+              )}
+              {taskPreview && (
+                <span className="text-gray-600 max-w-[200px] truncate">{taskPreview}</span>
+              )}
+            </div>
           </div>
-        </div>
-      </EdgeLabelRenderer>
+        </EdgeLabelRenderer>
+      )}
 
       {/* Animated particles for active handoffs */}
-      {(isActive || wasUsed || messageCount > 0) && (
+  {!minimal && (isActive || wasUsed || messageCount > 0) && (
         <circle
           r="3"
           fill={isActive ? '#22c55e' : '#8b5cf6'}

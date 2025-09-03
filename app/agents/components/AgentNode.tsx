@@ -24,6 +24,7 @@ interface AgentNodeData {
   onExecute: (input: string) => void
   onShowExecution?: (execution: AgentExecution) => void
   executions?: AgentExecution[]
+  compact?: boolean
 }
 
 interface AgentNodeProps extends NodeProps {
@@ -32,7 +33,7 @@ interface AgentNodeProps extends NodeProps {
 
 export function AgentNodeComponent({ data }: AgentNodeProps) {
   const { currentExecution } = useClientAgentStore()
-  const { agent, status, executionCount, lastExecution, onExecute, onShowExecution, executions = [] } = data
+  const { agent, status, executionCount, lastExecution, onExecute, onShowExecution, executions = [], compact } = data
   
   // Check if this agent is currently active
   const isCurrentlyActive = currentExecution?.agentId === agent.id && currentExecution?.status === 'running'
@@ -86,6 +87,51 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
     if (input) {
       onExecute(input)
     }
+  }
+
+  // Minimal/compact card UI
+  if (compact) {
+    const border = agent.color ? `${agent.color}66` : '#64748B66'
+    return (
+      <div className="relative" title={agent.description}>
+        {/* Trail glow */}
+        {isTrail && !isCurrentlyActive && (
+          <div className="absolute -inset-0.5 rounded-lg bg-purple-400/20 blur-[2px]" />
+        )}
+        <div
+          className={`flex items-center gap-2 rounded-lg border bg-background/70 backdrop-blur px-2.5 py-1.5 shadow-sm transition-all ${
+            isCurrentlyActive ? 'ring-2 ring-blue-400/60' : ''
+          }`}
+          style={{ borderColor: border, borderWidth: 2 }}
+        >
+          <span className="text-base leading-none" aria-hidden>
+            {getRoleIcon(agent.role)}
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
+                {agent.name}
+              </span>
+              <span className={`inline-block size-2 rounded-full ${getStatusColor(status)} ${isCurrentlyActive ? 'animate-pulse' : ''}`} />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <span>{executionCount} exec</span>
+              {lastExecution && (
+                <span>
+                  {lastExecution instanceof Date
+                    ? lastExecution.toLocaleTimeString()
+                    : new Date(lastExecution as any).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Handles (small) */}
+          <Handle type="target" position={Position.Left} className="!size-2 !bg-blue-500" />
+          <Handle type="source" position={Position.Right} className="!size-2 !bg-green-500" />
+        </div>
+      </div>
+    )
   }
 
   return (

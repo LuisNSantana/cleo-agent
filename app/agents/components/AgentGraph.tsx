@@ -65,12 +65,14 @@ export function AgentGraph({
   onEdgeClick,
   className = "w-full h-full"
 }: AgentGraphProps) {
-  const { nodes: storeNodes, edges: storeEdges, agents, executions, executeAgent, selectAgent, currentExecution } = useClientAgentStore()
+  const { nodes: storeNodes, edges: storeEdges, agents, executions, executeAgent, selectAgent, currentExecution, setNodePosition, resetGraphLayout, updateGraphData } = useClientAgentStore()
   const { currentStep, agentThoughts, isLive } = useRealTimeExecution()
   const [selectedExecution, setSelectedExecution] = useState<AgentExecution | null>(null)
   const [showLangChainFlow, setShowLangChainFlow] = useState(false)
   const [responseModal, setResponseModal] = useState<{ title?: string; content: string } | null>(null)
   const [fitOnInit, setFitOnInit] = useState(true)
+  const [minimalMode, setMinimalMode] = useState(true)
+  const rfRef = React.useRef<any>(null)
 
   // Only fit the view once on mount, to avoid resetting the viewport on updates
   React.useEffect(() => {
@@ -125,6 +127,7 @@ export function AgentGraph({
         position: nodeData.position,
         data: {
           ...nodeData.data,
+          compact: minimalMode,
           status: nodeStatus,
           onExecute: (input: string) => executeAgent(input, nodeData.id),
           onShowExecution: (execution: AgentExecution) => {
@@ -146,6 +149,7 @@ export function AgentGraph({
       position: { x: 50, y: 150 },
       data: {
     label: 'Cleo · Supervisando',
+        compact: minimalMode,
         status: (() => {
           if (currentExecution?.status === 'running') {
             if (currentStep?.action === 'analyzing' || currentStep?.action === 'routing' || currentStep?.action === 'thinking' || currentStep?.action === 'delegating' || !currentStep) {
@@ -181,6 +185,7 @@ export function AgentGraph({
       position: { x: 650, y: 250 },
       data: {
         label: 'Cleo - Finalizando',
+        compact: minimalMode,
         status: (() => {
           if (currentExecution?.status === 'running') {
             if (currentStep?.action === 'completing') return 'active'
@@ -224,6 +229,7 @@ export function AgentGraph({
         data: { 
           title: 'Respuesta Final', 
           content: String(content),
+          compact: minimalMode,
           onOpen: () => {
             if (lastAi?.content) {
               setResponseModal({
@@ -242,7 +248,7 @@ export function AgentGraph({
   const stateNode: Node | null = null
 
   return [...baseNodes, routerNode, finalizeNode, responseNode]
-  }, [storeNodes, executeAgent, executions, currentExecution, currentStep])
+  }, [storeNodes, executeAgent, executions, currentExecution, currentStep, minimalMode])
 
   const initialEdges: Edge[] = useMemo(() => {
     // Base edges from store, but hide noisy tool/handoff edges (e.g., delegate, complete_task)
@@ -255,14 +261,14 @@ export function AgentGraph({
         if (label.includes('complete_task') || label.includes('complete')) return false
         return true
       })
-      .map((edgeData) => ({
+  .map((edgeData) => ({
       id: edgeData.id,
       source: edgeData.source,
       target: edgeData.target,
       type: edgeData.type === 'handoff' ? 'handoff' : 'default',
       animated: edgeData.animated,
-      label: edgeData.label,
-      data: edgeData.data,
+  label: minimalMode ? undefined : edgeData.label,
+  data: { ...(edgeData.data || {}), minimal: minimalMode },
       style: {
         stroke: edgeData.type === 'handoff' ? '#FF6B6B' : '#64748B',
         strokeWidth: edgeData.type === 'handoff' ? 3 : 2,
@@ -300,12 +306,13 @@ export function AgentGraph({
         target: specialist.id,
         type: 'handoff',
         animated: recentlyUsed || isDelegatingNow,
+  data: { minimal: minimalMode },
         style: { 
           stroke: (recentlyUsed || isDelegatingNow) ? '#8b5cf6' : '#3b82f6', 
           strokeDasharray: (recentlyUsed || isDelegatingNow) ? '8 4' : '4 2',
           strokeWidth: (recentlyUsed || isDelegatingNow) ? 4 : 2
         },
-        label: recentlyUsed ? '✓ asignado' : 'decidir'
+  label: minimalMode ? undefined : (recentlyUsed ? '✓ asignado' : 'decidir')
       })
     })
 
@@ -339,12 +346,13 @@ export function AgentGraph({
         target: 'finalize-node',
         type: 'handoff',
         animated: recentlyUsed || isCompletingNow,
+  data: { minimal: minimalMode },
         style: { 
           stroke: (recentlyUsed || isCompletingNow) ? '#8b5cf6' : '#10b981', 
           strokeDasharray: (recentlyUsed || isCompletingNow) ? '8 4' : '4 2',
           strokeWidth: (recentlyUsed || isCompletingNow) ? 4 : 2
         },
-        label: recentlyUsed ? '✓ entrega' : 'entregar'
+  label: minimalMode ? undefined : (recentlyUsed ? '✓ entrega' : 'entregar')
       })
     })
 
@@ -372,13 +380,14 @@ export function AgentGraph({
       target: 'finalize-node',
       type: 'handoff',
       animated: false, // This path is rarely used for now
+  data: { minimal: minimalMode },
       style: { 
         stroke: hasRecentDelegation ? '#94a3b8' : '#10b981', 
         strokeDasharray: '4 2',
         strokeWidth: hasRecentDelegation ? 1 : 2,
         opacity: hasRecentDelegation ? 0.5 : 1
       },
-      label: 'responder'
+  label: minimalMode ? undefined : 'responder'
     }
 
     const entryEdge: Edge = {
@@ -387,12 +396,13 @@ export function AgentGraph({
       target: 'router-node',
       type: 'handoff',
       animated: Boolean(currentExecution?.status === 'running' && (!currentStep || ['analyzing','routing','thinking','delegating'].includes(currentStep.action as any))),
+  data: { minimal: minimalMode },
       style: {
         stroke: '#64748B',
         strokeDasharray: '4 2',
         strokeWidth: 2,
       },
-      label: 'mensaje'
+  label: minimalMode ? undefined : 'mensaje'
     }
 
     // Finalize → Response edge (always visible)
@@ -412,6 +422,7 @@ export function AgentGraph({
         source: 'finalize-node',
         target: 'response-node',
     type: 'handoff',
+  data: { minimal: minimalMode },
         animated,
         style: { 
           stroke,
@@ -424,7 +435,7 @@ export function AgentGraph({
     })()
 
     return [...baseEdges, entryEdge, ...routerEdges, ...finalizeEdges, directEdge, respEdge]
-  }, [storeEdges, currentExecution, executions, storeNodes])
+  }, [storeEdges, currentExecution, executions, storeNodes, minimalMode])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -433,6 +444,17 @@ export function AgentGraph({
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   )
+
+  // Persist node position during drag/move
+  const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node?.id && node?.position) {
+      setNodePosition(node.id, node.position as any)
+    }
+  }, [setNodePosition])
+
+  const onNodesDelete = useCallback(() => {
+    // no-op for now
+  }, [])
 
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     onNodeClick?.(node)
@@ -614,23 +636,40 @@ export function AgentGraph({
   }, [currentExecution, selectedExecution, currentStep, setEdges])
 
   return (
-    <div className={className}>
+    <div className={`${className} touch-none overscroll-contain`}>
       <ReactFlow
+  onInit={(inst) => { rfRef.current = inst }}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+  onNodeDragStop={onNodeDragStop}
+  onNodesDelete={onNodesDelete}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-  fitView={fitOnInit}
+        fitView={fitOnInit}
+        fitViewOptions={{ padding: 0.15 }}
+        // Mobile/touch optimizations
+        panOnDrag
+        panOnScroll={false}
+        zoomOnScroll={false}
+        zoomOnPinch
+        zoomOnDoubleClick={false}
+        nodesConnectable={false}
+        selectionOnDrag={false}
+        minZoom={0.45}
+        maxZoom={2}
         attributionPosition="bottom-left"
       >
-        <Controls />
-        <Background color="#f1f5f9" gap={20} />
-        <MiniMap
+        <div className="hidden sm:block">
+          <Controls />
+        </div>
+  <Background color="#f1f5f9" gap={14} />
+  <div className="hidden sm:block">
+  <MiniMap
           nodeColor={(node) => {
             const agent = node.data?.agent as AgentConfig
             return agent?.color || '#64748B'
@@ -639,22 +678,52 @@ export function AgentGraph({
           zoomable
           pannable
         />
+  </div>
 
         {/* Status Panel */}
-  <Panel position="top-left" className="bg-white/90 p-2 rounded-md shadow max-w-xs w-64">
+  <Panel position="top-left" className="hidden sm:block bg-white/90 p-2 rounded-md shadow max-w-xs w-64">
           <div className="space-y-2">
             <div className="flex items-center justify-between border-b border-gray-200 pb-1">
               <div className="text-xs font-semibold text-gray-800">
                 Sistema Multi-Agente
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowLangChainFlow(!showLangChainFlow)}
-                className="text-[11px] h-6 px-2"
-              >
-                {showLangChainFlow ? 'Ocultar' : 'Mostrar'} Flujo
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { try { rfRef.current?.fitView({ padding: 0.15 }) } catch (_) {} }}
+                  className="text-[11px] h-6 px-2"
+                  title="Fit"
+                >
+                  Fit
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowLangChainFlow(!showLangChainFlow)}
+                  className="text-[11px] h-6 px-2"
+                >
+                  {showLangChainFlow ? 'Ocultar' : 'Mostrar'} Flujo
+                </Button>
+                <Button
+                  variant={minimalMode ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setMinimalMode(!minimalMode)}
+                  className="text-[11px] h-6 px-2"
+                  title="Minimal mode"
+                >
+                  Minimal
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => resetGraphLayout()}
+                  className="text-[11px] h-6 px-2"
+                  title="Reset layout"
+                >
+                  Reset
+                </Button>
+              </div>
             </div>
             
             {/* Agent Thinking Visualizer */}
@@ -709,6 +778,16 @@ export function AgentGraph({
             </div>
           </Panel>
         )}
+
+        {/* Tiny legend */}
+        <Panel position="bottom-left" className="hidden sm:block bg-white/90 p-2 rounded-md shadow text-[10px]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-gray-400" /> Idle</div>
+            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-green-500" /> Running</div>
+            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-blue-500" /> Completed</div>
+            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-purple-500" /> Trail</div>
+          </div>
+        </Panel>
 
       </ReactFlow>
 

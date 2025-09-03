@@ -1,10 +1,9 @@
 /**
  * Agents Page
- * Dedicated page for multi-agent system visualization and management
+ * Entry: render consolidated AgentsSettings hub
  */
-
-import { AgentsPageContent } from './components/AgentsPageContent'
+import { AgentsSettings } from '@/app/components/layout/settings/agents/AgentsSettings'
 
 export default function AgentsPage() {
-  return <AgentsPageContent />
+  return <AgentsSettings />
 }

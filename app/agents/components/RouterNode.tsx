@@ -8,6 +8,7 @@ import { LucideBrain, LucideArrowRight, LucideHeart } from 'lucide-react'
 type RouterNodeData = {
   label?: string
   status?: 'active' | 'idle' | 'trail'
+  compact?: boolean
 }
 
 /**
@@ -16,9 +17,25 @@ type RouterNodeData = {
  * Shows when the supervisor is evaluating which specialist to delegate to.
  */
 export default function RouterNode({ data }: NodeProps<RouterNodeData>) {
-  const { label = 'Cleo Supervisor', status = 'idle' } = data || {}
+  const { label = 'Cleo Supervisor', status = 'idle', compact } = data || {}
   const isActive = status === 'active'
   const isTrail = status === 'trail'
+
+  if (compact) {
+    return (
+      <div className="relative" title="Supervisor routing">
+        {isTrail && (
+          <div className="absolute -inset-0.5 rounded-lg bg-pink-400/20 blur-[2px]" />
+        )}
+        <div className={`flex items-center gap-2 rounded-lg border bg-white/80 backdrop-blur px-2.5 py-1.5 shadow-sm ${isActive ? 'ring-2 ring-pink-400/60' : ''}`} style={{ borderColor: '#f0abfc', borderWidth: 2 }}>
+          <div className={`p-1 rounded-full ${isActive ? 'bg-pink-200' : 'bg-pink-100'}`}></div>
+          <span className={`text-xs font-medium truncate max-w-[140px] ${isActive ? 'text-pink-800' : 'text-gray-700'}`}>{label}</span>
+          <Handle type="target" position={Position.Left} className="!size-2 !bg-pink-500" />
+          <Handle type="source" position={Position.Right} className="!size-2 !bg-pink-500" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative">

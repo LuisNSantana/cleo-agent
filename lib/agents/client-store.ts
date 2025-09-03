@@ -49,6 +49,10 @@ interface ClientAgentStore {
   addAgent: (agent: AgentConfig) => void
   addDelegationEvent: (event: any) => void
   resetGraph: () => void
+  // Graph layout persistence
+  setNodePosition: (nodeId: string, position: { x: number; y: number }) => void
+  setNodePositions: (positions: Record<string, { x: number; y: number }>) => void
+  resetGraphLayout: () => void
 }
 
 export const useClientAgentStore = create<ClientAgentStore>()(
@@ -153,6 +157,16 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
     updateGraphData: () => {
       const { agents, executions } = get()
+      // Read persisted positions from localStorage
+      let persisted: Record<string, { x: number; y: number }> = {}
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = window.localStorage.getItem('cleo:agent-graph:positions')
+          if (raw) persisted = JSON.parse(raw)
+        } catch (_) {
+          // ignore
+        }
+      }
       
       // Create nodes from agents
       const nodes: AgentNode[] = agents.map((agent, index) => {
@@ -162,13 +176,21 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         const last = sortedForAgent[0]
         const lastExecDate = last ? new Date(last.startTime as any) : undefined
 
+        // Default grid position
+        const defaultPos = {
+          x: (index % 2) * 300 + 100,
+          y: Math.floor(index / 2) * 200 + 100
+        }
+
+        // Use persisted position if available, else keep existing store position, else default
+        const existing = get().nodes.find(n => n.id === agent.id)?.position
+        const persistedPos = persisted[agent.id]
+        const position = persistedPos || existing || defaultPos
+
         return {
           id: agent.id,
           type: 'agent',
-          position: {
-            x: (index % 2) * 300 + 100,
-            y: Math.floor(index / 2) * 200 + 100
-          },
+          position,
           data: {
             label: agent.name,
             agent,
@@ -302,6 +324,63 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     resetGraph: () => {
       set({ currentExecution: null, executions: [] })
       get().updateGraphData()
+    },
+
+    // Persist a single node position and update store state
+    setNodePosition: (nodeId, position) => {
+      set((state) => {
+        const nextNodes = state.nodes.map(n => n.id === nodeId ? { ...n, position } : n)
+        // Write to localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = window.localStorage.getItem('cleo:agent-graph:positions')
+            const map = raw ? JSON.parse(raw) : {}
+            map[nodeId] = position
+            window.localStorage.setItem('cleo:agent-graph:positions', JSON.stringify(map))
+          } catch (_) { /* ignore */ }
+        }
+        return { nodes: nextNodes }
+      })
+    },
+
+    // Bulk set positions (used for potential future features)
+    setNodePositions: (positions) => {
+      set((state) => {
+        const nextNodes = state.nodes.map(n => positions[n.id] ? { ...n, position: positions[n.id] } : n)
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem('cleo:agent-graph:positions', JSON.stringify(positions))
+          } catch (_) { /* ignore */ }
+        }
+        return { nodes: nextNodes }
+      })
+    },
+
+    // Reset graph layout positions: clear persistence and re-grid nodes
+    resetGraphLayout: () => {
+      if (typeof window !== 'undefined') {
+        try { window.localStorage.removeItem('cleo:agent-graph:positions') } catch (_) { /* ignore */ }
+      }
+      const { agents } = get()
+      set(() => {
+        const nodes: AgentNode[] = agents.map((agent, index) => ({
+          id: agent.id,
+          type: 'agent',
+          position: {
+            x: (index % 2) * 300 + 100,
+            y: Math.floor(index / 2) * 200 + 100
+          },
+          data: {
+            label: agent.name,
+            agent,
+            status: 'pending',
+            executionCount: 0,
+            lastExecution: undefined as any,
+            connections: []
+          }
+        }))
+        return { nodes }
+      })
     }
   }))
 )

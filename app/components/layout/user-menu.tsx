@@ -67,8 +67,8 @@ export function UserMenu() {
             {user?.email}
           </span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-  <SettingsTrigger onOpenChangeAction={handleSettingsOpenChangeAction} />
+  <DropdownMenuSeparator />
+  <SettingsTrigger withinDropdown onOpenChangeAction={handleSettingsOpenChangeAction} />
         <FeedbackTrigger />
         <AppInfoTrigger />
         <DropdownMenuSeparator />

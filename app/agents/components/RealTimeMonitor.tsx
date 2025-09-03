@@ -79,6 +79,13 @@ export function RealTimeExecutionMonitor() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showThoughts, setShowThoughts] = useState(true)
 
+  // Mobile toggle: listen for an event to open/close
+  React.useEffect(() => {
+    const onToggle = () => setIsExpanded((v) => !v)
+    window.addEventListener('agents:toggle-monitor', onToggle)
+    return () => window.removeEventListener('agents:toggle-monitor', onToggle)
+  }, [])
+
   const getActionIcon = (action: string) => {
     switch (action) {
       case 'analyzing':
@@ -131,51 +138,73 @@ export function RealTimeExecutionMonitor() {
   if (!isExpanded && !isLive && runningExecutions.length === 0) {
     // Minimized view when no activity
     return (
-      <Card className="fixed bottom-4 right-4 w-80 shadow-lg border-2 border-blue-200 z-40">
-        <CardHeader className="pb-3 cursor-pointer" onClick={() => setIsExpanded(true)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="size-5 text-blue-600" />
-              <CardTitle className="text-sm">Monitor de Agentes</CardTitle>
+      <>
+        {/* Icon-only on mobile, small card on sm+ */}
+        <button
+          className="sm:hidden fixed bottom-3 right-3 z-40 w-10 h-10 rounded-full bg-white/80 dark:bg-zinc-900/70 border border-blue-200 shadow flex items-center justify-center"
+          onClick={() => setIsExpanded(true)}
+          aria-label="Abrir monitor"
+        >
+          <Activity className="h-5 w-5 text-blue-600" />
+        </button>
+        <Card className="hidden sm:block fixed bottom-3 right-3 w-80 shadow-lg border-2 border-blue-200 z-40">
+          <CardHeader className="pb-3 cursor-pointer" onClick={() => setIsExpanded(true)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="size-5 text-blue-600" />
+                <CardTitle className="text-sm">Monitor de Agentes</CardTitle>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {executionStats.total}
+              </Badge>
             </div>
-            <Badge variant="secondary" className="text-xs">
-              {executionStats.total}
-            </Badge>
-          </div>
-          <CardDescription className="text-xs">
-            {executionStats.running} activos • {executionStats.completed} completados
-          </CardDescription>
-        </CardHeader>
-      </Card>
+            <CardDescription className="text-xs">
+              {executionStats.running} activos • {executionStats.completed} completados
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </>
     )
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 w-96 max-h-[700px] shadow-lg border-2 border-blue-200 z-40">
+    <Card className="fixed bottom-3 right-3 w-48 sm:w-96 max-h-[42vh] sm:max-h-[700px] shadow-lg border-2 border-blue-200 z-40">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Eye className="size-5 text-blue-600" />
-            <CardTitle className="text-sm">Monitor en Tiempo Real</CardTitle>
+            <CardTitle className="text-xs sm:text-sm">Monitor<span className="hidden sm:inline"> en Tiempo Real</span></CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            {showThoughts && (
+            <div className="hidden sm:flex items-center gap-2">
+              {showThoughts && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowThoughts(!showThoughts)}
+                  className="text-xs"
+                >
+                  <Brain className="size-3 mr-1" />
+                  Pensamientos
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
-                size="sm"
-                onClick={() => setShowThoughts(!showThoughts)}
-                className="text-xs"
+                size="sm" 
+                onClick={() => setIsExpanded(!isExpanded)}
               >
-                <Brain className="size-3 mr-1" />
-                Pensamientos
+                {isExpanded ? '−' : '+'}
               </Button>
-            )}
+            </div>
+            {/* Mobile close button */}
             <Button 
               variant="ghost" 
-              size="sm" 
-              onClick={() => setIsExpanded(!isExpanded)}
+              size="icon"
+              className="sm:hidden h-7 w-7"
+              onClick={() => setIsExpanded(false)}
+              aria-label="Cerrar monitor"
             >
-              {isExpanded ? '−' : '+'}
+              ×
             </Button>
           </div>
         </div>
@@ -185,16 +214,17 @@ export function RealTimeExecutionMonitor() {
           <div className="flex items-center gap-2 pt-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm text-green-600 font-medium">EN VIVO</span>
+              <span className="text-xs sm:text-sm text-green-600 font-medium">EN VIVO</span>
             </div>
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-[10px] sm:text-xs">
               {runningExecutions.length} ejecución(es)
             </Badge>
           </div>
         )}
       </CardHeader>
 
-  <CardContent className="space-y-4 max-h-[550px] overflow-y-auto">
+      {/* Hide heavy content in mobile to avoid overlaying the graph */}
+      <CardContent className="hidden sm:block space-y-4 max-h-[550px] overflow-y-auto">
         {/* Current Execution Status */}
         {currentStep && (
           <div className="p-3 rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50">

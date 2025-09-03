@@ -1,0 +1,20 @@
+/* Section-specific tweaks for the Agents area */
+
+@media (max-width: 640px) {
+  .agents-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(15,23,42,0.75), rgba(2,6,23,0.6));
+  border: 1px solid rgba(148,163,184,0.18);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.premium-gradient {
+  background-image: radial-gradient(1200px 400px at 0% 0%, rgba(56,189,248,0.12), transparent),
+    radial-gradient(1200px 400px at 100% 0%, rgba(147,51,234,0.12), transparent);
+}

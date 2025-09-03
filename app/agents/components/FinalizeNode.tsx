@@ -8,6 +8,7 @@ import { LucideSparkles, LucideMessageSquare, LucideCheckCircle } from 'lucide-r
 type FinalizeNodeData = {
   label?: string
   status?: 'active' | 'idle' | 'trail'
+  compact?: boolean
 }
 
 /**
@@ -16,9 +17,25 @@ type FinalizeNodeData = {
  * Represents the final step before sending to the user.
  */
 export default function FinalizeNode({ data }: NodeProps<FinalizeNodeData>) {
-  const { label = 'Cleo Finalizado', status = 'idle' } = data || {}
+  const { label = 'Cleo Finalizado', status = 'idle', compact } = data || {}
   const isActive = status === 'active'
   const isTrail = status === 'trail'
+
+  if (compact) {
+    return (
+      <div className="relative" title="Finalize">
+        {isTrail && (
+          <div className="absolute -inset-0.5 rounded-lg bg-emerald-400/20 blur-[2px]" />
+        )}
+        <div className={`flex items-center gap-2 rounded-lg border bg-white/80 backdrop-blur px-2.5 py-1.5 shadow-sm ${isActive ? 'ring-2 ring-emerald-400/60' : ''}`} style={{ borderColor: '#6ee7b7', borderWidth: 2 }}>
+          <div className={`p-1 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-100'}`}></div>
+          <span className={`text-xs font-medium truncate max-w-[160px] ${isActive ? 'text-emerald-800' : 'text-gray-700'}`}>{label}</span>
+          <Handle type="target" position={Position.Left} className="!size-2 !bg-emerald-500" />
+          <Handle type="source" position={Position.Right} className="!size-2 !bg-emerald-500" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative">

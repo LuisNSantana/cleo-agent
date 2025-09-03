@@ -435,6 +435,22 @@ export class AgentOrchestrator {
               data: { toAgent: handoff.toAgent, task: input.task }
             })
 
+            // Record a delegation step for UI/graph visibility
+            try {
+              const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+              if (currentExecution) {
+                this.addExecutionStep(currentExecution.id, {
+                  agent: agentConfig.id,
+                  action: 'delegating',
+                  content: `Delegating to ${handoff.toAgent}`,
+                  progress: 60,
+                  metadata: { delegatedTo: handoff.toAgent, reason: input.task }
+                })
+              }
+            } catch (e) {
+              console.warn('Failed to add delegation step for handoff tool', e)
+            }
+
             return new Command({
               goto: handoff.toAgent,
               update: {
@@ -740,6 +756,21 @@ export class AgentOrchestrator {
               })
               globalThis.dispatchEvent(event)
             }
+            // Also record as an execution step so clients can derive delegation from polling
+            try {
+              const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+              if (currentExecution) {
+                this.addExecutionStep(currentExecution.id, {
+                  agent: 'cleo-supervisor',
+                  action: 'delegating',
+                  content: `Delegating to ${bestId}`,
+                  progress: 55,
+                  metadata: { delegatedTo: bestId, reason: `Best match with score ${bestScore}` }
+                })
+              }
+            } catch (e) {
+              console.warn('Failed to add delegation step for router selection', e)
+            }
             return bestId
           }
 
@@ -756,6 +787,21 @@ export class AgentOrchestrator {
               }
             })
             globalThis.dispatchEvent(event)
+          }
+          // Also record fallback as a delegation step to finalize for UI visibility
+          try {
+            const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+            if (currentExecution) {
+              this.addExecutionStep(currentExecution.id, {
+                agent: 'cleo-supervisor',
+                action: 'delegating',
+                content: 'Delegating to finalize',
+                progress: 55,
+                metadata: { delegatedTo: 'finalize', reason: `No suitable agent found (best score: ${bestScore})` }
+              })
+            }
+          } catch (e) {
+            console.warn('Failed to add delegation step for finalize fallback', e)
           }
           return 'finalize'
         },
@@ -812,15 +858,19 @@ export class AgentOrchestrator {
   const finfo = this.resolveModelInfo(supervisorCfg!)
   console.log('[Finalize] Model selection:', { agentId: 'cleo-supervisor', ...finfo, timestamp: new Date().toISOString() })
 
-        const system = new SystemMessage(
-          `${supervisorCfg?.prompt || 'Eres un asistente.'}
+  const system = new SystemMessage(
+    `${supervisorCfg?.prompt || 'Eres un asistente.'}
 
-Reglas:
-- Usa el historial de mensajes para dar una respuesta final clara y práctica.
+Reglas de finalización (prioridad alta):
+- Responde en el mismo idioma del último mensaje del usuario.
+- Contesta directamente la intención del usuario sin frases genéricas ni saludos innecesarios.
+- No preguntes "¿Cómo te sientes hoy?" ni hagas preguntas emocionales a menos que el usuario lo haya indicado explícitamente.
+- Si el usuario solo saluda (p. ej., "hola"), responde cortésmente en una sola línea y ofrece ayuda: «¿En qué puedo ayudarte?».
+- Usa el historial de mensajes para dar una respuesta final clara, específica y práctica.
 - Si el usuario pidió código o ejemplos, genera solo lo necesario y verificado, sin inventar.
 - No asumas dependencias ni claves; si son necesarias, menciónalas brevemente.
-- Sé conciso y enfocado en resolver la solicitud.`
-        )
+- Sé conciso y enfocado en resolver la solicitud. Evita repeticiones.`
+  )
 
         const prior = Array.isArray(state.messages) ? state.messages : []
 
