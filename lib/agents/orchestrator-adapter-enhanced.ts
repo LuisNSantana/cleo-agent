@@ -1,0 +1,257 @@
+/**
+ * Enhanced Orchestrator Adapter
+ * Integrates modular core components with legacy functionality for full delegation support
+ */
+
+import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
+import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
+import { getAllAgents } from '@/lib/agents/config'
+
+// Import legacy orchestrator as backup for complex delegation logic
+import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
+
+// Simple core components for optimized execution
+class CoreModelFactory {
+  resolveModelInfo(agentConfig: AgentConfig) {
+    const provider = agentConfig.model.includes('gpt-') ? 'openai' : 
+                   agentConfig.model.includes('claude-') ? 'anthropic' : 'openai'
+    const modelName = agentConfig.model === 'gpt-4o-mini' ? 'gpt-4o-mini' : 
+                     agentConfig.model === 'gpt-4o' ? 'gpt-4o' : 'gpt-4o-mini'
+    return { provider, modelName, configured: agentConfig.model }
+  }
+}
+
+class CoreEventEmitter {
+  private listeners: Array<(event: any) => void> = []
+  
+  emit(type: string, data: any) {
+    this.listeners.forEach(fn => fn({ type, data, timestamp: new Date() }))
+  }
+  
+  on(fn: (event: any) => void) {
+    this.listeners.push(fn)
+  }
+  
+  off(fn: (event: any) => void) {
+    const idx = this.listeners.indexOf(fn)
+    if (idx >= 0) this.listeners.splice(idx, 1)
+  }
+}
+
+// Core orchestrator with delegation support
+class EnhancedCoreOrchestrator {
+  private modelFactory = new CoreModelFactory()
+  private eventEmitter = new CoreEventEmitter()
+  private agentConfigs = new Map<string, AgentConfig>()
+  
+  constructor() {
+    // Load built-in agents
+    getAllAgents().forEach(agent => this.agentConfigs.set(agent.id, agent))
+  }
+  
+  getModelInfo(agentId?: string) {
+    const targetId = agentId && this.agentConfigs.has(agentId) ? agentId : 'cleo-supervisor'
+    const config = this.agentConfigs.get(targetId)
+    if (!config) return null
+    
+    const info = this.modelFactory.resolveModelInfo(config)
+    return { agentId: targetId, ...info, timestamp: new Date().toISOString() }
+  }
+  
+  registerAgent(agentConfig: AgentConfig) {
+    this.agentConfigs.set(agentConfig.id, agentConfig)
+  }
+  
+  getAgentConfigs() {
+    return this.agentConfigs
+  }
+  
+  onEvent(fn: (event: any) => void) {
+    this.eventEmitter.on(fn)
+  }
+  
+  offEvent(fn: (event: any) => void) {
+    this.eventEmitter.off(fn)
+  }
+}
+
+// Global state
+const g = globalThis as any
+if (!g.__cleoRuntimeAgents) g.__cleoRuntimeAgents = new Map<string, AgentConfig>()
+if (!g.__cleoExecRegistry) g.__cleoExecRegistry = [] as AgentExecution[]
+if (!g.__cleoAdapterListeners) g.__cleoAdapterListeners = [] as Array<(event: any) => void>
+if (!g.__cleoCoreOrchestrator) g.__cleoCoreOrchestrator = new EnhancedCoreOrchestrator()
+
+const runtimeAgents = g.__cleoRuntimeAgents as Map<string, AgentConfig>
+const execRegistry = g.__cleoExecRegistry as AgentExecution[]
+const listeners = g.__cleoAdapterListeners as Array<(event: any) => void>
+const coreOrchestrator = g.__cleoCoreOrchestrator as EnhancedCoreOrchestrator
+
+export function getAgentOrchestrator() {
+  return {
+    __id: 'enhanced-core-adapter',
+    // Execution methods - delegate to legacy for complex delegation logic
+    executeAgent(input: string, agentId?: string) {
+      return createAndRunExecution(input, agentId, [])
+    },
+    startAgentExecution(input: string, agentId?: string) {
+      return createAndRunExecution(input, agentId, [])
+    },
+    startAgentExecutionWithHistory(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>) {
+      return createAndRunExecution(input, agentId, prior)
+    },
+    // Execution getters - combine legacy and core
+    getExecution(executionId: string) {
+      // Try legacy first (authoritative), then adapter registry
+      try {
+        const lorch = (globalThis as any).__cleoOrchestrator
+        if (lorch && typeof lorch.getExecution === 'function') {
+          const e = lorch.getExecution(executionId)
+          if (e) return e as AgentExecution
+        }
+      } catch {}
+      return execRegistry.find(e => e.id === executionId) || null
+    },
+    getAllExecutions(): AgentExecution[] {
+      const list: AgentExecution[] = []
+      // Get from legacy orchestrator
+      try {
+        const lorch = (globalThis as any).__cleoOrchestrator
+        if (lorch && typeof lorch.getAllExecutions === 'function') {
+          list.push(...lorch.getAllExecutions())
+        }
+      } catch {}
+      // Merge with adapter registry (dedupe by id)
+      const map = new Map<string, AgentExecution>()
+      list.forEach(e => map.set(e.id, e))
+      execRegistry.forEach(e => map.set(e.id, e))
+      return Array.from(map.values())
+    },
+    getActiveExecutions(): AgentExecution[] {
+      return this.getAllExecutions().filter((e: AgentExecution) => e.status === 'running')
+    },
+    // Agent management - use core for simplicity
+    getAgentConfigs(): Map<string, AgentConfig> {
+      const map = new Map<string, AgentConfig>()
+      coreOrchestrator.getAgentConfigs().forEach((config, id) => map.set(id, config))
+      runtimeAgents.forEach((config, id) => map.set(id, config))
+      return map
+    },
+    registerRuntimeAgent(agentConfig: AgentConfig) {
+      coreOrchestrator.registerAgent(agentConfig)
+      runtimeAgents.set(agentConfig.id, agentConfig)
+      return true
+    },
+    removeRuntimeAgent(agentId: string) {
+      return runtimeAgents.delete(agentId)
+    },
+    // Model info - use enhanced core
+    getModelInfo(agentId?: string) {
+      return coreOrchestrator.getModelInfo(agentId)
+    },
+    // Events - use core
+    onEvent(fn: (event: any) => void) {
+      coreOrchestrator.onEvent(fn)
+      listeners.push(fn)
+    },
+    offEvent(fn: (event: any) => void) {
+      coreOrchestrator.offEvent(fn)
+      const idx = listeners.indexOf(fn)
+      if (idx >= 0) listeners.splice(idx, 1)
+    },
+    cleanup() {
+      listeners.splice(0, listeners.length)
+    }
+  }
+}
+
+// Convenience wrapper
+export function registerRuntimeAgent(agentConfig: AgentConfig) {
+  const orch = getAgentOrchestrator() as any
+  return orch.registerRuntimeAgent(agentConfig)
+}
+
+function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): BaseMessage[] {
+  return (prior || []).map(m => {
+    switch (m.role) {
+      case 'user': return new HumanMessage(m.content)
+      case 'assistant': return new AIMessage(m.content)
+      case 'system': return new SystemMessage(m.content)
+      case 'tool': return new ToolMessage({ content: m.content, tool_call_id: m.metadata?.tool_call_id || 'tool' })
+      default: return new HumanMessage(String(m.content || ''))
+    }
+  })
+}
+
+function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
+  // For full delegation functionality, use legacy orchestrator
+  let legacyOrch = (globalThis as any).__cleoOrchestrator
+  if (!legacyOrch) {
+    try {
+      legacyOrch = getLegacyOrchestrator()
+      console.log('[Enhanced Adapter] Initialized legacy orchestrator for delegation')
+    } catch (e) {
+      console.warn('[Enhanced Adapter] Failed to initialize legacy orchestrator, using basic core:', e)
+    }
+  }
+  
+  if (legacyOrch) {
+    if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
+      const exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, prior)
+      execRegistry.push(exec)
+      return exec
+    }
+    if (typeof legacyOrch.startAgentExecution === 'function') {
+      const exec = legacyOrch.startAgentExecution(input, agentId)
+      execRegistry.push(exec)
+      return exec
+    }
+  }
+  
+  // Fallback: simple core execution (without delegation)
+  const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const exec: AgentExecution = {
+    id: executionId,
+    agentId: agentId || 'cleo-supervisor',
+    threadId: 'default',
+    userId: 'anonymous',
+    status: 'running',
+    startTime: new Date(),
+    messages: [],
+    metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 },
+    steps: []
+  }
+  
+  // Simple core execution (no delegation, direct response)
+  setTimeout(() => {
+    exec.status = 'completed'
+    exec.endTime = new Date()
+    exec.result = 'Core orchestrator response (basic mode - no delegation)'
+    exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: exec.result, timestamp: new Date() })
+    listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
+  }, 1000)
+  
+  execRegistry.push(exec)
+  return exec
+}
+
+export function recreateAgentOrchestrator() {
+  // Reset core components
+  const g = globalThis as any
+  if (g.__cleoCoreOrchestrator) {
+    delete g.__cleoCoreOrchestrator
+  }
+  g.__cleoCoreOrchestrator = new EnhancedCoreOrchestrator()
+  
+  // Also try to reset legacy if needed
+  if (g.__cleoOrchestrator) {
+    try { 
+      if (typeof g.__cleoOrchestrator.cleanup === 'function') {
+        g.__cleoOrchestrator.cleanup()
+      }
+      delete g.__cleoOrchestrator 
+    } catch {}
+  }
+  
+  return getAgentOrchestrator()
+}

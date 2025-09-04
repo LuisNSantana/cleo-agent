@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/agent-orchestrator'
+import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { AgentConfig } from '@/lib/agents/types'
 
 export async function POST(req: Request) {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       console.error('Error registering runtime agent via wrapper:', err)
       // Try recreating and using the wrapper again
       try {
-        const { recreateAgentOrchestrator } = await import('@/lib/agents/agent-orchestrator')
+  const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
         recreateAgentOrchestrator()
         registerRuntimeAgent(cfg)
         return NextResponse.json({ success: true, agentId: cfg.id, recreated: true })

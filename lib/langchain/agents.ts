@@ -128,6 +128,67 @@ function renderToolResultReadable(toolName: string | null, resultStr: string): s
   const name = (toolName || 'tool').toString()
   const parsed = safeJsonParse<any>(resultStr)
   if (parsed && typeof parsed === 'object') {
+  // Pretty print Shopify products
+    if (name === 'shopifyGetProducts' && parsed.success && Array.isArray(parsed.products)) {
+      const page = parsed.page || 1
+      const pageSize = parsed.pageSize || parsed.products.length
+      const total = parsed.count || parsed.products.length
+      const pageCount = parsed.pageCount || 1
+      const active = parsed.products.filter((p: any) => p.status === 'active')
+      const draft = parsed.products.filter((p: any) => p.status === 'draft')
+      const archived = parsed.products.filter((p: any) => p.status === 'archived')
+
+      const fmt = (arr: any[]) => arr.map((p: any, i: number) => `
+${i + 1}. ${p.title}
+   • Price: ${p.price}
+   • Inventory: ${p.inventory_quantity ?? 0}
+   • Status: ${p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+`).join('')
+
+      const storeLine = parsed.store_url ? `Store: ${parsed.store_url}\n\n` : ''
+      let out = `${storeLine}Here are the products (page ${page}/${pageCount}):\n\n`
+      if (active.length) out += `## Active Products\n${fmt(active)}\n`
+      if (draft.length) out += `## Draft Products\n${fmt(draft)}\n`
+      if (archived.length) out += `## Archived Products\n${fmt(archived)}\n`
+
+      // Quick insights
+      const lowStock = parsed.products.filter((p: any) => (p.inventory_quantity ?? 0) <= 1)
+      if (lowStock.length) {
+        out += `\n### Insights\n- Some products have low inventory (≤ 1). Consider restocking.\n`
+      }
+
+      if (parsed.ui_hint?.suggestFollowUp) {
+        out += `\nWould you like me to list more products? I can show page ${page + 1} (another ${pageSize}).`
+      }
+      return out.trim()
+    }
+    // Confirmation flow for Shopify write ops
+    if (name === 'shopifyUpdateProductPrice' && parsed.success) {
+      if (parsed.require_confirmation) {
+        const title = parsed.preview?.title || parsed.product?.title || 'product'
+        const variantTitle = parsed.variant?.title ? ` (variant: ${parsed.variant.title})` : ''
+        const current = parsed.variant?.current_price
+        const next = parsed.new_price
+        const img = parsed.preview?.image?.src
+        let out = `Store: ${parsed.store_url || parsed.store_domain}
+
+You are about to change the price of "${title}"${variantTitle} from ${current} to ${next}.
+Type "confirm" to proceed or "cancel" to abort.`
+        if (img) out += `
+
+Image: ${img}`
+        return out
+      }
+      if (parsed.updated) {
+        const title = parsed.product?.title || 'product'
+        const price = parsed.variant?.new_price
+        return `Store: ${parsed.store_url || parsed.store_domain}
+
+Price for "${title}" was updated successfully to ${price}.`
+      }
+      // Fallback stringify
+      try { return JSON.stringify(parsed) } catch { /* ignore */ }
+    }
     // Weather pretty print
     if (name === 'weather') {
       const loc = parsed.location || parsed.city || parsed.place || 'ubicación'

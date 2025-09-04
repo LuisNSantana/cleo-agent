@@ -48,14 +48,19 @@ export interface ExecutionStep {
 export interface AgentExecution {
   id: string
   agentId: string
+  threadId: string
+  userId: string
   status: ExecutionStatus
   startTime: Date
   endTime?: Date
+  input?: string
+  result?: any
   messages: AgentMessage[]
   currentStep?: string
   error?: string
   metrics: ExecutionMetrics
   steps?: ExecutionStep[] // Add steps for real-time visualization
+  options?: ExecutionOptions
 }
 
 export type ExecutionStatus =
@@ -64,6 +69,7 @@ export type ExecutionStatus =
   | 'completed'
   | 'failed'
   | 'paused'
+  | 'cancelled'
 
 export interface AgentMessage {
   id: string
@@ -157,10 +163,40 @@ export interface ExecutionMetrics {
   inputTokens: number
   outputTokens: number
   executionTime: number
+  executionTimeMs: number
+  tokensUsed: number
   toolCallsCount: number
   handoffsCount: number
   errorCount: number
+  retryCount: number
   cost: number
+}
+
+// Execution options
+export interface ExecutionOptions {
+  timeout?: number
+  priority?: 'low' | 'normal' | 'high'
+  enableStreaming?: boolean
+  maxTokens?: number
+  temperature?: number
+}
+
+// Execution result
+export interface ExecutionResult {
+  content: string
+  metadata?: Record<string, any>
+  toolCalls?: ToolCall[]
+  executionTime?: number
+  tokensUsed?: number
+}
+
+// Agent state for LangGraph
+export interface AgentState {
+  messages: any[]
+  sender?: string
+  next?: string
+  current_agent?: string
+  metadata?: Record<string, any>
 }
 
 // Real-time monitoring types
@@ -202,6 +238,7 @@ export interface ExecuteAgentRequest {
   input: string
   context?: Record<string, any>
   stream?: boolean
+  threadId?: string // Added threadId for type usage
 }
 
 export interface AgentExecutionResponse {
@@ -209,6 +246,12 @@ export interface AgentExecutionResponse {
   status: ExecutionStatus
   result?: any
   error?: string
+}
+
+export interface ExecuteAgentResponse {
+  success: boolean
+  execution: AgentExecution
+  thread?: { id: string } | null
 }
 
 // Store types for React state management

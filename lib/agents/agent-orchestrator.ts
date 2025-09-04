@@ -70,8 +70,8 @@ export class AgentOrchestrator {
       async invoke(state: any) {
     // Use orchestrator's model factory (not the agent object itself)
     const model = (self as any).createModelForAgent(agentConfig)
-        const system = new SystemMessage(
-          agentConfig.prompt || `Eres ${agentConfig.name}. Responde de forma clara y concisa.`
+          const system = new SystemMessage(
+          agentConfig.prompt || `You are ${agentConfig.name}. Respond clearly and concisely in English. Provide only what's needed to solve the request.`
         )
         const prior = Array.isArray(state?.messages) ? state.messages : []
         try {
@@ -80,7 +80,7 @@ export class AgentOrchestrator {
           return { messages: [new AIMessage({ content, additional_kwargs: { sender: agentConfig.id } })] }
         } catch (err) {
           console.error(`[Runtime Agent Error] ${agentConfig.id}:`, err)
-          return { messages: [new AIMessage({ content: 'No pude procesar esta solicitud ahora mismo.', additional_kwargs: { sender: agentConfig.id, error: 'runtime_agent_llm_failed' } })] }
+          return { messages: [new AIMessage({ content: "I couldn't process this request right now.", additional_kwargs: { sender: agentConfig.id, error: 'runtime_agent_llm_failed' } })] }
         }
       }
     })
@@ -135,15 +135,23 @@ export class AgentOrchestrator {
 
   // Fire-and-forget start: returns a running execution immediately for live UI
   startAgentExecution(input: string, agentId?: string): AgentExecution {
+    return this.startAgentExecutionWithHistory(input, agentId, [])
+  }
+
+  // Variant that includes prior thread messages for context across confirms/delegations
+  startAgentExecutionWithHistory(input: string, agentId: string | undefined, priorMessages: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const startTime = new Date()
 
     // Clean up old runtime agents before starting execution
     this.cleanupRuntimeAgents()
+    this.cleanupOldExecutions()
 
     const execution: AgentExecution = {
       id: executionId,
       agentId: agentId || 'cleo-supervisor',
+      threadId: 'default',
+      userId: 'anonymous',
       status: 'running',
       startTime,
       messages: [],
@@ -152,9 +160,12 @@ export class AgentOrchestrator {
         inputTokens: 0,
         outputTokens: 0,
         executionTime: 0,
+        executionTimeMs: 0,
+        tokensUsed: 0,
         toolCallsCount: 0,
         handoffsCount: 0,
         errorCount: 0,
+        retryCount: 0,
         cost: 0
       }
     }
@@ -182,7 +193,7 @@ export class AgentOrchestrator {
         this.addExecutionStep(executionId, {
           agent: execution.agentId,
           action: 'analyzing',
-          content: 'Analizando la consulta del usuario...',
+          content: 'Analyzing the user request...',
           progress: 10
         })
 
@@ -193,7 +204,7 @@ export class AgentOrchestrator {
         this.addExecutionStep(executionId, {
           agent: execution.agentId,
           action: 'routing',
-          content: 'Determinando la mejor estrategia de respuesta...',
+          content: 'Determining the best response strategy...',
           progress: 30
         })
 
@@ -205,8 +216,25 @@ export class AgentOrchestrator {
           }
         })
         console.log(`📤 Invoking graph with message: "${input.substring(0, 50)}..."`)
-        
-  let result = await this.graph.invoke({ messages: [initialMessage] })
+
+        // Map prior thread messages into LangChain messages for graph state
+        const lcPrior = Array.isArray(priorMessages) ? priorMessages.flatMap((m) => {
+          try {
+            switch (m.role) {
+              case 'user': return [new HumanMessage({ content: m.content, additional_kwargs: m.metadata || {} })]
+              case 'assistant': return [new AIMessage({ content: m.content, additional_kwargs: m.metadata || {} })]
+              case 'system': return [new SystemMessage(m.content)]
+              default: return []
+            }
+          } catch {
+            return []
+          }
+        }) : []
+
+        console.log(`🔍 Prior context messages for graph state: ${lcPrior.length}`)
+        console.log(`🔍 Prior message preview:`, lcPrior.slice(-3).map(m => ({ type: m._getType(), content: String(m.content).substring(0, 100) })))
+
+        let result = await this.graph.invoke({ messages: [...lcPrior, initialMessage] })
         
         console.log(`📨 Graph execution completed:`, {
           executionId,
@@ -262,8 +290,8 @@ export class AgentOrchestrator {
 
         console.log(`✅ Execution completed with final message:`, {
           executionId,
-          finalMessageType: execution.messages.length > 0 ? execution.messages[execution.messages.length - 1].type : 'none',
-          finalMessageContent: execution.messages.length > 0 ? execution.messages[execution.messages.length - 1].content.substring(0, 100) : 'none'
+          finalMessageType: (execution.messages && execution.messages.length > 0) ? execution.messages[execution.messages.length - 1].type : 'none',
+          finalMessageContent: (execution.messages && execution.messages.length > 0) ? execution.messages[execution.messages.length - 1].content.substring(0, 100) : 'none'
         })
 
         this.emitEvent({
@@ -311,6 +339,13 @@ export class AgentOrchestrator {
   const info = this.resolveModelInfo(agentConfig)
   this.agentModelInfo.set(agentConfig.id, info)
       const tools = this.createToolsForAgent(agentConfig, config.handoffTools)
+      
+      console.log(`🔧 Creating agent ${agentConfig.id} with:`, {
+        toolCount: tools.length,
+        toolNames: tools.map((t: any) => t.name || 'unnamed'),
+        modelProvider: agentConfig.model,
+        temperature: agentConfig.temperature
+      })
 
       const agent = createReactAgent({
         llm: model,
@@ -318,6 +353,8 @@ export class AgentOrchestrator {
         prompt: agentConfig.prompt,
         name: agentConfig.id
       })
+      
+      console.log(`✅ Agent ${agentConfig.id} created successfully`)
 
       this.agents.set(agentConfig.id, agent)
       this.emitEvent({
@@ -385,12 +422,16 @@ export class AgentOrchestrator {
   }
 
   private createToolsForAgent(agentConfig: AgentConfig, handoffTools: HandoffTool[]) {
+    console.log(`🔧 Building tools for agent ${agentConfig.id}...`)
     const tools: any[] = []
 
     // 1) Real app tools via registry (filters to existing ones)
     const selected = Array.isArray(agentConfig.tools) ? agentConfig.tools : []
+    console.log(`📦 Agent ${agentConfig.id} requested tools:`, selected)
+    
     const runtime = buildToolRuntime(selected)
     tools.push(...runtime.lcTools)
+    console.log(`✅ Added ${runtime.lcTools.length} runtime tools for ${agentConfig.id}:`, runtime.lcTools.map((t: any) => t.name))
 
     // 2) Complete task tool for specialists (to close the loop into finalize)
     if (agentConfig.role === 'specialist') {
@@ -456,7 +497,7 @@ export class AgentOrchestrator {
               update: {
                 messages: [
                   new HumanMessage({
-                    content: `Nueva tarea delegada: ${input.task}${input.context ? `\n\nContexto: ${input.context}` : ''}`,
+                    content: `New delegated task: ${input.task}${input.context ? `\n\nContext: ${input.context}` : ''}`,
                     additional_kwargs: {
                       handoff_to: handoff.toAgent,
                       handoff_from: agentConfig.id
@@ -470,9 +511,9 @@ export class AgentOrchestrator {
           {
             name: handoff.name,
             description: handoff.description,
-            schema: z.object({
-              task: z.string().describe('Descripción detallada de la tarea a delegar'),
-              context: z.string().optional().describe('Contexto adicional para la tarea')
+              schema: z.object({
+              task: z.string().describe('Detailed description of the delegated task'),
+              context: z.string().optional().describe('Additional context for the task')
             })
           }
         )
@@ -480,6 +521,8 @@ export class AgentOrchestrator {
       }
     }
 
+    console.log(`🔧 Final tool count for ${agentConfig.id}: ${tools.length}`)
+    console.log(`🔧 Final tools for ${agentConfig.id}:`, tools.map((t: any) => t.name || 'unnamed'))
     return tools
   }
 
@@ -529,6 +572,28 @@ export class AgentOrchestrator {
       : 'cleo-supervisor'
     const info = this.agentModelInfo.get(targetId) || this.resolveModelInfo(this.agentConfigs.get('cleo-supervisor')!)
     return { agentId: targetId, ...info, timestamp: new Date().toISOString() }
+  }
+
+  private cleanupOldExecutions() {
+    const currentTime = Date.now()
+    const EXECUTION_TIMEOUT = 10 * 60 * 1000 // 10 minutes
+    
+    let cleanedCount = 0
+    for (const [executionId, execution] of this.executions.entries()) {
+      const executionTime = execution.startTime.getTime()
+      const age = currentTime - executionTime
+      
+      // Clean up old completed, failed, or very old running executions
+      if (execution.status === 'completed' || execution.status === 'failed' || age > EXECUTION_TIMEOUT) {
+        console.log(`🧹 Cleaning up old execution: ${executionId} (status: ${execution.status}, age: ${Math.round(age/1000)}s)`)
+        this.executions.delete(executionId)
+        cleanedCount++
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`🧹 Cleaned up ${cleanedCount} old executions. Remaining: ${this.executions.size}`)
+    }
   }
 
   private cleanupRuntimeAgents() {
@@ -595,7 +660,7 @@ export class AgentOrchestrator {
               this.addExecutionStep(currentExecution.id, {
                 agent: agentId,
                 action: 'analyzing',
-                content: `Ejecutando ${agentId}...`,
+                content: `Executing ${agentId}...`,
                 progress: 70,
                 metadata: { phase: 'agent_execution', agentId }
               })
@@ -612,14 +677,33 @@ export class AgentOrchestrator {
             // Execute the actual agent with guardrails
             let result: any
             try {
-              result = await agent.invoke(state)
+              console.log(`🚀 Starting agent invocation for ${agentId}...`)
+              const startTime = Date.now()
+              
+              // Add timeout wrapper to prevent hanging
+              const agentPromise = agent.invoke(state)
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`Agent ${agentId} timed out after 2 minutes`)), 120000)
+              })
+              
+              result = await Promise.race([agentPromise, timeoutPromise])
+              
+              const executionTime = Date.now() - startTime
+              console.log(`✅ Agent ${agentId} completed in ${executionTime}ms`)
+              console.log(`📦 Agent ${agentId} result:`, {
+                hasMessages: !!result.messages,
+                messageCount: result.messages?.length || 0,
+                lastMessageType: result.messages?.[result.messages?.length - 1]?._getType?.() || 'unknown',
+                lastMessageContent: String(result.messages?.[result.messages?.length - 1]?.content || '').substring(0, 200)
+              })
+              
             } catch (err) {
               console.error(`❌ Agent node failed during invoke: ${agentId}`, err)
               // Return a minimal AI message to keep the graph flowing
               result = {
                 messages: [
                   new AIMessage({
-                    content: `Hubo un problema ejecutando ${agentId}. Paso a la síntesis final.`,
+                    content: `There was a problem running ${agentId}. Moving to final synthesis.`,
                     additional_kwargs: { sender: agentId, error: 'agent_invoke_failed' }
                   })
                 ]
@@ -631,7 +715,7 @@ export class AgentOrchestrator {
               this.addExecutionStep(currentExecution.id, {
                 agent: agentId,
                 action: 'completing',
-                content: `${agentId} completado`,
+                content: `${agentId} completed`,
                 progress: 80,
                 metadata: { phase: 'agent_completed', agentId, completed: true }
               })
@@ -656,7 +740,7 @@ export class AgentOrchestrator {
         }
       }
 
-  // Add router node
+  // Add router node (pure pass-through; routing handled by conditional edges)
   graphBuilder.addNode('router' as any, async (state: any) => {
         // Find current execution to add routing step
         const currentExecution = Array.from(this.executions.values())
@@ -666,7 +750,7 @@ export class AgentOrchestrator {
           this.addExecutionStep(currentExecution.id, {
             agent: 'cleo-supervisor',
             action: 'routing',
-            content: 'Analizando consulta y determinando estrategia...',
+            content: 'Analyzing request and determining strategy...',
             progress: 40,
             metadata: { phase: 'routing' }
           })
@@ -682,24 +766,32 @@ export class AgentOrchestrator {
           availableAgents: Array.from(this.agents.keys())
         })
         if (requested && requested !== 'cleo-supervisor' && this.agents.has(requested)) {
-          console.log(`🧭 Router honoring requested agent from message: ${requested}`)
-          return requested
+          console.log(`🧭 Router detected requested agent in message: ${requested}`)
+          // Do not route here; conditional edges will handle the goto.
         }
 
         // Router node just passes through messages - conditional edges will decide the destination
-        console.log('� Router node: passing through to conditional edges for routing decision')
+  console.log('🧭 Router node: passing through to conditional edges for routing decision')
         return { messages: state.messages }
       })
 
       // Conditional routing from router to next node
-      graphBuilder.addConditionalEdges(
+  graphBuilder.addConditionalEdges(
         'router' as any,
         async (state: any) => {
+          // If the incoming message explicitly targets an agent, honor it first
+          const lastMsg = state.messages[state.messages.length - 1]
+          const requestedFromMsg = (lastMsg?.additional_kwargs as any)?.requested_agent_id
+          if (requestedFromMsg && requestedFromMsg !== 'cleo-supervisor' && this.agents.has(requestedFromMsg)) {
+            console.log(`🔀 Router: honoring requested agent from message metadata ${requestedFromMsg}`)
+            return requestedFromMsg as any
+          }
+
           // If the current execution explicitly targets an agent, honor it
           const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
           if (currentExecution && currentExecution.agentId && currentExecution.agentId !== 'cleo-supervisor' && this.agents.has(currentExecution.agentId)) {
             console.log(`🔀 Router: honoring requested agent ${currentExecution.agentId}`)
-            return currentExecution.agentId
+    return currentExecution.agentId as any
           }
 
           const last = state.messages[state.messages.length - 1]
@@ -743,6 +835,8 @@ export class AgentOrchestrator {
           }
           if (bestId && bestScore > 0) {
             console.log(`🔀 Router: Selected best match ${bestId} with score ${bestScore}`)
+            console.log(`📊 Router: Adding delegation step to execution...`)
+            
             // Emit UI event for delegation
             if (typeof globalThis !== 'undefined' && globalThis.dispatchEvent) {
               const event = new CustomEvent('agent-delegation', {
@@ -759,6 +853,11 @@ export class AgentOrchestrator {
             // Also record as an execution step so clients can derive delegation from polling
             try {
               const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+              console.log(`📊 Router: Current execution for delegation step:`, {
+                found: !!currentExecution,
+                executionId: currentExecution?.id,
+                status: currentExecution?.status
+              })
               if (currentExecution) {
                 this.addExecutionStep(currentExecution.id, {
                   agent: 'cleo-supervisor',
@@ -767,11 +866,14 @@ export class AgentOrchestrator {
                   progress: 55,
                   metadata: { delegatedTo: bestId, reason: `Best match with score ${bestScore}` }
                 })
+                console.log(`✅ Router: Delegation step added successfully`)
+              } else {
+                console.warn(`⚠️ Router: No running execution found for delegation step`)
               }
             } catch (e) {
               console.warn('Failed to add delegation step for router selection', e)
             }
-            return bestId
+            return bestId as any
           }
 
           console.log('🔀 Router: Going to finalize (default)')
@@ -803,7 +905,7 @@ export class AgentOrchestrator {
           } catch (e) {
             console.warn('Failed to add delegation step for finalize fallback', e)
           }
-          return 'finalize'
+          return 'finalize' as any
         },
         // Build dynamic mapping for conditional edges so runtime agents are included
         (() => {
@@ -827,26 +929,44 @@ export class AgentOrchestrator {
         console.log('🏁 *** FINALIZE NODE EXECUTING ***')
         console.log('🏁 Finalizing execution with Cleo response')
         console.log('🏁 State messages count:', state.messages?.length || 0)
+        
+        const prior = Array.isArray(state.messages) ? state.messages : []
+        
+        // Check if a specialist agent already provided a complete response with tool results
+        const lastAIMessage = prior.slice().reverse().find((m: any) => m._getType() === 'ai')
+        const hasToolResults = prior.some((m: any) => m._getType() === 'tool')
+        const specialistResponded = lastAIMessage && 
+          lastAIMessage.additional_kwargs?.sender && 
+          lastAIMessage.additional_kwargs.sender !== 'cleo-supervisor' &&
+          hasToolResults
 
-        const msgs = Array.isArray(state.messages) ? state.messages : []
-        const last = msgs[msgs.length - 1]
-        // If the last message is from a specialist/runtime agent and no error flag, pass it through verbatim
-        if (last instanceof AIMessage) {
-          const sender = (last.additional_kwargs as any)?.sender
-          const hasError = Boolean((last.additional_kwargs as any)?.error)
-          if (sender && sender !== 'cleo-supervisor' && !hasError) {
-            console.log('🏁 Finalize pass-through: returning specialist output without rewrite', { sender })
-            return { messages: [last] }
+        if (specialistResponded) {
+          console.log('🏁 Specialist already provided complete response, using pass-through')
+          
+          // Add completion step for UI
+          const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
+          if (currentExecution) {
+            this.addExecutionStep(currentExecution.id, {
+              agent: 'cleo-supervisor',
+              action: 'completing',
+              content: 'Task completed by specialist agent',
+              progress: 100,
+              metadata: { phase: 'finalized', completed: true, passThrough: true }
+            })
           }
+          
+          console.log('✅ Finalize node completed via pass-through:', String(lastAIMessage.content).substring(0, 100))
+          // Return existing messages without adding duplicate response
+          return { messages: prior }
         }
 
-        // Add a visualization step for UI
+        // Add a visualization step for UI when synthesizing
         const currentExecution = Array.from(this.executions.values()).find(exec => exec.status === 'running')
         if (currentExecution) {
           this.addExecutionStep(currentExecution.id, {
             agent: 'cleo-supervisor',
             action: 'completing',
-            content: 'Generando respuesta final con el contexto de la conversación...',
+            content: 'Generating final answer with conversation context...',
             progress: 95,
             metadata: { phase: 'finalizing' }
           })
@@ -859,20 +979,16 @@ export class AgentOrchestrator {
   console.log('[Finalize] Model selection:', { agentId: 'cleo-supervisor', ...finfo, timestamp: new Date().toISOString() })
 
   const system = new SystemMessage(
-    `${supervisorCfg?.prompt || 'Eres un asistente.'}
+    `${supervisorCfg?.prompt || 'You are Cleo, the supervisor.'}
 
-Reglas de finalización (prioridad alta):
-- Responde en el mismo idioma del último mensaje del usuario.
-- Contesta directamente la intención del usuario sin frases genéricas ni saludos innecesarios.
-- No preguntes "¿Cómo te sientes hoy?" ni hagas preguntas emocionales a menos que el usuario lo haya indicado explícitamente.
-- Si el usuario solo saluda (p. ej., "hola"), responde cortésmente en una sola línea y ofrece ayuda: «¿En qué puedo ayudarte?».
-- Usa el historial de mensajes para dar una respuesta final clara, específica y práctica.
-- Si el usuario pidió código o ejemplos, genera solo lo necesario y verificado, sin inventar.
-- No asumas dependencias ni claves; si son necesarias, menciónalas brevemente.
-- Sé conciso y enfocado en resolver la solicitud. Evita repeticiones.`
+Finalization rules (high priority):
+- Always respond in English for instructions and examples.
+- Provide a direct, concise answer to the user’s intent without generic greetings.
+- Use the conversation history and any tool outputs to synthesize a helpful final answer.
+- If the user asked for code or examples, provide only necessary, correct snippets—no fabrications.
+- Do not assume secrets or dependencies; if required, mention them briefly.
+- Summarize delegated agent results when applicable and clearly indicate key outcomes.`
   )
-
-        const prior = Array.isArray(state.messages) ? state.messages : []
 
         let ai: AIMessage
         try {
@@ -890,7 +1006,7 @@ Reglas de finalización (prioridad alta):
             this.addExecutionStep(currentExecution.id, {
               agent: 'cleo-supervisor',
               action: 'completing',
-              content: 'Respuesta final completada',
+              content: 'Final answer completed',
               progress: 100,
               metadata: { phase: 'finalized', completed: true }
             })
@@ -898,12 +1014,13 @@ Reglas de finalización (prioridad alta):
         } catch (err) {
           console.error('❌ Finalizer LLM failed:', err)
           ai = new AIMessage({
-            content: 'No pude generar la respuesta final en este momento. Intenta nuevamente o especifica más contexto.',
+            content: 'I could not generate the final answer at this moment. Please try again or provide more context.',
             additional_kwargs: { sender: 'cleo-supervisor', error: 'finalizer_llm_failed' }
           })
         }
 
-        return { messages: [ai] }
+        // Append finalize message to preserve full conversation state (including Emma's tool calls)
+        return { messages: [...prior, ai] }
       })
       console.log('✅ Added node: finalize')
 
@@ -927,7 +1044,8 @@ Reglas de finalización (prioridad alta):
       graphBuilder.addEdge('finalize' as any, END)
       console.log('✅ Added edge: finalize -> END')
 
-      this.graph = graphBuilder.compile()
+  // Compile graph; finalize edges ensure termination
+  this.graph = graphBuilder.compile()
       console.log('✅ Graph successfully built with router/finalizer pattern', {
         nodes: Array.from(this.agents.keys()).filter(id => id !== 'cleo-supervisor').concat(['router', 'finalize']),
         totalNodes: this.agents.size - 1 + 2 // specialists + router + finalize
@@ -975,6 +1093,8 @@ Reglas de finalización (prioridad alta):
     const execution: AgentExecution = {
       id: executionId,
       agentId: agentId || 'cleo-supervisor',
+      threadId: 'default',
+      userId: 'anonymous',
       status: 'running',
       startTime,
       messages: [],
@@ -983,9 +1103,12 @@ Reglas de finalización (prioridad alta):
         inputTokens: 0,
         outputTokens: 0,
         executionTime: 0,
+        executionTimeMs: 0,
+        tokensUsed: 0,
         toolCallsCount: 0,
         handoffsCount: 0,
         errorCount: 0,
+        retryCount: 0,
         cost: 0
       }
     }
@@ -1054,7 +1177,7 @@ Reglas de finalización (prioridad alta):
       console.log(`📊 Execution completed successfully:`, {
         executionId,
         duration: execution.metrics.executionTime + 'ms',
-        messageCount: execution.messages.length
+        messageCount: execution.messages?.length || 0
       })
 
       this.emitEvent({

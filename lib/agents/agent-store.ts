@@ -58,7 +58,7 @@ export const useAgentStore = create<AgentStoreState>()(
         const builtInAgents = getAllAgents()
         
         // Get runtime agents from orchestrator
-        const { getAgentOrchestrator } = await import('./agent-orchestrator')
+  const { getAgentOrchestrator } = await import('./orchestrator-adapter')
         const orchestrator = getAgentOrchestrator()
         const agentConfigs = orchestrator.getAgentConfigs()
         const runtimeAgents = Array.from(agentConfigs.values()).filter(config => {
@@ -84,7 +84,7 @@ export const useAgentStore = create<AgentStoreState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const { getAgentOrchestrator } = await import('./agent-orchestrator')
+  const { getAgentOrchestrator } = await import('./orchestrator-adapter')
         const orchestrator = getAgentOrchestrator()
         const execution = await orchestrator.executeAgent(input, agentId)
 
@@ -138,9 +138,9 @@ export const useAgentStore = create<AgentStoreState>()(
       const agentEdges: AgentEdge[] = []
       executions.forEach(execution => {
         // Find handoff patterns in messages
-        for (let i = 0; i < execution.messages.length - 1; i++) {
-          const currentMessage = execution.messages[i]
-          const nextMessage = execution.messages[i + 1]
+        for (let i = 0; i < (execution.messages || []).length - 1; i++) {
+          const currentMessage = (execution.messages || [])[i]
+          const nextMessage = (execution.messages || [])[i + 1]
 
           if (currentMessage.type === 'ai' && nextMessage.type === 'human') {
             // Potential handoff detected
@@ -187,7 +187,7 @@ export const useAgentStore = create<AgentStoreState>()(
     },
 
     subscribeToEvents: async () => {
-      const { getAgentOrchestrator } = await import('./agent-orchestrator')
+  const { getAgentOrchestrator } = await import('./orchestrator-adapter')
       const orchestrator = getAgentOrchestrator()
 
       const handleEvent = (event: AgentActivity) => {
@@ -230,7 +230,7 @@ export const useAgentStore = create<AgentStoreState>()(
     },
 
     unsubscribeFromEvents: async () => {
-      const { getAgentOrchestrator } = await import('./agent-orchestrator')
+  const { getAgentOrchestrator } = await import('./orchestrator-adapter')
       const orchestrator = getAgentOrchestrator()
       // Note: In a real implementation, you'd want to pass the specific listener
       // For now, we'll clear all listeners

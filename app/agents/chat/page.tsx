@@ -28,6 +28,8 @@ interface ChatMessage {
   timestamp: Date
   agentId?: string
   agentName?: string
+  isDelegated?: boolean
+  delegatedFrom?: string | null
 }
 
 export default function AgentsChatPage() {
@@ -35,12 +37,14 @@ export default function AgentsChatPage() {
   
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   // Track which executions we've already appended to avoid duplicates
   const appendedExecRef = useRef<Set<string>>(new Set())
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
+  
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -49,6 +53,22 @@ export default function AgentsChatPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Ensure CSRF cookie exists early for POSTs guarded by middleware
+  useEffect(() => {
+    const ensureCsrf = async () => {
+      try {
+        if (typeof document === 'undefined') return
+        const has = /(?:^|; )csrf_token=/.test(document.cookie)
+        if (!has) {
+          await fetch('/api/csrf', { method: 'GET', credentials: 'same-origin' })
+        }
+      } catch (_) {
+        // non-fatal
+      }
+    }
+    ensureCsrf()
+  }, [])
 
   // When an execution completes, append the AI messages from orchestrator
   useEffect(() => {
@@ -93,6 +113,67 @@ export default function AgentsChatPage() {
     clearError?.()
   }, [error, clearError])
 
+  // Load historical messages for the latest thread of the selected agent
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!selectedAgent) return
+      setLoadingHistory(true)
+      try {
+  // Clear local messages when switching agent to avoid mixing threads
+  setMessages([])
+        appendedExecRef.current.clear()
+
+        // Try to get latest thread for this agent; create one if none
+        const params = new URLSearchParams({ agentKey: selectedAgent.id, limit: '1' })
+  let res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
+        if (!res.ok) throw new Error('Failed to fetch threads')
+        let data = await res.json()
+        let thread = data?.threads?.[0]
+        if (!thread?.id) {
+          const cr = await fetch('/api/agents/threads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/) ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') } : {}) },
+            credentials: 'same-origin',
+            body: JSON.stringify({ agentKey: selectedAgent.id, agentName: selectedAgent.name, title: `${selectedAgent.name} Conversation` })
+          })
+          if (cr.ok) {
+            const cd = await cr.json()
+            thread = cd.thread
+          }
+        }
+        if (!thread?.id) return
+        // Persist this thread as the active one for this agent
+        try {
+          useClientAgentStore.setState((prev) => ({
+            _agentThreadMap: { ...(prev as any)._agentThreadMap, [selectedAgent.id]: thread.id }
+          }))
+        } catch (_) { /* ignore */ }
+  const mr = await fetch(`/api/agents/threads/${thread.id}/messages?limit=200`, { credentials: 'same-origin' })
+        if (!mr.ok) throw new Error('Failed to fetch thread messages')
+        const md = await mr.json()
+        const mapped: ChatMessage[] = (md?.messages || []).map((m: any) => ({
+          id: String(m.id),
+          type: m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'agent' : 'system'),
+          content: m.content || '',
+          timestamp: new Date(m.created_at),
+          agentId: m.role === 'assistant' ? selectedAgent.id : undefined,
+          agentName: m.role === 'assistant' ? selectedAgent.name : undefined,
+          isDelegated: m.metadata?.isDelegated || false,
+          delegatedFrom: m.metadata?.delegatedFrom || null,
+        }))
+        setMessages(mapped)
+      } catch (e) {
+        console.warn('Failed to load agent chat history:', e)
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+    loadHistory()
+  }, [selectedAgent])
+
+  
+  // Effective agent will be computed after lastDelegation is defined below
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedAgent) return
 
@@ -109,8 +190,8 @@ export default function AgentsChatPage() {
     setInputMessage('')
 
     try {
-      // Start execution; orchestrator will run in background and store will poll updates
-      await executeAgent(currentInput, selectedAgent.id)
+  // Start execution; route to effective agent if delegated
+  await executeAgent(currentInput, effectiveAgent?.id || selectedAgent.id)
       // Do not add a mock response; the effect above will append real AI messages when ready
     } catch (error) {
       console.error('Error sending message:', error)
@@ -181,6 +262,14 @@ export default function AgentsChatPage() {
     const t = lastDelegation.ts.getTime()
     return messages.findIndex((m) => m.type === 'agent' && m.timestamp.getTime() >= t)
   }, [messages, lastDelegation])
+
+  // Effective agent to target for next message: prefer last delegated-to (not finalize)
+  const effectiveAgent = useMemo(() => {
+    if (lastDelegation && lastDelegation.to && lastDelegation.to !== 'finalize') {
+      return agents.find(a => a.id === lastDelegation.to) || selectedAgent
+    }
+    return selectedAgent
+  }, [lastDelegation, agents, selectedAgent])
 
   // Helper to render an inline "assigned agent" chip based on delegation
   const renderDelegationChip = (delegation: { to: string; reason?: string } | null) => {
@@ -331,14 +420,56 @@ export default function AgentsChatPage() {
                       )})()}
                     </div>
                     {/* Mobile agent switcher */}
-                    <div className="ml-auto lg:hidden">
-                      <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
-                        Change
+                    <div className="ml-auto flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            // Ensure we have a thread for this agent
+                            const map = (useClientAgentStore.getState() as any)._agentThreadMap || {}
+                            let threadId = map[selectedAgent.id]
+                            if (!threadId) {
+                              const cr = await fetch('/api/agents/threads', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/) ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') } : {}) },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ agentKey: selectedAgent.id, agentName: selectedAgent.name, title: `${selectedAgent.name} Conversation` })
+                              })
+                              if (cr.ok) {
+                                const cd = await cr.json()
+                                threadId = cd?.thread?.id
+                                if (threadId) {
+                                  useClientAgentStore.setState((prev) => ({
+                                    _agentThreadMap: { ...(prev as any)._agentThreadMap, [selectedAgent.id]: threadId }
+                                  }))
+                                }
+                              }
+                            }
+                            if (!threadId) return
+                            const del = await fetch(`/api/agents/threads/${threadId}/messages`, { method: 'DELETE', credentials: 'same-origin', headers: { ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/) ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') } : {}) } })
+                            if (del.ok) {
+                              setMessages([])
+                            }
+                          } catch (e) {
+                            console.warn('Failed to clear conversation:', e)
+                          }
+                        }}
+                      >
+                        Clear
                       </Button>
+                      <div className="lg:hidden">
+                        <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+                          Change
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   {/* Messages */}
                   <div className="flex-1 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 overflow-y-auto space-y-3 sm:space-y-4">
+                    {loadingHistory && (
+                      <div className="text-xs text-slate-400">Loading conversation history…</div>
+                    )}
                     <AnimatePresence>
                       {messages.length === 0 ? (
                         <motion.div
@@ -425,6 +556,12 @@ export default function AgentsChatPage() {
 
                   {/* Input Area */}
                   <div className="sticky bottom-0 border-t border-slate-700 p-2 sm:p-4 pb-[env(safe-area-inset-bottom)] bg-slate-800/80 backdrop-blur supports-[backdrop-filter]:bg-slate-800/60">
+                    {/* Assignment hint if routing to a different agent than selected */}
+                    {effectiveAgent && selectedAgent && effectiveAgent.id !== selectedAgent.id && (
+                      <div className="mb-2 text-[11px] text-violet-200/80">
+                        Next message will be handled by <span className="font-medium">{effectiveAgent.name}</span>
+                      </div>
+                    )}
                     {/* Typing indicator when execution is running */}
                     {currentExecution && currentExecution.status === 'running' && (
                       <div className="mb-2 flex items-center gap-2 text-slate-300">
@@ -462,7 +599,7 @@ export default function AgentsChatPage() {
                       <Input
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder={`Type a message for ${selectedAgent.name}...`}
+                        placeholder={`Type a message for ${effectiveAgent?.name || selectedAgent.name}...`}
                         className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 h-10 sm:h-11"
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                         disabled={isLoading}

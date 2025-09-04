@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ export async function GET(
       )
     }
 
-    const orchestrator = getAgentOrchestrator()
+  const orchestrator = getAgentOrchestrator()
   const exec = orchestrator.getExecution(executionId)
 
     if (!exec) {
@@ -36,7 +36,7 @@ export async function GET(
       ...exec,
       startTime: exec.startTime instanceof Date ? exec.startTime.toISOString() : exec.startTime,
       endTime: exec.endTime instanceof Date ? exec.endTime.toISOString() : exec.endTime,
-      messages: exec.messages.map(m => ({
+      messages: (exec.messages || []).map(m => ({
         ...m,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
       })),

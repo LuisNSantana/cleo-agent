@@ -98,3 +98,7 @@ export type Database = {
     }
   }
 }
+
+// Convenience alias to match common import pattern in app code
+export type Tables = Database['public']['Tables']
+

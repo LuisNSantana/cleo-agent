@@ -190,15 +190,16 @@ function formatCustomer(customer: any): any {
  * Retrieve and filter products with various parameters
  */
 export const shopifyGetProductsTool = tool({
-  description: 'Retrieve products from a Shopify store with filtering options. Can get active, draft, or archived products, filter by vendor, and limit results.',
+  description: 'Retrieve products from a Shopify store with filtering options, including paginated output (20 per page) and friendly summaries.',
   inputSchema: z.object({
     ...ShopifyStoreSelector.shape,
-    limit: z.number().min(1).max(250).default(50).describe('Maximum number of products to retrieve'),
+    limit: z.number().min(1).max(250).default(20).describe('Maximum number of products to retrieve (page size, default 20)'),
+    page: z.number().min(1).default(1).describe('Page number for pagination (default 1)'),
     status: z.enum(['active', 'archived', 'draft']).optional().describe('Filter products by status'),
     vendor: z.string().optional().describe('Filter products by vendor name'),
     searchTerm: z.string().optional().describe('Search term to filter products by title')
   }),
-  execute: async ({ store_identifier = 'default', limit = 50, status, vendor, searchTerm }) => {
+  execute: async ({ store_identifier = 'default', limit = 20, page = 1, status, vendor, searchTerm }) => {
     try {
       const userId = await getCurrentUserId()
       const client = await getShopifyClientForUser(userId, store_identifier)
@@ -211,18 +212,32 @@ export const shopifyGetProductsTool = tool({
       if (searchTerm) searchParams.set('title', searchTerm)
 
       const response = await client.makeRequest(`products.json?${searchParams.toString()}`)
-      const products = response.products || []
+      const allProducts = response.products || []
+      // Client-side paginate (Shopify also supports since_id/page_info for deep pagination; this keeps it simple)
+      const start = Math.max(0, (page - 1) * limit)
+      const pageItems = allProducts.slice(start, start + limit)
+      const products = pageItems
 
       return {
         success: true,
-        count: products.length,
+        count: allProducts.length,
+        page,
+        pageSize: limit,
+        pageCount: Math.max(1, Math.ceil(allProducts.length / limit)),
         products: products.map((product: any) => formatProduct(product)),
         store_domain: client.domain,
+        store_url: `https://${client.domain}`,
         query: {
           limit,
+          page,
           status,
           vendor,
           searchTerm
+        },
+        ui_hint: {
+          style: 'products_list_v2',
+          suggestFollowUp: allProducts.length > start + products.length,
+          followUpPrompt: `Would you like me to list more products? I can show page ${page + 1} (${limit} more).`
         }
       }
     } catch (error) {
@@ -230,6 +245,8 @@ export const shopifyGetProductsTool = tool({
         success: false,
         count: 0,
         products: [],
+        page,
+        pageSize: limit,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
@@ -522,4 +539,157 @@ export const shopifyTools = {
   shopifyGetCustomers: shopifyGetCustomersTool,
   shopifyGetAnalytics: shopifyGetAnalyticsTool,
   shopifySearchProducts: shopifySearchProductsTool
+}
+
+// ---------------------------------------------------------------------------
+// WRITE-OP TOOLS (REQUIRE USER CONFIRMATION)
+// ---------------------------------------------------------------------------
+
+export const shopifyUpdateProductPriceTool = tool({
+  description: 'Update the price of a Shopify product variant. Requires user confirmation. When confirm=false or omitted, returns product details and asks for confirmation.',
+  inputSchema: z.object({
+    ...ShopifyStoreSelector.shape,
+    product_id: z.string().optional().describe('Shopify product ID'),
+    handle: z.string().optional().describe('Shopify product handle (if product_id not provided)'),
+    variant_id: z.string().optional().describe('Variant ID to update (defaults to first variant when omitted)'),
+    new_price: z.number().positive().describe('New price to set for the variant'),
+    confirm: z.boolean().default(false).describe('Set true only after the user explicitly confirms the change')
+  }).refine((data) => !!data.product_id || !!data.handle, { message: 'Either product_id or handle is required.' }),
+  execute: async ({ store_identifier = 'default', product_id, handle, variant_id, new_price, confirm = false }) => {
+    try {
+      const userId = await getCurrentUserId()
+      const client = await getShopifyClientForUser(userId, store_identifier)
+
+      // Resolve product by id or handle
+      let product: any | null = null
+      if (product_id) {
+        const resp = await client.makeRequest(`products/${product_id}.json`)
+        product = resp.product || null
+      } else if (handle) {
+        // Fallback search by handle
+        const resp = await client.makeRequest('products.json?limit=250&status=any')
+        const found = (resp.products || []).find((p: any) => p.handle === handle)
+        product = found || null
+      }
+
+      if (!product) {
+        // Try fuzzy suggestions based on handle/title
+        let suggestions: any[] = []
+        try {
+          const resp = await client.makeRequest('products.json?limit=250&status=any')
+          const all = (resp.products || []) as any[]
+          const q = (handle || product_id || '').toString().toLowerCase()
+          suggestions = all
+            .filter(p => {
+              const h = (p.handle || '').toLowerCase()
+              const t = (p.title || '').toLowerCase()
+              return q && (h.includes(q) || t.includes(q))
+            })
+            .slice(0, 5)
+            .map(p => ({ id: String(p.id), title: p.title, handle: p.handle }))
+        } catch {}
+
+        return {
+          success: false,
+          error: 'Product not found',
+          store_domain: client.domain,
+          store_url: `https://${client.domain}`,
+          suggestions,
+          ui_hint: suggestions.length ? {
+            style: 'suggest_similar',
+            message: 'I could not find that product. Here are similar matches:',
+          } : undefined
+        }
+      }
+
+      const variants = Array.isArray(product.variants) ? product.variants : []
+      const targetVariant = variant_id ? variants.find((v: any) => String(v.id) === String(variant_id)) : variants[0]
+      if (!targetVariant) {
+        return {
+          success: false,
+          error: 'Variant not found on product',
+          product: formatProduct(product),
+          store_domain: client.domain,
+          store_url: `https://${client.domain}`
+        }
+      }
+
+      // If not confirmed, return a preview and ask for confirmation
+      if (!confirm) {
+        const mainImage = Array.isArray(product.images) && product.images.length ? product.images[0] : null
+        return {
+          success: true,
+          require_confirmation: true,
+          action: 'update_product_price',
+          store_domain: client.domain,
+          store_url: `https://${client.domain}`,
+          product: formatProduct(product),
+          variant: {
+            id: String(targetVariant.id),
+            title: targetVariant.title,
+            current_price: targetVariant.price
+          },
+          new_price: Number(new_price).toFixed(2),
+          preview: {
+            image: mainImage ? { src: mainImage.src, alt: mainImage.alt || product.title } : null,
+            title: product.title,
+            vendor: product.vendor,
+            status: product.status
+          },
+          ui_hint: {
+            style: 'confirm_write_operation',
+            prompt: `You are about to change the price of "${product.title}" (variant: ${targetVariant.title}) from ${targetVariant.price} to ${Number(new_price).toFixed(2)}. Reply with "confirm" to proceed, or "cancel" to abort.`,
+            suggestedUserReply: 'confirm'
+          }
+        }
+      }
+
+      // Execute update when confirmed
+      const updateBody = {
+        product: {
+          id: product.id,
+          variants: [
+            {
+              id: targetVariant.id,
+              price: Number(new_price).toFixed(2)
+            }
+          ]
+        }
+      }
+
+      const updateResp = await client.makeRequest(`products/${product.id}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(updateBody)
+      })
+
+      // Fetch updated product to confirm
+      const updatedProductResp = await client.makeRequest(`products/${product.id}.json`)
+      const updatedProduct = updatedProductResp.product
+      const updatedVariant = (updatedProduct?.variants || []).find((v: any) => String(v.id) === String(targetVariant.id))
+
+      return {
+        success: true,
+        updated: true,
+        store_domain: client.domain,
+        store_url: `https://${client.domain}`,
+        product: formatProduct(updatedProduct),
+        variant: updatedVariant ? { id: String(updatedVariant.id), title: updatedVariant.title, new_price: updatedVariant.price } : null,
+        ui_hint: {
+          style: 'write_operation_result',
+          message: `Price updated successfully to ${updatedVariant?.price ?? Number(new_price).toFixed(2)}.`,
+          followUpPrompt: 'Would you like me to update another product or review recent changes?'
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  }
+})
+
+// Extend exports
+export const shopifyWriteTools = {
+  shopifyUpdateProductPrice: shopifyUpdateProductPriceTool
 }

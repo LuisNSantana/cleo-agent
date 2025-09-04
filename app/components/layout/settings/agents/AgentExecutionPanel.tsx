@@ -132,7 +132,7 @@ export function AgentExecutionPanel({
           <h3 className="font-medium mb-3">Timeline de Mensajes</h3>
           <ScrollArea className="h-96">
             <div className="space-y-4">
-              {execution.messages.map((message, index) => (
+              {(execution.messages || []).map((message, index) => (
                 <div key={message.id} className="flex gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm">
                     {getMessageIcon(message.type)}

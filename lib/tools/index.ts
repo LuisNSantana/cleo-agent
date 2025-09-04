@@ -7,7 +7,7 @@ import { createDocumentTool } from './create-document';
 import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
 import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail';
-import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool } from './shopify';
+import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool, shopifyUpdateProductPriceTool } from './shopify';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -276,6 +276,26 @@ export const randomFactTool = tool({
   },
 });
 
+// Task completion tool - For specialist agents to signal task completion
+export const completeTaskTool = tool({
+  description: 'Signal that a specialist task has been completed and results are ready for final synthesis. Used by specialist agents to return control to the supervisor.',
+  inputSchema: z.object({
+    summary: z.string().describe('Brief summary of the completed work'),
+    status: z.enum(['completed', 'ready', 'done']).default('completed').describe('Task completion status'),
+    nextSteps: z.string().optional().describe('Suggested next steps or follow-up actions'),
+  }),
+  execute: async ({ summary, status, nextSteps }) => {
+    return {
+      taskCompleted: true,
+      status,
+      summary,
+      nextSteps: nextSteps || null,
+      timestamp: new Date().toISOString(),
+      message: `Task ${status}: ${summary}${nextSteps ? ` Next steps: ${nextSteps}` : ''}`,
+    };
+  },
+});
+
 // Export all tools as a collection with categories for modularity
 export const tools = {
   // Core Web Search
@@ -295,6 +315,9 @@ export const tools = {
   
   // Random Fun
   randomFact: randomFactTool,
+
+  // Task Management
+  complete_task: completeTaskTool,
 
   // Document Tools
   createDocument: createDocumentTool,
@@ -327,6 +350,7 @@ export const tools = {
   shopifyGetAnalytics: shopifyGetAnalyticsTool,
   shopifyGetCustomers: shopifyGetCustomersTool,
   shopifySearchProducts: shopifySearchProductsTool,
+  shopifyUpdateProductPrice: shopifyUpdateProductPriceTool,
 };
 
 export type ToolName = keyof typeof tools;

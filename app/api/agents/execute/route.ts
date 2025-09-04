@@ -4,15 +4,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { ExecuteAgentRequest } from '@/lib/agents/types'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ExecuteAgentRequest = await request.json()
-    const { agentId, input, context } = body
+  const body: any = await request.json()
+  const { agentId, input, context, threadId } = body as ExecuteAgentRequest & { threadId?: string }
 
     if (!input || !input.trim()) {
       return NextResponse.json(
@@ -33,9 +34,96 @@ export async function POST(request: NextRequest) {
   } catch {}
 
     try {
-  // Start execution non-blocking to enable live UI updates
-  const execution = orchestrator.startAgentExecution(input, agentId)
-  console.log('[API/execute] Started execution:', execution.id)
+      // Resolve authenticated user for persistence
+  const supabase = await createClient()
+  const { data: authData } = supabase ? await supabase.auth.getUser() : { data: { user: null } }
+      const authedUserId = authData?.user?.id
+
+      // Optionally create or reuse an agent thread so we keep context across confirms
+      let effectiveThreadId: string | null = null
+      if (authedUserId && supabase) {
+        try {
+          // Use explicit threadId if provided and valid
+          if (threadId) {
+            const { data } = await (supabase as any)
+              .from('agent_threads')
+              .select('id, agent_key')
+              .eq('id', threadId)
+              .eq('user_id', authedUserId)
+              .single()
+            // Only use thread if it matches the target agent or is for cleo (supervisor can delegate)
+            if (data && (data.agent_key === (agentId || 'cleo-supervisor') || data.agent_key === 'cleo-supervisor')) {
+              effectiveThreadId = data.id
+            }
+          }
+          
+          // If no valid thread found, try to find existing thread for this agent
+          if (!effectiveThreadId) {
+            const { data } = await (supabase as any)
+              .from('agent_threads')
+              .select('id')
+              .eq('user_id', authedUserId)
+              .eq('agent_key', agentId || 'cleo-supervisor')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            effectiveThreadId = data?.id || null
+          }
+          
+          // If still no thread, create one for this agent
+          if (!effectiveThreadId) {
+            const { data } = await (supabase as any)
+              .from('agent_threads')
+              .insert({ user_id: authedUserId, agent_key: agentId || 'cleo-supervisor', agent_name: agentId || 'Cleo' })
+              .select('id')
+              .single()
+            effectiveThreadId = (data as any)?.id || null
+          }
+          
+          // Save the user message to thread
+          if (effectiveThreadId) {
+            await (supabase as any).from('agent_messages').insert({
+              thread_id: effectiveThreadId,
+              user_id: authedUserId,
+              role: 'user',
+              content: input,
+              metadata: { 
+                agentId: agentId || 'cleo-supervisor', 
+                context: context || null,
+                isDelegated: agentId && agentId !== 'cleo-supervisor',
+                delegatedFrom: agentId && agentId !== 'cleo-supervisor' ? 'cleo-supervisor' : null
+              }
+            })
+          }
+        } catch (e) {
+          console.warn('[API/execute] Could not persist agent thread/message:', e)
+        }
+      }
+
+      // Build prior messages context from thread (last ~25 messages) so confirms carry state
+      let priorMessages: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }> = []
+      if (effectiveThreadId && authedUserId && supabase) {
+        try {
+          const { data: msgs } = await (supabase as any)
+            .from('agent_messages')
+            .select('role, content, metadata, created_at')
+            .eq('thread_id', effectiveThreadId)
+            .eq('user_id', authedUserId)
+            .order('created_at', { ascending: true })
+            .limit(25)
+          if (Array.isArray(msgs)) {
+            priorMessages = msgs.map((m: any) => ({ role: m.role, content: m.content || '', metadata: m.metadata || undefined }))
+          }
+          console.log(`[API/execute] Loaded ${priorMessages.length} prior messages from thread ${effectiveThreadId}`)
+          console.log(`[API/execute] Prior messages preview:`, priorMessages.slice(-3).map(m => ({ role: m.role, content: m.content.substring(0, 80) })))
+        } catch (e) {
+          console.warn('[API/execute] Failed to load prior thread messages:', e)
+        }
+      }
+
+      // Start execution non-blocking with prior context for better continuity
+      const execution = (orchestrator as any).startAgentExecutionWithHistory?.(input, agentId, priorMessages) || orchestrator.startAgentExecution(input, agentId)
+      console.log('[API/execute] Started execution:', execution.id)
 
       return NextResponse.json({
         success: true,
@@ -48,7 +136,8 @@ export async function POST(request: NextRequest) {
           metrics: execution.metrics,
           error: execution.error,
           steps: execution.steps || []
-        }
+        },
+        thread: effectiveThreadId ? { id: effectiveThreadId } : null
       })
     } catch (error) {
       console.error('Agent execution error:', error)
@@ -64,8 +153,8 @@ export async function POST(request: NextRequest) {
           errorType: error.constructor.name
         })
         
-        const { recreateAgentOrchestrator } = await import('@/lib/agents/agent-orchestrator')
-        const newOrchestrator = recreateAgentOrchestrator()
+  const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
+  const newOrchestrator = recreateAgentOrchestrator()
 
         try {
           const execution = newOrchestrator.startAgentExecution(input, agentId)

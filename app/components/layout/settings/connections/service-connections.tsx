@@ -10,7 +10,7 @@ import {
   ArrowSquareOutIcon
 } from "@phosphor-icons/react"
 import { useState, useEffect } from "react"
-import { Tables } from '@/lib/database.types'
+import type { Tables } from '@/app/types/database.types'
 import Image from 'next/image'
 
 type ServiceStatus = "connected" | "disconnected" | "connecting"

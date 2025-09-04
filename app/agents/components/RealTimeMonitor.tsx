@@ -57,8 +57,8 @@ export function RealTimeExecutionMonitor() {
       setBreadcrumb((prev) => (prev.length ? [] : prev))
       return
     }
-    const parts: string[] = ['Cleo']
-    exec.messages.forEach((m) => {
+    const parts: string[] = ['Cleo'];
+    (exec.messages || []).forEach((m: any) => {
       const from = (m.metadata as any)?.handoff_from
       const to = (m.metadata as any)?.handoff_to
       if (from && to) {
@@ -68,7 +68,7 @@ export function RealTimeExecutionMonitor() {
         parts.push(prettyTo)
       }
     })
-    const lastAi = [...exec.messages].reverse().find(m => m.type === 'ai')
+    const lastAi = [...(exec.messages || [])].reverse().find(m => m.type === 'ai')
     if (lastAi) parts.push('Respuesta')
 
     // only update when changed
@@ -401,7 +401,7 @@ export function RealTimeExecutionMonitor() {
                 </div>
                 
                 <div className="text-xs text-gray-600">
-                  {execution.messages.length} mensajes
+                  {(execution.messages || []).length} mensajes
                   {execution.status === 'completed' && execution.metrics.executionTime && (
                     <> • {execution.metrics.executionTime}ms</>
                   )}
@@ -409,20 +409,20 @@ export function RealTimeExecutionMonitor() {
                 
                 {/* Mini execution flow with durations */}
                 <div className="flex items-center gap-1 mt-1">
-                  {execution.messages.slice(0, 4).map((msg, idx) => (
+                  {(execution.messages || []).slice(0, 4).map((msg, idx) => (
                     <div key={idx} className="flex items-center gap-1">
                       <div className={`w-1.5 h-1.5 rounded-full ${
                         msg.type === 'human' ? 'bg-blue-400' :
                         msg.type === 'ai' ? 'bg-purple-400' :
                         'bg-gray-400'
                       }`} />
-                      {idx < 3 && idx < execution.messages.length - 1 && (
+                      {idx < 3 && idx < (execution.messages || []).length - 1 && (
                         <ArrowRight className="size-2 text-gray-400" />
                       )}
                     </div>
                   ))}
-                  {execution.messages.length > 4 && (
-                    <span className="text-xs text-gray-400">+{execution.messages.length - 4}</span>
+                  {(execution.messages || []).length > 4 && (
+                    <span className="text-xs text-gray-400">+{(execution.messages || []).length - 4}</span>
                   )}
                   {execution.metrics.executionTime && (
                     <span className="text-xs text-gray-500 ml-auto">{execution.metrics.executionTime}ms</span>

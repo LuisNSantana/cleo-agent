@@ -488,7 +488,7 @@ export function AgentGraph({
 
     // Extract handoff pairs from messages (source -> target) with timestamps
     const pairs: Array<{ from: string; to: string; at: number }> = []
-    for (const m of exec.messages) {
+    for (const m of (exec.messages || [])) {
       const to = (m.metadata as any)?.handoff_to
       const from = (m.metadata as any)?.handoff_from
       if (from && to) {

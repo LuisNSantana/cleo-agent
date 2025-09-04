@@ -39,6 +39,10 @@ interface ClientAgentStore {
   initializeAgents: () => Promise<void>
   syncAgents: () => Promise<void>
   executeAgent: (input: string, agentId?: string) => Promise<void>
+  // Thread mapping per agent to keep conversation context across confirms
+  _agentThreadMap?: Record<string, string>
+  // Track which executions have already posted their final assistant message
+  _finalPosted?: Record<string, boolean>
   selectAgent: (agent: AgentConfig | null) => void
   updateGraphData: () => void
   clearError: () => void
@@ -46,6 +50,7 @@ interface ClientAgentStore {
   addExecution: (execution: AgentExecution) => void
   updateMetrics: (metrics: Partial<SystemMetrics>) => void
   pollExecutionStatus: (executionId: string) => Promise<void>
+  persistFinalAssistantMessage: (execution: AgentExecution) => Promise<void>
   addAgent: (agent: AgentConfig) => void
   addDelegationEvent: (event: any) => void
   resetGraph: () => void
@@ -75,6 +80,8 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     isLoading: false,
     error: null,
     delegationEvents: [],
+  _agentThreadMap: {},
+  _finalPosted: {},
 
     // Actions
     initializeAgents: async () => {
@@ -90,8 +97,15 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     },
 
     syncAgents: async () => {
+      // Skip sync on server-side rendering to avoid URL parse errors
+      if (typeof window === 'undefined') {
+        console.log('Skipping agent sync on server-side')
+        get().updateGraphData()
+        return
+      }
+
       try {
-        const res = await fetch('/api/agents/sync', { method: 'GET' })
+        const res = await fetch('/api/agents/sync', { method: 'GET', credentials: 'same-origin' })
         if (!res.ok) throw new Error('Failed to fetch agents from server')
         const data = await res.json()
         const builtIns = getAllAgents()
@@ -109,12 +123,31 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       set({ isLoading: true, error: null })
 
       try {
+        // Helper: read CSRF token from cookie if present
+        const getCsrfToken = () => {
+          if (typeof document === 'undefined') return undefined
+          const m = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)
+          return m ? decodeURIComponent(m[1]) : undefined
+        }
+
+        // Abort if the network is stuck
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 30000)
+
+        const map = get()._agentThreadMap || {}
+        const threadId = agentId ? map[agentId] : undefined
         // Call API instead of direct orchestrator
         const response = await fetch('/api/agents/execute', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input, agentId })
+          headers: {
+            'Content-Type': 'application/json',
+            ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken()! } : {})
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ input, agentId, threadId }),
+          signal: controller.signal
         })
+        clearTimeout(timeout)
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
@@ -132,9 +165,19 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           isLoading: false
         }))
 
+        // Persist thread mapping per agent for subsequent messages
+        if (data.thread?.id && agentId) {
+          const newMap = { ...(get()._agentThreadMap || {}) }
+          newMap[agentId] = data.thread.id
+          set({ _agentThreadMap: newMap })
+        }
+
         // Start polling for execution updates if it's running
         if (data.execution.status === 'running') {
           get().pollExecutionStatus(data.execution.id)
+        } else if (data.execution.status === 'completed') {
+          // Persist assistant final message immediately when already completed
+          try { await get().persistFinalAssistantMessage(data.execution) } catch (e) { console.warn('Persist final message failed:', e) }
         }
 
         get().updateMetrics({
@@ -144,8 +187,13 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
       } catch (error) {
         console.error('Error executing agent:', error)
+        const message = (error instanceof DOMException && error.name === 'AbortError')
+          ? 'Request timed out'
+          : (error instanceof TypeError && /Failed to fetch/i.test(error.message))
+            ? 'Network error: Failed to fetch'
+            : (error instanceof Error ? error.message : 'Unknown error occurred')
         set({ 
-          error: error instanceof Error ? error.message : 'Unknown error occurred',
+          error: message,
           isLoading: false 
         })
       }
@@ -261,7 +309,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         pollCount++
         
         try {
-          const response = await fetch(`/api/agents/execution/${executionId}`)
+          const response = await fetch(`/api/agents/execution/${executionId}`, { credentials: 'same-origin' })
           if (response.ok) {
             const data = await response.json()
             if (data.execution) {
@@ -284,6 +332,15 @@ export const useClientAgentStore = create<ClientAgentStore>()(
               if (data.execution.status !== 'running') {
                 clearInterval(pollInterval)
                 console.log(`✅ Polling stopped for ${executionId}: ${data.execution.status}`)
+
+                // On completion, persist assistant final message to the thread
+                if (data.execution.status === 'completed') {
+                  try {
+                    await get().persistFinalAssistantMessage(data.execution)
+                  } catch (e) {
+                    console.warn('Persist final message failed:', e)
+                  }
+                }
               }
             }
           } else {
@@ -303,6 +360,53 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     }
 
     ,
+
+    // Persist the assistant's final AI message into the current agent thread
+    persistFinalAssistantMessage: async (execution) => {
+      const posted = get()._finalPosted || {}
+      if (posted[execution.id]) return
+      const agentId = execution.agentId
+      const map = get()._agentThreadMap || {}
+      const threadId = agentId ? map[agentId] : undefined
+      if (!threadId) return
+
+      // Find the last AI message
+      const aiMessages = (execution.messages || []).filter(m => m.type === 'ai')
+      const last = aiMessages[aiMessages.length - 1]
+      if (!last || !last.content) {
+        // Mark as posted to avoid repeated attempts
+        set({ _finalPosted: { ...posted, [execution.id]: true } })
+        return
+      }
+      try {
+        const res = await fetch('/api/agents/threads/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // pass csrf token when available (future-proof if API adds CSRF)
+            ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/)
+              ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') }
+              : {})
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            threadId,
+            role: 'assistant',
+            content: last.content,
+            toolCalls: last.toolCalls || null,
+            metadata: { sender: last.metadata?.sender || agentId, executionId: execution.id }
+          })
+        })
+        if (!res.ok) {
+          const msg = await res.text().catch(() => '')
+          console.warn('Failed to append assistant message:', res.status, msg)
+        }
+      } catch (e) {
+        console.warn('Error posting assistant message:', e)
+      } finally {
+        set({ _finalPosted: { ...posted, [execution.id]: true } })
+      }
+    },
 
     addAgent: (agent: AgentConfig) => {
       set((state) => ({ agents: [...state.agents, agent] }))
@@ -385,8 +489,10 @@ export const useClientAgentStore = create<ClientAgentStore>()(
   }))
 )
 
-// Initialize agents on store creation
-useClientAgentStore.getState().initializeAgents()
+// Initialize agents on store creation (client-only to avoid server fetch of relative URLs)
+if (typeof window !== 'undefined') {
+  useClientAgentStore.getState().initializeAgents()
+}
 
 // Listen for delegation events from the orchestrator
 if (typeof window !== 'undefined') {

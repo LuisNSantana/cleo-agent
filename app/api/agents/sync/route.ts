@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter'
 
 export const dynamic = 'force-dynamic'
 

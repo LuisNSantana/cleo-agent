@@ -231,7 +231,7 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
                     </span>
                   </div>
                   <Badge variant="outline" className="text-xs px-1 py-0">
-                    {execution.messages.length}
+                    {(execution.messages || []).length}
                   </Badge>
                 </div>
               ))}

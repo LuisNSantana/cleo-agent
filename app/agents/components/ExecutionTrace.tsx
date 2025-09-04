@@ -104,7 +104,7 @@ export function ExecutionTrace({ execution, onClose }: ExecutionTraceProps) {
             }
           </div>
           <div className="text-sm text-muted-foreground">
-            {execution.messages.length} mensajes
+            {(execution.messages || []).length} mensajes
           </div>
         </div>
       </CardHeader>
@@ -120,7 +120,7 @@ export function ExecutionTrace({ execution, onClose }: ExecutionTraceProps) {
           <TabsContent value="trace" className="mt-4">
             <div className="h-[400px] overflow-y-auto">
               <div className="space-y-3">
-                {execution.messages.map((message, index) => (
+                {(execution.messages || []).map((message, index) => (
                   <div
                     key={message.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
@@ -154,7 +154,7 @@ export function ExecutionTrace({ execution, onClose }: ExecutionTraceProps) {
                           </div>
                         )}
                       </div>
-                      {index < execution.messages.length - 1 && (
+                      {index < (execution.messages || []).length - 1 && (
                         <ArrowRight className="size-4 text-gray-400 mt-1" />
                       )}
                     </div>
@@ -230,7 +230,7 @@ export function ExecutionTrace({ execution, onClose }: ExecutionTraceProps) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {execution.messages.map((message) => (
+                  {(execution.messages || []).map((message) => (
                     <div
                       key={message.id}
                       className="p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"

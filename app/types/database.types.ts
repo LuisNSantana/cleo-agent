@@ -11,6 +11,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_threads: {
+        Row: {
+          id: string
+          user_id: string
+          agent_key: string | null
+          agent_name: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          agent_key?: string | null
+          agent_name?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          agent_key?: string | null
+          agent_name?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_threads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_messages: {
+        Row: {
+          id: string
+          thread_id: string
+          user_id: string
+          role: 'user' | 'assistant' | 'tool' | 'system'
+          content: string
+          metadata: Json | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          user_id: string
+          role: 'user' | 'assistant' | 'tool' | 'system'
+          content: string
+          metadata?: Json | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          user_id?: string
+          role?: 'user' | 'assistant' | 'tool' | 'system'
+          content?: string
+          metadata?: Json | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_service_connections: {
         Row: {
           id: string

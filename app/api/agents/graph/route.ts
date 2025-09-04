@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllAgents } from '@/lib/agents/config'
-import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 
 export async function GET() {
   try {
@@ -36,9 +36,9 @@ export async function GET() {
     // Create edges for handoffs
     const edges: any[] = []
     executions.forEach(execution => {
-      for (let i = 0; i < execution.messages.length - 1; i++) {
-        const currentMessage = execution.messages[i]
-        const nextMessage = execution.messages[i + 1]
+      for (let i = 0; i < (execution.messages || []).length - 1; i++) {
+        const currentMessage = (execution.messages || [])[i]
+        const nextMessage = (execution.messages || [])[i + 1]
 
         if (currentMessage.type === 'ai' && nextMessage.type === 'human') {
           if (currentMessage.content.toLowerCase().includes('delegat') ||
