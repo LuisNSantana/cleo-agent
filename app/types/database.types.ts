@@ -701,6 +701,101 @@ export type Database = {
         }
         Relationships: []
       }
+      skyvern_user_credentials: {
+        Row: {
+          api_key: string
+          base_url: string
+          created_at: string
+          credential_name: string
+          id: string
+          is_active: boolean
+          organization_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          base_url?: string
+          created_at?: string
+          credential_name?: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          base_url?: string
+          created_at?: string
+          credential_name?: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skyvern_task_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          credential_id: string
+          error_message: string | null
+          id: string
+          request_data: Json | null
+          response_data: Json | null
+          started_at: string | null
+          status: string
+          task_id: string
+          task_type: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          credential_id: string
+          error_message?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          started_at?: string | null
+          status: string
+          task_id: string
+          task_type: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          credential_id?: string
+          error_message?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          started_at?: string | null
+          status?: string
+          task_id?: string
+          task_type?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skyvern_task_history_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "skyvern_user_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           anonymous: boolean | null

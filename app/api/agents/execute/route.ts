@@ -141,6 +141,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Set global user context for tools (like chat route does)
+      if (authedUserId) {
+        ;(globalThis as any).__currentUserId = authedUserId;
+      }
+
       // Start execution with enhanced dual-mode support
       const execution = (orchestrator as any).startAgentExecutionForUI?.(
         input, 
@@ -170,12 +175,15 @@ export async function POST(request: NextRequest) {
           error: execution.error,
           steps: execution.steps || []
         },
-  thread: effectiveThreadId ? { id: effectiveThreadId } : null
+        thread: effectiveThreadId ? { id: effectiveThreadId } : null
       })
     } catch (error) {
       console.error('Agent execution error:', error)
 
-      // Only recreate orchestrator for very specific graph errors, not general errors
+      // Clean up global context on error
+      if ((globalThis as any).__currentUserId) {
+        delete (globalThis as any).__currentUserId;
+      }      // Only recreate orchestrator for very specific graph errors, not general errors
       if (error instanceof Error && (
         error.message.includes('already present') ||
         error.message.includes('Graph not initialized') ||
@@ -206,6 +214,12 @@ export async function POST(request: NextRequest) {
           })
         } catch (retryError) {
           console.error('Retry execution failed:', retryError)
+          
+          // Clean up global context on retry error
+          if ((globalThis as any).__currentUserId) {
+            delete (globalThis as any).__currentUserId;
+          }
+          
           return NextResponse.json(
             { error: 'Failed to execute agent after retry', details: retryError instanceof Error ? retryError.message : String(retryError) },
             { status: 500 }
@@ -214,6 +228,12 @@ export async function POST(request: NextRequest) {
       }
 
       // For other errors, just return the error without recreating
+      
+      // Clean up global context on general error
+      if ((globalThis as any).__currentUserId) {
+        delete (globalThis as any).__currentUserId;
+      }
+      
       return NextResponse.json(
         { 
           error: 'Failed to execute agent',
@@ -225,6 +245,12 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error executing agent:', error)
+    
+    // Clean up global context on outer error
+    if ((globalThis as any).__currentUserId) {
+      delete (globalThis as any).__currentUserId;
+    }
+    
     return NextResponse.json(
       {
         error: 'Failed to execute agent',

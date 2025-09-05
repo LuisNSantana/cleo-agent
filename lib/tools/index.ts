@@ -8,6 +8,7 @@ import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
 import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail';
 import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool, shopifyUpdateProductPriceTool } from './shopify';
+import { skyvernTools, addSkyvernCredentialsTool, testSkyvernConnectionTool, createSkyvernTaskTool, getSkyvernTaskTool, takeSkyvernScreenshotTool, listSkyvernTasksTool } from '../skyvern';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -351,6 +352,14 @@ export const tools = {
   shopifyGetCustomers: shopifyGetCustomersTool,
   shopifySearchProducts: shopifySearchProductsTool,
   shopifyUpdateProductPrice: shopifyUpdateProductPriceTool,
+
+  // Skyvern Tools - Web Automation
+  add_skyvern_credentials: addSkyvernCredentialsTool,
+  test_skyvern_connection: testSkyvernConnectionTool,
+  create_skyvern_task: createSkyvernTaskTool,
+  get_skyvern_task: getSkyvernTaskTool,
+  take_skyvern_screenshot: takeSkyvernScreenshotTool,
+  list_skyvern_tasks: listSkyvernTasksTool,
 };
 
 export type ToolName = keyof typeof tools;

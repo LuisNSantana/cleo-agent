@@ -456,6 +456,7 @@ export class GraphBuilder {
         }
 
         // Handle tool calls if present
+        const toolCallHistory: string[] = []
         for (let i = 0; i < 3; i++) {
           const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
           console.log(`🔍 [DEBUG] BuildGraph - Tool loop iteration ${i + 1}, tool_calls found:`, toolCalls.length)
@@ -464,6 +465,18 @@ export class GraphBuilder {
             console.log(`🔍 [DEBUG] BuildGraph - No tool calls in iteration ${i + 1}, breaking loop`)
             break
           }
+
+          // Check for repeated tool calls (potential infinite loop)
+          const currentToolNames = toolCalls.map((t: any) => t?.name).join(',')
+          if (toolCallHistory.includes(currentToolNames) && toolCalls.length === 1) {
+            console.log(`🔍 [DEBUG] BuildGraph - Detected repeated tool call pattern: ${currentToolNames}, breaking loop`)
+            // Force a final response by clearing tool calls and asking for summary
+            messages.push(new AIMessage({
+              content: "I need to provide a summary of the current task status and results."
+            }))
+            break
+          }
+          toolCallHistory.push(currentToolNames)
 
           console.log('🔍 [DEBUG] BuildGraph - Adding AIMessage with tool_calls to messages array')
           console.log('🔍 [DEBUG] BuildGraph - tool_calls found:', toolCalls.length)
@@ -522,6 +535,24 @@ export class GraphBuilder {
           } catch (error) {
             console.log('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
             throw error
+          }
+        }
+
+        // Ensure we always have a final response
+        if (!response.content || response.content.trim() === '') {
+          console.log('🔍 [DEBUG] BuildGraph - Empty response detected, requesting final summary')
+          // Add a system message to force a response
+          messages.push(new HumanMessage({
+            content: "Please provide a summary of the current task status and any results obtained so far."
+          }))
+          try {
+            response = await model.invoke(messages)
+            console.log('🔍 [DEBUG] BuildGraph - Final summary response generated')
+          } catch (error) {
+            console.log('🔍 [DEBUG] BuildGraph - Final summary failed, using fallback')
+            response = {
+              content: "Task execution completed. Please check the task status for detailed results."
+            }
           }
         }
 

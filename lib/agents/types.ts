@@ -18,6 +18,7 @@ export interface AgentConfig {
   prompt: string
   color: string
   icon: string
+  avatar?: string // Path to agent avatar image
   // Optional LangChain / LangGraph specific fields
   objective?: string // High-level objective for the agent (what it should achieve)
   customInstructions?: string // Extra system/user instructions or constraints

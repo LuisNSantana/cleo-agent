@@ -4,7 +4,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
-import ShopifyCredentialsManager from '@/components/shopify/ShopifyCredentialsManager'
+import { ShopifyCredentialsManager, SkyvernCredentialsManager } from '@/components/common/CredentialsManager'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { PlusIcon, RobotIcon } from '@phosphor-icons/react'
 
@@ -53,13 +53,27 @@ export default function AgentsManagePage() {
           />
         </motion.div>
 
-        {/* Shopify Credentials Section */}
+        {/* Agent Credentials Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          className="space-y-6"
         >
-          <ShopifyCredentialsManager />
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-foreground">Agent Credentials</h2>
+            <p className="text-muted-foreground">
+              Manage API keys and credentials for your specialized agents. Each agent requires specific credentials to access external services.
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-1 xl:grid-cols-2">
+            {/* Shopify Credentials for Emma */}
+            <ShopifyCredentialsManager />
+
+            {/* Skyvern Credentials for Wex */}
+            <SkyvernCredentialsManager />
+          </div>
         </motion.div>
 
         {/* Empty State */}
@@ -70,14 +84,14 @@ export default function AgentsManagePage() {
             transition={{ delay: 0.2 }}
             className="flex flex-col items-center justify-center py-24"
           >
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center mb-6">
-              <RobotIcon className="w-12 h-12 text-white" />
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-border flex items-center justify-center mb-6">
+              <RobotIcon className="w-12 h-12 text-muted-foreground" />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Create your first agent</h3>
-            <p className="text-slate-400 text-center max-w-md mb-8">Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.</p>
+            <h3 className="text-2xl font-bold text-foreground mb-2">Create your first agent</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-8">Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.</p>
             <Button
               size="lg"
-              className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white px-8"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
             >
               <PlusIcon className="w-5 h-5 mr-2" />
               Create my first agent

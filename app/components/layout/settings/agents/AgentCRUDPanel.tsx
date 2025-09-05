@@ -523,6 +523,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     if (key.includes('peter')) return '/img/agents/peter4.png'
     if (key.includes('cleo')) return '/img/agents/logocleo4.png'
     if (key.includes('emma')) return '/img/agents/emma4.png'
+    if (key.includes('wex')) return '/img/agents/wex4.png'
     return null
   }
 

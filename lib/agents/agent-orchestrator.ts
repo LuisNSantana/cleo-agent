@@ -108,24 +108,51 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 	}
 
 	// Run via core orchestrator (includes routing/delegation)
-		core.executeAgent(target, ctx, { timeout: 60000 }).then(res => {
-			exec.status = 'completed'
-			exec.endTime = new Date()
-			const content = (res && (res as any).content) || ''
-			exec.messages = exec.messages || []
-			
-			// CRITICAL FIX: Use the actual delegated agent from result metadata, not the original target
-			const actualSender = (res && (res as any).metadata?.sender) || target.id
-			console.log('🔍 [DEBUG] Legacy orchestrator - Final message sender:', {
-				originalTargetId: target.id,
-				resultSender: (res && (res as any).metadata?.sender),
-				finalSender: actualSender,
-				resultMetadata: (res && (res as any).metadata)
-			})
-			
+	console.log('🔍 [DEBUG] About to call core.executeAgent with timeout 60000ms')
+	
+	// Add timeout wrapper to prevent hanging
+	const executionPromise = core.executeAgent(target, ctx, { timeout: 60000 })
+	const timeoutPromise = new Promise((_, reject) => {
+		setTimeout(() => reject(new Error('Execution timeout after 60 seconds')), 60000)
+	})
+	
+	Promise.race([executionPromise, timeoutPromise]).then(res => {
+		console.log('🔍 [DEBUG] core.executeAgent resolved successfully')
+		console.log('🔍 [DEBUG] Result type:', typeof res)
+		console.log('🔍 [DEBUG] Result keys:', res ? Object.keys(res) : 'null')
+		console.log('🔍 [DEBUG] Result content preview:', (res as any)?.content?.slice(0, 100) + '...')
+		
+		exec.status = 'completed'
+		exec.endTime = new Date()
+		const content = (res && (res as any).content) || ''
+		exec.messages = exec.messages || []
+		
+		console.log('🔍 [DEBUG] About to update exec status and messages')
+		
+		// CRITICAL FIX: Use the actual delegated agent from result metadata, not the original target
+		const actualSender = (res && (res as any).metadata?.sender) || target.id
+		console.log('🔍 [DEBUG] Legacy orchestrator - Final message sender:', {
+			originalTargetId: target.id,
+			resultSender: (res && (res as any).metadata?.sender),
+			finalSender: actualSender,
+			resultMetadata: (res && (res as any).metadata)
+		})
+		
+		try {
 			exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(content), timestamp: new Date(), metadata: { sender: actualSender, source: 'core' } })
-		listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
+			console.log('🔍 [DEBUG] Message pushed to exec.messages, count:', exec.messages.length)
+		} catch (pushError) {
+			console.error('🔍 [DEBUG] Error pushing message:', pushError)
+		}
+		
+		try {
+			listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
+			console.log('🔍 [DEBUG] Listeners notified, execution completed')
+		} catch (listenerError) {
+			console.error('🔍 [DEBUG] Error notifying listeners:', listenerError)
+		}
 	}).catch(err => {
+		console.log('🔍 [DEBUG] core.executeAgent rejected or timed out:', err)
 		exec.status = 'failed'
 		exec.endTime = new Date()
 		exec.error = err instanceof Error ? err.message : String(err)

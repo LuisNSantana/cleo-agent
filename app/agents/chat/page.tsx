@@ -86,10 +86,24 @@ export default function AgentsChatPage() {
     if (currentExecution.status !== 'completed') return
     if (appendedExecRef.current.has(currentExecution.id)) return
 
+    console.log('🔍 [CHAT DEBUG] Processing completed execution:', {
+      executionId: currentExecution.id,
+      status: currentExecution.status,
+      messagesCount: currentExecution.messages?.length,
+      messages: currentExecution.messages?.map(m => ({
+        id: m.id,
+        type: m.type,
+        contentPreview: m.content.slice(0, 100)
+      }))
+    })
+
     const aiMessages = (currentExecution.messages || [])
       .filter((m) => m.type === 'ai')
       // Suppress internal agent error placeholders
       .filter((m) => !(m.metadata && (m.metadata as any).error === 'agent_invoke_failed'))
+    
+    console.log('🔍 [CHAT DEBUG] Filtered AI messages:', aiMessages.length)
+    
     if (aiMessages.length === 0) return
 
     const mapped = aiMessages.map((m) => {
@@ -117,6 +131,7 @@ export default function AgentsChatPage() {
       }
     })
 
+    console.log('🔍 [CHAT DEBUG] Adding mapped messages to chat:', mapped.length)
     setMessages((prev) => [...prev, ...mapped])
     appendedExecRef.current.add(currentExecution.id)
   }, [currentExecution, agents, selectedAgent])
@@ -224,6 +239,50 @@ export default function AgentsChatPage() {
     }
     loadHistory()
   }, [selectedAgent, forceSupervised]) // Re-load when mode changes
+
+  // Refresh messages when execution completes to ensure DB persistence
+  useEffect(() => {
+    const refreshMessagesAfterExecution = async () => {
+      if (!currentExecution || currentExecution.status !== 'completed' || !selectedAgent) return
+      
+      // Wait a bit for the message to be persisted
+      setTimeout(async () => {
+        try {
+          const threadKey = `${selectedAgent.id}_${forceSupervised ? 'supervised' : 'direct'}`
+          const params = new URLSearchParams({ agentKey: threadKey, limit: '1' })
+          const res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
+          if (!res.ok) return
+          
+          const data = await res.json()
+          const thread = data?.threads?.[0]
+          if (!thread?.id) return
+          
+          const mr = await fetch(`/api/agents/threads/${thread.id}/messages?limit=200`, { credentials: 'same-origin' })
+          if (!mr.ok) return
+          
+          const md = await mr.json()
+          const mapped: ChatMessage[] = (md?.messages || []).map((m: any) => ({
+            id: String(m.id),
+            type: m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'agent' : 'system'),
+            content: m.content || '',
+            timestamp: new Date(m.created_at),
+            agentId: m.role === 'assistant' ? (m.metadata?.sender || selectedAgent.id) : undefined,
+            agentName: m.role === 'assistant' ? (agents.find(a => a.id === (m.metadata?.sender || selectedAgent.id))?.name || selectedAgent.name) : undefined,
+            isDelegated: m.metadata?.isDelegated || false,
+            delegatedFrom: m.metadata?.delegatedFrom || null,
+            metadata: m.metadata || {},
+          }))
+          
+          console.log('🔄 [CHAT DEBUG] Refreshed messages after execution completion:', mapped.length)
+          setMessages(mapped)
+        } catch (e) {
+          console.warn('Failed to refresh messages after execution:', e)
+        }
+      }, 2000) // Wait 2 seconds for DB persistence
+    }
+    
+    refreshMessagesAfterExecution()
+  }, [currentExecution?.status, currentExecution?.id, selectedAgent, forceSupervised])
 
   
   // Effective agent will be computed after lastDelegation is defined below
@@ -399,6 +458,7 @@ export default function AgentsChatPage() {
     if (key?.includes('peter')) return '/img/agents/peter4.png'
     if (key?.includes('cleo')) return '/img/agents/logocleo4.png'
     if (key?.includes('emma')) return '/img/agents/emma4.png'
+    if (key?.includes('wex')) return '/img/agents/wex4.png'
     return null
   }
 

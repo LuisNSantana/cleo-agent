@@ -318,7 +318,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
     pollExecutionStatus: async (executionId: string) => {
       let pollCount = 0
-      const maxPolls = 30 // Maximum 30 seconds of polling
+      const maxPolls = 60 // Increase to 60 seconds of polling for longer tasks
       
       const pollInterval = setInterval(async () => {
         pollCount++
@@ -332,7 +332,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                 status: data.execution.status,
                 messageCount: data.execution.messages?.length || 0,
                 stepCount: data.execution.steps?.length || 0,
-                currentStep: data.execution.currentStep
+                currentStep: data.execution.currentStep,
+                lastMessageType: data.execution.messages?.[data.execution.messages?.length - 1]?.type,
+                lastMessageContent: data.execution.messages?.[data.execution.messages?.length - 1]?.content?.slice(0, 100)
               })
               
               set((state) => ({

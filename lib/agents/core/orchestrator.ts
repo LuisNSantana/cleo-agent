@@ -199,6 +199,7 @@ export class AgentOrchestrator {
     context: ExecutionContext,
     options: ExecutionOptions = {}
   ): Promise<ExecutionResult> {
+    console.log('🔍 [DEBUG] Core executeAgent - Starting execution for:', agentConfig.id)
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const execution: AgentExecution = {
@@ -228,15 +229,22 @@ export class AgentOrchestrator {
     }
 
     try {
+      console.log('🔍 [DEBUG] Core executeAgent - Checking if supervisor:', agentConfig.id === 'cleo-supervisor')
       // Use routing logic for supervisor agent
       if (agentConfig.id === 'cleo-supervisor') {
+        console.log('🔍 [DEBUG] Core executeAgent - Using routing for supervisor')
         return await this.executeWithRouting(agentConfig, context, execution, options)
       }
 
+      console.log('🔍 [DEBUG] Core executeAgent - Direct execution for specialist')
       // Direct execution for specialist agents
       await this.initializeAgent(agentConfig)
+      console.log('🔍 [DEBUG] Core executeAgent - Agent initialized')
+      
       const processedContext = await this.prepareExecutionContext(context)
+      console.log('🔍 [DEBUG] Core executeAgent - Context prepared')
 
+      console.log('🔍 [DEBUG] Core executeAgent - About to call errorHandler.withRetry')
       const result = await this.errorHandler.withRetry(
         () => this.executionManager.executeWithHistory(
           agentConfig,
@@ -252,14 +260,21 @@ export class AgentOrchestrator {
         }
       )
 
+      console.log('🔍 [DEBUG] Core executeAgent - errorHandler.withRetry completed successfully')
+      console.log('🔍 [DEBUG] Core executeAgent - Result type:', typeof result)
+      console.log('🔍 [DEBUG] Core executeAgent - Result preview:', result ? JSON.stringify(result).slice(0, 200) : 'null')
+
       execution.status = 'completed'
       execution.endTime = new Date()
   execution.result = (result as ExecutionResult).content
       execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
 
+      console.log('🔍 [DEBUG] Core executeAgent - About to emit execution.completed')
       this.eventEmitter.emit('execution.completed', execution)
+      console.log('🔍 [DEBUG] Core executeAgent - Returning result')
       return result as ExecutionResult
     } catch (error) {
+      console.log('🔍 [DEBUG] Core executeAgent - Error caught:', error)
       await this.errorHandler.handleExecutionError(execution, error as Error)
       this.eventEmitter.emit('execution.failed', execution)
       throw error

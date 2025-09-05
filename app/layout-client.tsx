@@ -2,8 +2,12 @@
 
 import { API_ROUTE_CSRF } from "@/lib/routes"
 import { useQuery } from "@tanstack/react-query"
+import { useRouter } from 'next/navigation'
+import SkyvernNotificationManager from '@/components/notifications/skyvern-notification-manager'
 
 export function LayoutClient() {
+  const router = useRouter()
+
   useQuery({
     queryKey: ["csrf-init"],
     queryFn: async () => {
@@ -16,5 +20,13 @@ export function LayoutClient() {
     retry: false,
   })
 
-  return null
+  const handleViewAllTasks = () => {
+    router.push('/agents/tasks')
+  }
+
+  return (
+    <>
+      <SkyvernNotificationManager onViewAllTasks={handleViewAllTasks} />
+    </>
+  )
 }
