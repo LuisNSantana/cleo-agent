@@ -566,10 +566,67 @@ export const shopifyUpdateProductPriceTool = tool({
         const resp = await client.makeRequest(`products/${product_id}.json`)
         product = resp.product || null
       } else if (handle) {
-        // Fallback search by handle
-        const resp = await client.makeRequest('products.json?limit=250&status=any')
-        const found = (resp.products || []).find((p: any) => p.handle === handle)
-        product = found || null
+        // Helper normalizer for robust matching (spaces vs hyphens, accents)
+        const norm = (s: string) => (s || '')
+          .toString()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .trim()
+
+        const handleRaw = String(handle)
+        const handleNorm = norm(handleRaw)
+        const titleGuess = handleRaw.replace(/[-_]+/g, ' ').trim()
+        const titleGuessNorm = norm(titleGuess)
+
+        // 1) Try exact handle match from a batch list
+        try {
+          console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Searching for handle:', handleRaw)
+          const resp = await client.makeRequest('products.json?limit=250')
+          const all = (resp.products || []) as any[]
+          console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Found', all.length, 'products')
+          
+          // Log some examples to help debug
+          const almaProducts = all.filter(p => String(p.title).toLowerCase().includes('alma'))
+          console.log('🔍 [DEBUG] shopifyUpdateProductPrice - ALMA products found:', almaProducts.map(p => ({ title: p.title, handle: p.handle })))
+          
+          product = all.find(p => String(p.handle) === handleRaw) || null
+          console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Exact handle match:', !!product)
+
+          // 2) Try normalized title/handle match
+          if (!product) {
+            console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Trying normalized matching')
+            console.log('🔍 [DEBUG] shopifyUpdateProductPrice - handleNorm:', handleNorm)
+            console.log('🔍 [DEBUG] shopifyUpdateProductPrice - titleGuessNorm:', titleGuessNorm)
+            
+            const candidate = all.find(p => {
+              const h = norm(String(p.handle))
+              const t = norm(String(p.title))
+              const result = h === handleNorm || t === titleGuessNorm || h.includes(handleNorm) || t.includes(titleGuessNorm)
+              if (result) {
+                console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Found candidate:', p.title, 'handle:', p.handle)
+              }
+              return result
+            })
+            if (candidate) product = candidate
+            console.log('🔍 [DEBUG] shopifyUpdateProductPrice - Normalized match:', !!product)
+          }
+        } catch {}
+
+        // 3) Try Shopify title filter (exact title match)
+        if (!product) {
+          try {
+            const respByTitle = await client.makeRequest(`products.json?title=${encodeURIComponent(titleGuess)}`)
+            const list = (respByTitle.products || []) as any[]
+            if (list.length === 1) {
+              product = list[0]
+            } else if (list.length > 1) {
+              const exact = list.find(p => norm(String(p.title)) === titleGuessNorm)
+              product = exact || list[0]
+            }
+          } catch {}
+        }
       }
 
       if (!product) {
@@ -578,12 +635,26 @@ export const shopifyUpdateProductPriceTool = tool({
         try {
           const resp = await client.makeRequest('products.json?limit=250&status=any')
           const all = (resp.products || []) as any[]
-          const q = (handle || product_id || '').toString().toLowerCase()
+          const rawQ = (handle || product_id || '').toString()
+          const q = rawQ.toLowerCase()
+          const norm = (s: string) => (s || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '')
+            .trim()
+          const qn = norm(rawQ.replace(/[-_]+/g, ' '))
           suggestions = all
             .filter(p => {
               const h = (p.handle || '').toLowerCase()
               const t = (p.title || '').toLowerCase()
-              return q && (h.includes(q) || t.includes(q))
+              const hn = norm(p.handle || '')
+              const tn = norm(p.title || '')
+              return (
+                (q && (h.includes(q) || t.includes(q))) ||
+                (qn && (hn.includes(qn) || tn.includes(qn)))
+              )
             })
             .slice(0, 5)
             .map(p => ({ id: String(p.id), title: p.title, handle: p.handle }))

@@ -205,15 +205,34 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     exec.endTime = new Date()
     exec.result = (res && (res as any).content) || ''
     exec.messages = exec.messages || []
+    
+    // DEBUG: Check who actually processed the message
+    console.log(`🔍 [DEBUG] Final message metadata:`, {
+      originalAgentId: exec.agentId,
+      targetAgentId: targetAgent.id,
+      resultSender: (res && (res as any).metadata?.sender),
+      finalSender: (res && (res as any).metadata?.sender) || targetAgent.id,
+      messageContent: String(exec.result || '').substring(0, 100),
+      fullResult: res,
+      resultType: typeof res,
+      resultKeys: res ? Object.keys(res) : [],
+      metadataKeys: res && (res as any).metadata ? Object.keys((res as any).metadata) : []
+    })
+    
     exec.messages.push({ 
       id: `${exec.id}_final`, 
       type: 'ai', 
-      content: exec.result, 
+      content: String(exec.result || ''), 
       timestamp: new Date(),
-      metadata: { sender: targetAgent.id, source: 'core' }
+      metadata: { 
+        sender: (res && (res as any).metadata?.sender) || targetAgent.id, 
+        source: 'core',
+        originalAgentId: exec.agentId,
+        targetAgentId: targetAgent.id
+      }
     })
     listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
-    console.log(`[Adapter] Core execution completed for ${targetAgent.id}: ${String(exec.result).substring(0, 100)}`)
+  console.log(`[Adapter] Core execution completed for ${targetAgent.id}: ${String(exec.result || '').substring(0, 100)}`)
   }).catch(err => {
     console.error(`[Adapter] Core execution failed for ${targetAgent.id}:`, err)
     // Fallback to legacy orchestrator for critical scenarios

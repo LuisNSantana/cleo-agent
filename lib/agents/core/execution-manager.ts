@@ -7,6 +7,7 @@ import { BaseMessage } from '@langchain/core/messages'
 import { AgentConfig, AgentExecution, ExecutionResult, ExecutionOptions } from '../types'
 import { EventEmitter } from './event-emitter'
 import { AgentErrorHandler } from './error-handler'
+import { SystemMessage } from '@langchain/core/messages'
 
 export interface ExecutionManagerConfig {
   eventEmitter: EventEmitter
@@ -49,9 +50,13 @@ export class ExecutionManager {
     try {
       this.eventEmitter.emit('execution.started', execution)
 
+      // Filter out standalone ToolMessages which cause LangChain errors
+      // ToolMessages must only follow same-turn tool_calls
+      const filteredMessages = this.filterStaleToolMessages(context.messageHistory)
+
       // Prepare initial state compatible with MessagesAnnotation
       const initialState = {
-        messages: context.messageHistory
+        messages: filteredMessages
       }
 
       // Compile and execute graph
@@ -140,5 +145,22 @@ export class ExecutionManager {
       return sum + (typeof msg.content === 'string' ? msg.content.length : 0)
     }, 0)
     return Math.ceil(totalChars / 4)
+  }
+
+  /**
+   * Filter out standalone ToolMessages which cause LangChain errors.
+   * ToolMessages must only follow same-turn tool_calls.
+   * Convert to system breadcrumbs to preserve context.
+   */
+  private filterStaleToolMessages(messages: BaseMessage[]): BaseMessage[] {
+    return messages.map(msg => {
+      if (msg._getType() === 'tool') {
+        // Convert stale ToolMessage to SystemMessage breadcrumb
+        return new SystemMessage({
+          content: `[Tool result from previous session: ${msg.content}]`
+        })
+      }
+      return msg
+    })
   }
 }

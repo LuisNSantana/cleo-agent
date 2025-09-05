@@ -45,22 +45,44 @@ export interface ExecutionStep {
   metadata?: any
 }
 
+export type ConversationMode = 'direct' | 'supervised'
+
+export interface ConversationContext {
+  mode: ConversationMode
+  targetAgentId?: string // For direct mode
+  supervisorAgentId?: string // For supervised mode (default: 'cleo-supervisor')
+  userPreferences: {
+    allowDelegation: boolean
+    requireExplicitApproval: boolean
+    defaultMode: ConversationMode
+  }
+  metadata: {
+    threadId: string
+    sessionId: string
+    userId: string
+    createdAt: Date
+    lastUpdated: Date
+  }
+}
+
 export interface AgentExecution {
   id: string
   agentId: string
   threadId: string
   userId: string
-  status: ExecutionStatus
+  status: 'running' | 'completed' | 'failed'
   startTime: Date
   endTime?: Date
+  messages: AgentMessage[]
+  metrics: ExecutionMetrics
+  error?: string
+  // Optional fields used by orchestrators/adapters
   input?: string
   result?: any
-  messages: AgentMessage[]
-  currentStep?: string
-  error?: string
-  metrics: ExecutionMetrics
-  steps?: ExecutionStep[] // Add steps for real-time visualization
   options?: ExecutionOptions
+  steps?: ExecutionStep[]
+  currentStep?: string
+  conversationContext?: ConversationContext
 }
 
 export type ExecutionStatus =

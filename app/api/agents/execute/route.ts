@@ -13,7 +13,10 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
   const body: any = await request.json()
-  const { agentId, input, context, threadId } = body as ExecuteAgentRequest & { threadId?: string }
+  const { agentId, input, context, threadId, forceSupervised } = body as ExecuteAgentRequest & { 
+    threadId?: string, 
+    forceSupervised?: boolean 
+  }
 
     if (!input || !input.trim()) {
       return NextResponse.json(
@@ -41,6 +44,8 @@ export async function POST(request: NextRequest) {
 
       // Optionally create or reuse an agent thread so we keep context across confirms
       let effectiveThreadId: string | null = null
+      // Compose composite agent key by mode to segregate histories
+      const compositeAgentKey = `${agentId || 'cleo-supervisor'}_${forceSupervised ? 'supervised' : 'direct'}`
       if (authedUserId && supabase) {
         try {
           // Use explicit threadId if provided and valid
@@ -51,8 +56,8 @@ export async function POST(request: NextRequest) {
               .eq('id', threadId)
               .eq('user_id', authedUserId)
               .single()
-            // Only use thread if it matches the target agent or is for cleo (supervisor can delegate)
-            if (data && (data.agent_key === (agentId || 'cleo-supervisor') || data.agent_key === 'cleo-supervisor')) {
+            // Accept any owned thread id; UI ensures mode segregation
+            if (data) {
               effectiveThreadId = data.id
             }
           }
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
               .from('agent_threads')
               .select('id')
               .eq('user_id', authedUserId)
-              .eq('agent_key', agentId || 'cleo-supervisor')
+              .eq('agent_key', compositeAgentKey)
               .order('updated_at', { ascending: false })
               .limit(1)
               .maybeSingle()
@@ -74,7 +79,12 @@ export async function POST(request: NextRequest) {
           if (!effectiveThreadId) {
             const { data } = await (supabase as any)
               .from('agent_threads')
-              .insert({ user_id: authedUserId, agent_key: agentId || 'cleo-supervisor', agent_name: agentId || 'Cleo' })
+              .insert({ 
+                user_id: authedUserId, 
+                agent_key: compositeAgentKey, 
+                agent_name: agentId || 'Cleo', 
+                title: `${agentId || 'Cleo'} (${forceSupervised ? 'Supervised by Cleo' : 'Direct Chat'})`
+              })
               .select('id')
               .single()
             effectiveThreadId = (data as any)?.id || null
@@ -91,7 +101,9 @@ export async function POST(request: NextRequest) {
                 agentId: agentId || 'cleo-supervisor', 
                 context: context || null,
                 isDelegated: agentId && agentId !== 'cleo-supervisor',
-                delegatedFrom: agentId && agentId !== 'cleo-supervisor' ? 'cleo-supervisor' : null
+                delegatedFrom: agentId && agentId !== 'cleo-supervisor' ? 'cleo-supervisor' : null,
+                conversation_mode: forceSupervised ? 'supervised' : 'direct',
+                composite_agent_key: compositeAgentKey
               }
             })
           }
@@ -106,13 +118,21 @@ export async function POST(request: NextRequest) {
         try {
           const { data: msgs } = await (supabase as any)
             .from('agent_messages')
-            .select('role, content, metadata, created_at')
+            .select('role, content, metadata, tool_calls, tool_results, created_at')
             .eq('thread_id', effectiveThreadId)
             .eq('user_id', authedUserId)
             .order('created_at', { ascending: true })
             .limit(25)
           if (Array.isArray(msgs)) {
-            priorMessages = msgs.map((m: any) => ({ role: m.role, content: m.content || '', metadata: m.metadata || undefined }))
+            priorMessages = msgs.map((m: any) => ({
+              role: m.role,
+              content: m.content || '',
+              metadata: {
+                ...m.metadata,
+                tool_calls: m.tool_calls || undefined,
+                tool_results: m.tool_results || undefined
+              }
+            }))
           }
           console.log(`[API/execute] Loaded ${priorMessages.length} prior messages from thread ${effectiveThreadId}`)
           console.log(`[API/execute] Prior messages preview:`, priorMessages.slice(-3).map(m => ({ role: m.role, content: m.content.substring(0, 80) })))
@@ -121,9 +141,22 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Start execution non-blocking with prior context for better continuity
-      const execution = (orchestrator as any).startAgentExecutionWithHistory?.(input, agentId, priorMessages) || orchestrator.startAgentExecution(input, agentId)
-      console.log('[API/execute] Started execution:', execution.id)
+      // Start execution with enhanced dual-mode support
+      const execution = (orchestrator as any).startAgentExecutionForUI?.(
+        input, 
+        agentId, 
+        effectiveThreadId || undefined, 
+        authedUserId || undefined, 
+        priorMessages,
+        forceSupervised || false
+      ) || (orchestrator as any).startAgentExecutionWithHistory?.(input, agentId, priorMessages) || orchestrator.startAgentExecution(input, agentId)
+      
+      console.log('[API/execute] Started dual-mode execution:', {
+        id: execution.id,
+        mode: forceSupervised ? 'supervised' : (agentId && agentId !== 'cleo-supervisor' ? 'direct' : 'supervised'),
+        agentId: execution.agentId,
+        threadId: effectiveThreadId
+      })
 
       return NextResponse.json({
         success: true,
@@ -137,7 +170,7 @@ export async function POST(request: NextRequest) {
           error: execution.error,
           steps: execution.steps || []
         },
-        thread: effectiveThreadId ? { id: effectiveThreadId } : null
+  thread: effectiveThreadId ? { id: effectiveThreadId } : null
       })
     } catch (error) {
       console.error('Agent execution error:', error)

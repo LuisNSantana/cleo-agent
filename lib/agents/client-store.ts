@@ -38,9 +38,11 @@ interface ClientAgentStore {
   // Actions
   initializeAgents: () => Promise<void>
   syncAgents: () => Promise<void>
-  executeAgent: (input: string, agentId?: string) => Promise<void>
+  executeAgent: (input: string, agentId?: string, forceSupervised?: boolean) => Promise<void>
   // Thread mapping per agent to keep conversation context across confirms
   _agentThreadMap?: Record<string, string>
+  // Map execution id -> thread id used for that run (to persist final message reliably)
+  _executionThreadMap?: Record<string, string>
   // Track which executions have already posted their final assistant message
   _finalPosted?: Record<string, boolean>
   selectAgent: (agent: AgentConfig | null) => void
@@ -81,6 +83,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     error: null,
     delegationEvents: [],
   _agentThreadMap: {},
+    _executionThreadMap: {},
   _finalPosted: {},
 
     // Actions
@@ -119,7 +122,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       }
     },
 
-    executeAgent: async (input: string, agentId?: string) => {
+  executeAgent: async (input: string, agentId?: string, forceSupervised?: boolean) => {
       set({ isLoading: true, error: null })
 
       try {
@@ -134,9 +137,11 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 30000)
 
-        const map = get()._agentThreadMap || {}
-        const threadId = agentId ? map[agentId] : undefined
-        // Call API instead of direct orchestrator
+  // Use composite key so direct/supervised conversations don't mix
+  const map = get()._agentThreadMap || {}
+  const key = agentId ? `${agentId}_${forceSupervised ? 'supervised' : 'direct'}` : undefined
+  const threadId = key ? map[key] : undefined
+        // Call API with dual-mode support
         const response = await fetch('/api/agents/execute', {
           method: 'POST',
           headers: {
@@ -144,7 +149,12 @@ export const useClientAgentStore = create<ClientAgentStore>()(
             ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken()! } : {})
           },
           credentials: 'same-origin',
-          body: JSON.stringify({ input, agentId, threadId }),
+          body: JSON.stringify({ 
+            input, 
+            agentId, 
+            threadId, 
+            forceSupervised: forceSupervised || false 
+          }),
           signal: controller.signal
         })
         clearTimeout(timeout)
@@ -167,9 +177,14 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
         // Persist thread mapping per agent for subsequent messages
         if (data.thread?.id && agentId) {
+          // Persist mapping under composite key
           const newMap = { ...(get()._agentThreadMap || {}) }
-          newMap[agentId] = data.thread.id
-          set({ _agentThreadMap: newMap })
+          const composite = `${agentId}_${forceSupervised ? 'supervised' : 'direct'}`
+          newMap[composite] = data.thread.id
+          // Track execution -> thread mapping for final message persistence
+          const execMap = { ...(get()._executionThreadMap || {}) }
+          execMap[data.execution.id] = data.thread.id
+          set({ _agentThreadMap: newMap, _executionThreadMap: execMap })
         }
 
         // Start polling for execution updates if it's running
@@ -365,9 +380,14 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     persistFinalAssistantMessage: async (execution) => {
       const posted = get()._finalPosted || {}
       if (posted[execution.id]) return
-      const agentId = execution.agentId
-      const map = get()._agentThreadMap || {}
-      const threadId = agentId ? map[agentId] : undefined
+      // Prefer exact execution -> thread mapping
+      const execMap = get()._executionThreadMap || {}
+      let threadId = execMap[execution.id]
+      // Fallback to composite map if missing (best-effort)
+      if (!threadId && execution.agentId) {
+        const m = get()._agentThreadMap || {}
+        threadId = m[`${execution.agentId}_supervised`] || m[`${execution.agentId}_direct`]
+      }
       if (!threadId) return
 
       // Find the last AI message
@@ -378,6 +398,14 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         set({ _finalPosted: { ...posted, [execution.id]: true } })
         return
       }
+      console.log('🔍 [CLIENT-STORE DEBUG] Persisting final message:', {
+        executionId: execution.id,
+        executionAgentId: execution.agentId,
+        lastMessageType: last.type,
+        lastMessageMetadata: last.metadata,
+        finalSender: last.metadata?.sender || execution.agentId
+      })
+
       try {
         const res = await fetch('/api/agents/threads/messages', {
           method: 'POST',
@@ -394,7 +422,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
             role: 'assistant',
             content: last.content,
             toolCalls: last.toolCalls || null,
-            metadata: { sender: last.metadata?.sender || agentId, executionId: execution.id }
+            metadata: { sender: last.metadata?.sender || execution.agentId, executionId: execution.id }
           })
         })
         if (!res.ok) {

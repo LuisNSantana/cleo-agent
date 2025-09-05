@@ -1,53 +1,117 @@
 
-# Cleo v3.0 – Multi-Agent AI Assistant with Emma E-commerce Integration
+# Cleo v4.0 – Complete Modular Multi-Agent AI System
 
-**Cleo by Huminary Labs is a next-generation, emotionally intelligent AI assistant with specialized multi-agent capabilities.**
+**Cleo by Huminary Labs is a revolutionary AI system with complete modular architecture, advanced multi-agent coordination, and enterprise-grade reliability.**
 
 ![cleo cover](./public/logocleo.png)
 
 ---
 
-## 🚀 What's New in v3.0
+## 🚀 Revolutionary Changes in v4.0
 
-- **Multi-Agent Architecture:** Cleo coordinates with specialized agents (Toby, Ami, Peter, Emma) for different domains
-- **Emma E-commerce Agent:** Shopify specialist with per-user credential management and sales analytics
-- **Database-Native Agents:** Real-time agent persistence with Supabase backend
-- **Delegation System:** Cleo automatically delegates tasks to the best specialist agent
-- **Universal Agent Modal:** Rich agent details with tools, use cases, and configurations
-- **Protected Default Agents:** Cleo (supervisor) cannot be deleted, ensuring system stability
-
----
-
-## 🤖 Meet the Team
-
-### Cleo (Supervisor)
-- **Role**: Emotional intelligence coordinator and task delegator
-- **Specialty**: Human conversation, empathy, task routing
-- **Tools**: Emotion analysis, support provision, delegation to specialists
-
-### Toby (Technical Specialist) 
-- **Role**: Technical analysis and data processing
-- **Specialty**: Research, metrics, information synthesis  
-- **Tools**: Web search, data analysis, technical reports
-
-### Ami (Creative Specialist)
-- **Role**: Creative content and design
-- **Specialty**: Brainstorming, artistic concepts, innovation
-- **Tools**: Creative ideation, narrative creation, design thinking
-
-### Peter (Logic Specialist)
-- **Role**: Mathematical and logical problem solving
-- **Specialty**: Structured reasoning, calculations, optimization
-- **Tools**: Calculator, logical analysis, systematic problem solving
-
-### Emma (E-commerce Specialist) 🆕
-- **Role**: Shopify management and sales analytics
-- **Specialty**: Product catalogs, order processing, customer insights
-- **Tools**: Shopify API integration, sales analytics, inventory management
+- **🏗️ Complete Modular Core Architecture:** Fully integrated modular orchestrator with advanced error handling, execution management, and real-time monitoring
+- **🎯 Enhanced Agent Specializations:** Dramatically improved capabilities for all agents with advanced tools, methodologies, and domain expertise
+- **⚡ Enhanced Adapter System:** Seamless integration of modular core with legacy delegation for optimal performance
+- **🛡️ Enterprise-Grade Reliability:** Advanced error classification, circuit breaker patterns, and automatic recovery strategies
+- **📊 Comprehensive Observability:** Real-time metrics, performance analytics, and predictive insights
+- **🔧 Optimized Tool Integration:** Enhanced tool runtime with intelligent caching and execution optimization
 
 ---
 
-## 🧠 Key Technologies
+## 🤖 Advanced Multi-Agent Team
+
+### 💝 Cleo - Advanced Emotional Intelligence Supervisor
+- **Enhanced Role**: Sophisticated emotional detection and intelligent task orchestration
+- **Advanced Capabilities**: Context preservation, quality assurance, empathetic interaction
+- **Tools**: `getCurrentDateTime`, `weatherInfo`, `randomFact`
+- **Specializations**: Emotional AI, delegation optimization, user experience excellence
+
+### 🔬 Toby - Advanced Technical Research Specialist  
+- **Enhanced Role**: Deep technical analysis and comprehensive research excellence
+- **Advanced Capabilities**: Statistical analysis, API documentation research, performance optimization
+- **Tools**: `webSearch`, `calculator`, `getCurrentDateTime`, `cryptoPrices`, `complete_task`
+- **Specializations**: Data analysis, technical feasibility, system architecture evaluation
+
+### 🎨 Ami - Advanced Creative Design & Innovation Specialist
+- **Enhanced Role**: Strategic creativity and design thinking leadership
+- **Advanced Capabilities**: Design thinking processes, content strategy, brand development
+- **Tools**: `webSearch`, `randomFact`, `createDocument`, `getCurrentDateTime`, `complete_task`
+- **Specializations**: User-centered design, creative campaigns, innovation facilitation
+
+### 🧮 Peter - Advanced Logic & Mathematical Problem Solver
+- **Enhanced Role**: Systematic reasoning and complex optimization
+- **Advanced Capabilities**: Statistical modeling, algorithmic design, financial mathematics
+- **Tools**: `calculator`, `webSearch`, `getCurrentDateTime`, `cryptoPrices`, `createDocument`, `complete_task`
+- **Specializations**: Mathematical proofs, optimization algorithms, risk assessment
+
+### 🛍️ Emma - Enhanced E-commerce & Business Intelligence Specialist
+- **Enhanced Role**: Advanced Shopify management and business optimization
+- **Advanced Capabilities**: Multi-store operations, predictive analytics, customer segmentation
+- **Tools**: All Shopify tools + `complete_task` (Products, Orders, Analytics, Customers, Search, Price Updates)
+- **Specializations**: Sales optimization, inventory management, conversion strategies
+
+---
+
+## 🏗️ Complete Modular Architecture
+
+### Core System Components
+- **🧠 Orchestrator**: Central coordination hub with lifecycle management
+- **⚠️ Error Handler**: Advanced error classification and recovery patterns  
+- **📊 Graph Builder**: LangGraph construction with full compatibility
+- **🎯 Execution Manager**: Comprehensive agent and tool coordination
+- **🏭 Model Factory**: Intelligent model instantiation with caching
+- **📡 Event Emitter**: Real-time monitoring and event system
+- **🧠 Memory Manager**: Persistent state and context management
+- **📈 Metrics Collector**: Performance analytics and optimization insights
+
+### Enhanced Integration
+```typescript
+// Complete modular integration
+import { globalOrchestrator } from '@/lib/agents/core'
+
+const result = await globalOrchestrator.executeAgent(
+  agentConfig,
+  context,
+  { 
+    enableMetrics: true, 
+    retryPolicy: 'exponential',
+    enableStreaming: true,
+    errorRecovery: 'advanced'
+  }
+)
+```
+
+---
+
+## 🎯 Advanced Features & Benefits
+
+### 🛡️ **Enterprise-Grade Reliability**
+- Circuit breaker patterns for fault tolerance
+- Exponential backoff with intelligent retry logic
+- Graceful degradation and fallback strategies
+- Comprehensive error classification and recovery
+
+### ⚡ **Performance Excellence**
+- Intelligent model and execution caching
+- Optimized execution paths and parallel processing
+- Advanced memory management and resource optimization
+- Real-time performance monitoring and bottleneck detection
+
+### 📊 **Comprehensive Observability**
+- Real-time execution tracking and system health monitoring
+- Advanced analytics with performance trends and insights
+- Complete audit trails and decision tracking
+- Predictive analytics for proactive optimization
+
+### 🔧 **Developer Experience**
+- Full TypeScript integration with comprehensive type safety
+- Hot reloading and advanced debugging capabilities
+- Detailed logging with configurable verbosity levels
+- Built-in testing utilities and comprehensive mock framework
+
+---
+
+## 🧠 Enhanced Technologies
 
 - **Multi-Agent System**: LangGraph orchestration with specialized agents
 - **Supabase Backend**: Real-time agent persistence, RLS security, analytics

@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { AgentConfig } from '@/lib/agents/types'
 import {
@@ -17,7 +20,11 @@ import {
   UserIcon,
   BrainIcon,
   LightningIcon,
-  HeartIcon
+  HeartIcon,
+  EyeIcon,
+  ShieldIcon,
+  LockIcon,
+  ArrowRightIcon
 } from '@phosphor-icons/react'
 import { Markdown } from '@/components/prompt-kit/markdown'
 
@@ -30,6 +37,7 @@ interface ChatMessage {
   agentName?: string
   isDelegated?: boolean
   delegatedFrom?: string | null
+  metadata?: Record<string, any>
 }
 
 export default function AgentsChatPage() {
@@ -38,6 +46,8 @@ export default function AgentsChatPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [forceSupervised, setForceSupervised] = useState(false) // Toggle for forcing Cleo supervision
+  const [showModeIndicator, setShowModeIndicator] = useState(true) // Show conversation mode indicator
   const [inputMessage, setInputMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -85,6 +95,17 @@ export default function AgentsChatPage() {
     const mapped = aiMessages.map((m) => {
       const senderId = (m.metadata && (m.metadata as any).sender) || currentExecution.agentId || selectedAgent?.id
       const sender = agents.find((a) => a.id === senderId) || selectedAgent || null
+      
+      console.log('🔍 [CHAT DEBUG] Mapping execution message:', {
+        messageId: m.id,
+        originalMetadata: m.metadata,
+        extractedSenderId: senderId,
+        currentExecutionAgentId: currentExecution.agentId,
+        selectedAgentId: selectedAgent?.id,
+        finalSender: sender?.name,
+        finalSenderId: sender?.id
+      })
+      
       return {
         id: m.id,
         type: 'agent' as const,
@@ -92,6 +113,7 @@ export default function AgentsChatPage() {
         timestamp: new Date(m.timestamp as any),
         agentId: sender?.id,
         agentName: sender?.name,
+        metadata: (m.metadata as any) || {},
       }
     })
 
@@ -113,7 +135,7 @@ export default function AgentsChatPage() {
     clearError?.()
   }, [error, clearError])
 
-  // Load historical messages for the latest thread of the selected agent
+  // Load historical messages for the latest thread of the selected agent with mode segregation
   useEffect(() => {
     const loadHistory = async () => {
       if (!selectedAgent) return
@@ -123,18 +145,38 @@ export default function AgentsChatPage() {
   setMessages([])
         appendedExecRef.current.clear()
 
-        // Try to get latest thread for this agent; create one if none
-        const params = new URLSearchParams({ agentKey: selectedAgent.id, limit: '1' })
+        // Generate thread key with mode segregation
+        const threadKey = `${selectedAgent.id}_${forceSupervised ? 'supervised' : 'direct'}`
+        console.log(`🧵 Loading thread history for ${threadKey}`)
+
+        // Try to get latest thread for this agent + mode; create one if none
+        const params = new URLSearchParams({ 
+          agentKey: threadKey, 
+          limit: '1' 
+        })
   let res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
         if (!res.ok) throw new Error('Failed to fetch threads')
         let data = await res.json()
         let thread = data?.threads?.[0]
         if (!thread?.id) {
+          const modeTitle = forceSupervised 
+            ? `${selectedAgent.name} (Supervised by Cleo)` 
+            : `${selectedAgent.name} (Direct Chat)`
+          
           const cr = await fetch('/api/agents/threads', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/) ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') } : {}) },
             credentials: 'same-origin',
-            body: JSON.stringify({ agentKey: selectedAgent.id, agentName: selectedAgent.name, title: `${selectedAgent.name} Conversation` })
+            body: JSON.stringify({ 
+              agentKey: threadKey, 
+              agentName: selectedAgent.name, 
+              title: modeTitle,
+              metadata: {
+                conversation_mode: forceSupervised ? 'supervised' : 'direct',
+                target_agent_id: selectedAgent.id,
+                created_with_dual_mode: true
+              }
+            })
           })
           if (cr.ok) {
             const cd = await cr.json()
@@ -142,10 +184,11 @@ export default function AgentsChatPage() {
           }
         }
         if (!thread?.id) return
-        // Persist this thread as the active one for this agent
+        
+        // Persist this thread as the active one for this agent + mode combination
         try {
           useClientAgentStore.setState((prev) => ({
-            _agentThreadMap: { ...(prev as any)._agentThreadMap, [selectedAgent.id]: thread.id }
+            _agentThreadMap: { ...(prev as any)._agentThreadMap, [threadKey]: thread.id }
           }))
         } catch (_) { /* ignore */ }
   const mr = await fetch(`/api/agents/threads/${thread.id}/messages?limit=200`, { credentials: 'same-origin' })
@@ -156,11 +199,22 @@ export default function AgentsChatPage() {
           type: m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'agent' : 'system'),
           content: m.content || '',
           timestamp: new Date(m.created_at),
-          agentId: m.role === 'assistant' ? selectedAgent.id : undefined,
-          agentName: m.role === 'assistant' ? selectedAgent.name : undefined,
+          agentId: m.role === 'assistant' ? (m.metadata?.sender || selectedAgent.id) : undefined,
+          agentName: m.role === 'assistant' ? (agents.find(a => a.id === (m.metadata?.sender || selectedAgent.id))?.name || selectedAgent.name) : undefined,
           isDelegated: m.metadata?.isDelegated || false,
           delegatedFrom: m.metadata?.delegatedFrom || null,
+          metadata: m.metadata || {},
         }))
+        
+        console.log('🔍 [CHAT DEBUG] Mapped messages:', mapped.map(m => ({
+          id: m.id,
+          type: m.type,
+          agentId: m.agentId,
+          agentName: m.agentName,
+          metadata: m.metadata,
+          contentPreview: m.content.slice(0, 50) + '...'
+        })))
+        
         setMessages(mapped)
       } catch (e) {
         console.warn('Failed to load agent chat history:', e)
@@ -169,7 +223,7 @@ export default function AgentsChatPage() {
       }
     }
     loadHistory()
-  }, [selectedAgent])
+  }, [selectedAgent, forceSupervised]) // Re-load when mode changes
 
   
   // Effective agent will be computed after lastDelegation is defined below
@@ -190,8 +244,13 @@ export default function AgentsChatPage() {
     setInputMessage('')
 
     try {
-  // Start execution; route to effective agent if delegated
-  await executeAgent(currentInput, effectiveAgent?.id || selectedAgent.id)
+  // Start execution with dual-mode support
+  console.log(`🎮 Sending message with mode: ${currentConversationMode.mode}, forceSupervised: ${forceSupervised}`)
+  await executeAgent(
+    currentInput, 
+    effectiveAgent?.id || selectedAgent.id,
+    forceSupervised
+  )
       // Do not add a mock response; the effect above will append real AI messages when ready
     } catch (error) {
       console.error('Error sending message:', error)
@@ -271,6 +330,34 @@ export default function AgentsChatPage() {
     return selectedAgent
   }, [lastDelegation, agents, selectedAgent])
 
+  // Determine current conversation mode for UI indicators
+  const currentConversationMode = useMemo(() => {
+    if (forceSupervised) {
+      return {
+        mode: 'supervised' as const,
+        description: 'Supervised by Cleo',
+        icon: <ShieldIcon className="w-4 h-4" />,
+        color: 'text-blue-400'
+      }
+    }
+    
+    if (selectedAgent && selectedAgent.id !== 'cleo-supervisor') {
+      return {
+        mode: 'direct' as const,
+        description: `Direct chat with ${selectedAgent.name}`,
+        icon: <ArrowRightIcon className="w-4 h-4" />,
+        color: 'text-green-400'
+      }
+    }
+    
+    return {
+      mode: 'supervised' as const,
+      description: 'Supervised by Cleo',
+      icon: <EyeIcon className="w-4 h-4" />,
+      color: 'text-blue-400'
+    }
+  }, [selectedAgent, forceSupervised])
+
   // Helper to render an inline "assigned agent" chip based on delegation
   const renderDelegationChip = (delegation: { to: string; reason?: string } | null) => {
     if (!delegation || !delegation.to || delegation.to === 'finalize') return null
@@ -331,11 +418,72 @@ export default function AgentsChatPage() {
   }
 
   return (
-    <div className="py-2 sm:py-4">
-      <div className="space-y-4 sm:space-y-6 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 min-h-[calc(100dvh-160px)] sm:min-h-[calc(100dvh-200px)] w-full">
-          {/* Agent Selection Sidebar */}
-          <div className="hidden lg:block lg:col-span-1">
+    <TooltipProvider>
+      <div className="py-2 sm:py-4">
+        {/* Dual-Mode Header with Controls */}
+        {selectedAgent && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 sm:mb-6"
+          >
+            <Card className="bg-slate-800/50 border-slate-700/50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* Current Mode Indicator */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${
+                      currentConversationMode.mode === 'direct' 
+                        ? 'bg-green-500/15 border-green-500/30 text-green-400' 
+                        : 'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                    }`}>
+                      {currentConversationMode.icon}
+                      <span className="text-sm font-medium">
+                        {currentConversationMode.mode === 'direct' ? 'Direct Mode' : 'Supervised Mode'}
+                      </span>
+                    </div>
+
+                    {/* Mode Description */}
+                    <span className="text-sm text-slate-400">
+                      {currentConversationMode.description}
+                    </span>
+                  </div>
+
+                  {/* Force Supervised Toggle */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Label 
+                            htmlFor="force-supervised" 
+                            className="text-sm text-slate-300 cursor-pointer flex items-center gap-2"
+                          >
+                            <ShieldIcon className="w-4 h-4" />
+                            Force Cleo Supervision
+                          </Label>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>When enabled, all messages go through Cleo for supervision and delegation, even when chatting with specific agents</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Switch
+                        id="force-supervised"
+                        checked={forceSupervised}
+                        onCheckedChange={setForceSupervised}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        <div className="space-y-4 sm:space-y-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 min-h-[calc(100dvh-160px)] sm:min-h-[calc(100dvh-200px)] w-full">
+            {/* Agent Selection Sidebar */}
+            <div className="hidden lg:block lg:col-span-1">
             <Card className="h-full bg-slate-800/50 border-slate-700/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
@@ -426,22 +574,27 @@ export default function AgentsChatPage() {
                         size="sm"
                         onClick={async () => {
                           try {
-                            // Ensure we have a thread for this agent
+                            // Ensure we have a thread for this agent + mode
                             const map = (useClientAgentStore.getState() as any)._agentThreadMap || {}
-                            let threadId = map[selectedAgent.id]
+                            const compositeKey = `${selectedAgent.id}_${forceSupervised ? 'supervised' : 'direct'}`
+                            let threadId = map[compositeKey]
                             if (!threadId) {
                               const cr = await fetch('/api/agents/threads', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/) ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') } : {}) },
                                 credentials: 'same-origin',
-                                body: JSON.stringify({ agentKey: selectedAgent.id, agentName: selectedAgent.name, title: `${selectedAgent.name} Conversation` })
+                                body: JSON.stringify({ 
+                                  agentKey: compositeKey, 
+                                  agentName: selectedAgent.name, 
+                                  title: `${selectedAgent.name} (${forceSupervised ? 'Supervised by Cleo' : 'Direct Chat'})` 
+                                })
                               })
                               if (cr.ok) {
                                 const cd = await cr.json()
                                 threadId = cd?.thread?.id
                                 if (threadId) {
                                   useClientAgentStore.setState((prev) => ({
-                                    _agentThreadMap: { ...(prev as any)._agentThreadMap, [selectedAgent.id]: threadId }
+                                    _agentThreadMap: { ...(prev as any)._agentThreadMap, [compositeKey]: threadId }
                                   }))
                                 }
                               }
@@ -466,7 +619,7 @@ export default function AgentsChatPage() {
                     </div>
                   </div>
                   {/* Messages */}
-                  <div className="flex-1 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 overflow-y-auto space-y-3 sm:space-y-4">
+                  <div className="flex-1 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 overflow-y-auto scrollbar-hide space-y-3 sm:space-y-4">
                     {loadingHistory && (
                       <div className="text-xs text-slate-400">Loading conversation history…</div>
                     )}
@@ -497,9 +650,25 @@ export default function AgentsChatPage() {
                         </motion.div>
                       ) : (
                         messages.map((message, idx) => {
-                          const displayAgent = message.type === 'agent'
-                            ? (message.agentId ? agents.find(a => a.id === message.agentId) : selectedAgent)
+                          // Extract the correct agent ID from metadata first, fallback to message agentId
+                          const actualAgentId = message.metadata?.sender || message.agentId
+                          const displayAgent = message.type === 'agent' && actualAgentId
+                            ? agents.find(a => a.id === actualAgentId) || null
                             : null
+                          
+                          // DEBUG: Log message metadata
+                          if (message.type === 'agent') {
+                            console.log(`🔍 [DEBUG] Message metadata:`, {
+                              messageId: message.id,
+                              originalAgentId: message.agentId,
+                              metadataSender: message.metadata?.sender,
+                              actualAgentId,
+                              displayAgent: displayAgent?.name,
+                              selectedAgent: selectedAgent?.name,
+                              foundAgent: !!agents.find(a => a.id === actualAgentId)
+                            })
+                          }
+                          
                           const avatarSrc = displayAgent ? getAgentAvatar(displayAgent) : null
                           // Decide if we show the single inline delegation chip on this message
                           const showDelegationChip = message.type !== 'user' && idx === firstAgentIdxAfterDelegation
@@ -532,9 +701,64 @@ export default function AgentsChatPage() {
                                     : 'bg-slate-700 text-white'
                                 }`}
                               >
-                                {/* Delegation chip inline, like a tool */}
                                 {/* Delegation chip inline (first agent message after latest delegation) */}
                                 {showDelegationChip && renderDelegationChip(lastDelegation)}
+                                
+                                {/* Agent Identity Chip - Always show for agent messages */}
+                                {message.type === 'agent' && (
+                                  <div className="mb-2">
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border bg-violet-500/15 border-violet-500/30 text-violet-300">
+                                      {displayAgent ? (
+                                        <>
+                                          <Avatar className="w-3 h-3">
+                                            {getAgentAvatar(displayAgent) ? (
+                                              <AvatarImage src={getAgentAvatar(displayAgent)!} alt={displayAgent.name} />
+                                            ) : null}
+                                            <AvatarFallback className="bg-violet-600 text-[8px]">
+                                              {displayAgent.name?.[0] || 'A'}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <span>{displayAgent.name}</span>
+                                          {(() => {
+                                            const info = getSpecificRoleInfo(displayAgent)
+                                            return (
+                                              <span className="text-[9px] opacity-75">• {info.label}</span>
+                                            )
+                                          })()}
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-red-400">⚠</span>
+                                          <span>Unknown Agent ({actualAgentId || 'no-id'})</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Conversation Mode Indicator for Agent Messages */}
+                                {message.type === 'agent' && currentExecution && (
+                                  <div className="mb-2">
+                                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border ${
+                                      currentExecution.conversationContext?.mode === 'direct'
+                                        ? 'bg-green-500/15 border-green-500/30 text-green-300'
+                                        : 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                                    }`}>
+                                      {currentExecution.conversationContext?.mode === 'direct' ? (
+                                        <>
+                                          <ArrowRightIcon className="w-3 h-3" />
+                                          <span>Direct Response</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <EyeIcon className="w-3 h-3" />
+                                          <span>Supervised</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 {message.type === 'user' ? (
                                   <p className="text-[13px] sm:text-sm leading-relaxed">{message.content}</p>
                                 ) : (
@@ -637,7 +861,7 @@ export default function AgentsChatPage() {
           <SheetHeader className="p-3">
             <SheetTitle className="text-white">Select Agent</SheetTitle>
           </SheetHeader>
-          <div className="p-3 space-y-3 overflow-y-auto">
+          <div className="p-3 space-y-3 overflow-y-auto scrollbar-hide">
             {agents.length === 0 ? (
               <div className="text-center py-8 text-slate-400 text-sm">No agents available</div>
             ) : (
@@ -674,5 +898,6 @@ export default function AgentsChatPage() {
         </SheetContent>
       </Sheet>
     </div>
+    </TooltipProvider>
   )
 }

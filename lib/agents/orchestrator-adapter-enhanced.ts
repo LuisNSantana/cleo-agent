@@ -100,6 +100,19 @@ export function getAgentOrchestrator() {
     startAgentExecutionWithHistory(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>) {
       return createAndRunExecution(input, agentId, prior)
     },
+
+    // Dual-mode execution for UI with enhanced context
+    startAgentExecutionForUI(
+      input: string, 
+      agentId?: string, 
+      threadId?: string, 
+      userId?: string, 
+      prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+      forceSupervised?: boolean
+    ) {
+      // Use the same execution logic with filtered messages
+      return createAndRunExecution(input, agentId, prior || [])
+    },
     // Execution getters - combine legacy and core
     getExecution(executionId: string) {
       // Try legacy first (authoritative), then adapter registry
@@ -172,18 +185,31 @@ export function registerRuntimeAgent(agentConfig: AgentConfig) {
 }
 
 function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): BaseMessage[] {
-  return (prior || []).map(m => {
+  // Avoid injecting stale ToolMessages which must follow same-turn tool_calls; convert to system breadcrumbs
+  return (prior || []).flatMap(m => {
     switch (m.role) {
-      case 'user': return new HumanMessage(m.content)
-      case 'assistant': return new AIMessage(m.content)
-      case 'system': return new SystemMessage(m.content)
-      case 'tool': return new ToolMessage({ content: m.content, tool_call_id: m.metadata?.tool_call_id || 'tool' })
-      default: return new HumanMessage(String(m.content || ''))
+      case 'user': return [new HumanMessage(m.content)]
+      case 'assistant': return [new AIMessage(m.content)]
+      case 'system': return [new SystemMessage(m.content)]
+      case 'tool': {
+        const note = `[tool:${m?.metadata?.name || m?.metadata?.tool_name || 'unknown'}] ${String(m.content).slice(0, 400)}`
+        return [new SystemMessage(note)]
+      }
+      default: return [new HumanMessage(String(m.content || ''))]
     }
   })
 }
 
 function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
+  // Filter ToolMessages to prevent LangChain errors before delegating
+  const filteredPrior = prior ? (prior || []).filter(m => m.role !== 'tool').concat(
+    (prior || []).filter(m => m.role === 'tool').map(m => ({
+      role: 'system' as const,
+      content: `[tool:${m?.metadata?.name || m?.metadata?.tool_name || 'unknown'}] ${String(m.content).slice(0, 400)}`,
+      metadata: m.metadata
+    }))
+  ) : []
+  
   // For full delegation functionality, use legacy orchestrator
   let legacyOrch = (globalThis as any).__cleoOrchestrator
   if (!legacyOrch) {
@@ -197,7 +223,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   
   if (legacyOrch) {
     if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
-      const exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, prior)
+      const exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, filteredPrior)
       execRegistry.push(exec)
       return exec
     }
@@ -224,10 +250,10 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   
   // Simple core execution (no delegation, direct response)
   setTimeout(() => {
-    exec.status = 'completed'
-    exec.endTime = new Date()
-    exec.result = 'Core orchestrator response (basic mode - no delegation)'
-    exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: exec.result, timestamp: new Date() })
+  exec.status = 'completed'
+  exec.endTime = new Date()
+  exec.result = 'Core orchestrator response (basic mode - no delegation)'
+  exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
     listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
   }, 1000)
   

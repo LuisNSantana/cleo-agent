@@ -207,9 +207,9 @@ export class AgentOrchestrator {
       threadId: context.threadId,
       userId: context.userId,
       status: 'running',
-      startTime: new Date(),
-      input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
-      result: undefined,
+  startTime: new Date(),
+  input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
+  result: undefined,
       messages: [],
       options,
       metrics: {
@@ -254,7 +254,7 @@ export class AgentOrchestrator {
 
       execution.status = 'completed'
       execution.endTime = new Date()
-      execution.result = (result as ExecutionResult).content
+  execution.result = (result as ExecutionResult).content
       execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
 
       this.eventEmitter.emit('execution.completed', execution)
@@ -315,7 +315,24 @@ export class AgentOrchestrator {
         metadata: { source: 'specialist', passThrough: true }
       })
       
-      return specialistResult
+      // CRITICAL FIX: Ensure the result has the correct agent metadata
+      const enhancedResult = {
+        ...specialistResult,
+        metadata: {
+          ...((specialistResult as any).metadata || {}),
+          sender: bestAgent.id,
+          delegatedFrom: supervisorConfig.id
+        }
+      }
+      
+      console.log(`🔍 [DEBUG] Enhanced specialist result:`, {
+        originalSender: (specialistResult as any).metadata?.sender,
+        enhancedSender: enhancedResult.metadata.sender,
+        specialistId: bestAgent.id,
+        supervisorId: supervisorConfig.id
+      })
+      
+      return enhancedResult
     }
 
     // Fallback: direct supervisor execution

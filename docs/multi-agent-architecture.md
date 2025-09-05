@@ -1,15 +1,326 @@
-# Cleo Multi-Agent Architecture Guide - v3.0
+# Cleo Multi-Agent Architecture Guide - v5.0 (September 2025)
 
-This guide describes Cleo's multi-agent system end-to-end: backend architecture, modular UI, explainable routing, real-time agent management, and fully integrated database persistence.
+This guide describes Cleo's revolutionary dual-mode agent system: complete modular core architecture, enhanced agent specializations, **dual-mode conversation system**, bulletproof execution management, and optimized database integration.
 
-## 🚀 Key changes in v3.0
+## 🚀 Revolutionary Changes in v5.0
 
-- **Database-Driven Agents**: Full Supabase integration with real-time persistence
-- **Emma E-commerce Agent**: Shopify specialist with per-user credential management
-- **Delegation System**: Cleo as protected supervisor with automatic task delegation
-- **Enhanced UI**: Agent details modal with vibrant design and tool descriptions
-- **Bulletproof Persistence**: All agent changes persist in real-time with RLS security
-- **Protected Default Agents**: Cleo cannot be deleted; Emma auto-initialized for all usersti-Agent Architecture Guide - v2.0
+- **� Dual-Mode Conversation System**: Direct agent interaction OR Cleo supervision - user's choice
+- **🎯 Intuitive Agent Selection**: Selecting specific agent = direct mode automatically  
+- **👩‍💼 Optional Cleo Supervision**: Toggle to activate Cleo oversight when needed
+- **🧵 Thread Segregation**: Complete context isolation between direct and supervised modes
+- **📊 Enhanced UI Indicators**: Clear visual feedback for active conversation mode
+- **�🏗️ Complete Modular Core Architecture**: Full integration of modular orchestrator, error handling, execution management, and metrics collection
+- **🎯 Enhanced Agent Specializations**: Dramatically improved capabilities for all specialist agents with advanced tools and methodologies
+- **⚡ Enhanced Adapter System**: `orchestrator-adapter-enhanced.ts` bridges modular core with legacy delegation for seamless operation
+- **🛡️ Bulletproof Execution Management**: Global registry, cross-request persistence, automatic cleanup, and robust error recovery
+- **📊 Advanced Observability**: Comprehensive metrics, real-time monitoring, and detailed execution tracking
+- **🔧 Optimized Tool Integration**: Enhanced tool mapping, better runtime performance, and improved completion workflows
+
+## 🎮 Dual-Mode Conversation System
+
+### Modos Disponibles
+
+#### 🎯 **Modo Directo** (Por Defecto)
+- **Activación**: Automática al seleccionar agente específico
+- **Comportamiento**: Interacción directa sin intervención de Cleo
+- **Beneficios**: Más rápido, contexto específico, sin overhead
+- **Thread**: `{agentId}_direct`
+
+#### 👩‍💼 **Modo Supervisado** (Toggle)
+- **Activación**: Toggle "Force Cleo Supervision"
+- **Comportamiento**: Cleo supervisa y coordina interacciones
+- **Beneficios**: Coordinación inteligente, manejo de errores robusto
+- **Thread**: `{agentId}_supervised`
+
+### Flujo Intuitivo de Usuario
+```typescript
+// Usuario selecciona Toby → Modo directo automático
+selectedAgent: 'toby-developer' → mode: 'direct'
+
+// Usuario activa toggle → Modo supervisado
+forceSupervised: true → mode: 'supervised'
+```
+
+> **📖 Documentación Completa**: Ver `dual-mode-agent-system.md` para detalles técnicos y guía de uso
+
+## ✨ Architecture Excellence
+
+### Modular Core System (`lib/agents/core/`)
+- **🧠 Orchestrator**: Central coordination hub with singleton pattern and lifecycle management
+- **⚠️ Error Handler**: Advanced error classification, retry logic, and circuit breaker patterns
+- **📊 Graph Builder**: LangGraph construction with MessagesAnnotation compatibility  
+- **🎯 Execution Manager**: Comprehensive agent and tool execution coordination
+- **🏭 Model Factory**: Intelligent model instantiation with caching and provider fallbacks
+- **📡 Event Emitter**: Real-time event system for monitoring and updates
+- **🧠 Memory Manager**: Persistent state management and context preservation
+- **📈 Metrics Collector**: Performance tracking and analytics collection
+
+### Enhanced Adapter Integration
+- **`orchestrator-adapter-enhanced.ts`**: Seamlessly integrates modular core with existing delegation system
+- **Global Registry**: Cross-request execution tracking with automatic cleanup
+- **Legacy Compatibility**: Maintains full compatibility with existing delegation patterns
+- **Runtime Optimization**: Optimized execution paths and memory management
+
+---
+
+## 🎯 Advanced Agent Specializations
+
+### 💝 Cleo - Advanced Emotional Intelligence Supervisor
+**Enhanced Coordination & Emotional Awareness**
+
+- **🧠 Advanced Emotional Intelligence**: Sophisticated detection and response to user emotional states
+- **� Intelligent Task Orchestration**: Smart delegation based on deep task analysis
+- **🔄 Context Preservation**: Maintains conversation flow and relationship continuity
+- **✅ Quality Assurance**: Reviews specialist outputs before user delivery
+- **🌟 Empathetic Interaction**: Warm, supportive, and personalized communication
+
+**Available Tools**: `getCurrentDateTime`, `weatherInfo`, `randomFact`
+
+### 🔬 Toby - Advanced Technical Research Specialist
+**Deep Technical Analysis & Research Excellence**
+
+**Enhanced Specializations:**
+- Advanced data analysis and statistical interpretation
+- Technical documentation research and synthesis
+- API documentation analysis and integration patterns
+- Performance metrics and benchmarking analysis
+- Technology trend analysis and competitive research
+- Complex system architecture evaluation
+- Technical feasibility assessments
+- Code analysis and optimization recommendations
+
+**Available Tools**: `webSearch`, `calculator`, `getCurrentDateTime`, `cryptoPrices`, `complete_task`
+
+**Research Methodology:**
+1. Scope Analysis → Multi-Source Research → Data Processing
+2. Synthesis → Validation → Documentation → Completion
+
+### 🎨 Ami - Advanced Creative Design & Innovation Specialist
+**Strategic Creativity & Innovation Excellence**
+
+**Enhanced Specializations:**
+- Design thinking and human-centered design processes
+- Content strategy and multi-platform optimization
+- Brand development and visual storytelling
+- Creative campaign design and integrated marketing
+- Innovation workshops and ideation facilitation
+- User experience design and journey optimization
+- Creative problem solving with lateral thinking
+
+**Available Tools**: `webSearch`, `randomFact`, `createDocument`, `getCurrentDateTime`, `complete_task`
+
+**Creative Methodologies**: SCAMPER, Design Sprints, Mind Mapping, Storytelling Frameworks, Color Psychology
+
+### 🧮 Peter - Advanced Logic & Mathematical Problem Solver
+**Systematic Reasoning & Optimization Excellence**
+
+**Enhanced Specializations:**
+- Complex calculations and statistical modeling
+- Optimization problems and algorithmic design
+- Financial mathematics and investment analysis
+- Data modeling and performance analysis
+- Logic puzzles and constraint satisfaction
+- Mathematical proof techniques and validation
+
+**Available Tools**: `calculator`, `webSearch`, `getCurrentDateTime`, `cryptoPrices`, `createDocument`, `complete_task`
+
+**Problem-Solving Framework:**
+1. Problem Decomposition → Constraint Identification → Method Selection
+2. Research → Calculation → Validation → Optimization → Documentation
+
+### 🛍️ Emma - Enhanced E-commerce & Shopify Specialist
+**Advanced Business Intelligence & Store Optimization**
+
+**Enhanced Capabilities:**
+- Comprehensive Shopify store management and optimization
+- Advanced sales analytics and business insights
+- Multi-store operations with secure credential management
+- Inventory management and predictive analytics
+- Customer behavior analysis and segmentation
+- Marketing optimization and conversion strategies
+
+**Available Tools**: All Shopify tools + `complete_task`
+- `shopifyGetProducts`, `shopifyGetOrders`, `shopifyGetAnalytics`
+- `shopifyGetCustomers`, `shopifySearchProducts`, `shopifyUpdateProductPrice`
+
+---
+
+## 🏗️ Complete Technical Architecture
+
+### Dual-Mode Orchestrator Integration
+```typescript
+// Enhanced Orchestrator with Dual-Mode Support
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+
+const orchestrator = getAgentOrchestrator()
+
+// Método principal para UI con soporte dual-mode
+const execution = await orchestrator.startAgentExecutionForUI(
+  input,
+  selectedAgentId,
+  threadId,
+  userId,
+  priorMessages,
+  forceSupervised  // true = supervised, false = automatic mode detection
+)
+```
+
+### Conversation Mode Detection
+```typescript
+// Lógica intuitiva de detección de modo
+private determineConversationMode(agentId?: string): {
+  mode: ConversationMode
+  targetAgentId?: string
+} {
+  // Regla: Agente específico seleccionado = Modo directo
+  if (agentId && agentId !== 'cleo-supervisor') {
+    return { mode: 'direct', targetAgentId: agentId }
+  }
+  return { mode: 'supervised' }
+}
+```
+
+### Thread Segregation System
+```typescript
+// Threads completamente segregados por modo
+const generateThreadKey = (agentId: string, mode: ConversationMode) => {
+  return `${agentId}_${mode}`
+}
+
+// Ejemplos:
+// "toby-developer_direct"     → Conversación directa con Toby
+// "toby-developer_supervised" → Toby supervisado por Cleo
+```
+
+### Global Registry System
+```typescript
+// Cross-request execution tracking with dual-mode support
+interface GlobalRegistry {
+  executions: Map<string, AgentExecution>
+  runtimeAgents: Map<string, any>
+  conversationContexts: Map<string, ConversationContext>
+  metrics: MetricsData
+  cleanup: () => void
+}
+```
+
+### Router Intelligence with Mode Awareness
+```typescript
+// Router con detección de modo de conversación
+graphBuilder.addConditionalEdges('router', async (state) => {
+  const conversationMode = additionalKwargs.conversation_mode
+  const targetAgentId = additionalKwargs.target_agent_id
+  
+  // Routing directo para modo direct
+  if (conversationMode === 'direct' && targetAgentId) {
+    console.log(`🎯 Direct routing to ${targetAgentId}`)
+    return targetAgentId
+  }
+  
+  // Routing supervisado con análisis de contenido
+  console.log('👩‍💼 Supervised routing via content analysis')
+  return supervisedRoutingLogic(state)
+})
+```
+
+### Event-Driven Architecture with Mode Events
+```typescript
+// Real-time monitoring and updates with dual-mode events
+eventEmitter.on('mode.switched', (data) => { /* track mode changes */ })
+eventEmitter.on('direct.executed', (data) => { /* direct mode metrics */ })
+eventEmitter.on('supervised.delegated', (data) => { /* supervision analytics */ })
+eventEmitter.on('execution.started', (data) => { /* general tracking */ })
+eventEmitter.on('agent.completed', (data) => { /* completion logging */ })
+eventEmitter.on('error.occurred', (data) => { /* error recovery */ })
+```
+
+---
+
+## 📊 Advanced Features & Capabilities
+
+### 🛡️ Robust Error Handling
+- **Error Classification**: Network, model, validation, authentication, rate limit, timeout
+- **Recovery Strategies**: Exponential backoff, circuit breaker patterns, automatic retry
+- **Fault Tolerance**: Graceful degradation and fallback mechanisms
+
+### ⚡ Performance Optimization
+- **Model Caching**: Intelligent model instantiation and reuse
+- **Tool Runtime**: Optimized tool execution with comprehensive logging
+- **Memory Management**: Efficient state management and garbage collection
+- **Execution Tracking**: Real-time performance monitoring and bottleneck identification
+
+### 📈 Comprehensive Observability
+- **Execution Metrics**: Duration, success rates, error patterns
+- **Agent Performance**: Task completion rates, delegation efficiency
+- **Tool Usage**: Execution times, success patterns, optimization opportunities
+- **Real-time Monitoring**: Live execution tracking and system health
+
+### 🔄 Advanced Delegation System
+- **Intelligent Routing**: Sophisticated agent selection based on task analysis
+- **Context Preservation**: Maintains user state and conversation flow
+- **Quality Control**: Supervisor review before final user delivery
+- **Multi-agent Workflows**: Coordinated execution across multiple specialists
+
+---
+
+## 🚀 Implementation Highlights
+
+### Enhanced Agent Execution Flow
+1. **Request Analysis**: Intelligent task categorization and agent selection
+2. **Modular Execution**: Core orchestrator manages specialist execution
+3. **Tool Integration**: Optimized tool runtime with comprehensive logging
+4. **Quality Assurance**: Supervisor validation before user delivery
+5. **State Management**: Global registry ensures consistency across requests
+6. **Cleanup & Optimization**: Automatic resource management and performance tuning
+
+### Database Integration
+- **Real-time Persistence**: All execution data persisted with RLS security
+- **Cross-request Consistency**: Global registry maintains state between API calls
+- **Automatic Cleanup**: Intelligent execution lifecycle management
+- **Audit Trail**: Complete execution history and performance metrics
+
+---
+
+## 🎯 Benefits & Outcomes
+
+### 🚀 **Scalability**
+- Modular architecture allows independent component scaling
+- Global registry enables efficient resource management
+- Enhanced adapter provides seamless legacy compatibility
+
+### 🔧 **Maintainability**  
+- Clear separation of concerns across all modules
+- Comprehensive error handling and recovery patterns
+- Detailed logging and observability for debugging
+
+### ⚡ **Performance**
+- Optimized execution paths and memory management
+- Intelligent caching and resource reuse
+- Real-time monitoring and bottleneck identification
+
+### 🛡️ **Robustness**
+- Advanced error handling with multiple recovery strategies
+- Fault-tolerant design with graceful degradation
+- Comprehensive validation and state management
+
+### 📊 **Observability**
+- Real-time execution tracking and performance metrics
+- Detailed agent performance analytics
+- Comprehensive audit trails and system health monitoring
+
+---
+
+## 🔮 Future Roadmap
+
+- **Advanced Analytics Dashboard**: Visual performance monitoring and optimization insights
+- **Multi-tenant Architecture**: Enterprise-grade multi-organization support
+- **Extended Tool Ecosystem**: Additional integrations and custom tool development
+- **Machine Learning Optimization**: AI-driven performance tuning and predictive scaling
+- **Advanced Security Features**: Enhanced encryption and audit capabilities
+
+---
+
+*Last Updated: September 2025 - Architecture v4.0*ti-Agent Architecture Guide - v2.0
 
 This guide describes Cleo’s multi-agent system end-to-end: backend architecture, modular UI, explainable routing, real-time agent management, and planned database integration.
 
