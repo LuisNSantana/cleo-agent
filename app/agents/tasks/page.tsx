@@ -22,7 +22,8 @@ import {
   VideoIcon,
   MonitorIcon,
   BellIcon,
-  ArrowClockwiseIcon
+  ArrowClockwiseIcon,
+  TrashIcon
 } from '@phosphor-icons/react'
 
 interface SkyvernTask {
@@ -111,6 +112,15 @@ export default function AgentsTasksPage() {
     task.url.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Map delegated agent (scalable: fallback to Wex for Skyvern tasks)
+  const getAgentInfo = (task: SkyvernTask) => {
+    // Future: if API returns agent_id/agent_name/avatar, prefer that
+    const agentId = (task as any).agent_id || 'wex-automation'
+    const agentName = agentId.includes('wex') ? 'Wex' : 'Agent'
+    const avatar = agentId.includes('wex') ? '/img/agents/wex4.png' : '/img/agents/cleo4.png'
+    return { id: agentId, name: agentName, avatar }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-500/20 text-green-300 border-green-500/40'
@@ -130,6 +140,25 @@ export default function AgentsTasksPage() {
       case 'running': return <PlayIcon className="w-4 h-4" />
       case 'queued': return <ClockIcon className="w-4 h-4" />
       default: return <CircleIcon className="w-4 h-4" />
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const confirmed = window.confirm('Delete this task? This cannot be undone.');
+      if (!confirmed) return;
+      const res = await fetch(`/api/skyvern/tasks?task_id=${encodeURIComponent(taskId)}&deleteNotifications=true`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!data.success) {
+        console.error('Failed to delete task:', data.error);
+        return;
+      }
+      // Optimistic update
+      setSkyvernTasks(prev => prev.filter(t => t.task_id !== taskId));
+    } catch (e) {
+      console.error('Error deleting task:', e);
     }
   }
 
@@ -289,7 +318,7 @@ export default function AgentsTasksPage() {
             >
               <Card className="h-full bg-slate-800/50 border-slate-700/50 hover:border-orange-500/50 transition-colors backdrop-blur-xl">
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <CardTitle className="text-lg font-semibold text-slate-100 mb-2 line-clamp-2">
                         {task.title}
@@ -298,6 +327,24 @@ export default function AgentsTasksPage() {
                         {getStatusIcon(task.status)}
                         {task.status}
                       </Badge>
+                    </div>
+                    {/* Delegated Agent + Delete */}
+                    <div className="flex items-start gap-2 shrink-0">
+                      {(() => { const agent = getAgentInfo(task); return (
+                        <div className="flex items-center gap-2 bg-slate-700/40 px-2 py-1 rounded-full border border-slate-600/40">
+                          <img src={agent.avatar} alt={agent.name} className="w-6 h-6 rounded-full border border-slate-600/60" />
+                          <span className="text-xs text-slate-300 hidden sm:inline">{agent.name}</span>
+                        </div>
+                      )})()}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-slate-300 hover:text-red-300 hover:bg-red-500/10"
+                        onClick={() => handleDeleteTask(task.task_id)}
+                        title="Delete task"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -331,14 +378,14 @@ export default function AgentsTasksPage() {
                       </div>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2 pt-2">
                       {task.live_url && (
                         <Button
                           size="sm"
                           variant="outline"
-                          asChild
-                          className="flex-1 bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
+          asChild
+          className="flex-1 min-w-[140px] bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
                         >
                           <a href={task.live_url} target="_blank" rel="noopener noreferrer">
                             <MonitorIcon className="w-4 h-4 mr-1" />
@@ -352,8 +399,8 @@ export default function AgentsTasksPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          asChild
-                          className="flex-1 bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
+          asChild
+          className="flex-1 min-w-[140px] bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
                         >
                           <a href={task.recording_url} target="_blank" rel="noopener noreferrer">
                             <VideoIcon className="w-4 h-4 mr-1" />

@@ -324,3 +324,62 @@ export async function createSkyvernTaskNotification(notificationData: {
     };
   }
 }
+
+/**
+ * Delete a Skyvern task record (and optionally its notifications) for current user
+ */
+export async function deleteSkyvernTaskRecord(
+  taskId: string,
+  options: { deleteNotifications?: boolean } = {}
+): Promise<{ success: boolean; deleted_count?: number; notifications_deleted?: number; error?: string }> {
+  try {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const supabase = await createClient();
+    if (!supabase) {
+      return { success: false, error: 'Database not available' };
+    }
+
+    // Optionally delete related notifications first
+    let notifications_deleted = 0;
+    if (options.deleteNotifications) {
+      const { data: notifData, error: notifError } = await supabase
+        .from('skyvern_task_notifications' as any)
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', userId)
+        .select('id');
+
+      if (notifError) {
+        console.error('❌ Error deleting Skyvern task notifications:', notifError);
+        return { success: false, error: notifError.message };
+      }
+      notifications_deleted = Array.isArray(notifData) ? notifData.length : 0;
+    }
+
+    // Delete the task record
+    const { data, error } = await supabase
+      .from('skyvern_tasks' as any)
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) {
+      console.error('❌ Error deleting Skyvern task record:', error);
+      return { success: false, error: error.message };
+    }
+
+    const deleted_count = Array.isArray(data) ? data.length : 0;
+    return { success: true, deleted_count, notifications_deleted };
+  } catch (error) {
+    console.error('❌ Error in deleteSkyvernTaskRecord:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}

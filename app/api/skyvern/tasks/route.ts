@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserSkyvernTasks, getPendingNotifications } from '@/lib/skyvern/tasks-db';
+import { getUserSkyvernTasks, getPendingNotifications, deleteSkyvernTaskRecord } from '@/lib/skyvern/tasks-db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,6 +36,38 @@ export async function GET(request: NextRequest) {
       { 
         success: false, 
         error: error instanceof Error ? error.message : 'Internal server error' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const taskId = searchParams.get('task_id');
+    const deleteNotifications = searchParams.get('deleteNotifications') === 'true';
+
+    if (!taskId) {
+      return NextResponse.json({ success: false, error: 'Missing task_id' }, { status: 400 });
+    }
+
+    const result = await deleteSkyvernTaskRecord(taskId, { deleteNotifications });
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      deleted_count: result.deleted_count || 0,
+      notifications_deleted: result.notifications_deleted || 0
+    });
+  } catch (error) {
+    console.error('❌ Error in Skyvern tasks DELETE API:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Internal server error'
       },
       { status: 500 }
     );
