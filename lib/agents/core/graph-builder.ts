@@ -10,6 +10,7 @@ import { ModelFactory } from './model-factory'
 import { EventEmitter } from './event-emitter'
 import { ExecutionManager } from './execution-manager'
 import { buildToolRuntime } from '@/lib/langchain/tooling'
+import { getAllAgents } from '../config'
 
 export interface GraphBuilderConfig {
   modelFactory: ModelFactory
@@ -220,10 +221,15 @@ export class GraphBuilder {
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
 
-        // Prepare messages with agent prompt
+  // Prepare messages with agent prompt
         const systemMessage = new SystemMessage(agentConfig.prompt)
         
-        let messages: any[] = [systemMessage, ...filteredStateMessages]
+  let messages: any[] = [systemMessage, ...filteredStateMessages]
+  // Execution safety caps
+  const EXECUTION_START = Date.now()
+  const MAX_EXECUTION_MS = 45_000
+  const MAX_TOOL_CALLS = 6
+  let totalToolCalls = 0
 
         // DEBUG: Log the messages being sent to LangChain
         console.log('🔍 [DEBUG] Messages being sent to LangChain:', messages.map((m, i) => ({
@@ -246,7 +252,7 @@ export class GraphBuilder {
         }
 
         // Handle tool calls if present
-        for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 3; i++) {
           const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
           if (!toolCalls || toolCalls.length === 0) break
 
@@ -259,21 +265,198 @@ export class GraphBuilder {
           })
 
           for (const call of toolCalls) {
+            // Stop if we are running out of budget
+            if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
+              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
+              messages = [
+                ...messages,
+                new HumanMessage({ content: 'Ahora finaliza con un resumen claro y concreto usando lo ya obtenido. Incluye 5 modelos con enlaces. No llames más herramientas.' })
+              ]
+              response = await model.invoke(messages)
+              break
+            }
             const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
             const name = call?.name || call?.function?.name
             let args = call?.args || call?.function?.arguments || {}
+            
+            // Emit tool.executing event before execution
+            this.eventEmitter.emit('tool.executing', { 
+              agentId: agentConfig.id, 
+              toolName: name, 
+              callId: callId,
+              args: args 
+            })
+            
             try {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args) } catch {}
               }
               const output = await toolRuntime.run(String(name), args)
+              
+              console.log(`🔍 [DEBUG] Tool ${name} output:`, output)
+              console.log(`🔍 [DEBUG] Tool ${name} output type:`, typeof output)
+              
+              // Check if this is a delegation tool response
+              let parsedOutput: any = null
+              try {
+                parsedOutput = typeof output === 'string' ? JSON.parse(output) : output
+                console.log(`🔍 [DEBUG] Parsed output:`, parsedOutput)
+                console.log(`🔍 [DEBUG] parsedOutput.command:`, parsedOutput?.command)
+                console.log(`🔍 [DEBUG] parsedOutput.target_agent:`, parsedOutput?.target_agent)
+              } catch (parseError) {
+                console.log(`🔍 [DEBUG] Failed to parse output:`, parseError)
+              }
+              
+              // Handle delegation responses (LangGraph Supervisor pattern)
+              if (parsedOutput && parsedOutput.command === 'HANDOFF_TO_AGENT' && parsedOutput.target_agent) {
+                console.log(`🔄 [DELEGATION] Detected handoff to ${parsedOutput.target_agent}`)
+                
+                // Emit delegation event
+                this.eventEmitter.emit('agent.delegated', {
+                  fromAgent: agentConfig.id,
+                  toAgent: parsedOutput.target_agent,
+                  task: parsedOutput.task_description,
+                  handoffMessage: parsedOutput.handoff_message
+                })
+                
+                // Get the target agent config
+                const allAgents = getAllAgents()
+                const targetAgent = allAgents.find(a => a.id === parsedOutput.target_agent)
+                
+                if (targetAgent) {
+                  console.log(`🚀 [DELEGATION] Executing delegated agent: ${parsedOutput.target_agent}`)
+                  
+                  // Create a focused task message for the delegated agent
+                  const taskMessage = new HumanMessage({
+                    content: parsedOutput.task_description,
+                    additional_kwargs: {
+                      delegated: true,
+                      fromAgent: agentConfig.id,
+                      handoffMessage: parsedOutput.handoff_message
+                    }
+                  })
+                  
+                  // Build a new runtime for the target agent
+                  const targetRuntime = buildToolRuntime(targetAgent.tools)
+                  
+                  // Execute the delegated agent with full tool loop
+                  try {
+                    // Create system message for the delegated agent
+                    const systemMessage = new SystemMessage(targetAgent.prompt || 'You are a helpful AI assistant.')
+                    
+                    // Create model for the delegated agent
+                    const model = await this.modelFactory.getModel(targetAgent.model, {
+                      temperature: targetAgent.temperature,
+                      maxTokens: targetAgent.maxTokens
+                    })
+                    const modelWithTools = (typeof (model as any).bindTools === 'function')
+                      ? (model as any).bindTools(targetRuntime.lcTools)
+                      : model
+                    
+                    // Execute the delegated agent with tool loop
+                    let targetMessages = [systemMessage, taskMessage]
+                    let delegatedResponse
+                    let toolLoopCount = 0
+                    const maxToolLoops = 10 // Prevent infinite loops
+                    
+                    while (toolLoopCount < maxToolLoops) {
+                      delegatedResponse = await modelWithTools.invoke(targetMessages)
+                      
+                      // Check if the delegated agent wants to use tools
+                      if (delegatedResponse.tool_calls && delegatedResponse.tool_calls.length > 0) {
+                        console.log(`🛠️ [DELEGATION] ${parsedOutput.target_agent} invoking tools:`, delegatedResponse.tool_calls.map((tc: any) => tc.name))
+                        
+                        // Add AI message with tool calls
+                        targetMessages.push(new AIMessage({
+                          content: delegatedResponse.content || '',
+                          tool_calls: delegatedResponse.tool_calls
+                        }))
+                        
+                        // Execute tools for the delegated agent
+                        for (const toolCall of delegatedResponse.tool_calls) {
+                          try {
+                            const toolOutput = await targetRuntime.run(toolCall.name, toolCall.args)
+                            targetMessages.push(new ToolMessage({
+                              content: toolOutput,
+                              tool_call_id: toolCall.id || `tool_${Date.now()}`
+                            }))
+                          } catch (toolError) {
+                            console.error(`❌ [DELEGATION] Tool ${toolCall.name} failed:`, toolError)
+                            targetMessages.push(new ToolMessage({
+                              content: `Error executing tool: ${toolError}`,
+                              tool_call_id: toolCall.id || `tool_error_${Date.now()}`
+                            }))
+                          }
+                        }
+                        
+                        toolLoopCount++
+                      } else {
+                        // No more tool calls, we have the final response
+                        break
+                      }
+                    }
+                    
+                    console.log(`✅ [DELEGATION] ${parsedOutput.target_agent} completed task`)
+                    
+                    // Return the delegated agent's final response
+                    return {
+                      messages: [
+                        ...filteredStateMessages,
+                        new AIMessage({
+                          content: delegatedResponse?.content || 'Delegated task completed',
+                          additional_kwargs: {
+                            sender: parsedOutput.target_agent,
+                            delegatedFrom: agentConfig.id,
+                            originalTask: parsedOutput.task_description,
+                            delegationComplete: true
+                          }
+                        })
+                      ]
+                    }
+                  } catch (delegationError) {
+                    console.error(`❌ [DELEGATION] Failed to execute ${parsedOutput.target_agent}:`, delegationError)
+                    
+                    // Return error message
+                    return {
+                      messages: [
+                        ...filteredStateMessages,
+                        new AIMessage({
+                          content: `Lo siento, hubo un error al ejecutar la delegación a ${parsedOutput.target_agent}. Error: ${delegationError}`,
+                          additional_kwargs: {
+                            sender: agentConfig.id,
+                            delegationError: true
+                          }
+                        })
+                      ]
+                    }
+                  }
+                } else {
+                  console.warn(`⚠️ [DELEGATION] Target agent ${parsedOutput.target_agent} not found`)
+                  
+                  // Return error message
+                  return {
+                    messages: [
+                      ...filteredStateMessages,
+                      new AIMessage({
+                        content: `No se pudo encontrar el agente ${parsedOutput.target_agent} para la delegación.`,
+                        additional_kwargs: {
+                          sender: agentConfig.id,
+                          delegationError: true
+                        }
+                      })
+                    ]
+                  }
+                }
+              }
+              
               console.log('🔍 [DEBUG] Before adding ToolMessage. Current messages count:', messages.length)
               messages = [
                 ...messages,
                 new ToolMessage({ content: String(output), tool_call_id: String(callId) })
               ]
+              totalToolCalls++
               console.log('🔍 [DEBUG] After adding ToolMessage. New messages count:', messages.length)
-              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, name, callId })
+              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
             } catch (err) {
               console.log('🔍 [DEBUG] Before adding ToolMessage (error). Current messages count:', messages.length)
               messages = [
@@ -285,6 +468,14 @@ export class GraphBuilder {
             }
           }
 
+          // Check budgets before re-invocation
+          if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
+            console.log('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
+            messages = [
+              ...messages,
+              new HumanMessage({ content: 'Por favor, entrega la respuesta final ahora. Resume los hallazgos con 5 opciones y enlaces. No llames más herramientas.' })
+            ]
+          }
           console.log('🔍 [DEBUG] About to re-invoke model with', messages.length, 'messages')
           console.log('🔍 [DEBUG] Last 3 messages types:', messages.slice(-3).map(m => m.constructor.name))
           
@@ -430,10 +621,15 @@ export class GraphBuilder {
 
         console.log(`🧩 [Graph] Agent ${agentConfig.id} using ${toolRuntime.lcTools.length} tools:`, toolRuntime.lcTools.map(t => t.name))
 
-        // Prepare messages with agent prompt
+  // Prepare messages with agent prompt
         const systemMessage = new SystemMessage(agentConfig.prompt)
         
-        let messages: any[] = [systemMessage, ...filteredStateMessages]
+  let messages: any[] = [systemMessage, ...filteredStateMessages]
+  // Execution safety caps
+  const EXECUTION_START = Date.now()
+  const MAX_EXECUTION_MS = 45_000
+  const MAX_TOOL_CALLS = 6
+  let totalToolCalls = 0
 
         // DEBUG: Log the messages being sent to LangChain (buildGraph method)
         console.log('🔍 [DEBUG] BuildGraph - Messages being sent to LangChain:', messages.map((m, i) => ({
@@ -457,7 +653,7 @@ export class GraphBuilder {
 
         // Handle tool calls if present
         const toolCallHistory: string[] = []
-        for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 3; i++) {
           const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
           console.log(`🔍 [DEBUG] BuildGraph - Tool loop iteration ${i + 1}, tool_calls found:`, toolCalls.length)
           
@@ -492,9 +688,30 @@ export class GraphBuilder {
           console.log(`🛠️  [Graph] ${agentConfig.id} invoked tools:`, toolCalls.map((t: any) => t?.name))
 
           for (const call of toolCalls) {
+            // Stop if we are running out of budget
+            if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
+              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
+              messages.push(new HumanMessage({ content: 'Finaliza ahora con un resumen claro de los resultados con 5 mejores opciones y enlaces. No uses más herramientas.' }))
+              try {
+                response = await model.invoke(messages)
+              } catch (err) {
+                console.log('🔍 [DEBUG] BuildGraph - Forced finalization failed, using fallback')
+                response = new AIMessage({ content: 'Resumen: herramientas agotadas o tiempo límite alcanzado. Presenta los mejores resultados encontrados hasta ahora.' }) as any
+              }
+              break
+            }
             const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
             const name = call?.name || call?.function?.name
             let args = call?.args || call?.function?.arguments || {}
+            
+            // Emit tool.executing event before execution
+            this.eventEmitter.emit('tool.executing', { 
+              agentId: agentConfig.id, 
+              toolName: name, 
+              callId: callId,
+              args: args 
+            })
+            
             try {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args) } catch {}
@@ -502,6 +719,163 @@ export class GraphBuilder {
               console.log(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args)})`)
               const output = await toolRuntime.run(String(name), args)
               console.log(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
+              
+              console.log(`🔍 [DEBUG] Tool ${name} output:`, output)
+              console.log(`🔍 [DEBUG] Tool ${name} output type:`, typeof output)
+              
+              // Check if this is a delegation tool response
+              let parsedOutput: any = null
+              try {
+                parsedOutput = typeof output === 'string' ? JSON.parse(output) : output
+                console.log(`🔍 [DEBUG] Parsed output:`, parsedOutput)
+                console.log(`🔍 [DEBUG] parsedOutput.command:`, parsedOutput?.command)
+                console.log(`🔍 [DEBUG] parsedOutput.target_agent:`, parsedOutput?.target_agent)
+              } catch (parseError) {
+                console.log(`🔍 [DEBUG] Failed to parse output:`, parseError)
+              }
+              
+              // Handle delegation responses (LangGraph Supervisor pattern)
+              if (parsedOutput && parsedOutput.command === 'HANDOFF_TO_AGENT' && parsedOutput.target_agent) {
+                console.log(`🔄 [DELEGATION] Detected handoff to ${parsedOutput.target_agent}`)
+                
+                // Emit delegation event
+                this.eventEmitter.emit('agent.delegated', {
+                  fromAgent: agentConfig.id,
+                  toAgent: parsedOutput.target_agent,
+                  task: parsedOutput.task_description,
+                  handoffMessage: parsedOutput.handoff_message
+                })
+                
+                // Get the target agent config
+                const allAgents = getAllAgents()
+                const targetAgent = allAgents.find(a => a.id === parsedOutput.target_agent)
+                
+                if (targetAgent) {
+                  console.log(`🚀 [DELEGATION] Executing delegated agent: ${parsedOutput.target_agent}`)
+                  
+                  // Create a focused task message for the delegated agent
+                  const taskMessage = new HumanMessage({
+                    content: parsedOutput.task_description,
+                    additional_kwargs: {
+                      delegated: true,
+                      fromAgent: agentConfig.id,
+                      handoffMessage: parsedOutput.handoff_message
+                    }
+                  })
+                  
+                  // Build a new runtime for the target agent
+                  const targetRuntime = buildToolRuntime(targetAgent.tools)
+                  
+                  // Execute the delegated agent with full tool loop
+                  try {
+                    // Create system message for the delegated agent
+                    const systemMessage = new SystemMessage(targetAgent.prompt || 'You are a helpful AI assistant.')
+                    
+                    // Create model for the delegated agent
+                    const model = await this.modelFactory.getModel(targetAgent.model, {
+                      temperature: targetAgent.temperature,
+                      maxTokens: targetAgent.maxTokens
+                    })
+                    const modelWithTools = (typeof (model as any).bindTools === 'function')
+                      ? (model as any).bindTools(targetRuntime.lcTools)
+                      : model
+                    
+                    // Execute the delegated agent with tool loop
+                    let targetMessages = [systemMessage, taskMessage]
+                    let delegatedResponse
+                    let toolLoopCount = 0
+                    const maxToolLoops = 10 // Prevent infinite loops
+                    
+                    while (toolLoopCount < maxToolLoops) {
+                      delegatedResponse = await modelWithTools.invoke(targetMessages)
+                      
+                      // Check if the delegated agent wants to use tools
+                      if (delegatedResponse.tool_calls && delegatedResponse.tool_calls.length > 0) {
+                        console.log(`🛠️ [DELEGATION] ${parsedOutput.target_agent} invoking tools:`, delegatedResponse.tool_calls.map((tc: any) => tc.name))
+                        
+                        // Add AI message with tool calls
+                        targetMessages.push(new AIMessage({
+                          content: delegatedResponse.content || '',
+                          tool_calls: delegatedResponse.tool_calls
+                        }))
+                        
+                        // Execute tools for the delegated agent
+                        for (const toolCall of delegatedResponse.tool_calls) {
+                          try {
+                            const toolOutput = await targetRuntime.run(toolCall.name, toolCall.args)
+                            targetMessages.push(new ToolMessage({
+                              content: toolOutput,
+                              tool_call_id: toolCall.id || `tool_${Date.now()}`
+                            }))
+                          } catch (toolError) {
+                            console.error(`❌ [DELEGATION] Tool ${toolCall.name} failed:`, toolError)
+                            targetMessages.push(new ToolMessage({
+                              content: `Error executing tool: ${toolError}`,
+                              tool_call_id: toolCall.id || `tool_error_${Date.now()}`
+                            }))
+                          }
+                        }
+                        
+                        toolLoopCount++
+                      } else {
+                        // No more tool calls, we have the final response
+                        break
+                      }
+                    }
+                    
+                    console.log(`✅ [DELEGATION] ${parsedOutput.target_agent} completed task`)
+                    
+                    // Return the delegated agent's final response
+                    return {
+                      messages: [
+                        ...filteredStateMessages,
+                        new AIMessage({
+                          content: delegatedResponse?.content || 'Delegated task completed',
+                          additional_kwargs: {
+                            sender: parsedOutput.target_agent,
+                            delegatedFrom: agentConfig.id,
+                            originalTask: parsedOutput.task_description,
+                            delegationComplete: true
+                          }
+                        })
+                      ]
+                    }
+                  } catch (delegationError) {
+                    console.error(`❌ [DELEGATION] Failed to execute ${parsedOutput.target_agent}:`, delegationError)
+                    
+                    // Return error message
+                    return {
+                      messages: [
+                        ...filteredStateMessages,
+                        new AIMessage({
+                          content: `Lo siento, hubo un error al ejecutar la delegación a ${parsedOutput.target_agent}. Error: ${delegationError}`,
+                          additional_kwargs: {
+                            sender: agentConfig.id,
+                            delegationError: true
+                          }
+                        })
+                      ]
+                    }
+                  }
+                } else {
+                  console.warn(`⚠️ [DELEGATION] Target agent ${parsedOutput.target_agent} not found`)
+                  
+                  // Return error message
+                  return {
+                    messages: [
+                      ...filteredStateMessages,
+                      new AIMessage({
+                        content: `No se pudo encontrar el agente ${parsedOutput.target_agent} para la delegación.`,
+                        additional_kwargs: {
+                          sender: agentConfig.id,
+                          delegationError: true
+                        }
+                      })
+                    ]
+                  }
+                }
+              }
+              
               console.log('🔍 [DEBUG] BuildGraph - Before adding ToolMessage. Current messages count:', messages.length)
               console.log('🔍 [DEBUG] BuildGraph - Previous message type before adding ToolMessage:', messages[messages.length - 1]?.constructor?.name)
               console.log('🔍 [DEBUG] BuildGraph - Previous message has tool_calls:', !!messages[messages.length - 1]?.tool_calls?.length)
@@ -511,8 +885,9 @@ export class GraphBuilder {
                 ...messages,
                 new ToolMessage({ content: String(output), tool_call_id: String(callId) })
               ]
+              totalToolCalls++
               console.log('🔍 [DEBUG] BuildGraph - After adding ToolMessage. New messages count:', messages.length)
-              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, name, callId })
+              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
             } catch (err) {
               console.log('🔍 [DEBUG] BuildGraph - Before adding ToolMessage (error). Current messages count:', messages.length)
               messages = [
@@ -525,6 +900,11 @@ export class GraphBuilder {
             }
           }
 
+          // Check budgets before re-invocation
+          if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
+            console.log('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
+            messages.push(new HumanMessage({ content: 'Ahora entrega la respuesta final. Resume claramente y enlaza a las fuentes. Evita más herramientas.' }))
+          }
           console.log('🔍 [DEBUG] BuildGraph - About to re-invoke model with', messages.length, 'messages')
           console.log('🔍 [DEBUG] BuildGraph - Last 3 messages types:', messages.slice(-3).map(m => m.constructor.name))
           

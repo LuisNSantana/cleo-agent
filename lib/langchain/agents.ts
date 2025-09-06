@@ -391,13 +391,17 @@ export class OpenAIAgent extends BaseAgent {
       ? this.config.id.split(':')[1]
       : 'gpt-4o-mini'
     console.log('🤖 Initializing OpenAIAgent with model:', openaiModel)
-    const temperature = openaiModel.startsWith('gpt-5-') ? 1 : 0.1
-    this.model = new ChatOpenAI({
+    const isGpt5 = openaiModel.startsWith('gpt-5')
+    const opts: any = {
       model: openaiModel,
-      temperature,
       maxTokens: 4096,
       openAIApiKey: process.env.OPENAI_API_KEY,
-    })
+    }
+    // GPT-5 models don't accept custom temperature; omit to use provider default
+    if (!isGpt5) {
+      opts.temperature = 0.1
+    }
+    this.model = new ChatOpenAI(opts)
     console.log('✅ OpenAIAgent initialized successfully')
   }
 

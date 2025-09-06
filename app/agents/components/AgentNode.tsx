@@ -2,7 +2,30 @@
 
 /**
  * Agent Node Component
- * Visual representation of an agent in the graph
+ * Visual representation of an agent in the g  const  const   const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'supervisor': return '❤️'
+      case 'specialist': return '🔬'
+      case 'worker': return '⚙️'
+      case 'evaluator': return '📊'
+      default: return '🤖'
+    }
+  }on = (role: string) => {
+    switch (role) {
+      case 'supervisor': return '👤'
+      case 'specialist': return '🔬'
+      case 'worker': return '⚙️'
+      case 'evaluator': return '📊'
+      default: return '🤖'
+    }
+  }leIcon = (role: string) => {
+    switch (role) {
+      case 'supervisor': return '👤'
+      case 'specialist': return '🔬'
+      case 'worker': return '⚙️'
+      case 'evaluator': return '📊'
+      default: return '🤖'
+    }case 'supervisor': return '❤️'h
  */
 
 import React from 'react'
@@ -11,7 +34,8 @@ import { AgentConfig, ExecutionStatus, AgentExecution } from '@/lib/agents/types
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Clock, CheckCircle, XCircle, Play, Activity, Loader2, Zap } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Clock, CheckCircle, XCircle, Play, Activity, Loader2, Zap, User } from 'lucide-react'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 
 interface AgentNodeData {
@@ -38,6 +62,22 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
   // Check if this agent is currently active
   const isCurrentlyActive = currentExecution?.agentId === agent.id && currentExecution?.status === 'running'
   const isTrail = status === 'trail'
+
+  const getAgentAvatar = (agent: AgentConfig) => {
+    // Prefer explicit avatar from config when available
+    if (agent.avatar) return agent.avatar
+    // Map common agent names to avatars in public/img/agents
+    const key = agent.name?.toLowerCase()
+    if (key?.includes('toby')) return '/img/agents/toby4.png'
+    if (key?.includes('ami')) return '/img/agents/ami4.png'
+    if (key?.includes('peter')) return '/img/agents/peter4.png'
+    if (key?.includes('cleo')) return '/img/agents/logocleo4.png'
+    if (key?.includes('emma')) return '/img/agents/emma4.png'
+    if (key?.includes('wex')) return '/img/agents/wex4.png'
+    if (key?.includes('apu')) return '/img/agents/apu4.png'
+    // For "User Message" we'll use fallback with message icon
+    return null
+  }
 
   const getStatusColor = (status: ExecutionStatus | 'trail') => {
     switch (status) {
@@ -70,7 +110,7 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'supervisor': return '👑'
+      case 'supervisor': return '�'
       case 'specialist': return '🔬'
       case 'worker': return '⚙️'
       case 'evaluator': return '📊'
@@ -104,9 +144,14 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
           }`}
           style={{ borderColor: border, borderWidth: 2 }}
         >
-          <span className="text-base leading-none" aria-hidden>
-            {getRoleIcon(agent.role)}
-          </span>
+          <Avatar className="w-5 h-5">
+            {getAgentAvatar(agent) ? (
+              <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover" />
+            ) : null}
+            <AvatarFallback className="text-xs" style={{ backgroundColor: agent.color }}>
+              {getRoleIcon(agent.role)}
+            </AvatarFallback>
+          </Avatar>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
@@ -170,7 +215,14 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{getRoleIcon(agent.role)}</span>
+            <Avatar className="w-6 h-6">
+              {getAgentAvatar(agent) ? (
+                <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover" />
+              ) : null}
+              <AvatarFallback className="text-xs" style={{ backgroundColor: agent.color }}>
+                {getRoleIcon(agent.role)}
+              </AvatarFallback>
+            </Avatar>
             <h3 className="font-semibold text-sm text-foreground">{agent.name}</h3>
           </div>
           <div className={`w-3 h-3 rounded-full ${getStatusColor(status)} ${

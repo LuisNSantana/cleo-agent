@@ -33,12 +33,18 @@ export class ModelFactory {
 
     // OpenAI models
     if (modelName.startsWith('gpt-') || modelName.includes('openai')) {
-      return new ChatOpenAI({
-        modelName: modelName.replace('openai/', ''),
-        temperature,
+      const resolved = modelName.replace('openai/', '')
+      const isGpt5 = resolved.startsWith('gpt-5')
+      const opts: any = {
+        modelName: resolved,
         maxTokens,
         streaming
-      })
+      }
+      // GPT-5 models currently do not accept custom temperature; omit field entirely
+      if (!isGpt5 && typeof temperature === 'number') {
+        opts.temperature = temperature
+      }
+      return new ChatOpenAI(opts)
     }
 
     // Anthropic models

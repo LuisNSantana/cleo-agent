@@ -282,7 +282,8 @@ export class AgentOrchestrator {
   }
 
   /**
-   * Execute with routing and delegation logic (like legacy orchestrator)
+   * Execute with intelligent supervision - Cleo as smart supervisor
+   * Cleo analyzes the request and uses delegation tools if needed
    */
   private async executeWithRouting(
     supervisorConfig: AgentConfig,
@@ -292,70 +293,15 @@ export class AgentOrchestrator {
   ): Promise<ExecutionResult> {
     const userMessage = String(context.messageHistory[context.messageHistory.length - 1]?.content || '')
     
-    // Import agent configs for routing
-    const { getAllAgents } = await import('../config')
-    const availableAgents = getAllAgents().filter(a => a.id !== 'cleo-supervisor')
+    console.log(`[Smart Supervisor] Message received: "${userMessage.substring(0, 50)}..."`)
+    console.log(`[Smart Supervisor] Cleo will analyze and decide on delegation`)
     
-    console.log(`[Core Router] Analyzing message: "${userMessage.substring(0, 50)}..."`)
-    
-    // Simple keyword-based routing (can be enhanced with ML scoring later)
-    const bestAgent = this.selectBestAgent(userMessage.toLowerCase(), availableAgents)
-    
-    if (bestAgent) {
-      console.log(`[Core Router] Selected agent: ${bestAgent.name} (${bestAgent.id})`)
-      
-      // Add delegation step for tracking
-      execution.steps = execution.steps || []
-      execution.steps.push({
-        id: `step_${Date.now()}_delegate`,
-        agent: 'cleo-supervisor',
-        action: 'delegating',
-        content: `Delegating to ${bestAgent.name}`,
-        progress: 20,
-        timestamp: new Date(),
-        metadata: { delegatedTo: bestAgent.id, reason: 'routing' }
-      })
-      
-      // Execute specialist agent
-      const specialistResult = await this.executeAgent(bestAgent, context, options)
-      
-      // Add completion step
-      execution.steps.push({
-        id: `step_${Date.now()}_complete`,
-        agent: bestAgent.id,
-        action: 'completing',
-        content: 'Task completed by specialist',
-        progress: 100,
-        timestamp: new Date(),
-        metadata: { source: 'specialist', passThrough: true }
-      })
-      
-      // CRITICAL FIX: Ensure the result has the correct agent metadata
-      const enhancedResult = {
-        ...specialistResult,
-        metadata: {
-          ...((specialistResult as any).metadata || {}),
-          sender: bestAgent.id,
-          delegatedFrom: supervisorConfig.id
-        }
-      }
-      
-      console.log(`🔍 [DEBUG] Enhanced specialist result:`, {
-        originalSender: (specialistResult as any).metadata?.sender,
-        enhancedSender: enhancedResult.metadata.sender,
-        specialistId: bestAgent.id,
-        supervisorId: supervisorConfig.id
-      })
-      
-      return enhancedResult
-    }
-
-    // Fallback: direct supervisor execution
-    console.log('[Core Router] No specialist selected, using supervisor')
+    // Always execute Cleo as intelligent supervisor
+    // He has delegation tools and will decide if specialist help is needed
     await this.initializeAgent(supervisorConfig)
     const processedContext = await this.prepareExecutionContext(context)
 
-    return await this.errorHandler.withRetry(
+    const result = await this.errorHandler.withRetry(
       () => this.executionManager.executeWithHistory(
         supervisorConfig,
         this.graphs.get(supervisorConfig.id)!,
@@ -363,13 +309,18 @@ export class AgentOrchestrator {
         execution,
         options
       ),
-      `agent_execution_${supervisorConfig.id}`,
-      {
-        maxAttempts: this.config.errorHandlerConfig?.maxRetries || 3,
-        baseDelayMs: this.config.errorHandlerConfig?.baseDelayMs || 1000
-      }
+      execution.id
     )
+
+    console.log(`[Smart Supervisor] Cleo completed analysis and execution`)
+    
+    return result
   }
+
+  /**
+   * Legacy agent selector - now unused since Cleo handles all routing intelligently
+   * Keeping for potential future reference
+   */
 
   /**
    * Select best agent based on message content (simplified routing logic)
@@ -377,9 +328,10 @@ export class AgentOrchestrator {
   private selectBestAgent(message: string, agents: AgentConfig[]): AgentConfig | null {
     const keywords = {
       'emma-ecommerce': ['shopify', 'ecommerce', 'sales', 'products', 'orders', 'store', 'inventory', 'analytics', 'customers'],
-      'toby-technical': ['technical', 'research', 'data', 'analysis', 'information', 'metrics', 'programming', 'code'],
-      'ami-creative': ['creative', 'design', 'content', 'art', 'brainstorm', 'innovation', 'marketing'],
-      'peter-logical': ['logic', 'math', 'calculate', 'problem', 'solve', 'algorithm', 'structured']
+      'toby-technical': ['technical', 'programming', 'code', 'debug', 'api', 'database', 'server', 'development'],
+      'ami-creative': ['creative', 'design', 'content', 'art', 'brainstorm', 'innovation', 'marketing', 'brand'],
+      'peter-logical': ['logic', 'math', 'calculate', 'problem', 'solve', 'algorithm', 'structured', 'optimization'],
+      'apu-research': ['search', 'find', 'information', 'research', 'news', 'stock', 'market', 'price', 'analysis', 'data', 'report', 'tesla', 'company', 'google', 'web', 'internet', 'investigate', 'explore', 'discover', 'busca', 'información']
     }
 
     let bestAgent: AgentConfig | null = null

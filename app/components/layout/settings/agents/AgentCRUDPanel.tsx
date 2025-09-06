@@ -516,14 +516,18 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     </Tabs>
   )
 
-  const getAgentAvatar = (name?: string) => {
-    const key = name?.toLowerCase() || ''
+  const getAgentAvatar = (agent?: AgentConfig) => {
+    if (!agent) return null
+    // Prefer explicit avatar path on the agent config when set
+    if (agent.avatar) return agent.avatar
+    const key = agent.name?.toLowerCase() || ''
     if (key.includes('toby')) return '/img/agents/toby4.png'
     if (key.includes('ami')) return '/img/agents/ami4.png'
     if (key.includes('peter')) return '/img/agents/peter4.png'
     if (key.includes('cleo')) return '/img/agents/logocleo4.png'
     if (key.includes('emma')) return '/img/agents/emma4.png'
     if (key.includes('wex')) return '/img/agents/wex4.png'
+    if (key.includes('apu')) return '/img/agents/apu4.png'
     return null
   }
 
@@ -572,9 +576,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                       {/* Enhanced Avatar with better resolution */}
                       <div className="relative group">
                         <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
-                          {getAgentAvatar(agent.name) ? (
+                          {getAgentAvatar(agent) ? (
                             <AvatarImage 
-                              src={getAgentAvatar(agent.name)!} 
+                              src={getAgentAvatar(agent)!} 
                               alt={agent.name}
                               className="object-cover rounded-xl"
                             />
@@ -775,9 +779,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                   {/* Agent Avatar */}
                   <div className="relative">
                     <Avatar className="h-20 w-20 rounded-xl ring-2 ring-violet-400/50">
-                      {getAgentAvatar(detailsAgent.name) ? (
+                      {getAgentAvatar(detailsAgent) ? (
                         <AvatarImage 
-                          src={getAgentAvatar(detailsAgent.name)!} 
+                          src={getAgentAvatar(detailsAgent)!} 
                           alt={detailsAgent.name}
                           className="object-cover rounded-xl"
                         />

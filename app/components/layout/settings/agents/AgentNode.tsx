@@ -2,7 +2,15 @@
 
 /**
  * Agent Node Component
- * Visual representation of an agent in the graph
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'supervisor': return <User className="w-4 h-4" />
+      case 'specialist': return '🔬'
+      case 'worker': return '⚙️'
+      case 'evaluator': return '📊'
+      default: return '🤖'
+    }
+  }se 'supervisor': return '👤' Visual representation of an agent in the graph
  */
 
 import React from 'react'
@@ -11,6 +19,7 @@ import { AgentConfig, ExecutionStatus } from '@/lib/agents/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Clock, CheckCircle, XCircle, Play, Activity, User } from 'lucide-react'
 
 interface AgentNodeData {
   label: string
@@ -41,7 +50,7 @@ export function AgentNodeComponent({ data }: AgentNodeProps) {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'supervisor': return '👑'
+      case 'supervisor': return '�'
       case 'specialist': return '🔬'
       case 'worker': return '⚙️'
       case 'evaluator': return '📊'

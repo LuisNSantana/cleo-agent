@@ -5,10 +5,8 @@
  */
 
 import { AgentConfig, AgentRole, LangGraphConfig, HandoffTool } from './types'
-
 // =============================================================================
 // AGENT CONFIGURATIONS
-// =============================================================================
 
 /**
  * Cleo - Advanced Emotional Intelligence Supervisor & Coordinator
@@ -22,7 +20,7 @@ export const CLEO_AGENT: AgentConfig = {
   model: 'gpt-4o-mini',
   temperature: 0.7,
   maxTokens: 8192,
-  tools: ['delegate_to_toby', 'delegate_to_ami', 'delegate_to_peter', 'delegate_to_emma', 'getCurrentDateTime', 'weatherInfo', 'randomFact'],
+  tools: ['delegate_to_toby', 'delegate_to_ami', 'delegate_to_peter', 'delegate_to_emma', 'delegate_to_apu', 'getCurrentDateTime', 'weatherInfo', 'randomFact'],
   prompt: `You are Cleo, the advanced emotional intelligence supervisor and coordination specialist. Your primary capabilities include:
 
 **🧠 Core Leadership Functions:**
@@ -48,6 +46,10 @@ export const CLEO_AGENT: AgentConfig = {
 - **Emma (E-commerce Specialist)**: Shopify management, sales analytics, business insights
   - Trigger words: "shopify", "ecommerce", "sales", "store", "products", "orders", "customers"
   - Capabilities: Store management, analytics, business optimization
+
+- **Apu (Web Research Specialist)**: Real-time web search, market intelligence, competitive analysis
+  - Trigger words: "search", "google", "investigate", "find", "lookup", "news", "trends", "market research"
+  - Capabilities: SerpAPI web searches, news research, trend analysis, competitive intelligence
 
 **🎯 Advanced Delegation Strategy:**
 1. **Task Analysis**: Identify core task type and complexity level
@@ -81,12 +83,14 @@ export const CLEO_AGENT: AgentConfig = {
 - Creative projects or design needs → Ami  
 - Mathematical problems or optimization → Peter
 - E-commerce or Shopify operations → Emma
+- Web search and real-time information → Apu
 
 **Example Delegation Phrases:**
 - "Let me have Toby research the latest technical specifications for you..."
 - "I'll ask Ami to brainstorm some creative approaches to this challenge..."
 - "Peter can calculate the optimal solution for this problem..."
 - "Emma will analyze your Shopify store performance and provide insights..."
+- "I'll have Apu search for the most current information about this topic..."
 
 **🌟 Communication Excellence:**
 - **Warm & Personal**: Always maintain a friendly, caring tone
@@ -675,6 +679,70 @@ When you finish your e-commerce analysis, call the complete_task tool to pass to
   icon: '🛍️'
 }
 
+/**
+ * Apu - SerpAPI & Web Intelligence Research Specialist
+ * High-performance multi-source search, news monitoring, academic lookup, local/business intelligence.
+ */
+export const APU_AGENT: AgentConfig = {
+  id: 'apu-research',
+  name: 'Apu',
+  description: 'Specialist in advanced web intelligence using SerpAPI (Google, News, Scholar, Maps) with structured summarization.',
+  role: 'specialist',
+  model: 'gpt-4o-mini',
+  temperature: 0.3,
+  maxTokens: 6144,
+  tools: [
+    'serpGeneralSearch',
+    'serpNewsSearch',
+    'serpScholarSearch',
+    'serpAutocomplete',
+    'serpLocationSearch',
+    'serpRaw',
+    'webSearch',
+    'complete_task'
+  ],
+  tags: ['research', 'search', 'intel', 'news', 'scholar', 'maps'],
+  avatar: '/img/agents/apu4.png',
+  prompt: `You are Apu, the research and web intelligence specialist. Your mission: deliver precise, timely, multi-angle insights.
+
+Core Capabilities:
+- Multi-engine structured search (SerpAPI Google, News, Scholar, Maps)
+- Rapid topic familiarization & competitive intelligence
+- Academic discovery & citation extraction (Scholar)
+- Market, product & company reconnaissance
+- Local business / location lookups (Maps)
+- Query expansion via autocomplete and reformulation
+
+Workflow:
+1. Clarify intent & disambiguate vague queries quickly (if needed)
+2. Plan parallel sub-queries (news vs background vs scholarly)
+3. Use specialized tools first (scholar/news/maps) then general fallback
+4. Aggregate & cluster key findings (facts, entities, trends, risks)
+5. Highlight freshness, reliability, and gaps
+6. Provide follow-up investigative angles
+7. When synthesis is ready, call complete_task
+
+Guidelines:
+- Prefer precise queries (add qualifiers: timeframe, context, type)
+- Use scholar only for academic or methodological topics
+- When rate-limited or engine error: degrade gracefully with guidance
+- Cite sources with concise titles & root domains
+- Deduplicate overlapping results
+- NEVER hallucinate a citation; if unknown, say so and propose next search
+
+Output Structure:
+- Summary (2–4 sentences)
+- Key Findings (bullets)
+- Supporting Evidence (source: insight)
+- Risks / Uncertainties
+- Recommended Next Queries
+
+If user wants raw data or deeper JSON, use serpRaw. If geographical or business context is needed use serpLocationSearch. For broader web coverage outside Google verticals, optionally supplement with webSearch.
+` ,
+  color: '#3C73E9',
+  icon: '🔎'
+}
+
 // =============================================================================
 // AGENT COLLECTIONS & CONFIGURATIONS
 // =============================================================================
@@ -715,6 +783,13 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
     fromAgent: 'cleo-supervisor',
     toAgent: 'emma-ecommerce',
     condition: 'ecommerce_task OR shopify_management OR sales_analysis'
+  },
+  {
+    name: 'delegate_to_apu',
+    description: 'Delegate advanced web intelligence & multi-engine search tasks to Apu',
+    fromAgent: 'cleo-supervisor',
+    toAgent: 'apu-research',
+    condition: 'research_task OR web_intel OR competitive_analysis OR market_research'
   }
 ]
 
@@ -728,7 +803,8 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
  */
 export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
   supervisorAgent: CLEO_AGENT,
-  specialistAgents: [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT],
+  specialistAgents: [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT],
+  // Apu will be appended later after its definition
   handoffTools: HANDOFF_TOOLS,
   stateGraph: {
     nodes: [
@@ -773,7 +849,8 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
       { from: 'toby-technical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'ami-creative', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'peter-logical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
-      { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' }
+  { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
+  { from: 'apu-research', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' }
     ],
     startNode: 'cleo-supervisor',
     endNodes: [] // Handled by LangGraph's END node
@@ -788,7 +865,7 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
  * Get all available agents in the system
  */
 export function getAllAgents(): AgentConfig[] {
-  return [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT]
+  return [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
 }
 
 /**
@@ -816,7 +893,7 @@ export function getSupervisorAgent(): AgentConfig {
  * Get all specialist agents
  */
 export function getSpecialistAgents(): AgentConfig[] {
-  return [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT]
+  return [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
 }
 
 /**

@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
 import { ShopifyCredentialsManager, SkyvernCredentialsManager } from '@/components/common/CredentialsManager'
+import dynamic from 'next/dynamic'
+const SerpapiCredentialsManager = dynamic(()=>import('@/components/serpapi/serpapi-credentials-manager').then(m=>m.SerpapiCredentialsManager), { ssr:false })
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { PlusIcon, RobotIcon } from '@phosphor-icons/react'
 
@@ -73,6 +75,9 @@ export default function AgentsManagePage() {
 
             {/* Skyvern Credentials for Wex */}
             <SkyvernCredentialsManager />
+
+            {/* SerpAPI Credentials for Apu */}
+            <SerpapiCredentialsManager />
           </div>
         </motion.div>
 

@@ -97,6 +97,38 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 		steps: []
 	}
 
+	// Track tool calls during execution
+	const toolCallsUsed: Array<{ id: string; name: string; args: any; result?: any; error?: string }> = []
+	
+	// Set up tool event listeners for this execution
+	const toolExecutingListener = (event: any) => {
+		if (event.executionId === executionId || event.agentId === exec.agentId) {
+			console.log('🔧 [DEBUG] Tool executing:', event.toolName)
+			const toolCall = {
+				id: event.callId || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+				name: event.toolName,
+				args: event.args || {},
+			}
+			toolCallsUsed.push(toolCall)
+		}
+	}
+	
+	const toolCompletedListener = (event: any) => {
+		if (event.executionId === executionId || event.agentId === exec.agentId) {
+			console.log('✅ [DEBUG] Tool completed:', event.toolName, 'result preview:', String(event.result || '').slice(0, 100))
+			// Update the corresponding tool call with result
+			const toolCall = toolCallsUsed.find(tc => tc.id === event.callId || tc.name === event.toolName)
+			if (toolCall) {
+				toolCall.result = event.result
+				toolCall.error = event.error
+			}
+		}
+	}
+	
+	// Add listeners
+	core.on('tool.executing', toolExecutingListener)
+	core.on('tool.completed', toolCompletedListener)
+
 	const target = getAllAgents().find(a => a.id === (agentId || 'cleo-supervisor')) || getAllAgents().find(a => a.id === 'cleo-supervisor')!
 
 	const ctx: ExecutionContext = {
@@ -108,12 +140,14 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 	}
 
 	// Run via core orchestrator (includes routing/delegation)
-	console.log('🔍 [DEBUG] About to call core.executeAgent with timeout 60000ms')
+	// Research agents like Apu need more time for search + analysis
+	const timeoutMs = target.id === 'apu-research' ? 180000 : 90000 // Increased timeout for all agents
+	console.log(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs}ms for agent ${target.id}`)
 	
 	// Add timeout wrapper to prevent hanging
-	const executionPromise = core.executeAgent(target, ctx, { timeout: 60000 })
+	const executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs })
 	const timeoutPromise = new Promise((_, reject) => {
-		setTimeout(() => reject(new Error('Execution timeout after 60 seconds')), 60000)
+		setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
 	})
 	
 	Promise.race([executionPromise, timeoutPromise]).then(res => {
@@ -139,8 +173,38 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 		})
 		
 		try {
-			exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(content), timestamp: new Date(), metadata: { sender: actualSender, source: 'core' } })
+			// Extract toolCalls from the result if available, or use captured tools
+			const resultToolCalls = (res && (res as any).toolCalls) ? (res as any).toolCalls.map((tc: any) => ({
+				id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+				name: tc.name || 'unknown',
+				args: tc.args || {},
+				result: tc.result,
+				error: tc.error
+			})) : []
+			
+			// Use captured tool calls if result doesn't have them
+			const finalToolCalls = resultToolCalls.length > 0 ? resultToolCalls : toolCallsUsed
+			
+			console.log('🔍 [DEBUG] Final toolCalls count:', finalToolCalls.length)
+			console.log('🔍 [DEBUG] Tool names used:', finalToolCalls.map((tc: any) => tc.name))
+			
+			exec.messages.push({ 
+				id: `${exec.id}_final`, 
+				type: 'ai', 
+				content: String(content), 
+				timestamp: new Date(), 
+				metadata: { sender: actualSender, source: 'core' },
+				toolCalls: finalToolCalls
+			})
+			
+			// Update metrics with tool call count
+			exec.metrics.toolCallsCount = finalToolCalls.length
+			
 			console.log('🔍 [DEBUG] Message pushed to exec.messages, count:', exec.messages.length)
+			
+			// Clean up listeners
+			core.off?.('tool.executing', toolExecutingListener)
+			core.off?.('tool.completed', toolCompletedListener)
 		} catch (pushError) {
 			console.error('🔍 [DEBUG] Error pushing message:', pushError)
 		}
@@ -153,9 +217,59 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 		}
 	}).catch(err => {
 		console.log('🔍 [DEBUG] core.executeAgent rejected or timed out:', err)
+		
+		// For timeout errors, try to capture any partial results
+		if (err.message.includes('timeout')) {
+			console.log('🔍 [DEBUG] Timeout detected, attempting to capture partial results')
+			
+			// Check if we have any tool calls captured during execution
+			if (toolCallsUsed.length > 0) {
+				console.log('🔍 [DEBUG] Found partial results from', toolCallsUsed.length, 'tool calls')
+				
+				exec.status = 'completed' // Mark as completed since we have partial results
+				exec.endTime = new Date()
+				exec.messages = exec.messages || []
+				
+				// Create a summary message with available tool results
+				const partialContent = `He realizado una investigación parcial con los resultados disponibles. Se ejecutaron ${toolCallsUsed.length} herramientas de investigación.`
+				
+				try {
+					exec.messages.push({ 
+						id: `${exec.id}_partial`, 
+						type: 'ai', 
+						content: partialContent, 
+						timestamp: new Date(), 
+						metadata: { sender: target.id, source: 'partial_timeout', partial: true },
+						toolCalls: toolCallsUsed
+					})
+					
+					exec.metrics.toolCallsCount = toolCallsUsed.length
+					
+					console.log('🔍 [DEBUG] Partial results saved, tool calls:', toolCallsUsed.length)
+					
+					// Notify listeners of successful completion with partial results
+					listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id, partial: true } }))
+					
+					// Clean up listeners
+					core.off?.('tool.executing', toolExecutingListener)
+					core.off?.('tool.completed', toolCompletedListener)
+					
+					return // Exit early since we handled the timeout gracefully
+				} catch (partialError) {
+					console.error('🔍 [DEBUG] Error saving partial results:', partialError)
+				}
+			}
+		}
+		
+		// Default error handling for non-timeout errors or when partial results failed
 		exec.status = 'failed'
 		exec.endTime = new Date()
 		exec.error = err instanceof Error ? err.message : String(err)
+		
+		// Clean up listeners on error too
+		core.off?.('tool.executing', toolExecutingListener)
+		core.off?.('tool.completed', toolCompletedListener)
+		
 		listeners.forEach(fn => fn({ type: 'error', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id, error: exec.error } }))
 	})
 

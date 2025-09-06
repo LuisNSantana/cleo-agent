@@ -9,6 +9,8 @@ import { memoryAddNoteTool } from './memory';
 import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail';
 import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool, shopifyUpdateProductPriceTool } from './shopify';
 import { skyvernTools, addSkyvernCredentialsTool, testSkyvernConnectionTool, createSkyvernTaskTool, getSkyvernTaskTool, takeSkyvernScreenshotTool, listSkyvernTasksTool } from '../skyvern';
+import { serpapiTools, serpGeneralSearchTool, serpNewsSearchTool, serpScholarSearchTool, serpAutocompleteTool, serpLocationSearchTool, serpRawTool, serpapiCredentialTools } from '@/lib/serpapi/tools'
+import { delegationTools, delegateToTobyTool, delegateToAmiTool, delegateToPeterTool, delegateToEmmaTool, delegateToApuTool } from './delegation';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -320,6 +322,13 @@ export const tools = {
   // Task Management
   complete_task: completeTaskTool,
 
+  // Agent Delegation Tools
+  delegate_to_toby: delegateToTobyTool,
+  delegate_to_ami: delegateToAmiTool,
+  delegate_to_peter: delegateToPeterTool,
+  delegate_to_emma: delegateToEmmaTool,
+  delegate_to_apu: delegateToApuTool,
+
   // Document Tools
   createDocument: createDocumentTool,
   openDocument: openDocumentTool,
@@ -360,6 +369,26 @@ export const tools = {
   get_skyvern_task: getSkyvernTaskTool,
   take_skyvern_screenshot: takeSkyvernScreenshotTool,
   list_skyvern_tasks: listSkyvernTasksTool,
+
+  // SerpAPI / Apu Search Tools
+  serpGeneralSearch: serpGeneralSearchTool,
+  serpNewsSearch: serpNewsSearchTool,
+  serpScholarSearch: serpScholarSearchTool,
+  serpAutocomplete: serpAutocompleteTool,
+  serpLocationSearch: serpLocationSearchTool,
+  serpRaw: serpRawTool,
+  // (Credential helpers not auto-used by agents, available for UI / admin flows)
+  addSerpapiKey: serpapiCredentialTools.addSerpapiKey,
+  listSerpapiKeys: serpapiCredentialTools.listSerpapiKeys,
+  deleteSerpapiKey: serpapiCredentialTools.deleteSerpapiKey,
+  testSerpapiKey: serpapiCredentialTools.testSerpapiKey,
+
+  // Delegation Tools - Agent-to-Agent Task Handoffs
+  delegate_to_toby: delegateToTobyTool,
+  delegate_to_ami: delegateToAmiTool,
+  delegate_to_peter: delegateToPeterTool,
+  delegate_to_emma: delegateToEmmaTool,
+  delegate_to_apu: delegateToApuTool,
 };
 
 export type ToolName = keyof typeof tools;

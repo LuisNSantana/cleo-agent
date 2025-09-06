@@ -38,6 +38,7 @@ interface ChatMessage {
   isDelegated?: boolean
   delegatedFrom?: string | null
   metadata?: Record<string, any>
+  toolCalls?: Array<{ id: string; name: string; args: any; result?: any; error?: string }>
 }
 
 export default function AgentsChatPage() {
@@ -128,6 +129,7 @@ export default function AgentsChatPage() {
         agentId: sender?.id,
         agentName: sender?.name,
         metadata: (m.metadata as any) || {},
+        toolCalls: m.toolCalls || [], // Include toolCalls from execution
       }
     })
 
@@ -219,6 +221,7 @@ export default function AgentsChatPage() {
           isDelegated: m.metadata?.isDelegated || false,
           delegatedFrom: m.metadata?.delegatedFrom || null,
           metadata: m.metadata || {},
+          toolCalls: m.tool_calls || [], // Include toolCalls from database
         }))
         
         console.log('🔍 [CHAT DEBUG] Mapped messages:', mapped.map(m => ({
@@ -271,6 +274,7 @@ export default function AgentsChatPage() {
             isDelegated: m.metadata?.isDelegated || false,
             delegatedFrom: m.metadata?.delegatedFrom || null,
             metadata: m.metadata || {},
+            toolCalls: m.tool_calls || [], // Include toolCalls from database
           }))
           
           console.log('🔄 [CHAT DEBUG] Refreshed messages after execution completion:', mapped.length)
@@ -316,29 +320,199 @@ export default function AgentsChatPage() {
     }
   }
 
-  // Helper to render tool call chips for a message if present in currentExecution
-  const renderToolChips = (messageId: string) => {
+  // Helper to render tool call chips for a message
+  const renderToolChips = (messageId: string, message?: ChatMessage) => {
+    // Helper function to get tool icon, style, and display name
+    const getToolDisplay = (toolName: string) => {
+      const name = toolName.toLowerCase()
+      
+      // Delegation tools - Agent-specific styling with avatars
+      if (name === 'delegate_to_apu') {
+        return {
+          icon: '/img/agents/apu4.png',
+          bgColor: 'bg-purple-500/15',
+          borderColor: 'border-purple-400/30',
+          textColor: 'text-purple-200',
+          badgeColor: 'bg-purple-400/20',
+          displayName: '🔍 Delegado a Apu',
+          description: 'Investigación y Búsqueda Avanzada'
+        }
+      }
+      if (name === 'delegate_to_emma') {
+        return {
+          icon: '/img/agents/emma4.png',
+          bgColor: 'bg-pink-500/15',
+          borderColor: 'border-pink-400/30',
+          textColor: 'text-pink-200',
+          badgeColor: 'bg-pink-400/20',
+          displayName: '🛍️ Delegado a Emma',
+          description: 'E-commerce y Negocios'
+        }
+      }
+      if (name === 'delegate_to_toby') {
+        return {
+          icon: '/img/agents/toby4.png',
+          bgColor: 'bg-blue-500/15',
+          borderColor: 'border-blue-400/30',
+          textColor: 'text-blue-200',
+          badgeColor: 'bg-blue-400/20',
+          displayName: '⚡ Delegado a Toby',
+          description: 'Análisis Técnico y Datos'
+        }
+      }
+      if (name === 'delegate_to_ami') {
+        return {
+          icon: '/img/agents/ami4.png',
+          bgColor: 'bg-orange-500/15',
+          borderColor: 'border-orange-400/30',
+          textColor: 'text-orange-200',
+          badgeColor: 'bg-orange-400/20',
+          displayName: '🎨 Delegado a Ami',
+          description: 'Creatividad y Diseño'
+        }
+      }
+      if (name === 'delegate_to_peter') {
+        return {
+          icon: '/img/agents/peter4.png',
+          bgColor: 'bg-green-500/15',
+          borderColor: 'border-green-400/30',
+          textColor: 'text-green-200',
+          badgeColor: 'bg-green-400/20',
+          displayName: '🧮 Delegado a Peter',
+          description: 'Lógica y Matemáticas'
+        }
+      }
+      
+      // SerpAPI/Google search tools
+      if (name.includes('serp') || name.includes('google') || name.includes('search')) {
+        return {
+          icon: '/img/google-icon.png',
+          bgColor: 'bg-blue-500/15',
+          borderColor: 'border-blue-400/30',
+          textColor: 'text-blue-200',
+          badgeColor: 'bg-blue-400/20',
+          displayName: name.includes('news') ? '📰 News Search' : 
+                      name.includes('scholar') ? '🎓 Scholar Search' :
+                      name.includes('location') ? '📍 Location Search' : '🔍 Web Search',
+          description: 'Google-powered search'
+        }
+      }
+      
+      // Other tools with better names
+      if (name === 'getcurrentdatetime') {
+        return {
+          icon: null,
+          bgColor: 'bg-slate-500/15',
+          borderColor: 'border-slate-400/30',
+          textColor: 'text-slate-200',
+          badgeColor: 'bg-slate-400/20',
+          displayName: '🕐 Current Time',
+          description: 'Date & time information'
+        }
+      }
+      
+      if (name === 'weatherinfo') {
+        return {
+          icon: null,
+          bgColor: 'bg-sky-500/15',
+          borderColor: 'border-sky-400/30',
+          textColor: 'text-sky-200',
+          badgeColor: 'bg-sky-400/20',
+          displayName: '🌤️ Weather Info',
+          description: 'Weather conditions'
+        }
+      }
+      
+      // Default tool style
+      return {
+        icon: null,
+        bgColor: 'bg-amber-500/15',
+        borderColor: 'border-amber-400/30',
+        textColor: 'text-amber-200',
+        badgeColor: 'bg-amber-400/20',
+        displayName: toolName.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2'),
+        description: 'System tool'
+      }
+    }
+
+    // First try to get toolCalls from the message directly (for historical messages)
+    if (message && message.toolCalls && message.toolCalls.length > 0) {
+      return (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {message.toolCalls.map((tc, idx) => {
+            const key = `${messageId}_tool_${idx}`
+            const open = !!expandedTools[key]
+            const display = getToolDisplay(tc.name)
+            return (
+              <div key={key} className={`group relative inline-flex items-center gap-2 rounded-lg border ${display.borderColor} ${display.bgColor} ${display.textColor} px-3 py-1.5 text-[11px] shadow-sm transition-all hover:shadow-md`}>
+                <div className="flex items-center gap-1.5">
+                  {display.icon && (
+                    <img src={display.icon} alt="" className="w-6 h-6 rounded-full opacity-90" />
+                  )}
+                  <span className={`inline-block ${display.badgeColor} rounded-full px-2 py-0.5 text-[9px] uppercase font-medium tracking-wide`}>
+                    tool
+                  </span>
+                </div>
+                <span className="font-medium">{tc.name}</span>
+                {tc.args && Object.keys(tc.args).length > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={`h-5 px-2 ${display.textColor} hover:${display.textColor.replace('200', '100')} transition-colors`} 
+                    onClick={() => setExpandedTools((prev) => ({ ...prev, [key]: !open }))}
+                  >
+                    <span className="text-[10px]">{open ? '▼' : '▶'}</span>
+                  </Button>
+                )}
+                {open && (
+                  <div className="absolute top-full left-0 z-10 mt-1 w-80 text-[10px] bg-slate-900/95 border border-slate-700 rounded-lg p-3 text-slate-300 shadow-lg backdrop-blur-sm">
+                    <div className="font-medium text-slate-200 mb-2">Tool Arguments:</div>
+                    <pre className="whitespace-pre-wrap break-words overflow-auto max-h-40">{JSON.stringify(tc.args, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+    
+    // Fallback to currentExecution for newly executed messages
     const exec = currentExecution
     if (!exec || !exec.messages) return null
     const m = exec.messages.find((mm) => mm.id === messageId)
     if (!m || !m.toolCalls || m.toolCalls.length === 0) return null
     return (
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap gap-2">
         {m.toolCalls.map((tc, idx) => {
           const key = `${messageId}_tool_${idx}`
           const open = !!expandedTools[key]
+          const display = getToolDisplay(tc.name)
           return (
-            <div key={key} className="group inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/15 text-amber-200 px-2 py-1 text-[11px]">
-              <span className="inline-block bg-amber-400/20 rounded-full px-1.5 py-0.5 text-[10px]">tool</span>
+            <div key={key} className={`group relative inline-flex items-center gap-2 rounded-lg border ${display.borderColor} ${display.bgColor} ${display.textColor} px-3 py-1.5 text-[11px] shadow-sm transition-all hover:shadow-md`}>
+              <div className="flex items-center gap-1.5">
+                {display.icon && (
+                  <img src={display.icon} alt="" className="w-6 h-6 rounded-full opacity-90" />
+                )}
+                <span className={`inline-block ${display.badgeColor} rounded-full px-2 py-0.5 text-[9px] uppercase font-medium tracking-wide`}>
+                  tool
+                </span>
+              </div>
               <span className="font-medium">{tc.name}</span>
               {tc.args && Object.keys(tc.args).length > 0 && (
-                <Button variant="ghost" size="sm" className="h-5 px-1 text-amber-200 hover:text-amber-100" onClick={() => setExpandedTools((prev) => ({ ...prev, [key]: !open }))}>
-                  {open ? 'hide' : 'view'}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`h-5 px-2 ${display.textColor} hover:${display.textColor.replace('200', '100')} transition-colors`} 
+                  onClick={() => setExpandedTools((prev) => ({ ...prev, [key]: !open }))}
+                >
+                  <span className="text-[10px]">{open ? '▼' : '▶'}</span>
                 </Button>
               )}
               {open && (
-                <div className="w-full mt-1 text-[10px] bg-slate-900/70 border border-slate-700 rounded-md p-2 text-slate-300">
-                  <pre className="whitespace-pre-wrap break-words">{JSON.stringify(tc.args, null, 2)}</pre>
+                <div className="absolute top-full left-0 z-10 mt-1 w-80 text-[10px] bg-slate-900/95 border border-slate-700 rounded-lg p-3 text-slate-300 shadow-lg backdrop-blur-sm">
+                  <div className="font-medium text-slate-200 mb-2">Tool Arguments:</div>
+                  <pre className="whitespace-pre-wrap break-words overflow-auto max-h-40">{JSON.stringify(tc.args, null, 2)}</pre>
                 </div>
               )}
             </div>
@@ -440,25 +614,29 @@ export default function AgentsChatPage() {
   const getAgentIcon = (agent: AgentConfig) => {
     switch (agent.icon) {
       case 'brain':
-        return <BrainIcon className="w-5 h-5" />
+        return <BrainIcon className="w-6 h-6" />
       case 'lightning':
-        return <LightningIcon className="w-5 h-5" />
+        return <LightningIcon className="w-6 h-6" />
       case 'heart':
-        return <HeartIcon className="w-5 h-5" />
+        return <HeartIcon className="w-6 h-6" />
       default:
-        return <RobotIcon className="w-5 h-5" />
+        return <RobotIcon className="w-6 h-6" />
     }
   }
 
   const getAgentAvatar = (agent: AgentConfig) => {
+    // Prefer explicit avatar from config when available
+    if (agent.avatar) return agent.avatar
     // Map common agent names to avatars in public/img/agents
     const key = agent.name?.toLowerCase()
+    if (key?.includes('user message')) return null // No avatar for user message, use icon instead
     if (key?.includes('toby')) return '/img/agents/toby4.png'
     if (key?.includes('ami')) return '/img/agents/ami4.png'
     if (key?.includes('peter')) return '/img/agents/peter4.png'
     if (key?.includes('cleo')) return '/img/agents/logocleo4.png'
     if (key?.includes('emma')) return '/img/agents/emma4.png'
     if (key?.includes('wex')) return '/img/agents/wex4.png'
+    if (key?.includes('apu')) return '/img/agents/apu4.png'
     return null
   }
 
@@ -547,7 +725,7 @@ export default function AgentsChatPage() {
             <Card className="h-full bg-slate-800/50 border-slate-700/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <RobotIcon className="w-5 h-5" />
+                  <RobotIcon className="w-6 h-6" />
                   Available Agents
                 </CardTitle>
               </CardHeader>
@@ -828,7 +1006,7 @@ export default function AgentsChatPage() {
                                   {message.timestamp.toLocaleTimeString()}
                                 </p>
                                 {/* Tools used for this message (if any) */}
-                                {renderToolChips(message.id)}
+                                {renderToolChips(message.id, message)}
                               </div>
                             </motion.div>
                           )
