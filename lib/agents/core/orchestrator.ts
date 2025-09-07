@@ -13,6 +13,7 @@ import { EventEmitter } from './event-emitter'
 import { globalErrorHandler, AgentErrorHandler } from './error-handler'
 import { MemoryManager } from './memory-manager'
 import { MetricsCollector } from './metrics-collector'
+import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgents } from '../config'
 
 export interface OrchestratorConfig {
@@ -64,6 +65,7 @@ export class AgentOrchestrator {
   private errorHandler: AgentErrorHandler = globalErrorHandler
   private memoryManager?: MemoryManager
   private metricsCollector?: MetricsCollector
+  private subAgentManager!: SubAgentManager
   private config: OrchestratorConfig
 
   private graphs = new Map<string, StateGraph<AgentState>>()
@@ -94,6 +96,7 @@ export class AgentOrchestrator {
     this.eventEmitter = new EventEmitter()
     this.errorHandler = globalErrorHandler
     this.modelFactory = new ModelFactory()
+    this.subAgentManager = new SubAgentManager('default-user', this.eventEmitter)
     this.executionManager = new ExecutionManager({
       eventEmitter: this.eventEmitter,
       errorHandler: this.errorHandler
@@ -132,6 +135,12 @@ export class AgentOrchestrator {
     this.eventEmitter.on('execution.failed', (execution: AgentExecution) => {
       this.activeExecutions.delete(execution.id)
       this.metricsCollector?.recordExecutionFailure(execution)
+    })
+
+    // Delegation events - handle multi-agent handoffs
+    this.eventEmitter.on('delegation.requested', async (delegationData: any) => {
+      console.log('🔄 [ORCHESTRATOR] Delegation requested:', delegationData)
+      await this.handleDelegation(delegationData)
     })
 
     // Memory management events
@@ -175,7 +184,15 @@ export class AgentOrchestrator {
     }
 
     try {
-      const graph = await this.graphBuilder.buildGraph(agentConfig)
+  // Ensure sub-agent manager is initialized (loads cache and registers tools)
+  await this.subAgentManager.initialize()
+
+  // Dynamically include sub-agent delegation tools for this agent (if any)
+  const subAgentTools = Object.keys(this.subAgentManager.getDelegationTools(agentConfig.id) || {})
+  const uniqueTools = Array.from(new Set([...(agentConfig.tools || []), ...subAgentTools]))
+  const effectiveAgentConfig = { ...agentConfig, tools: uniqueTools }
+
+  const graph = await this.graphBuilder.buildGraph(effectiveAgentConfig)
       this.graphs.set(agentConfig.id, graph)
       
       this.eventEmitter.emit('agent.initialized', {
@@ -183,7 +200,7 @@ export class AgentOrchestrator {
         agentName: agentConfig.name
       })
 
-      console.log(`[Orchestrator] Initialized agent: ${agentConfig.name} (${agentConfig.id})`)
+  console.log(`[Orchestrator] Initialized agent: ${agentConfig.name} (${agentConfig.id}) with tools: ${uniqueTools.join(', ')}`)
     } catch (error) {
       this.errorHandler.recordError(error as Error)
       throw new Error(`Failed to initialize agent ${agentConfig.id}: ${error}`)
@@ -323,42 +340,6 @@ export class AgentOrchestrator {
    */
 
   /**
-   * Select best agent based on message content (simplified routing logic)
-   */
-  private selectBestAgent(message: string, agents: AgentConfig[]): AgentConfig | null {
-    const keywords = {
-      'emma-ecommerce': ['shopify', 'ecommerce', 'sales', 'products', 'orders', 'store', 'inventory', 'analytics', 'customers'],
-      'toby-technical': ['technical', 'programming', 'code', 'debug', 'api', 'database', 'server', 'development'],
-      'ami-creative': ['creative', 'design', 'content', 'art', 'brainstorm', 'innovation', 'marketing', 'brand'],
-      'peter-logical': ['logic', 'math', 'calculate', 'problem', 'solve', 'algorithm', 'structured', 'optimization'],
-      'apu-research': ['search', 'find', 'information', 'research', 'news', 'stock', 'market', 'price', 'analysis', 'data', 'report', 'tesla', 'company', 'google', 'web', 'internet', 'investigate', 'explore', 'discover', 'busca', 'información']
-    }
-
-    let bestAgent: AgentConfig | null = null
-    let bestScore = 0
-
-    for (const agent of agents) {
-      const agentKeywords = keywords[agent.id as keyof typeof keywords] || []
-      let score = 0
-
-      for (const keyword of agentKeywords) {
-        if (message.includes(keyword)) {
-          score++
-        }
-      }
-
-      console.log(`[Core Router] Agent ${agent.id} scored ${score}`)
-
-      if (score > bestScore) {
-        bestScore = score
-        bestAgent = agent
-      }
-    }
-
-    return bestScore > 0 ? bestAgent : null
-  }
-
-  /**
    * Prepare execution context with memory management
    */
   private async prepareExecutionContext(context: ExecutionContext): Promise<ExecutionContext> {
@@ -479,6 +460,208 @@ export class AgentOrchestrator {
     this.eventEmitter.removeAllListeners()
 
     console.log('[Orchestrator] Shutdown complete')
+  }
+
+  /**
+   * Get the sub-agent manager instance
+   */
+  getSubAgentManager(): SubAgentManager {
+    return this.subAgentManager
+  }
+
+  /**
+   * Create a new sub-agent for a parent agent
+   */
+  async createSubAgent(
+    parentAgentId: string,
+    subAgentSpec: {
+      name: string
+      description: string
+      specialization: string
+      model?: string
+      temperature?: number
+      tools?: string[]
+      promptOverride?: string
+    },
+    createdBy: string = 'user'
+  ): Promise<SubAgent> {
+    const subAgentData = {
+      name: subAgentSpec.name,
+      description: subAgentSpec.description,
+      parentAgentId,
+      systemPrompt: subAgentSpec.promptOverride || `You are a specialized sub-agent for ${subAgentSpec.specialization}. ${subAgentSpec.description}`,
+      model: subAgentSpec.model,
+      config: {
+        specialization: subAgentSpec.specialization,
+        temperature: subAgentSpec.temperature,
+        tools: subAgentSpec.tools,
+        createdBy
+      }
+    }
+    
+    return await this.subAgentManager.createSubAgent(subAgentData)
+  }
+
+  /**
+   * Get all sub-agents for a parent agent
+   */
+  async getSubAgents(parentAgentId: string): Promise<SubAgent[]> {
+    return await this.subAgentManager.getSubAgents(parentAgentId)
+  }
+
+  /**
+   * Delete a sub-agent
+   */
+  async deleteSubAgent(subAgentId: string): Promise<boolean> {
+    return await this.subAgentManager.deleteSubAgent(subAgentId)
+  }
+
+  /**
+   * Update a sub-agent
+   */
+  async updateSubAgent(
+    subAgentId: string,
+    updates: Partial<{
+      name: string
+      description: string
+      specialization: string
+      model: string
+      temperature: number
+      tools: string[]
+      promptOverride: string
+    }>
+  ): Promise<boolean> {
+    return await this.subAgentManager.updateSubAgent(subAgentId, updates)
+  }
+
+  /**
+   * Handle delegation requests from agents
+   */
+  private async handleDelegation(delegationData: any): Promise<void> {
+    try {
+      console.log(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
+      console.log(`📋 [DELEGATION] Task: ${delegationData.task}`)
+      const normalizedPriority: 'low' | 'normal' | 'high' =
+        delegationData.priority === 'medium' ? 'normal' : (delegationData.priority || 'normal')
+      
+      // First, check if target is a sub-agent
+      let targetAgentConfig: AgentConfig | SubAgent | null | undefined = await this.subAgentManager.getSubAgent(delegationData.targetAgent)
+      let isSubAgent = false
+      
+      // If not a sub-agent, look in main agents
+      if (!targetAgentConfig) {
+        const allAgents = getAllAgents()
+        targetAgentConfig = allAgents.find(agent => agent.id === delegationData.targetAgent)
+        isSubAgent = false
+      } else {
+        isSubAgent = true
+      }
+      
+      if (!targetAgentConfig) {
+        console.error(`❌ [DELEGATION] Target agent not found: ${delegationData.targetAgent}`)
+        this.eventEmitter.emit('delegation.failed', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          error: `Agent ${delegationData.targetAgent} not found`
+        })
+        return
+      }
+      
+      console.log(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
+      
+      // Create execution context for delegated task
+      const delegationContext: ExecutionContext = {
+        threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId: 'system_delegation',
+        agentId: delegationData.targetAgent,
+        messageHistory: [
+          new SystemMessage({
+            content: `You have been delegated a task by ${delegationData.sourceAgent}. ${delegationData.context ? `Context: ${delegationData.context}` : ''}`
+          }),
+          new HumanMessage({
+            content: delegationData.task
+          })
+        ],
+        metadata: {
+          isDelegation: true,
+          sourceAgent: delegationData.sourceAgent,
+          delegationPriority: normalizedPriority,
+          isSubAgentDelegation: isSubAgent
+        }
+      }
+      
+      console.log(`🚀 [DELEGATION] Executing ${targetAgentConfig.name} with delegated task`)
+      
+      let delegationResult: ExecutionResult
+
+      if (isSubAgent && 'isSubAgent' in targetAgentConfig) {
+        // Execute sub-agent as a real agent by mapping to AgentConfig
+        console.log(`📋 [SUB-AGENT] Delegating to sub-agent: ${targetAgentConfig.name}`)
+
+        const sub = targetAgentConfig as SubAgent
+        // Build a minimal AgentConfig from SubAgent record
+        const subAgentConfig: AgentConfig = {
+          id: sub.id,
+          name: sub.name,
+          description: sub.description,
+          role: 'worker',
+          model: sub.model || 'gpt-4o-mini',
+          temperature: typeof sub.temperature === 'number' ? sub.temperature : 0.7,
+          maxTokens: typeof sub.maxTokens === 'number' ? sub.maxTokens : 4096,
+          // Prefer explicit tools from subAgentConfig if present, else none (safe default)
+          tools: Array.isArray(sub.subAgentConfig?.tools) ? sub.subAgentConfig.tools : [],
+          prompt: sub.systemPrompt || `You are a specialized sub-agent named ${sub.name}.` ,
+          color: '#64748B',
+          icon: 'SparklesIcon',
+          avatar: undefined,
+          isSubAgent: true,
+          parentAgentId: sub.parentAgentId,
+          tags: Array.isArray(sub.subAgentConfig?.tags) ? sub.subAgentConfig.tags : undefined
+        }
+
+        // Ensure graph exists and execute
+        await this.initializeAgent(subAgentConfig)
+        delegationResult = await this.executeAgent(
+          subAgentConfig,
+          delegationContext,
+          {
+            timeout: 30000,
+            priority: normalizedPriority
+          }
+        )
+      } else {
+        // Execute regular agent with delegated task
+        delegationResult = await this.executeAgent(
+          targetAgentConfig as AgentConfig,
+          delegationContext,
+          {
+            timeout: 30000, // 30 seconds timeout for delegated tasks
+            priority: normalizedPriority
+          }
+        )
+      }
+      
+      console.log(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
+      
+      // Emit delegation completed event with result
+      this.eventEmitter.emit('delegation.completed', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        status: 'completed',
+        result: delegationResult.content,
+        executionTime: delegationResult.executionTime,
+        tokensUsed: delegationResult.tokensUsed,
+        isSubAgentDelegation: isSubAgent
+      })
+      
+    } catch (error) {
+      console.error('❌ [DELEGATION] Error handling delegation:', error)
+      this.eventEmitter.emit('delegation.failed', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
 }
 

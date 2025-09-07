@@ -398,6 +398,59 @@ Flujo:
 5. Peter llama complete_task, Cleo entrega análisis final
 ```
 
+---
+
+## 11) Delegación y Sub‑Agentes (Ejecución Real)
+
+Esta versión integra delegación real entre agentes y sus sub‑agentes, alineada con patrones de LangGraph (herramientas de handoff + supervisor opcional):
+
+- Registro dinámico de herramientas de delegación: al crear un sub‑agente, se registra en runtime una tool con nombre `delegate_to_{subAgentId}`. Implementación: ver `ensureDelegationToolForAgent` en `lib/tools/index.ts`.
+- Exposición automática en API: el endpoint `GET /api/agents` agrega al agente padre las herramientas `delegate_to_*` de todos sus sub‑agentes activos e incluye `delegationToolName` en cada sub‑agente.
+- Detección de handoff en el grafo: cuando un agente llama la tool de delegación, el GraphBuilder detecta `{ status: 'delegated', nextAction: 'handoff_to_agent', agentId: ... }` y emite el evento de delegación.
+- Orquestación con ejecución real: el Orchestrator resuelve el `agentId` destino, construye su `AgentConfig` y ejecuta el sub‑agente realmente (no simulado). El resultado se incorpora al hilo y se propaga de regreso al agente fuente.
+- Modo dual compatible: la delegación funciona tanto en modo directo (padre → sub‑agente) como bajo supervisión (Cleo → agente → sub‑agente → agente → Cleo).
+
+Resumen de flujo real:
+1) Agente padre ejecuta `delegate_to_{subAgentId}` → 2) Graph detecta handoff → 3) Orchestrator ejecuta sub‑agente → 4) Sub‑agente resuelve y finaliza → 5) Resultado vuelve al agente padre → 6) Respuesta final al usuario (o a Cleo si hay supervisión).
+
+### Cómo un agente “sabe” que puede delegar
+- Si un agente tiene sub‑agentes activos, su lista de herramientas incluirá entradas `delegate_to_*` (inyectadas por la API y registradas en runtime).
+- Cada sub‑agente expone `delegationToolName` para trazabilidad y UI.
+- Los prompts de agentes recomiendan delegar tareas que mejor resuelva un sub‑especialista.
+
+---
+
+## 12) Pruebas Rápidas (UI y REST)
+
+### UI (modo directo o supervisado)
+1) Crea o verifica un sub‑agente para un agente padre (desde el panel de agentes).
+2) Abre chat con el agente padre (p. ej., Toby). Activa o no el toggle “Force Cleo Supervision” según quieras probar directo o supervisado.
+3) Envía una instrucción que sugiera delegación, por ejemplo: “Usa tu sub‑agente de análisis para revisar esta tabla y dame hallazgos”.
+4) Espera ver un mensaje de handoff y luego la respuesta del sub‑agente integrada en la conversación.
+
+Sugerencia: Para forzar la ruta, indica explícitamente “usa la herramienta delegate_to_{SUB_AGENT_ID} con la tarea X…”.
+
+### REST (POST /api/agents/execute)
+Ejemplo mínimo para ejecutar con un agente padre y disparar delegación:
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "toby-technical",
+    "input": "Usa la herramienta delegate_to_SUBID con la tarea: analiza esta lista de métricas y resume hallazgos",
+    "forceSupervised": false
+  }' \
+  http://localhost:3000/api/agents/execute
+```
+
+Respuesta esperada (resumen):
+- Paso de handoff detectado → ejecución del sub‑agente → respuesta agregada al hilo → mensaje final al usuario.
+
+Verificación adicional:
+- `GET /api/agents` debe mostrar en el agente padre las tools `delegate_to_*` y cada sub‑agente con su `delegationToolName`.
+
+
 ### Optimización E-commerce:
 ```
 Usuario: "Analiza mis ventas de Shopify y sugiere mejoras para aumentar conversiones"

@@ -1,6 +1,21 @@
 /**
  * Client Agent Store
- * Zustand store for client-side agent management without LangGraph dependencies
+ * Zustand   // Actions
+  initializeAgents: () => Promise<void>
+  syncAgents: () => Promise<void>
+  executeAgent: (input: string, agentId?: string, forceSupervised?: boolean) => Promise<void>
+  // Thread mapping per agent to keep conversation context across confirms
+  _agentThreadMap?: Record<string, string>
+  // Map execution id -> thread id used for that run (to persist final message reliably)
+  _executionThreadMap?: Record<string, string>
+  // Track which executions have already posted their final assistant message
+  _finalPosted?: Record<string, boolean>
+  selectAgent: (agent: AgentConfig | null) => void
+  updateGraphData: () => void
+  clearError: () => void
+  addAgent: (agent: AgentConfig) => void
+  updateAgent: (id: string, updates: Partial<AgentConfig>) => void
+  deleteAgent: (id: string) => voidnt-side agent management without LangGraph dependencies
  */
 
 import { create } from 'zustand'
@@ -19,6 +34,7 @@ import { getAllAgents } from './config'
 interface ClientAgentStore {
   // State
   agents: AgentConfig[]
+  parentCandidates: Array<{ id: string; name: string; isDefault?: boolean }>
   executions: AgentExecution[]
   currentExecution: AgentExecution | null
   selectedAgent: AgentConfig | null
@@ -54,6 +70,8 @@ interface ClientAgentStore {
   pollExecutionStatus: (executionId: string) => Promise<void>
   persistFinalAssistantMessage: (execution: AgentExecution) => Promise<void>
   addAgent: (agent: AgentConfig) => void
+  updateAgent: (id: string, updates: Partial<AgentConfig>) => void
+  deleteAgent: (id: string) => void
   addDelegationEvent: (event: any) => void
   resetGraph: () => void
   // Graph layout persistence
@@ -66,6 +84,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
   subscribeWithSelector((set, get) => ({
     // Initial state
     agents: [],
+  parentCandidates: [],
     executions: [],
     currentExecution: null,
     selectedAgent: null,
@@ -88,14 +107,16 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
     // Actions
     initializeAgents: async () => {
-      // Start with built-ins, then merge with server runtime agents
-      const builtIns = getAllAgents()
-      set({ agents: builtIns })
+      // Load from server first; only fall back to built-ins if the sync fails
+      set({ agents: [], isLoading: true })
       try {
         await get().syncAgents()
       } catch (e) {
-        // keep built-ins if sync fails
+        const builtIns = getAllAgents()
+        set({ agents: builtIns })
+      } finally {
         get().updateGraphData()
+        set({ isLoading: false })
       }
     },
 
@@ -108,16 +129,50 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       }
 
       try {
-        const res = await fetch('/api/agents/sync', { method: 'GET', credentials: 'same-origin' })
+        const res = await fetch('/api/agents', { method: 'GET', credentials: 'same-origin' })
         if (!res.ok) throw new Error('Failed to fetch agents from server')
-        const data = await res.json()
-        const builtIns = getAllAgents()
-        const runtime = (data.agents || []).filter((a: AgentConfig) => /^custom_\d+$/.test(a.id))
-        const merged: AgentConfig[] = [...builtIns, ...runtime]
-        set({ agents: merged })
+        const payload = await res.json()
+        // Support both shapes: array or { agents: [...] }
+        const list = Array.isArray(payload) ? payload : (payload?.agents || [])
+        const parentCandidates = Array.isArray(payload?.parentCandidates) ? payload.parentCandidates : []
+
+        // Map API to AgentConfig (preserving sub-agent hints)
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+        let agents: AgentConfig[] = list.map((agent: any) => ({
+          id: agent.id,
+          name: agent.name,
+          description: agent.description,
+          role: (agent.role ?? agent.agent_role) as any,
+          model: agent.model,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens ?? agent.max_tokens,
+          color: agent.color,
+          icon: agent.icon,
+          tags: agent.tags || [],
+          prompt: agent.prompt ?? agent.system_prompt,
+          tools: agent.tools || [],
+          isDefault: agent.isDefault ?? agent.is_default,
+          priority: agent.priority,
+          createdAt: agent.createdAt ?? agent.created_at,
+          updatedAt: agent.updatedAt ?? agent.updated_at,
+          parentAgentId: (isUUID(agent.parent_agent_id) ? agent.parent_agent_id : (isUUID(agent.parentAgentId) ? agent.parentAgentId : '')) || '',
+          isSubAgent: agent.isSubAgent ?? agent.is_sub_agent ?? false
+        }))
+
+        // DB is the source of truth; do not merge built-ins to avoid duplicates and hardcoded defaults
+        // If API returned no agents (empty account), keep array empty and let initializer/migrations populate defaults
+        if (!agents || agents.length === 0) {
+          console.info('No agents returned from API; waiting for DB seeding/migrations')
+        }
+
+        console.log('📋 Synced agents from database:', agents.length)
+        set({ agents, parentCandidates })
         get().updateGraphData()
       } catch (err) {
-        console.warn('Agent sync failed, showing built-ins only:', err)
+        console.warn('Agent sync failed:', err)
+        // Fallback to built-ins only if API fails
+        const builtIns = getAllAgents()
+  set({ agents: builtIns, parentCandidates: [] })
         get().updateGraphData()
       }
     },
@@ -231,8 +286,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         }
       }
       
-      // Create nodes from agents
-      const nodes: AgentNode[] = agents.map((agent, index) => {
+  // Create nodes from agents (skip supervisor: represented by Router node)
+  const visibleAgents = agents.filter(a => a.role !== 'supervisor')
+  const nodes: AgentNode[] = visibleAgents.map((agent, index) => {
         const sortedForAgent = executions
           .filter(e => e.agentId === agent.id)
           .sort((a, b) => new Date(b.startTime as any).getTime() - new Date(a.startTime as any).getTime())
@@ -269,8 +325,8 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       const edges: AgentEdge[] = []
       
       // Add static connections based on agent roles
-      const cleoAgent = agents.find(a => a.role === 'supervisor')
-      const specialists = agents.filter(a => a.role === 'specialist')
+  const cleoAgent = agents.find(a => a.role === 'supervisor')
+  const specialists = agents.filter(a => a.role === 'specialist')
       
       if (cleoAgent) {
         specialists.forEach(specialist => {
@@ -284,6 +340,20 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           })
         })
       }
+
+  // Add explicit parent → sub-agent relationships from DB (e.g., Emma → Sofi)
+      agents.forEach(child => {
+        if (child.isSubAgent && child.parentAgentId) {
+          edges.push({
+            id: `${child.parentAgentId}-${child.id}`,
+            source: child.parentAgentId,
+            target: child.id,
+            type: 'delegation',
+            animated: false,
+            label: 'sub-agent'
+          })
+        }
+      })
 
       // Update connections in nodes
       nodes.forEach(node => {
@@ -456,6 +526,27 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           cleo.tools = [...cleo.tools, toolName]
         }
       }
+    },
+
+    updateAgent: (id: string, updates: Partial<AgentConfig>) => {
+      set((state) => ({
+        agents: state.agents.map(agent => 
+          agent.id === id ? { ...agent, ...updates } : agent
+        )
+      }))
+      get().updateGraphData()
+    },
+
+    deleteAgent: (id: string) => {
+      set((state) => ({
+        agents: state.agents.filter(agent => agent.id !== id),
+        selectedAgent: state.selectedAgent?.id === id ? null : state.selectedAgent
+      }))
+      get().updateGraphData()
+      get().updateMetrics({
+        totalExecutions: get().executions.length,
+        activeAgents: get().agents.filter(a => a.role === 'supervisor' || a.role === 'specialist').length
+      })
     },
 
     addDelegationEvent: (event: any) => {

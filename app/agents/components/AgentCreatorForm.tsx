@@ -42,7 +42,14 @@ export function AgentCreatorForm() {
     'webSearch',
     'complete_task',
     'randomFact',
-    'calculator'
+    'calculator',
+    // SerpAPI Tools - Research & Search
+    'serpGeneralSearch',
+    'serpNewsSearch',
+    'serpScholarSearch',
+    'serpAutocomplete',
+    'serpLocationSearch',
+    'serpRaw'
   ]
 
   const cloneToby = () => {
@@ -180,7 +187,15 @@ export function AgentCreatorForm() {
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-medium">Máx Tokens</Label>
-            <Input type="number" value={form.maxTokens as any} onChange={(e) => setForm(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))} className="h-9" />
+            <Input 
+              type="number" 
+              value={form.maxTokens as any} 
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0
+                setForm(prev => ({ ...prev, maxTokens: value }))
+              }} 
+              className="h-9" 
+            />
           </div>
         </div>
 
@@ -243,7 +258,20 @@ export function AgentCreatorForm() {
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Clave para delegación</span>
             </div>
             <div className="flex gap-2">
-              <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="ej: analytics, search, technical" className="h-8" />
+              <Input 
+                value={tagInput} 
+                onChange={(e) => setTagInput(e.target.value)} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (!tagInput.trim()) return
+                    setForm(prev => ({ ...prev, tags: [...(prev.tags || []), tagInput.trim()] }))
+                    setTagInput('')
+                  }
+                }}
+                placeholder="ej: analytics, search, technical" 
+                className="h-8" 
+              />
               <Button size="sm" className="h-8" onClick={() => {
                 if (!tagInput.trim()) return
                 setForm(prev => ({ ...prev, tags: [...(prev.tags || []), tagInput.trim()] }))

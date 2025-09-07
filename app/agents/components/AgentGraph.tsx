@@ -390,20 +390,7 @@ export function AgentGraph({
   label: minimalMode ? undefined : 'responder'
     }
 
-    const entryEdge: Edge = {
-      id: 'cleo-to-router',
-      source: 'cleo-supervisor',
-      target: 'router-node',
-      type: 'handoff',
-      animated: Boolean(currentExecution?.status === 'running' && (!currentStep || ['analyzing','routing','thinking','delegating'].includes(currentStep.action as any))),
-  data: { minimal: minimalMode },
-      style: {
-        stroke: '#64748B',
-        strokeDasharray: '4 2',
-        strokeWidth: 2,
-      },
-  label: minimalMode ? undefined : 'mensaje'
-    }
+  // No entry edge from Cleo node: supervisor is represented by the Router node now
 
     // Finalize → Response edge (always visible)
   const respEdge: Edge = (() => {
@@ -434,7 +421,7 @@ export function AgentGraph({
       }
     })()
 
-    return [...baseEdges, entryEdge, ...routerEdges, ...finalizeEdges, directEdge, respEdge]
+  return [...baseEdges, ...routerEdges, ...finalizeEdges, directEdge, respEdge]
   }, [storeEdges, currentExecution, executions, storeNodes, minimalMode])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)

@@ -19,6 +19,9 @@ export interface AgentConfig {
   color: string
   icon: string
   avatar?: string // Path to agent avatar image
+  // Sub-agent relationship (optional)
+  isSubAgent?: boolean
+  parentAgentId?: string | null
   // Optional LangChain / LangGraph specific fields
   objective?: string // High-level objective for the agent (what it should achieve)
   customInstructions?: string // Extra system/user instructions or constraints

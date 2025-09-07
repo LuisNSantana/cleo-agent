@@ -26,6 +26,7 @@ import { AgentConfig, AgentRole } from '@/lib/agents/types'
 import Image from 'next/image'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { useModel } from '@/lib/model-store/provider'
+import { useClientAgentStore } from '@/lib/agents/client-store'
 
 // Tool information for the agent details modal
 interface ToolInfo {
@@ -42,8 +43,50 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Web Search',
     description: 'Search the internet for current information and resources',
     category: 'Web & Search',
-  useCases: ['Market research', 'Latest news', 'Technical documentation', 'Industry trends'],
-  icon: '/icons/internet.png'
+    useCases: ['Market research', 'Latest news', 'Technical documentation', 'Industry trends'],
+    icon: '/icons/internet.png'
+  },
+  'serpGeneralSearch': {
+    name: 'SerpAPI General Search',
+    description: 'Google search with structured results using SerpAPI',
+    category: 'Web & Search',
+    useCases: ['Comprehensive web research', 'Real-time information', 'Competitive analysis'],
+    icon: '/img/google-icon.png'
+  },
+  'serpNewsSearch': {
+    name: 'SerpAPI News Search',
+    description: 'Google News search for recent articles and breaking news',
+    category: 'Web & Search',
+    useCases: ['Breaking news monitoring', 'Current events research', 'Media analysis'],
+    icon: '/img/google-icon.png'
+  },
+  'serpScholarSearch': {
+    name: 'SerpAPI Scholar Search',
+    description: 'Google Scholar search for academic papers and citations',
+    category: 'Web & Search',
+    useCases: ['Academic research', 'Scientific literature review', 'Citation tracking'],
+    icon: '/img/google-icon.png'
+  },
+  'serpAutocomplete': {
+    name: 'SerpAPI Autocomplete',
+    description: 'Google search autocomplete suggestions for query expansion',
+    category: 'Web & Search',
+    useCases: ['Query optimization', 'Search suggestion generation', 'Topic exploration'],
+    icon: '/img/google-icon.png'
+  },
+  'serpLocationSearch': {
+    name: 'SerpAPI Location Search',
+    description: 'Google Maps location and local business search',
+    category: 'Web & Search',
+    useCases: ['Local business research', 'Geographic information', 'Location-based analysis'],
+    icon: '/img/google-icon.png'
+  },
+  'serpRaw': {
+    name: 'SerpAPI Raw Search',
+    description: 'Raw SerpAPI search with custom parameters for advanced queries',
+    category: 'Web & Search',
+    useCases: ['Custom search configurations', 'Advanced query parameters', 'Specialized research'],
+    icon: '/img/google-icon.png'
   },
 
   // Google Workspace Tools
@@ -269,6 +312,10 @@ const updateCleoWithNewAgent = async (newAgentName: string, agents: AgentConfig[
 }
 
 export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteAgent }: AgentCRUDPanelProps) {
+  // Pull server-provided parent candidates (eligible parents) from client store when available
+  const parentCandidates = useClientAgentStore((s) => s.parentCandidates)
+  // Simple UUID v4-ish check (accepts generic UUID formats)
+  const isUUID = (v: string | undefined | null): boolean => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingAgent, setEditingAgent] = useState<AgentConfig | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -277,6 +324,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   const [toolCategory, setToolCategory] = useState<string>('All')
   // Guard for IME composition to prevent cursor jumps
   const isComposingRef = React.useRef(false)
+  // Tags chip input local state
+  const [tagInput, setTagInput] = useState('')
+  // State for active tab to prevent jumping back to basic
+  const [activeTab, setActiveTab] = useState('basic')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -310,6 +361,8 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       icon: 'brain',
       parentAgentId: ''
     })
+  setTagInput('')
+    setActiveTab('basic')
   }
 
   const handleCreate = async () => {
@@ -324,22 +377,13 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     onCreateAgent(newAgent)
     
     // Update Cleo's delegation capabilities if the new agent is a specialist
-    if (formData.role === 'specialist') {
+  if (formData.role === 'specialist') {
       try {
         const cleoUpdates = await updateCleoWithNewAgent(formData.name, agents)
         if (cleoUpdates) {
           onUpdateAgent('cleo-supervisor', cleoUpdates)
         }
-        // If parent agent selected, try to update that agent's tools list too (client-side UX)
-        if (formData.parentAgentId) {
-          const parent = agents.find(a => a.id === formData.parentAgentId)
-          if (parent) {
-            const normalizedId = newAgent.id.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
-            const toolName = `delegate_to_${normalizedId}`
-            const ptools = Array.from(new Set([...(parent.tools || []), toolName]))
-            onUpdateAgent(parent.id, { tools: ptools })
-          }
-        }
+    // Parent tools will be updated after server creation using the actual UUID id (handled upstream)
       } catch (error) {
         console.error('Failed to update Cleo delegation capabilities:', error)
       }
@@ -351,6 +395,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
   const handleEdit = (agent: AgentConfig) => {
     setEditingAgent(agent)
+  setTagInput('')
     setFormData({
       name: agent.name || '',
       role: agent.role || 'specialist',
@@ -366,9 +411,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       model: agent.model || 'gpt-4',
       temperature: agent.temperature || 0.7,
       maxTokens: agent.maxTokens || 2000,
-      color: agent.color || '#8B5CF6',
+  color: agent.color || '#8B5CF6',
   icon: agent.icon || 'brain',
-  parentAgentId: ''
+  parentAgentId: (agent.parentAgentId && isUUID(agent.parentAgentId) ? agent.parentAgentId : '')
     })
   }
 
@@ -396,6 +441,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       parentAgentId: '' as string | ''
     }
     setEditingAgent(null)
+  setTagInput('')
     setFormData(copied)
     setIsCreateDialogOpen(true)
   }
@@ -452,6 +498,30 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     })
   }
 
+  // Tags helpers: add/remove chip
+  const addTag = (raw: string) => {
+    const t = raw.trim()
+    if (!t) return
+    setFormData(prev => {
+      const existing = new Set(prev.tags || [])
+      existing.add(t)
+      return { ...prev, tags: Array.from(existing) }
+    })
+    setTagInput('')
+  }
+  const removeTag = (tag: string) => {
+    setFormData(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }))
+  }
+  const handleTagKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === 'Enter' || e.key === ',' ) {
+      e.preventDefault()
+      addTag(tagInput)
+    } else if (e.key === 'Backspace' && !tagInput) {
+      // Backspace with empty input removes last tag
+      setFormData(prev => ({ ...prev, tags: (prev.tags || []).slice(0, -1) }))
+    }
+  }
+
   // Models context
   const { models } = useModel()
 
@@ -490,9 +560,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   const AgentForm = ({ isEdit = false }: { isEdit?: boolean }) => {
     const [promptView, setPromptView] = React.useState<'edit' | 'preview'>('edit')
     return (
-    <Tabs defaultValue="basic" className="w-full">
+  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="basic">Básico</TabsTrigger>
+    <TabsTrigger value="basic">Basic</TabsTrigger>
         <TabsTrigger value="tools">Tools</TabsTrigger>
         <TabsTrigger value="prompt">Prompt</TabsTrigger>
         <TabsTrigger value="config">Config</TabsTrigger>
@@ -519,7 +589,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Avatar className="h-14 w-14 rounded-xl ring-2 ring-slate-600/40">
-                      <AvatarImage src={avatar} alt={formData.name || 'Agente'} className="object-cover rounded-xl" />
+                      <AvatarImage src={avatar} alt={formData.name || 'Agent'} className="object-cover rounded-xl" />
                       <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: formData.color }}>
                         <BrainIcon className="w-6 h-6 text-white" />
                       </AvatarFallback>
@@ -546,12 +616,12 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                       {isUrlIcon && (
                         <Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />
                       )}
-                      <span className="text-white font-medium">{formData.name || 'Nuevo Agente'}</span>
+                      <span className="text-white font-medium">{formData.name || 'New Agent'}</span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-500/10 text-violet-300 border-violet-500/30">
                         {formData.role}
                       </span>
                     </div>
-                    <p className="text-slate-400 text-xs line-clamp-1">{formData.description || 'Descripción corta del agente'}</p>
+                    <p className="text-slate-400 text-xs line-clamp-1">{formData.description || 'Short agent description'}</p>
                   </div>
                 </div>
               )
@@ -560,24 +630,24 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         </Card>
 
         <div className="space-y-2">
-          <Label htmlFor="name">Nombre del Agente</Label>
+          <Label htmlFor="name">Agent Name</Label>
           <Input
             id="name"
             value={formData.name}
             onChange={handleTextInputChange('name')}
             onCompositionStart={() => { isComposingRef.current = true }}
             onCompositionEnd={() => { isComposingRef.current = false }}
-            placeholder="Mi Agente Especializado"
+            placeholder="My Specialized Agent"
             className="bg-white/10 border-white/20"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="role">Rol del agente</Label>
+            <Label htmlFor="role">Agent Role</Label>
             <Select value={formData.role} onValueChange={(v) => handleInputChange('role', v as AgentRole)}>
               <SelectTrigger id="role" className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Selecciona un rol" />
+                <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 text-white border-slate-700">
                 <SelectItem value="supervisor">Supervisor</SelectItem>
@@ -586,21 +656,33 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 <SelectItem value="evaluator">Evaluator</SelectItem>
               </SelectContent>
             </Select>
-            <div className="text-xs text-slate-400">Selecciona “Especialist” para habilitar la <span className="font-medium">Especialidad</span>.</div>
+            <div className="text-xs text-slate-400">Select “Specialist” to enable <span className="font-medium">Specialization</span>.</div>
+            <div className="text-[11px] text-slate-500">Note: A sub‑agent cannot be a parent. For example, Sofi can be "Sub‑agent of Emma", but Emma can never be a "sub‑agent of Sofi".</div>
           </div>
 
           {/* Parent (optional) for sub-agent relationship */}
           <div className="space-y-2">
-            <Label htmlFor="parent">Sub-agente de</Label>
-            <Select value={formData.parentAgentId || 'none'} onValueChange={(v) => handleInputChange('parentAgentId', v === 'none' ? '' : v)}>
+            <Label htmlFor="parent">Sub-agent of <span className="text-[11px] text-slate-400 font-normal">(only primary agents, not sub-agents)</span></Label>
+            {(() => {
+              const currentId = editingAgent?.id
+              // Prefer server-provided parentCandidates; fallback to local eligible agents
+              const candidateIds = new Set(parentCandidates.map(p => p.id))
+              let uuidAgents = (parentCandidates.length > 0)
+                ? parentCandidates
+                    .filter(p => isUUID(p.id))
+                    .map(p => ({ id: p.id, name: p.name } as any))
+                : agents.filter(a => isUUID(a.id) && a.id !== currentId && !a.isSubAgent)
+              const currentVal = isUUID(formData.parentAgentId) ? formData.parentAgentId : ''
+              return (
+                <Select value={currentVal || 'none'} onValueChange={(v) => handleInputChange('parentAgentId', v === 'none' ? '' : v)}>
               <SelectTrigger id="parent" className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="(Opcional) Selecciona agente padre" />
+                <SelectValue placeholder="(Optional) Select parent agent" />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
-                <SelectItem value="none">Ninguno</SelectItem>
-                {agents.map((a) => {
+                <SelectItem value="none">None</SelectItem>
+                {uuidAgents.map((a) => {
                   const lower = (a.name || '').toLowerCase()
-                  const avatar = a.avatar 
+                  const avatar = (a.avatar)
                     || (lower.includes('toby') ? '/img/agents/toby4.png'
                     : lower.includes('ami') ? '/img/agents/ami4.png'
                     : lower.includes('peter') ? '/img/agents/peter4.png'
@@ -622,22 +704,32 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                   )
                 })}
               </SelectContent>
-            </Select>
-            {formData.parentAgentId && (() => { const p = agents.find(x => x.id === formData.parentAgentId); if (!p) return null; const lower=(p.name||'').toLowerCase(); const avatar = p.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/agents/logocleo4.png' : '/img/agents/logocleo4.png'); return (
+                </Select>
+              )
+            })()}
+            {(() => {
+              // Small helper when there are no candidates available
+              const hasCandidates = (parentCandidates && parentCandidates.length > 0) || agents.some(a => isUUID(a.id) && !a.isSubAgent)
+              if (hasCandidates) return null
+              return (
+                <div className="text-[11px] text-amber-400/90">No primary agents available yet. Create a primary agent first to assign as a parent.</div>
+              )
+            })()}
+            {formData.parentAgentId && (() => { const pAny: any = (agents.find(x => x.id === formData.parentAgentId) as any) || (parentCandidates.find((pc:any)=>pc.id===formData.parentAgentId) as any); if (!pAny) return null; const lower=(pAny.name||'').toLowerCase(); const avatar = pAny.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/agents/logocleo4.png' : '/img/agents/logocleo4.png'); return (
               <div className="flex items-center gap-2 text-xs text-slate-300">
                 <Avatar className="h-5 w-5">
-                  <AvatarImage src={avatar} alt={p.name} />
-                  <AvatarFallback className="text-[10px]">{(p.name||'A').charAt(0)}</AvatarFallback>
+                  <AvatarImage src={avatar} alt={pAny.name} />
+                  <AvatarFallback className="text-[10px]">{(pAny.name||'A').charAt(0)}</AvatarFallback>
                 </Avatar>
-                <span>{p.name}</span>
+                <span>{pAny.name}</span>
               </div>
             )})()}
           </div>
 
           {formData.role === 'specialist' && (
             <div className="space-y-2">
-              <Label>Especialidad</Label>
-              <div className="text-xs text-slate-400">Elige el foco principal del agente especialista.</div>
+              <Label>Specialization</Label>
+              <div className="text-xs text-slate-400">Choose the primary focus of this specialist agent.</div>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'technical', label: 'Technical', icon: '⚙️', tags: ['technical','análisis','datos'] },
@@ -654,7 +746,8 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                       onClick={() => {
                         handleInputChange('specialization', opt.id)
                         if (opt.tags.length) {
-                          handleInputChange('tags', Array.from(new Set([...(formData.tags || []), ...opt.tags])))
+                          const newTags = Array.from(new Set([...(formData.tags || []), ...opt.tags]))
+                          handleInputChange('tags', newTags)
                         }
                       }}
                       className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${active ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}
@@ -669,14 +762,14 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
+          <Label htmlFor="description">Description</Label>
           <Textarea
             id="description"
             value={formData.description}
             onChange={handleTextInputChange('description')}
             onCompositionStart={() => { isComposingRef.current = true }}
             onCompositionEnd={() => { isComposingRef.current = false }}
-            placeholder="Describe las capacidades y propósito de este agente..."
+            placeholder="Describe this agent's capabilities and purpose..."
             className="bg-white/10 border-white/20 min-h-[100px]"
           />
         </div>
@@ -689,27 +782,53 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               <Input id="color" type="color" value={formData.color} onChange={(e) => handleInputChange('color', e.target.value)} className="bg-white/10 border-white/20 h-10 p-1" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="icon">Icono/Emoji</Label>
+              <Label htmlFor="icon">Icon/Emoji</Label>
   <Input id="icon" value={formData.icon} onChange={handleTextInputChange('icon')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="🤖, 🧠, 🛠️..." className="bg-white/10 border-white/20" />
             </div>
           </div>
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="tags">Tags (separados por comas)</Label>
-  <Input id="tags" value={formData.tags.join(', ')} onChange={handleTextInputChange('tags')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="análisis, escritura, código..." className="bg-white/10 border-white/20" />
+          <Label htmlFor="tags">Tags</Label>
+          <div className="bg-white/10 border border-white/20 rounded-md px-2 py-2 flex flex-wrap gap-2">
+            {(formData.tags || []).map((tag) => (
+              <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/60 text-slate-100 border border-slate-600/60">
+                {tag}
+                <button
+                  type="button"
+                  aria-label={`Remove ${tag}`}
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-red-300/90 text-slate-300/80"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+            <input
+              id="tags"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onCompositionStart={() => { isComposingRef.current = true }}
+              onCompositionEnd={() => { isComposingRef.current = false }}
+              onBlur={() => addTag(tagInput)}
+              placeholder={(formData.tags?.length ?? 0) === 0 ? 'Add tag and press Enter' : 'Add another tag'}
+              className="flex-1 min-w-[120px] bg-transparent outline-none text-sm text-slate-100 placeholder:text-slate-400"
+            />
+          </div>
+          <div className="text-[11px] text-slate-500">Tip: Press Enter or comma to add a tag. Backspace removes last.</div>
         </div>
       </TabsContent>
 
       <TabsContent value="tools" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <Label className="m-0">Herramientas</Label>
+          <Label className="m-0">Tools</Label>
           <div className="flex gap-2">
             <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleInputChange('tools', Array.from(new Set(['complete_task', ...filteredTools.map(([k]) => k)])))}>
-              Seleccionar visibles
+              Select visible
             </Button>
             <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleInputChange('tools', ['complete_task'])}>
-              Limpiar
+              Clear
             </Button>
           </div>
         </div>
@@ -729,7 +848,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         </div>
 
         {/* Search */}
-        <Input placeholder="Buscar herramientas por nombre o descripción..." value={toolSearch} onChange={(e) => setToolSearch(e.target.value)} className="bg-white/10 border-white/20" />
+  <Input placeholder="Search tools by name or description..." value={toolSearch} onChange={(e) => setToolSearch(e.target.value)} className="bg-white/10 border-white/20" />
 
         {/* Tools list - vertical with invisible scroll to optimize space */}
         <div className="relative">
@@ -818,12 +937,12 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 type="button"
                 className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'edit' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
                 onClick={() => setPromptView('edit')}
-              >Editar</button>
+              >Edit</button>
               <button
                 type="button"
                 className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'preview' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
                 onClick={() => setPromptView('preview')}
-              >Vista previa</button>
+              >Preview</button>
             </div>
 
             {promptView === 'edit' ? (
@@ -831,8 +950,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 <Textarea
                   id="prompt"
                   value={formData.prompt}
-                  onChange={(e) => handleInputChange('prompt', e.target.value)}
-                  placeholder="Eres un asistente especializado en..."
+                  onChange={handleTextInputChange('prompt')}
+                  onCompositionStart={() => { isComposingRef.current = true }} 
+                  onCompositionEnd={() => { isComposingRef.current = false }}
+                  placeholder="You are a specialized assistant in..."
                   className="bg-white/10 border-white/20 min-h-[180px] max-h-[55vh] overflow-y-auto no-scrollbar resize-none"
                 />
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
@@ -840,7 +961,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               </div>
             ) : (
               <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3">
-                <div className="text-xs text-slate-400 mb-2">Vista previa (Markdown)</div>
+                <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
                 <div className="max-h-[55vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
                   <Markdown>{formData.prompt}</Markdown>
                 </div>
@@ -857,8 +978,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               <Textarea
                 id="prompt"
                 value={formData.prompt}
-                onChange={(e) => handleInputChange('prompt', e.target.value)}
-                placeholder="Eres un asistente especializado en..."
+                onChange={handleTextInputChange('prompt')}
+                onCompositionStart={() => { isComposingRef.current = true }} 
+                onCompositionEnd={() => { isComposingRef.current = false }}
+                placeholder="You are a specialized assistant in..."
                 className="bg-white/10 border-white/20 min-h-[180px] max-h-[50vh] overflow-y-auto no-scrollbar resize-none"
               />
               <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
@@ -867,7 +990,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
             {/* Markdown Preview */}
             <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
-              <div className="text-xs text-slate-400 mb-2">Vista previa (Markdown)</div>
+              <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
               <div className="max-h-[50vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
                 <Markdown>{formData.prompt}</Markdown>
               </div>
@@ -887,10 +1010,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       <TabsContent value="config" className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="model">Modelo</Label>
+            <Label htmlFor="model">Model</Label>
             <Select value={formData.model} onValueChange={(v) => handleInputChange('model', v)}>
               <SelectTrigger id="model" className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder={models.length ? 'Selecciona un modelo' : 'Cargando modelos...'} />
+                <SelectValue placeholder={models.length ? 'Select a model' : 'Loading models...'} />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
                 {models.map((m) => (
@@ -904,13 +1027,38 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
           <div className="space-y-2">
             <Label htmlFor="temperature">Temperature</Label>
-            <Input id="temperature" type="number" min="0" max="2" step="0.1" value={formData.temperature} onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))} className="bg-white/10 border-white/20" />
+            <Input 
+              id="temperature" 
+              type="number" 
+              min="0" 
+              max="2" 
+              step="0.1" 
+              value={formData.temperature} 
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0
+                handleInputChange('temperature', value)
+              }} 
+              onCompositionStart={() => { isComposingRef.current = true }} 
+              onCompositionEnd={() => { isComposingRef.current = false }}
+              className="bg-white/10 border-white/20" 
+            />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="maxTokens">Max Tokens</Label>
-          <Input id="maxTokens" type="number" value={formData.maxTokens} onChange={(e) => handleInputChange('maxTokens', parseInt(e.target.value))} className="bg-white/10 border-white/20" />
+          <Input 
+            id="maxTokens" 
+            type="number" 
+            value={formData.maxTokens} 
+            onChange={(e) => {
+              const value = parseInt(e.target.value) || 0
+              handleInputChange('maxTokens', value)
+            }} 
+            onCompositionStart={() => { isComposingRef.current = true }} 
+            onCompositionEnd={() => { isComposingRef.current = false }}
+            className="bg-white/10 border-white/20" 
+          />
         </div>
       </TabsContent>
     </Tabs>
@@ -938,9 +1086,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
-            Centro de Control de Agentes
+            Agent Control Center
           </h2>
-          <p className="text-slate-400 mt-1">Administra y configura tus agentes de IA</p>
+          <p className="text-slate-400 mt-1">Manage and configure your AI agents</p>
         </div>
         
         <Button
@@ -949,153 +1097,215 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
           className="border-slate-600 text-slate-300 hover:text-white hover:border-violet-500 hover:bg-violet-500/10 transition-all duration-200"
         >
           <PlusIcon className="w-4 h-4 mr-2" />
-          Crear Agente
+          Create Agent
         </Button>
       </div>
 
-      {/* Agents Grid */}
-  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6 w-full">
-        <AnimatePresence>
-          {agents.map((agent) => (
-            <motion.div
-              key={agent.id}
-              layout
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <Card 
-                className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden cursor-pointer"
-                onClick={() => setDetailsAgent(agent)}
+      {/* Filters & Grouped Agents: Default, My Agents, Sub-agents */}
+      {(() => {
+        // Simple filters: view (all/mine/defaults/subagents) + search + tool filter
+        // Local state via URL-less inputs to avoid prop drilling
+        const [viewFilter, setViewFilter] = React.useState<'all'|'mine'|'defaults'|'subagents'>('all')
+        const [search, setSearch] = React.useState('')
+        const [toolFilter, setToolFilter] = React.useState('')
+
+        const normalized = (s?: string) => (s || '').toLowerCase().trim()
+        const matchesSearch = (a: any) => {
+          const q = normalized(search)
+          if (!q) return true
+          return normalized(a.name).includes(q) || normalized(a.description).includes(q) || normalized(a.model).includes(q)
+        }
+        const matchesTool = (a: any) => {
+          const q = normalized(toolFilter)
+          if (!q) return true
+          const tools = Array.isArray(a.tools) ? a.tools : []
+          return tools.some((t: string) => normalized(t).includes(q))
+        }
+
+        const defaults = agents.filter((a: any) => (a as any).isDefault === true)
+        const subAgents = agents.filter(a => a.isSubAgent)
+        const myAgents = agents.filter(a => !subAgents.includes(a) && !defaults.includes(a))
+        let sections = [
+          { title: 'Default Agents', items: defaults },
+          { title: 'My Agents', items: myAgents },
+          { title: 'Sub-agents', items: subAgents }
+        ]
+
+        // Apply view filter by narrowing sections
+        if (viewFilter === 'defaults') sections = sections.filter(s => s.title === 'Default Agents')
+        if (viewFilter === 'mine') sections = sections.filter(s => s.title === 'My Agents')
+        if (viewFilter === 'subagents') sections = sections.filter(s => s.title === 'Sub-agents')
+
+        // Render filter controls
+        const FilterBar = (
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <select
+                value={viewFilter}
+                onChange={e => setViewFilter(e.target.value as any)}
+                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1"
               >
-                {/* Enhanced background gradient on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
-                <div className="relative z-10">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-4">
-                      {/* Enhanced Avatar with better resolution */}
-                      <div className="relative group">
-                        <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
-                          {getAgentAvatar(agent) ? (
-                            <AvatarImage 
-                              src={getAgentAvatar(agent)!} 
-                              alt={agent.name}
-                              className="object-cover rounded-xl"
-                            />
-                          ) : null}
-                          <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: agent.color }}>
-                            <BrainIcon className="w-8 h-8 text-white" />
-                          </AvatarFallback>
-                        </Avatar>
-                        {/* Subtle glow effect on hover */}
-                        <div 
-                          className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl"
-                          style={{ backgroundColor: agent.color }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
-                        <div className="mb-2">
-                          {(() => { const info = getSpecificRoleLabel(agent); return (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
-                              {info.label}
-                            </span>
-                          )})()}
-                        </div>
-                        {agent.description && (
-                          <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {agent.tags && agent.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-                      {agent.tags.slice(0, 3).map((tag, index) => (
-            <Badge key={index} variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {agent.tags.length > 3 && (
-            <Badge variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
-                          +{agent.tags.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
-                    <div className="text-xs text-slate-400">
-                      <span className="font-medium">{agent.model}</span>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleCopyFromAgent(agent)
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-violet-500/20"
-                        title="Copiar agente"
+                <option value="all">View: All</option>
+                <option value="defaults">View: Default Agents</option>
+                <option value="mine">View: My Agents</option>
+                <option value="subagents">View: Sub-agents</option>
+              </select>
+              <input
+                placeholder="Search by name/model..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-48"
+              />
+              <input
+                placeholder="Filter by tool (e.g. shopify)"
+                value={toolFilter}
+                onChange={e => setToolFilter(e.target.value)}
+                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-56"
+              />
+            </div>
+          </div>
+        )
+        return (
+          <div className="space-y-8">
+            {FilterBar}
+            {sections.map(({ title, items }) => (
+              <div key={title} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">{title}</h3>
+                  <span className="text-xs text-slate-400">{items.filter(a => matchesSearch(a) && matchesTool(a)).length} items</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6 w-full">
+                  <AnimatePresence>
+                    {items.filter(a => matchesSearch(a) && matchesTool(a)).map((agent) => (
+                      <motion.div
+                        key={`${title}_${agent.id}`}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
                       >
-                        <CopyIcon className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEdit(agent)
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-violet-500/20"
-                      >
-                        <PencilIcon className="w-3 h-3" />
-                      </Button>
-                      
-                      {/* Only show delete button if agent is not Cleo */}
-                      {agent.id !== 'cleo-supervisor' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteConfirm(agent.id!)
-                          }}
-                          className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                        <Card 
+                          className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden cursor-pointer"
+                          onClick={() => setDetailsAgent(agent)}
                         >
-                          <TrashIcon className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-                </div> {/* Close relative z-10 wrapper */}
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                          <div className="relative z-10">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-4">
+                                <div className="relative group">
+                                  <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
+                                    {getAgentAvatar(agent) ? (
+                                      <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover rounded-xl" />
+                                    ) : null}
+                                    <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: agent.color }}>
+                                      <BrainIcon className="w-8 h-8 text-white" />
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl" style={{ backgroundColor: agent.color }} />
+                                </div>
+                                <div className="flex-1">
+                                  <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
+                                  <div className="mb-2">
+                                    {(() => { const info = getSpecificRoleLabel(agent); return (
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
+                                        {info.label}
+                                      </span>
+                                    )})()}
+                                  </div>
+                                  {agent.description && (
+                                    <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          
+                          <CardContent className="space-y-4">
+                            {agent.tags && agent.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {agent.tags.slice(0, 3).map((tag, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                                {agent.tags.length > 3 && (
+                                  <Badge variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                                    +{agent.tags.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                              <div className="text-xs text-slate-400">
+                                <span className="font-medium">{agent.model}</span>
+                              </div>
+                              
+                              <div className="flex space-x-2">
+                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20" title="Copy agent">
+                                  <CopyIcon className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20">
+                                  <PencilIcon className="w-3 h-3" />
+                                </Button>
+                                {/* Hide delete for default agents */}
+                                {!(agent as any).isDefault && (agent.id !== 'cleo-supervisor') && (
+                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(agent.id!) }} className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300">
+                                    <TrashIcon className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Create Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
+      <Dialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={(open) => {
+          // Only allow closing via explicit user action, not from focus events
+          if (!open && !isComposingRef.current) {
+            setIsCreateDialogOpen(false)
+          }
+        }}
+      >
+        <DialogContent 
+          hasCloseButton={false}
+          className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col"
+          onInteractOutside={(e) => {
+            // Prevent dialog from closing when clicking on inputs or interacting inside
+            e.preventDefault()
+          }}
+          onEscapeKeyDown={(e) => {
+            // Only close on explicit Escape key when not composing
+            if (isComposingRef.current) {
+              e.preventDefault()
+            }
+          }}
+        >
           <DialogHeader>
             <div className="relative">
               <DialogTitle className="text-xl font-bold text-white flex items-center">
                 <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
-                Crear Nuevo Agente
+                Create New Agent
               </DialogTitle>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsCreateDialogOpen(false)}
                 className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
-                aria-label="Cerrar"
+                aria-label="Close"
               >
                 <XIcon className="w-4 h-4" />
               </Button>
@@ -1117,14 +1327,14 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 }}
                 className="border-slate-600 text-slate-300 hover:bg-slate-700"
               >
-                Cancelar
+                Cancel
               </Button>
               <Button
                 onClick={handleCreate}
                 disabled={!formData.name || !formData.role || !formData.model}
                 className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Crear Agente
+                Create Agent
               </Button>
           </div>
         </DialogContent>
@@ -1132,19 +1342,19 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
       {/* Edit Dialog */}
       <Dialog open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)}>
-        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
+        <DialogContent hasCloseButton={false} className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
           <DialogHeader>
             <div className="relative">
               <DialogTitle className="text-xl font-bold text-white flex items-center">
                 <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
-                Editar Agente
+                Edit Agent
               </DialogTitle>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setEditingAgent(null)}
                 className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
-                aria-label="Cerrar"
+                aria-label="Close"
               >
                 <XIcon className="w-4 h-4" />
               </Button>
@@ -1166,14 +1376,14 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 }}
                 className="border-slate-600 text-slate-300 hover:bg-slate-700"
               >
-                Cancelar
+                Cancel
               </Button>
               <Button
                 onClick={handleUpdate}
                 disabled={!formData.name || !formData.role || !formData.model}
                 className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Actualizar Agente
+                Update Agent
               </Button>
           </div>
         </DialogContent>
@@ -1183,11 +1393,11 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       <Dialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <DialogContent className="bg-slate-800 border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-red-400">Confirmar Eliminación</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-red-400">Confirm Deletion</DialogTitle>
           </DialogHeader>
           
           <p className="text-slate-300">
-            ¿Estás seguro de que deseas eliminar este agente? Esta acción no se puede deshacer.
+            Are you sure you want to delete this agent? This action cannot be undone.
           </p>
           
           <div className="flex justify-end space-x-3 pt-4">
@@ -1196,13 +1406,13 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               onClick={() => setDeleteConfirm(null)}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              Cancelar
+              Cancel
             </Button>
             <Button
               onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Eliminar
+              Delete
             </Button>
           </div>
         </DialogContent>

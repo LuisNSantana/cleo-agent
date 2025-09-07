@@ -1,11 +1,12 @@
 import React from 'react'
 import { GoogleCalendarIcon } from '@/components/icons/google-calendar'
+import Icon from '@/components/icons/google'
 
 interface ToolWithIcon {
   name: string
   icon: React.ComponentType<{ className?: string; size?: number }>
   description: string
-  category: 'productivity' | 'utility' | 'information'
+  category: 'productivity' | 'utility' | 'information' | 'research'
 }
 
 export const availableTools: ToolWithIcon[] = [
@@ -15,7 +16,54 @@ export const availableTools: ToolWithIcon[] = [
     description: 'View and create calendar events',
     category: 'productivity'
   },
-  // Add other tools here as needed
+  {
+    name: 'serpGeneralSearch',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'General Google search with structured results',
+    category: 'research'
+  },
+  {
+    name: 'serpNewsSearch',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'Google News search for recent articles',
+    category: 'research'
+  },
+  {
+    name: 'serpScholarSearch',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'Google Scholar search for academic papers',
+    category: 'research'
+  },
+  {
+    name: 'serpAutocomplete',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'Google search autocomplete suggestions',
+    category: 'research'
+  },
+  {
+    name: 'serpLocationSearch',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'Google Maps location and business search',
+    category: 'research'
+  },
+  {
+    name: 'serpRaw',
+    icon: ({ className, size = 24 }: { className?: string; size?: number }) => (
+      <Icon className={className} width={size} height={size} />
+    ),
+    description: 'Raw SerpAPI search with custom parameters',
+    category: 'research'
+  }
 ]
 
 interface ToolDisplayProps {

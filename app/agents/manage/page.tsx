@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/toast'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
 import { ShopifyCredentialsManager, SkyvernCredentialsManager } from '@/components/common/CredentialsManager'
 import dynamic from 'next/dynamic'
@@ -13,7 +14,10 @@ import { PlusIcon, RobotIcon } from '@phosphor-icons/react'
 export default function AgentsManagePage() {
   const {
     agents,
-    addAgent
+    addAgent,
+    updateAgent,
+    deleteAgent,
+    syncAgents
   } = useClientAgentStore()
 
   return (
@@ -30,6 +34,9 @@ export default function AgentsManagePage() {
             agents={agents}
             onCreateAgent={async (agent) => {
               try {
+        // Ensure we only send UUIDs for parentAgentId
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+        const parentAgentId = isUUID((agent as any).parentAgentId) ? (agent as any).parentAgentId : undefined
                 const res = await fetch('/api/agents', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -46,12 +53,12 @@ export default function AgentsManagePage() {
                     tags: agent.tags || [],
                     tools: agent.tools || [],
                     systemPrompt: agent.prompt,
-                    parentAgentId: (agent as any).parentAgentId || undefined
+          parentAgentId
                   })
                 })
                 if (!res.ok) throw new Error(`HTTP ${res.status}`)
                 const data = await res.json()
-                if (data?.agent) {
+        if (data?.agent) {
                   addAgent({
                     id: data.agent.id,
                     name: data.agent.name,
@@ -64,7 +71,9 @@ export default function AgentsManagePage() {
                     prompt: data.agent.prompt,
                     color: data.agent.color,
                     icon: data.agent.icon,
-                    tags: data.agent.tags
+          tags: data.agent.tags,
+          isSubAgent: data.agent.isSubAgent,
+          parentAgentId: data.agent.parentAgentId || ''
                   })
                 }
               } catch (e) {
@@ -86,13 +95,69 @@ export default function AgentsManagePage() {
                 })
               }
             }}
-            onUpdateAgent={(id, updatedAgent) => {
-              // TODO: Implementar updateAgent en el store
-              console.log('Update agent:', id, updatedAgent)
+            onUpdateAgent={async (id, updatedAgent) => {
+              try {
+                // Call API to update agent
+                const response = await fetch(`/api/agents/${id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updatedAgent)
+                })
+                
+                if (response.ok) {
+                  // Update local store
+                  updateAgent(id, updatedAgent)
+                  toast({
+                    title: 'Agente actualizado',
+                    description: 'El agente se ha actualizado correctamente',
+                    status: 'success'
+                  })
+                } else {
+                  toast({
+                    title: 'Error',
+                    description: 'Error al actualizar el agente',
+                    status: 'error'
+                  })
+                }
+              } catch (error) {
+                console.error('Error updating agent:', error)
+                toast({
+                  title: 'Error',
+                  description: 'Error al actualizar el agente',
+                  status: 'error'
+                })
+              }
             }}
-            onDeleteAgent={(id) => {
-              // TODO: Implementar deleteAgent en el store  
-              console.log('Delete agent:', id)
+            onDeleteAgent={async (id) => {
+              try {
+                // Call API to delete agent
+                const response = await fetch(`/api/agents/${id}`, {
+                  method: 'DELETE'
+                })
+                
+                if (response.ok) {
+                  // Update local store
+                  deleteAgent(id)
+                  toast({
+                    title: 'Agente eliminado',
+                    description: 'El agente se ha eliminado correctamente',
+                    status: 'success'
+                  })
+                } else {
+                  toast({
+                    title: 'Error',
+                    description: 'Error al eliminar el agente',
+                    status: 'error'
+                  })
+                }
+              } catch (error) {
+                console.error('Error deleting agent:', error)
+                toast({
+                  title: 'Error',
+                  description: 'Error al eliminar el agente',
+                  status: 'error'
+                })
+              }
             }}
           />
         </motion.div>
