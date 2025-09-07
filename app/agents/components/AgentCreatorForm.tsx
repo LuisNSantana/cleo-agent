@@ -36,6 +36,7 @@ export function AgentCreatorForm() {
     'delegate_to_toby',
     'delegate_to_ami',
     'delegate_to_peter',
+    'delegate_to_apu',
     'analyze_emotion',
     'provide_support',
     'webSearch',

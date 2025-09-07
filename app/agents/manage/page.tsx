@@ -28,21 +28,63 @@ export default function AgentsManagePage() {
         >
           <AgentCRUDPanel 
             agents={agents}
-            onCreateAgent={(agent) => {
-              addAgent({
-                id: agent.id!,
-                name: agent.name!,
-                description: agent.description!,
-                role: agent.role!,
-                model: agent.model!,
-                temperature: agent.temperature!,
-                maxTokens: agent.maxTokens!,
-                tools: agent.tools!,
-                prompt: agent.prompt!,
-                color: agent.color!,
-                icon: agent.icon!,
-                tags: agent.tags
-              })
+            onCreateAgent={async (agent) => {
+              try {
+                const res = await fetch('/api/agents', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({
+                    name: agent.name,
+                    description: agent.description || '',
+                    role: agent.role,
+                    model: agent.model,
+                    temperature: agent.temperature,
+                    maxTokens: agent.maxTokens,
+                    color: agent.color,
+                    icon: agent.icon,
+                    tags: agent.tags || [],
+                    tools: agent.tools || [],
+                    systemPrompt: agent.prompt,
+                    parentAgentId: (agent as any).parentAgentId || undefined
+                  })
+                })
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const data = await res.json()
+                if (data?.agent) {
+                  addAgent({
+                    id: data.agent.id,
+                    name: data.agent.name,
+                    description: data.agent.description,
+                    role: data.agent.role,
+                    model: data.agent.model,
+                    temperature: data.agent.temperature,
+                    maxTokens: data.agent.maxTokens,
+                    tools: data.agent.tools,
+                    prompt: data.agent.prompt,
+                    color: data.agent.color,
+                    icon: data.agent.icon,
+                    tags: data.agent.tags
+                  })
+                }
+              } catch (e) {
+                console.error('Create agent failed:', e)
+                // Best-effort fallback: add to local store
+                addAgent({
+                  id: agent.id || `custom_${Date.now()}`,
+                  name: agent.name!,
+                  description: agent.description || '',
+                  role: agent.role!,
+                  model: agent.model!,
+                  temperature: agent.temperature || 0.7,
+                  maxTokens: agent.maxTokens || 4096,
+                  tools: agent.tools || [],
+                  prompt: agent.prompt || `You are ${agent.name}`,
+                  color: agent.color || '#64748B',
+                  icon: agent.icon || '🤖',
+                  tags: agent.tags || []
+                })
+              }
             }}
             onUpdateAgent={(id, updatedAgent) => {
               // TODO: Implementar updateAgent en el store

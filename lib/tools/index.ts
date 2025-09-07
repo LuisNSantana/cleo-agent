@@ -10,7 +10,7 @@ import { gmailTools, listGmailMessagesTool, getGmailMessageTool, sendGmailMessag
 import { shopifyTools, shopifyGetProductsTool, shopifyGetOrdersTool, shopifyGetAnalyticsTool, shopifyGetCustomersTool, shopifySearchProductsTool, shopifyUpdateProductPriceTool } from './shopify';
 import { skyvernTools, addSkyvernCredentialsTool, testSkyvernConnectionTool, createSkyvernTaskTool, getSkyvernTaskTool, takeSkyvernScreenshotTool, listSkyvernTasksTool } from '../skyvern';
 import { serpapiTools, serpGeneralSearchTool, serpNewsSearchTool, serpScholarSearchTool, serpAutocompleteTool, serpLocationSearchTool, serpRawTool, serpapiCredentialTools } from '@/lib/serpapi/tools'
-import { delegationTools, delegateToTobyTool, delegateToAmiTool, delegateToPeterTool, delegateToEmmaTool, delegateToApuTool } from './delegation';
+import { delegationTools, delegateToTobyTool, delegateToAmiTool, delegateToPeterTool, delegateToEmmaTool, delegateToApuTool, createDelegateToTool } from './delegation';
 
 // Types used by tools in this module
 interface WeatherResult {
@@ -300,7 +300,8 @@ export const completeTaskTool = tool({
 });
 
 // Export all tools as a collection with categories for modularity
-export const tools = {
+// Mutable registry to support dynamic tools at runtime
+export const tools: Record<string, any> = {
   // Core Web Search
   webSearch: webSearchTool,
   
@@ -388,3 +389,25 @@ export type ToolName = keyof typeof tools;
 
 // Simple cache for weather (moved outside tool for global access if needed)
 const weatherCache: Record<string, { data: WeatherResult; expiry: number }> = {};
+
+/**
+ * Register a tool into the global registry at runtime.
+ * If a tool with the same name exists it will be overwritten.
+ */
+export function registerTool(name: string, toolImpl: any) {
+  (tools as any)[name] = toolImpl
+}
+
+/**
+ * Ensure a dynamic delegation tool exists for a given agent id/name and return the tool name.
+ * Produces a stable snake_case tool name like `delegate_to_custom_xxx`.
+ */
+export function ensureDelegationToolForAgent(agentId: string, agentName: string): string {
+  const suffix = agentId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+  const toolName = `delegate_to_${suffix}`
+  if (!tools[toolName]) {
+    const impl = createDelegateToTool(agentId, agentName)
+    registerTool(toolName, impl)
+  }
+  return toolName
+}

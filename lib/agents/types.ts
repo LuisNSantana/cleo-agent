@@ -247,6 +247,7 @@ export interface CreateAgentRequest {
   model: string
   tools: string[]
   prompt: string
+  parentAgentId?: string
   // additional fields to support richer agent creation
   objective?: string
   customInstructions?: string

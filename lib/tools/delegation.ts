@@ -94,3 +94,23 @@ export const delegationTools = {
   delegate_to_emma: delegateToEmmaTool,
   delegate_to_apu: delegateToApuTool
 };
+
+/**
+ * Factory to create a dynamic delegation tool for any target agent.
+ * The tool name should be registered in the global tools registry separately.
+ */
+export function createDelegateToTool(targetAgentId: string, targetAgentName: string) {
+  return tool({
+    description: `Delegate task to ${targetAgentName} (dynamic). Use when ${targetAgentName} is the right specialist for the task.`,
+    inputSchema: delegationSchema,
+    execute: async ({ task_description }) => {
+      return {
+        command: 'HANDOFF_TO_AGENT',
+        target_agent: targetAgentId,
+        task_description,
+        handoff_message: `Transferring to ${targetAgentName} for: ${task_description}`,
+        delegation_complete: true
+      };
+    }
+  })
+}

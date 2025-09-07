@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { ensureDelegationToolForAgent } from '@/lib/tools'
 
 export async function GET() {
   try {
@@ -80,10 +81,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+  const body = await request.json()
     
     // Validate required fields
-    const { name, description, role, model, systemPrompt, color, icon, tags, tools, temperature, maxTokens } = body
+  const { name, description, role, model, systemPrompt, color, icon, tags, tools, temperature, maxTokens, parentAgentId } = body
     
     if (!name || !role || !model || !systemPrompt) {
       return NextResponse.json({ 
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new agent directly
-    const { data: newAgent, error } = await supabase
+  const { data: newAgent, error } = await supabase
       .from('agents' as any)
       .insert({
         user_id: user.id,
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform response to match frontend format
-    const agent = newAgent as any
+  const agent = newAgent as any
     const transformedAgent = {
       id: agent.id,
       name: agent.name,
@@ -154,6 +155,68 @@ export async function POST(request: NextRequest) {
       priority: agent.priority,
       createdAt: agent.created_at,
       updatedAt: agent.updated_at
+    }
+
+    // Auto-create dynamic delegation tool for this new agent and assign it to Cleo (supervisor) and optionally a selected parent
+    try {
+      const toolName = ensureDelegationToolForAgent(transformedAgent.id, transformedAgent.name)
+      // Fetch Cleo record for this user
+      const { data: cleo, error: cleoErr } = await supabase
+        .from('agents' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('name', 'Cleo')
+        .eq('is_default', true)
+        .single()
+      if (!cleoErr && cleo) {
+        const c: any = cleo as any
+        const cleoTools: string[] = Array.isArray(c.tools) ? c.tools : []
+        if (!cleoTools.includes(toolName)) {
+          const { error: upErr } = await supabase
+            .from('agents' as any)
+            .update({ tools: [...cleoTools, toolName] })
+            .eq('id', c.id)
+          if (upErr) console.warn('Failed to update Cleo tools with delegation:', upErr)
+        }
+      }
+      // If parentAgentId provided, also add tool to that parent for convenient delegation
+      if (parentAgentId) {
+        const { data: parent, error: pErr } = await supabase
+          .from('agents' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('id', parentAgentId)
+          .single()
+        if (!pErr && parent) {
+          const p: any = parent as any
+          const ptools: string[] = Array.isArray(p.tools) ? p.tools : []
+          if (!ptools.includes(toolName)) {
+            const { error: up2 } = await supabase
+              .from('agents' as any)
+              .update({ tools: [...ptools, toolName] })
+              .eq('id', p.id)
+            if (up2) console.warn('Failed to update parent tools with delegation:', up2)
+          }
+          // Also mark the new agent as delegable by the selected parent (append to delegated_by)
+          const { data: child, error: chErr } = await supabase
+            .from('agents' as any)
+            .select('delegated_by')
+            .eq('id', transformedAgent.id)
+            .single()
+          if (!chErr && child) {
+            const delegatedBy = Array.isArray((child as any).delegated_by) ? (child as any).delegated_by : []
+            if (!delegatedBy.includes(String(p.id))) {
+              const { error: upChild } = await supabase
+                .from('agents' as any)
+                .update({ delegated_by: [...delegatedBy, String(p.id)] })
+                .eq('id', transformedAgent.id)
+              if (upChild) console.warn('Failed to update child delegated_by:', upChild)
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Auto delegation tool assignment failed:', e)
     }
 
     return NextResponse.json({ agent: transformedAgent }, { status: 201 })

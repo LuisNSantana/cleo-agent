@@ -11,16 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { 
   PlusIcon, 
   PencilIcon, 
   TrashIcon, 
   BrainIcon,
-  RobotIcon
+  RobotIcon,
+  CopyIcon
 } from '@phosphor-icons/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AgentConfig, AgentRole } from '@/lib/agents/types'
 import Image from 'next/image'
+import { Markdown } from '@/components/prompt-kit/markdown'
 import { useModel } from '@/lib/model-store/provider'
 
 // Tool information for the agent details modal
@@ -29,6 +32,7 @@ interface ToolInfo {
   description: string
   category: string
   useCases: string[]
+  icon?: string
 }
 
 const TOOL_REGISTRY: Record<string, ToolInfo> = {
@@ -37,7 +41,8 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Web Search',
     description: 'Search the internet for current information and resources',
     category: 'Web & Search',
-    useCases: ['Market research', 'Latest news', 'Technical documentation', 'Industry trends']
+  useCases: ['Market research', 'Latest news', 'Technical documentation', 'Industry trends'],
+  icon: '/icons/internet.png'
   },
 
   // Google Workspace Tools
@@ -45,49 +50,57 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Calendar Events',
     description: 'List and view Google Calendar events',
     category: 'Google Workspace',
-    useCases: ['Schedule management', 'Meeting planning', 'Event tracking']
+  useCases: ['Schedule management', 'Meeting planning', 'Event tracking'],
+  icon: '/icons/google-calendar.svg'
   },
   'createCalendarEvent': {
     name: 'Create Calendar Event',
     description: 'Create new events in Google Calendar',
     category: 'Google Workspace',
-    useCases: ['Meeting scheduling', 'Reminder creation', 'Event planning']
+  useCases: ['Meeting scheduling', 'Reminder creation', 'Event planning'],
+  icon: '/icons/google-calendar.svg'
   },
   'listDriveFiles': {
     name: 'Drive File List',
     description: 'List files and folders in Google Drive',
     category: 'Google Workspace',
-    useCases: ['File organization', 'Document discovery', 'Asset management']
+  useCases: ['File organization', 'Document discovery', 'Asset management'],
+  icon: '/icons/google-drive.svg'
   },
   'searchDriveFiles': {
     name: 'Drive File Search',
     description: 'Search for specific files in Google Drive',
     category: 'Google Workspace',
-    useCases: ['Document retrieval', 'Content search', 'File location']
+  useCases: ['Document retrieval', 'Content search', 'File location'],
+  icon: '/icons/google-drive.svg'
   },
   'getDriveFileDetails': {
     name: 'Drive File Details',
     description: 'Get detailed information about Drive files',
     category: 'Google Workspace',
-    useCases: ['File analysis', 'Metadata review', 'Version tracking']
+  useCases: ['File analysis', 'Metadata review', 'Version tracking'],
+  icon: '/icons/google-drive.svg'
   },
   'listGmailMessages': {
     name: 'Gmail Messages',
     description: 'List and filter Gmail messages',
     category: 'Google Workspace',
-    useCases: ['Email management', 'Communication tracking', 'Inbox organization']
+  useCases: ['Email management', 'Communication tracking', 'Inbox organization'],
+  icon: '/icons/gmail-icon.svg'
   },
   'getGmailMessage': {
     name: 'Gmail Message Details',
     description: 'Get detailed Gmail message information',
     category: 'Google Workspace',
-    useCases: ['Email analysis', 'Content review', 'Message tracking']
+  useCases: ['Email analysis', 'Content review', 'Message tracking'],
+  icon: '/icons/gmail-icon.svg'
   },
   'sendGmailMessage': {
     name: 'Send Gmail',
     description: 'Send email messages through Gmail',
     category: 'Google Workspace',
-    useCases: ['Email communication', 'Automated responses', 'Notifications']
+  useCases: ['Email communication', 'Automated responses', 'Notifications'],
+  icon: '/icons/gmail-icon.svg'
   },
 
   // Shopify E-commerce Tools
@@ -95,31 +108,36 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Shopify Products',
     description: 'Retrieve product listings and details from Shopify stores',
     category: 'E-commerce',
-    useCases: ['Inventory management', 'Product analysis', 'Catalog review', 'Price monitoring']
+  useCases: ['Inventory management', 'Product analysis', 'Catalog review', 'Price monitoring'],
+  icon: '/icons/shopify.png'
   },
   'shopifyGetOrders': {
     name: 'Shopify Orders',
     description: 'Access order data and transaction history',
     category: 'E-commerce',
-    useCases: ['Sales tracking', 'Order fulfillment', 'Revenue analysis', 'Customer orders']
+  useCases: ['Sales tracking', 'Order fulfillment', 'Revenue analysis', 'Customer orders'],
+  icon: '/icons/shopify.png'
   },
   'shopifyGetAnalytics': {
     name: 'Shopify Analytics',
     description: 'Generate business insights and performance metrics',
     category: 'E-commerce',
-    useCases: ['Sales reporting', 'Performance analysis', 'Business intelligence', 'Growth metrics']
+  useCases: ['Sales reporting', 'Performance analysis', 'Business intelligence', 'Growth metrics'],
+  icon: '/icons/shopify.png'
   },
   'shopifyGetCustomers': {
     name: 'Shopify Customers',
     description: 'Manage customer data and profiles',
     category: 'E-commerce',
-    useCases: ['Customer management', 'CRM integration', 'User analytics', 'Support assistance']
+  useCases: ['Customer management', 'CRM integration', 'User analytics', 'Support assistance'],
+  icon: '/icons/shopify.png'
   },
   'shopifySearchProducts': {
     name: 'Product Search',
     description: 'Search and filter products within Shopify stores',
     category: 'E-commerce',
-    useCases: ['Product discovery', 'Inventory search', 'Catalog filtering', 'Stock checking']
+  useCases: ['Product discovery', 'Inventory search', 'Catalog filtering', 'Stock checking'],
+  icon: '/icons/shopify.png'
   },
 
   // Document & Content Tools
@@ -127,13 +145,15 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Create Document',
     description: 'Generate new documents and content',
     category: 'Content Creation',
-    useCases: ['Report generation', 'Content creation', 'Documentation', 'Template building']
+  useCases: ['Report generation', 'Content creation', 'Documentation', 'Template building'],
+  icon: '/icons/docs.png'
   },
   'openDocument': {
     name: 'Open Document',
     description: 'Access and read existing documents',
     category: 'Content Management',
-    useCases: ['Document review', 'Content analysis', 'File access', 'Information retrieval']
+  useCases: ['Document review', 'Content analysis', 'File access', 'Information retrieval'],
+  icon: '/icons/docs.png'
   },
 
   // Memory & AI Tools
@@ -141,19 +161,22 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Add Memory Note',
     description: 'Store important information for future reference',
     category: 'AI Memory',
-    useCases: ['Information retention', 'Context preservation', 'Knowledge base', 'Personal notes']
+  useCases: ['Information retention', 'Context preservation', 'Knowledge base', 'Personal notes'],
+  icon: '/icons/notes.png'
   },
   'analyze_emotion': {
     name: 'Emotion Analysis',
     description: 'Analyze emotional context and sentiment',
     category: 'AI Intelligence',
-    useCases: ['Sentiment analysis', 'Mood detection', 'Emotional support', 'Communication insights']
+  useCases: ['Sentiment analysis', 'Mood detection', 'Emotional support', 'Communication insights'],
+  icon: '/icons/analyze_emotional.png'
   },
   'provide_support': {
     name: 'Emotional Support',
     description: 'Provide empathetic responses and emotional assistance',
     category: 'AI Intelligence',
-    useCases: ['Mental wellness', 'Empathetic communication', 'Support conversations', 'Care assistance']
+  useCases: ['Mental wellness', 'Empathetic communication', 'Support conversations', 'Care assistance'],
+  icon: '/icons/emotional_support.png'
   },
 
   // Delegation Tools
@@ -161,31 +184,43 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Delegate to Toby',
     description: 'Assign technical and research tasks to Toby specialist',
     category: 'Task Delegation',
-    useCases: ['Technical analysis', 'Data research', 'Information processing', 'Expert consultation']
+  useCases: ['Technical analysis', 'Data research', 'Information processing', 'Expert consultation'],
+  icon: '/img/agents/toby4.png'
   },
   'delegate_to_ami': {
     name: 'Delegate to Ami',
     description: 'Assign creative tasks to Ami specialist',
     category: 'Task Delegation',
-    useCases: ['Creative projects', 'Design work', 'Content creation', 'Artistic tasks']
+  useCases: ['Creative projects', 'Design work', 'Content creation', 'Artistic tasks'],
+  icon: '/img/agents/ami4.png'
   },
   'delegate_to_peter': {
     name: 'Delegate to Peter',
     description: 'Assign logical and mathematical tasks to Peter specialist',
     category: 'Task Delegation',
-    useCases: ['Problem solving', 'Mathematical calculations', 'Logic puzzles', 'Analytical tasks']
+  useCases: ['Problem solving', 'Mathematical calculations', 'Logic puzzles', 'Analytical tasks'],
+  icon: '/img/agents/peter4.png'
   },
   'delegate_to_emma': {
     name: 'Delegate to Emma',
     description: 'Assign e-commerce and business tasks to Emma specialist',
     category: 'Task Delegation',
-    useCases: ['E-commerce management', 'Sales analysis', 'Business operations', 'Store management']
+  useCases: ['E-commerce management', 'Sales analysis', 'Business operations', 'Store management'],
+  icon: '/img/agents/emma4.png'
+  },
+  'delegate_to_apu': {
+    name: 'Delegate to Apu',
+    description: 'Assign research and intelligence tasks to Apu specialist',
+    category: 'Task Delegation',
+    useCases: ['Web research', 'Market analysis', 'News synthesis', 'Competitive intelligence'],
+    icon: '/img/agents/apu4.png'
   },
   'complete_task': {
     name: 'Complete Task',
     description: 'Mark task as complete and return to coordinator',
     category: 'Task Management',
-    useCases: ['Task completion', 'Workflow management', 'Process control', 'Status updates']
+  useCases: ['Task completion', 'Workflow management', 'Process control', 'Status updates'],
+  icon: '/icons/completion_task.png'
   }
 }
 
@@ -237,6 +272,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   const [editingAgent, setEditingAgent] = useState<AgentConfig | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [detailsAgent, setDetailsAgent] = useState<AgentConfig | null>(null)
+  const [toolSearch, setToolSearch] = useState('')
+  const [toolCategory, setToolCategory] = useState<string>('All')
+  // Guard for IME composition to prevent cursor jumps
+  const isComposingRef = React.useRef(false)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -245,12 +284,13 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     prompt: 'You are a helpful AI assistant.',
     description: '',
     tags: [] as string[],
-    tools: [] as string[],
+  tools: ['complete_task'] as string[],
   model: '',
     temperature: 0.7,
     maxTokens: 2000,
     color: '#8B5CF6',
-    icon: 'brain'
+    icon: 'brain',
+    parentAgentId: '' as string | ''
   })
 
   const resetForm = () => {
@@ -261,19 +301,20 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       prompt: 'You are a helpful AI assistant.',
       description: '',
       tags: [],
-      tools: [],
+  tools: ['complete_task'],
   model: '',
       temperature: 0.7,
       maxTokens: 2000,
       color: '#8B5CF6',
-      icon: 'brain'
+      icon: 'brain',
+      parentAgentId: ''
     })
   }
 
   const handleCreate = async () => {
     if (!formData.name || !formData.role) return
     
-    const newAgent = {
+  const newAgent = {
       ...formData,
       id: `agent-${Date.now()}`
     }
@@ -287,6 +328,16 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         const cleoUpdates = await updateCleoWithNewAgent(formData.name, agents)
         if (cleoUpdates) {
           onUpdateAgent('cleo-supervisor', cleoUpdates)
+        }
+        // If parent agent selected, try to update that agent's tools list too (client-side UX)
+        if (formData.parentAgentId) {
+          const parent = agents.find(a => a.id === formData.parentAgentId)
+          if (parent) {
+            const normalizedId = newAgent.id.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+            const toolName = `delegate_to_${normalizedId}`
+            const ptools = Array.from(new Set([...(parent.tools || []), toolName]))
+            onUpdateAgent(parent.id, { tools: ptools })
+          }
         }
       } catch (error) {
         console.error('Failed to update Cleo delegation capabilities:', error)
@@ -310,13 +361,42 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       prompt: agent.prompt || 'You are a helpful AI assistant.',
       description: agent.description || '',
       tags: agent.tags || [],
-      tools: agent.tools || [],
+      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
       model: agent.model || 'gpt-4',
       temperature: agent.temperature || 0.7,
       maxTokens: agent.maxTokens || 2000,
       color: agent.color || '#8B5CF6',
-      icon: agent.icon || 'brain'
+  icon: agent.icon || 'brain',
+  parentAgentId: ''
     })
+  }
+
+  // Duplicate an agent into the Create dialog (without ID)
+  const handleCopyFromAgent = (agent: AgentConfig) => {
+    const computedSpec: 'technical' | 'creative' | 'logical' | 'research' | 'custom' =
+      (agent.tags?.includes('technical') || agent.tags?.includes('técnico')) ? 'technical'
+      : (agent.tags?.includes('creative') || agent.tags?.includes('creativo')) ? 'creative'
+      : (agent.tags?.includes('logical') || agent.tags?.includes('lógico')) ? 'logical'
+      : (agent.tags?.includes('research') || agent.tags?.includes('investigación')) ? 'research'
+      : 'custom'
+    const copied = {
+      name: agent.name ? `${agent.name} (Copy)` : '',
+      role: agent.role || 'specialist',
+      specialization: computedSpec,
+      prompt: agent.prompt || 'You are a helpful AI assistant.',
+      description: agent.description || '',
+      tags: agent.tags || [],
+      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
+      model: agent.model || '',
+      temperature: agent.temperature || 0.7,
+      maxTokens: agent.maxTokens || 2000,
+      color: agent.color || '#8B5CF6',
+      icon: agent.icon || 'brain',
+      parentAgentId: '' as string | ''
+    }
+    setEditingAgent(null)
+    setFormData(copied)
+    setIsCreateDialogOpen(true)
   }
 
   const handleUpdate = () => {
@@ -339,8 +419,56 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     }))
   }
 
+  // Prevent focus loss on controlled inputs by restoring focus after state updates
+  const handleTextInputChange = (field: keyof typeof formData) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const el = e.target
+    const elementId = el.id
+    const selStart = (el as HTMLInputElement | HTMLTextAreaElement).selectionStart ?? undefined
+    const selEnd = (el as HTMLInputElement | HTMLTextAreaElement).selectionEnd ?? undefined
+    // Update state first
+    const rawValue = el.value
+    // Special case for tags input where we store as string[]
+    const value: any = elementId === 'tags'
+      ? rawValue.split(',').map((t) => t.trim()).filter(Boolean)
+      : rawValue
+    setFormData(prev => ({ ...prev, [field]: value }))
+
+    // Restore focus on next frame to avoid Radix/Dialog focus juggling in re-renders
+    requestAnimationFrame(() => {
+      if (isComposingRef.current) return
+      const nextEl = document.getElementById(elementId) as HTMLInputElement | HTMLTextAreaElement | null
+      if (nextEl && document.activeElement !== nextEl) {
+        try {
+          nextEl.focus({ preventScroll: true })
+          // Restore caret/selection if possible
+          if (typeof selStart === 'number' && typeof selEnd === 'number' && nextEl.setSelectionRange) {
+            nextEl.setSelectionRange(selStart, selEnd)
+          }
+        } catch {}
+      }
+    })
+  }
+
   // Models context
   const { models } = useModel()
+
+  // Tool catalog helpers
+  const allCategories = React.useMemo(() => {
+    const set = new Set<string>(['All'])
+    Object.values(TOOL_REGISTRY).forEach(t => set.add(t.category))
+    return Array.from(set)
+  }, [])
+
+  const filteredTools = React.useMemo(() => {
+    const query = toolSearch.toLowerCase()
+    return Object.entries(TOOL_REGISTRY).filter(([key, info]) => {
+      const matchesCategory = toolCategory === 'All' || info.category === toolCategory
+      const matchesQuery = !query || info.name.toLowerCase().includes(query) || info.description.toLowerCase().includes(query)
+      return matchesCategory && matchesQuery
+    })
+  }, [toolSearch, toolCategory])
 
   // Helpers for enriched role/tag display
   const getSpecificRoleLabel = (agent: AgentConfig): { label: string; colorClass: string } => {
@@ -360,31 +488,91 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
   const AgentForm = ({ isEdit = false }: { isEdit?: boolean }) => (
     <Tabs defaultValue="basic" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="basic">Básico</TabsTrigger>
+        <TabsTrigger value="tools">Tools</TabsTrigger>
         <TabsTrigger value="prompt">Prompt</TabsTrigger>
         <TabsTrigger value="config">Config</TabsTrigger>
       </TabsList>
-      
+
       <TabsContent value="basic" className="space-y-4">
+        {/* Live Preview with Avatar and Icon/Emoji (real-time) */}
+        <Card className="bg-slate-900/40 border-slate-700/50">
+          <CardContent className="pt-4">
+            {(() => {
+              const name = (formData.name || '').toLowerCase()
+              const avatar = name.includes('toby') ? '/img/agents/toby4.png'
+                : name.includes('ami') ? '/img/agents/ami4.png'
+                : name.includes('peter') ? '/img/agents/peter4.png'
+                : name.includes('emma') ? '/img/agents/emma4.png'
+                : name.includes('apu') ? '/img/agents/apu4.png'
+                : name.includes('wex') ? '/img/agents/wex4.png'
+                : name.includes('cleo') ? '/img/agents/logocleo4.png'
+                : '/img/agents/logocleo4.png'
+              const iconVal = (formData.icon || '').trim()
+              const isUrlIcon = iconVal.startsWith('/') || iconVal.startsWith('http')
+              const isEmojiIcon = !!iconVal && !isUrlIcon && iconVal.length <= 3
+              return (
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="h-14 w-14 rounded-xl ring-2 ring-slate-600/40">
+                      <AvatarImage src={avatar} alt={formData.name || 'Agente'} className="object-cover rounded-xl" />
+                      <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: formData.color }}>
+                        <BrainIcon className="w-6 h-6 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
+                    {(isUrlIcon || isEmojiIcon) && (
+                      <div
+                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border border-white/20 bg-slate-900/90 flex items-center justify-center shadow ring-1 ring-black/20"
+                        style={{ outline: 'none' }}
+                        aria-hidden
+                      >
+                        {isUrlIcon ? (
+                          <Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />
+                        ) : (
+                          <span className="text-base leading-none">{iconVal}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      {isEmojiIcon && (
+                        <span className="text-lg" aria-hidden>{iconVal}</span>
+                      )}
+                      {isUrlIcon && (
+                        <Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />
+                      )}
+                      <span className="text-white font-medium">{formData.name || 'Nuevo Agente'}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-500/10 text-violet-300 border-violet-500/30">
+                        {formData.role}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-xs line-clamp-1">{formData.description || 'Descripción corta del agente'}</p>
+                  </div>
+                </div>
+              )
+            })()}
+          </CardContent>
+        </Card>
+
         <div className="space-y-2">
           <Label htmlFor="name">Nombre del Agente</Label>
           <Input
             id="name"
             value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
+            onChange={handleTextInputChange('name')}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
             placeholder="Mi Agente Especializado"
             className="bg-white/10 border-white/20"
           />
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="role">Rol</Label>
-            <Select
-              value={formData.role}
-              onValueChange={(v) => handleInputChange('role', v as AgentRole)}
-            >
+            <Label htmlFor="role">Rol del agente</Label>
+            <Select value={formData.role} onValueChange={(v) => handleInputChange('role', v as AgentRole)}>
               <SelectTrigger id="role" className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecciona un rol" />
               </SelectTrigger>
@@ -395,85 +583,268 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 <SelectItem value="evaluator">Evaluator</SelectItem>
               </SelectContent>
             </Select>
+            <div className="text-xs text-slate-400">Selecciona “Especialist” para habilitar la <span className="font-medium">Especialidad</span>.</div>
+          </div>
+
+          {/* Parent (optional) for sub-agent relationship */}
+          <div className="space-y-2">
+            <Label htmlFor="parent">Sub-agente de</Label>
+            <Select value={formData.parentAgentId || 'none'} onValueChange={(v) => handleInputChange('parentAgentId', v === 'none' ? '' : v)}>
+              <SelectTrigger id="parent" className="bg-white/10 border-white/20 text-white">
+                <SelectValue placeholder="(Opcional) Selecciona agente padre" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
+                <SelectItem value="none">Ninguno</SelectItem>
+                {agents.map((a) => {
+                  const lower = (a.name || '').toLowerCase()
+                  const avatar = a.avatar 
+                    || (lower.includes('toby') ? '/img/agents/toby4.png'
+                    : lower.includes('ami') ? '/img/agents/ami4.png'
+                    : lower.includes('peter') ? '/img/agents/peter4.png'
+                    : lower.includes('emma') ? '/img/agents/emma4.png'
+                    : lower.includes('apu') ? '/img/agents/apu4.png'
+                    : lower.includes('wex') ? '/img/agents/wex4.png'
+                    : lower.includes('cleo') ? '/img/agents/logocleo4.png'
+                    : '/img/agents/logocleo4.png')
+                  return (
+                    <SelectItem key={a.id} value={a.id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={avatar} alt={a.name} />
+                          <AvatarFallback className="text-[10px]">{(a.name || 'A').charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span>{a.name}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            {formData.parentAgentId && (() => { const p = agents.find(x => x.id === formData.parentAgentId); if (!p) return null; const lower=(p.name||'').toLowerCase(); const avatar = p.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/agents/logocleo4.png' : '/img/agents/logocleo4.png'); return (
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={avatar} alt={p.name} />
+                  <AvatarFallback className="text-[10px]">{(p.name||'A').charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span>{p.name}</span>
+              </div>
+            )})()}
           </div>
 
           {formData.role === 'specialist' && (
             <div className="space-y-2">
-              <Label htmlFor="specialization">Especialización</Label>
-              <Select
-                value={formData.specialization}
-                onValueChange={(v) => {
-                  // Map specialization to helpful default tags
-                  const spec = v as typeof formData.specialization
-                  let specTags: string[] = []
-                  if (spec === 'technical') specTags = ['technical', 'análisis', 'datos']
-                  if (spec === 'creative') specTags = ['creative', 'diseño', 'contenido']
-                  if (spec === 'logical') specTags = ['logical', 'matemática', 'algoritmo']
-                  if (spec === 'research') specTags = ['research', 'investigación']
-                  handleInputChange('specialization', spec)
-                  // Merge unique tags while keeping any user-defined
-                  handleInputChange('tags', Array.from(new Set([...(formData.tags || []), ...specTags])))
-                }}
-              >
-                <SelectTrigger id="specialization" className="bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="Selecciona una especialización" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 text-white border-slate-700">
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="creative">Creative</SelectItem>
-                  <SelectItem value="logical">Logical</SelectItem>
-                  <SelectItem value="research">Research</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Especialidad</Label>
+              <div className="text-xs text-slate-400">Elige el foco principal del agente especialista.</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'technical', label: 'Technical', icon: '⚙️', tags: ['technical','análisis','datos'] },
+                  { id: 'creative', label: 'Creative', icon: '🎨', tags: ['creative','diseño','contenido'] },
+                  { id: 'logical', label: 'Logical', icon: '🧮', tags: ['logical','matemática','algoritmo'] },
+                  { id: 'research', label: 'Research', icon: '🔎', tags: ['research','investigación'] },
+                  { id: 'custom', label: 'Custom', icon: '✨', tags: [] },
+                ].map(opt => {
+                  const active = formData.specialization === (opt.id as any)
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange('specialization', opt.id)
+                        if (opt.tags.length) {
+                          handleInputChange('tags', Array.from(new Set([...(formData.tags || []), ...opt.tags])))
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${active ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}
+                    >
+                      <span className="mr-1">{opt.icon}</span>{opt.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="description">Descripción</Label>
           <Textarea
             id="description"
             value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
+            onChange={handleTextInputChange('description')}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
             placeholder="Describe las capacidades y propósito de este agente..."
             className="bg-white/10 border-white/20 min-h-[100px]"
           />
         </div>
-        
+
+        {/* Color and Icon (only on create) */}
+        {!isEdit && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="color">Color</Label>
+              <Input id="color" type="color" value={formData.color} onChange={(e) => handleInputChange('color', e.target.value)} className="bg-white/10 border-white/20 h-10 p-1" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="icon">Icono/Emoji</Label>
+  <Input id="icon" value={formData.icon} onChange={handleTextInputChange('icon')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="🤖, 🧠, 🛠️..." className="bg-white/10 border-white/20" />
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="tags">Tags (separados por comas)</Label>
-          <Input
-            id="tags"
-            value={formData.tags.join(', ')}
-            onChange={(e) => handleInputChange('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-            placeholder="análisis, escritura, código..."
-            className="bg-white/10 border-white/20"
-          />
+  <Input id="tags" value={formData.tags.join(', ')} onChange={handleTextInputChange('tags')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="análisis, escritura, código..." className="bg-white/10 border-white/20" />
         </div>
       </TabsContent>
-      
+
+      <TabsContent value="tools" className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <Label className="m-0">Herramientas</Label>
+          <div className="flex gap-2">
+            <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleInputChange('tools', Array.from(new Set(['complete_task', ...filteredTools.map(([k]) => k)])))}>
+              Seleccionar visibles
+            </Button>
+            <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleInputChange('tools', ['complete_task'])}>
+              Limpiar
+            </Button>
+          </div>
+        </div>
+
+        {/* Category filter */}
+        <div className="flex flex-wrap gap-2">
+          {allCategories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setToolCategory(cat)}
+              className={`px-2 py-1 rounded-full text-xs border transition-colors ${toolCategory === cat ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <Input placeholder="Buscar herramientas por nombre o descripción..." value={toolSearch} onChange={(e) => setToolSearch(e.target.value)} className="bg-white/10 border-white/20" />
+
+        {/* Tools list - vertical with invisible scroll to optimize space */}
+        <div className="relative">
+          <div className="flex flex-col gap-2 sm:gap-3 max-h-[60vh] sm:max-h-[55vh] overflow-y-auto no-scrollbar pr-1">
+          {filteredTools.map(([key, info]) => {
+            const enabled = (formData.tools || []).includes(key)
+            return (
+              <div
+                key={key}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (key === 'complete_task') return
+                  const next = new Set(formData.tools || [])
+                  if (enabled) next.delete(key); else next.add(key)
+                  next.add('complete_task')
+                  handleInputChange('tools', Array.from(next))
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    if (key === 'complete_task') return
+                    const next = new Set(formData.tools || [])
+                    if (enabled) next.delete(key); else next.add(key)
+                    next.add('complete_task')
+                    handleInputChange('tools', Array.from(next))
+                  }
+                }}
+                className={`rounded-lg px-3 py-2 sm:px-4 sm:py-3 border transition-colors outline-none focus:ring-2 focus:ring-violet-400/40 ${enabled ? 'border-violet-500/40 bg-violet-500/5' : 'border-white/10 bg-white/5 hover:bg-white/8'}`}
+              >
+                <div className="flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    {info.icon ? (
+                      <Image src={info.icon} alt={info.name} width={28} height={28} loading="lazy" className="rounded-md flex-shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-md bg-white/10 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm text-white truncate">{info.name}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{info.category}</div>
+                    </div>
+                  </div>
+                  <Switch
+                    onClick={(e) => e.stopPropagation()}
+                    checked={enabled}
+                    disabled={key === 'complete_task'}
+                    onCheckedChange={(checked) => {
+                      if (key === 'complete_task') return
+                      const next = new Set(formData.tools || [])
+                      if (checked) next.add(key)
+                      else next.delete(key)
+                      next.add('complete_task')
+                      handleInputChange('tools', Array.from(next))
+                    }}
+                  />
+                </div>
+                {info.description && (
+                  <p className="text-[12px] sm:text-[11px] text-slate-400 mt-2 line-clamp-2">
+                    {info.description}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+          </div>
+          {/* subtle gradient masks top/bottom to hint scroll without visible bar */}
+          <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
+        </div>
+
+        {/* Invisible scrollbar utility (scoped) */}
+        <style jsx global>{`
+          .no-scrollbar::-webkit-scrollbar { display: none; }
+          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+      </TabsContent>
+
       <TabsContent value="prompt" className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="prompt">System Prompt</Label>
-          <Textarea
-            id="prompt"
-            value={formData.prompt}
-            onChange={(e) => handleInputChange('prompt', e.target.value)}
-            placeholder="Eres un asistente especializado en..."
-            className="bg-white/10 border-white/20 min-h-[200px]"
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Editor */}
+            <div className="relative">
+              <Textarea
+                id="prompt"
+                value={formData.prompt}
+                onChange={(e) => handleInputChange('prompt', e.target.value)}
+                placeholder="Eres un asistente especializado en..."
+                className="bg-white/10 border-white/20 min-h-[180px] max-h-[50vh] overflow-y-auto no-scrollbar resize-none"
+              />
+              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
+            </div>
+
+            {/* Markdown Preview */}
+            <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
+              <div className="text-xs text-slate-400 mb-2">Vista previa (Markdown)</div>
+              <div className="max-h-[50vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                <Markdown>{formData.prompt}</Markdown>
+              </div>
+              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent rounded-b-lg" />
+            </div>
+          </div>
         </div>
+
+        {/* Invisible scrollbar utility (scoped) */}
+        <style jsx global>{`
+          .no-scrollbar::-webkit-scrollbar { display: none; }
+          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
       </TabsContent>
-      
+
       <TabsContent value="config" className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="model">Modelo</Label>
-            <Select
-              value={formData.model}
-              onValueChange={(v) => handleInputChange('model', v)}
-            >
+            <Select value={formData.model} onValueChange={(v) => handleInputChange('model', v)}>
               <SelectTrigger id="model" className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder={models.length ? 'Selecciona un modelo' : 'Cargando modelos...'} />
               </SelectTrigger>
@@ -486,31 +857,16 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="temperature">Temperature</Label>
-            <Input
-              id="temperature"
-              type="number"
-              min="0"
-              max="2"
-              step="0.1"
-              value={formData.temperature}
-              onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))}
-              className="bg-white/10 border-white/20"
-            />
+            <Input id="temperature" type="number" min="0" max="2" step="0.1" value={formData.temperature} onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))} className="bg-white/10 border-white/20" />
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="maxTokens">Max Tokens</Label>
-          <Input
-            id="maxTokens"
-            type="number"
-            value={formData.maxTokens}
-            onChange={(e) => handleInputChange('maxTokens', parseInt(e.target.value))}
-            className="bg-white/10 border-white/20"
-          />
+          <Input id="maxTokens" type="number" value={formData.maxTokens} onChange={(e) => handleInputChange('maxTokens', parseInt(e.target.value))} className="bg-white/10 border-white/20" />
         </div>
       </TabsContent>
     </Tabs>
@@ -543,7 +899,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         </div>
         
         <Button
-          onClick={() => setIsCreateDialogOpen(true)}
+          onClick={() => { resetForm(); setEditingAgent(null); setIsCreateDialogOpen(true) }}
           variant="outline"
           className="border-slate-600 text-slate-300 hover:text-white hover:border-violet-500 hover:bg-violet-500/10 transition-all duration-200"
         >
@@ -632,6 +988,18 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     </div>
                     
                     <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyFromAgent(agent)
+                        }}
+                        className="h-8 w-8 p-0 hover:bg-violet-500/20"
+                        title="Copiar agente"
+                      >
+                        <CopyIcon className="w-3 h-3" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -840,21 +1208,13 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     </div>
                   </div>
 
-                  {/* Tags */}
+                  {/* System Prompt (Markdown Preview) */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-white">Specializations</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {detailsAgent.tags && detailsAgent.tags.length > 0 ? (
-                        detailsAgent.tags.map((tag, index) => (
-                          <Badge key={index} variant="secondary" className="bg-violet-900/30 text-violet-300 border border-violet-700/50 hover:bg-violet-800/30 transition-colors">
-                            {tag}
-                          </Badge>
-                        ))
-                      ) : (
-                        <div className="bg-slate-700/30 rounded-lg p-4 text-center">
-                          <p className="text-slate-400 text-sm">No specializations defined</p>
-                        </div>
-                      )}
+                    <h3 className="text-lg font-semibold text-white">System Prompt</h3>
+                    <div className="bg-slate-700/30 rounded-lg p-3 md:p-4">
+                      <div className="max-h-[40vh] overflow-y-auto no-scrollbar prose prose-invert prose-sm">
+                        <Markdown>{detailsAgent.prompt || ''}</Markdown>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -904,6 +1264,24 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                       <p className="text-slate-500 text-sm">This agent doesn't have any specialized tools assigned</p>
                     </div>
                   )}
+                </div>
+
+                {/* Tags / Specializations */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-white">Specializations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {detailsAgent.tags && detailsAgent.tags.length > 0 ? (
+                      detailsAgent.tags.map((tag, index) => (
+                        <Badge key={index} variant="secondary" className="bg-violet-900/30 text-violet-300 border border-violet-700/50 hover:bg-violet-800/30 transition-colors">
+                          {tag}
+                        </Badge>
+                      ))
+                    ) : (
+                      <div className="bg-slate-700/30 rounded-lg p-4 text-center">
+                        <p className="text-slate-400 text-sm">No specializations defined</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

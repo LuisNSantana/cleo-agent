@@ -446,6 +446,16 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         totalExecutions: get().executions.length,
         activeAgents: get().agents.filter(a => a.role === 'supervisor' || a.role === 'specialist').length
       })
+      // Lightweight UX: if Cleo exists, append a dynamic tool name locally for immediate UX (server will persist too)
+      const agents = get().agents
+      const cleo = agents.find(a => a.id === 'cleo-supervisor')
+      if (cleo) {
+        const suffix = agent.id.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+        const toolName = `delegate_to_${suffix}`
+        if (!cleo.tools.includes(toolName)) {
+          cleo.tools = [...cleo.tools, toolName]
+        }
+      }
     },
 
     addDelegationEvent: (event: any) => {
