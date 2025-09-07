@@ -18,7 +18,8 @@ import {
   TrashIcon, 
   BrainIcon,
   RobotIcon,
-  CopyIcon
+  CopyIcon,
+  XIcon
 } from '@phosphor-icons/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AgentConfig, AgentRole } from '@/lib/agents/types'
@@ -486,7 +487,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     return { label: 'Specialist', colorClass: 'bg-violet-500/20 text-violet-300 border-violet-500/30' }
   }
 
-  const AgentForm = ({ isEdit = false }: { isEdit?: boolean }) => (
+  const AgentForm = ({ isEdit = false }: { isEdit?: boolean }) => {
+    const [promptView, setPromptView] = React.useState<'edit' | 'preview'>('edit')
+    return (
     <Tabs defaultValue="basic" className="w-full">
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="basic">Básico</TabsTrigger>
@@ -807,7 +810,48 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       <TabsContent value="prompt" className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="prompt">System Prompt</Label>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Mobile: toggle between Edit and Preview */}
+          <div className="lg:hidden">
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'edit' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
+                onClick={() => setPromptView('edit')}
+              >Editar</button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'preview' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
+                onClick={() => setPromptView('preview')}
+              >Vista previa</button>
+            </div>
+
+            {promptView === 'edit' ? (
+              <div className="relative">
+                <Textarea
+                  id="prompt"
+                  value={formData.prompt}
+                  onChange={(e) => handleInputChange('prompt', e.target.value)}
+                  placeholder="Eres un asistente especializado en..."
+                  className="bg-white/10 border-white/20 min-h-[180px] max-h-[55vh] overflow-y-auto no-scrollbar resize-none"
+                />
+                <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
+              </div>
+            ) : (
+              <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-2">Vista previa (Markdown)</div>
+                <div className="max-h-[55vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                  <Markdown>{formData.prompt}</Markdown>
+                </div>
+                <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent rounded-b-lg" />
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: side-by-side */}
+          <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Editor */}
             <div className="relative">
               <Textarea
@@ -871,6 +915,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       </TabsContent>
     </Tabs>
   )
+  }
 
   const getAgentAvatar = (agent?: AgentConfig) => {
     if (!agent) return null
@@ -1038,18 +1083,32 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700">
+        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white flex items-center">
-              <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
-              Crear Nuevo Agente
-            </DialogTitle>
+            <div className="relative">
+              <DialogTitle className="text-xl font-bold text-white flex items-center">
+                <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
+                Crear Nuevo Agente
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCreateDialogOpen(false)}
+                className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                aria-label="Cerrar"
+              >
+                <XIcon className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogHeader>
-          
-          <div className="space-y-6">
-            <AgentForm />
-            
-            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700">
+
+          <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
+            <div className="space-y-6">
+              <AgentForm />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700 bg-slate-800">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1067,25 +1126,38 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               >
                 Crear Agente
               </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)}>
-        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700">
+        <DialogContent className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white flex items-center">
-              <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
-              Editar Agente
-            </DialogTitle>
+            <div className="relative">
+              <DialogTitle className="text-xl font-bold text-white flex items-center">
+                <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
+                Editar Agente
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditingAgent(null)}
+                className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                aria-label="Cerrar"
+              >
+                <XIcon className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogHeader>
-          
-          <div className="space-y-6">
-            <AgentForm isEdit={true} />
-            
-            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700">
+
+          <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
+            <div className="space-y-6">
+              <AgentForm isEdit={true} />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700 bg-slate-800">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1103,7 +1175,6 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               >
                 Actualizar Agente
               </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1147,39 +1218,39 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                   {/* Agent Avatar */}
                   <div className="relative">
                     <Avatar className="h-20 w-20 rounded-xl ring-2 ring-violet-400/50">
-                      {getAgentAvatar(detailsAgent) ? (
+            {getAgentAvatar(detailsAgent || undefined) ? (
                         <AvatarImage 
-                          src={getAgentAvatar(detailsAgent)!} 
-                          alt={detailsAgent.name}
+              src={getAgentAvatar(detailsAgent || undefined)!} 
+              alt={detailsAgent!.name}
                           className="object-cover rounded-xl"
                         />
                       ) : null}
-                      <AvatarFallback className="rounded-xl text-xl" style={{ backgroundColor: detailsAgent.color }}>
+            <AvatarFallback className="rounded-xl text-xl" style={{ backgroundColor: detailsAgent!.color }}>
                         <BrainIcon className="w-10 h-10 text-white" />
                       </AvatarFallback>
                     </Avatar>
                     {/* Glow effect */}
                     <div 
                       className="absolute inset-0 rounded-xl opacity-20 blur-xl"
-                      style={{ backgroundColor: detailsAgent.color }}
+            style={{ backgroundColor: detailsAgent!.color }}
                     />
                   </div>
                   
                   <div className="flex-1">
                     <DialogTitle className="text-2xl font-bold text-white flex items-center mb-2">
-                      {detailsAgent.name}
+            {detailsAgent!.name}
                     </DialogTitle>
                     <div className="flex items-center space-x-3 mb-3">
-                      {(() => { const info = getSpecificRoleLabel(detailsAgent); return (
+            {(() => { const info = getSpecificRoleLabel(detailsAgent!); return (
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${info.colorClass}`}>
                           {info.label}
                         </span>
                       )})()}
                       <Badge variant="secondary" className="bg-slate-700/60 text-slate-200 border border-slate-600/60">
-                        {detailsAgent.model}
+            {detailsAgent!.model}
                       </Badge>
                     </div>
-                    <p className="text-slate-300 text-base leading-relaxed">{detailsAgent.description}</p>
+          <p className="text-slate-300 text-base leading-relaxed">{detailsAgent!.description}</p>
                   </div>
                 </div>
               </DialogHeader>
@@ -1195,15 +1266,15 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     <div className="bg-slate-700/30 rounded-lg p-4 space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400">Temperature:</span>
-                        <span className="text-white font-medium">{detailsAgent.temperature}</span>
+                        <span className="text-white font-medium">{detailsAgent!.temperature}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400">Max Tokens:</span>
-                        <span className="text-white font-medium">{detailsAgent.maxTokens?.toLocaleString()}</span>
+                        <span className="text-white font-medium">{detailsAgent!.maxTokens?.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400">Role:</span>
-                        <span className="text-white font-medium capitalize">{detailsAgent.role}</span>
+                        <span className="text-white font-medium capitalize">{detailsAgent!.role}</span>
                       </div>
                     </div>
                   </div>
@@ -1213,7 +1284,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     <h3 className="text-lg font-semibold text-white">System Prompt</h3>
                     <div className="bg-slate-700/30 rounded-lg p-3 md:p-4">
                       <div className="max-h-[40vh] overflow-y-auto no-scrollbar prose prose-invert prose-sm">
-                        <Markdown>{detailsAgent.prompt || ''}</Markdown>
+                        <Markdown>{detailsAgent!.prompt || ''}</Markdown>
                       </div>
                     </div>
                   </div>
@@ -1222,9 +1293,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 {/* Tools & Capabilities */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Tools & Capabilities</h3>
-                  {detailsAgent.tools && detailsAgent.tools.length > 0 ? (
+                  {detailsAgent!.tools && detailsAgent!.tools.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {detailsAgent.tools.map((toolName, index) => {
+                      {detailsAgent!.tools.map((toolName, index) => {
                         const toolInfo = TOOL_REGISTRY[toolName] || {
                           name: toolName,
                           description: 'Tool description not available',
@@ -1270,8 +1341,8 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Specializations</h3>
                   <div className="flex flex-wrap gap-2">
-                    {detailsAgent.tags && detailsAgent.tags.length > 0 ? (
-                      detailsAgent.tags.map((tag, index) => (
+                    {detailsAgent!.tags && detailsAgent!.tags.length > 0 ? (
+                      detailsAgent!.tags.map((tag, index) => (
                         <Badge key={index} variant="secondary" className="bg-violet-900/30 text-violet-300 border border-violet-700/50 hover:bg-violet-800/30 transition-colors">
                           {tag}
                         </Badge>
