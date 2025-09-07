@@ -311,265 +311,72 @@ const updateCleoWithNewAgent = async (newAgentName: string, agents: AgentConfig[
   }
 }
 
-export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteAgent }: AgentCRUDPanelProps) {
-  // Pull server-provided parent candidates (eligible parents) from client store when available
-  const parentCandidates = useClientAgentStore((s) => s.parentCandidates)
-  // Simple UUID v4-ish check (accepts generic UUID formats)
-  const isUUID = (v: string | undefined | null): boolean => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingAgent, setEditingAgent] = useState<AgentConfig | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [detailsAgent, setDetailsAgent] = useState<AgentConfig | null>(null)
-  const [toolSearch, setToolSearch] = useState('')
-  const [toolCategory, setToolCategory] = useState<string>('All')
-  // Guard for IME composition to prevent cursor jumps
-  const isComposingRef = React.useRef(false)
-  // Tags chip input local state
-  const [tagInput, setTagInput] = useState('')
-  // State for active tab to prevent jumping back to basic
-  const [activeTab, setActiveTab] = useState('basic')
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    role: 'specialist' as AgentRole,
-  specialization: 'technical' as 'technical' | 'creative' | 'logical' | 'research' | 'custom',
-    prompt: 'You are a helpful AI assistant.',
-    description: '',
-    tags: [] as string[],
-  tools: ['complete_task'] as string[],
-  model: '',
-    temperature: 0.7,
-    maxTokens: 2000,
-    color: '#8B5CF6',
-    icon: 'brain',
-    parentAgentId: '' as string | ''
-  })
+// Stable, top-level AgentForm to avoid remount on every parent render
+interface AgentFormProps {
+  isEdit?: boolean
+  formData: any
+  handleInputChange: (field: string, value: any) => void
+  handleTextInputChange: (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  isComposingRef: React.MutableRefObject<boolean>
+  tagInput: string
+  setTagInput: React.Dispatch<React.SetStateAction<string>>
+  addTag: (t: string) => void
+  removeTag: (t: string) => void
+  handleTagKeyDown: React.KeyboardEventHandler<HTMLInputElement>
+  models: { id: string; name?: string }[]
+  activeTab: string
+  setActiveTab: (v: string) => void
+  parentCandidates: any[]
+  agents: AgentConfig[]
+  isUUID: (v: string | undefined | null) => boolean
+  editingAgent: AgentConfig | null
+  toolSearch: string
+  setToolSearch: React.Dispatch<React.SetStateAction<string>>
+  toolCategory: string
+  setToolCategory: React.Dispatch<React.SetStateAction<string>>
+  allCategories: string[]
+  filteredTools: Array<[string, ToolInfo]>
+  isDesktop: boolean
+}
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      role: 'specialist' as AgentRole,
-  specialization: 'technical',
-      prompt: 'You are a helpful AI assistant.',
-      description: '',
-      tags: [],
-  tools: ['complete_task'],
-  model: '',
-      temperature: 0.7,
-      maxTokens: 2000,
-      color: '#8B5CF6',
-      icon: 'brain',
-      parentAgentId: ''
-    })
-  setTagInput('')
-    setActiveTab('basic')
-  }
-
-  const handleCreate = async () => {
-    if (!formData.name || !formData.role) return
-    
-  const newAgent = {
-      ...formData,
-      id: `agent-${Date.now()}`
-    }
-    
-    // Create the new agent
-    onCreateAgent(newAgent)
-    
-    // Update Cleo's delegation capabilities if the new agent is a specialist
-  if (formData.role === 'specialist') {
-      try {
-        const cleoUpdates = await updateCleoWithNewAgent(formData.name, agents)
-        if (cleoUpdates) {
-          onUpdateAgent('cleo-supervisor', cleoUpdates)
-        }
-    // Parent tools will be updated after server creation using the actual UUID id (handled upstream)
-      } catch (error) {
-        console.error('Failed to update Cleo delegation capabilities:', error)
-      }
-    }
-    
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
-
-  const handleEdit = (agent: AgentConfig) => {
-    setEditingAgent(agent)
-  setTagInput('')
-    setFormData({
-      name: agent.name || '',
-      role: agent.role || 'specialist',
-      specialization: (agent.tags?.includes('technical') || agent.tags?.includes('técnico')) ? 'technical'
-        : (agent.tags?.includes('creative') || agent.tags?.includes('creativo')) ? 'creative'
-        : (agent.tags?.includes('logical') || agent.tags?.includes('lógico')) ? 'logical'
-        : (agent.tags?.includes('research') || agent.tags?.includes('investigación')) ? 'research'
-        : 'custom',
-      prompt: agent.prompt || 'You are a helpful AI assistant.',
-      description: agent.description || '',
-      tags: agent.tags || [],
-      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
-      model: agent.model || 'gpt-4',
-      temperature: agent.temperature || 0.7,
-      maxTokens: agent.maxTokens || 2000,
-  color: agent.color || '#8B5CF6',
-  icon: agent.icon || 'brain',
-  parentAgentId: (agent.parentAgentId && isUUID(agent.parentAgentId) ? agent.parentAgentId : '')
-    })
-  }
-
-  // Duplicate an agent into the Create dialog (without ID)
-  const handleCopyFromAgent = (agent: AgentConfig) => {
-    const computedSpec: 'technical' | 'creative' | 'logical' | 'research' | 'custom' =
-      (agent.tags?.includes('technical') || agent.tags?.includes('técnico')) ? 'technical'
-      : (agent.tags?.includes('creative') || agent.tags?.includes('creativo')) ? 'creative'
-      : (agent.tags?.includes('logical') || agent.tags?.includes('lógico')) ? 'logical'
-      : (agent.tags?.includes('research') || agent.tags?.includes('investigación')) ? 'research'
-      : 'custom'
-    const copied = {
-      name: agent.name ? `${agent.name} (Copy)` : '',
-      role: agent.role || 'specialist',
-      specialization: computedSpec,
-      prompt: agent.prompt || 'You are a helpful AI assistant.',
-      description: agent.description || '',
-      tags: agent.tags || [],
-      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
-      model: agent.model || '',
-      temperature: agent.temperature || 0.7,
-      maxTokens: agent.maxTokens || 2000,
-      color: agent.color || '#8B5CF6',
-      icon: agent.icon || 'brain',
-      parentAgentId: '' as string | ''
-    }
-    setEditingAgent(null)
-  setTagInput('')
-    setFormData(copied)
-    setIsCreateDialogOpen(true)
-  }
-
-  const handleUpdate = () => {
-    if (!editingAgent?.id || !formData.name || !formData.role) return
-    
-    onUpdateAgent(editingAgent.id, formData)
-    setEditingAgent(null)
-    resetForm()
-  }
-
-  const handleDelete = (id: string) => {
-    onDeleteAgent(id)
-    setDeleteConfirm(null)
-  }
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
-  // Prevent focus loss on controlled inputs by restoring focus after state updates
-  const handleTextInputChange = (field: keyof typeof formData) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const el = e.target
-    const elementId = el.id
-    const selStart = (el as HTMLInputElement | HTMLTextAreaElement).selectionStart ?? undefined
-    const selEnd = (el as HTMLInputElement | HTMLTextAreaElement).selectionEnd ?? undefined
-    // Update state first
-    const rawValue = el.value
-    // Special case for tags input where we store as string[]
-    const value: any = elementId === 'tags'
-      ? rawValue.split(',').map((t) => t.trim()).filter(Boolean)
-      : rawValue
-    setFormData(prev => ({ ...prev, [field]: value }))
-
-    // Restore focus on next frame to avoid Radix/Dialog focus juggling in re-renders
-    requestAnimationFrame(() => {
-      if (isComposingRef.current) return
-      const nextEl = document.getElementById(elementId) as HTMLInputElement | HTMLTextAreaElement | null
-      if (nextEl && document.activeElement !== nextEl) {
-        try {
-          nextEl.focus({ preventScroll: true })
-          // Restore caret/selection if possible
-          if (typeof selStart === 'number' && typeof selEnd === 'number' && nextEl.setSelectionRange) {
-            nextEl.setSelectionRange(selStart, selEnd)
-          }
-        } catch {}
-      }
-    })
-  }
-
-  // Tags helpers: add/remove chip
-  const addTag = (raw: string) => {
-    const t = raw.trim()
-    if (!t) return
-    setFormData(prev => {
-      const existing = new Set(prev.tags || [])
-      existing.add(t)
-      return { ...prev, tags: Array.from(existing) }
-    })
-    setTagInput('')
-  }
-  const removeTag = (tag: string) => {
-    setFormData(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }))
-  }
-  const handleTagKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
-    if (e.key === 'Enter' || e.key === ',' ) {
-      e.preventDefault()
-      addTag(tagInput)
-    } else if (e.key === 'Backspace' && !tagInput) {
-      // Backspace with empty input removes last tag
-      setFormData(prev => ({ ...prev, tags: (prev.tags || []).slice(0, -1) }))
-    }
-  }
-
-  // Models context
-  const { models } = useModel()
-
-  // Tool catalog helpers
-  const allCategories = React.useMemo(() => {
-    const set = new Set<string>(['All'])
-    Object.values(TOOL_REGISTRY).forEach(t => set.add(t.category))
-    return Array.from(set)
-  }, [])
-
-  const filteredTools = React.useMemo(() => {
-    const query = toolSearch.toLowerCase()
-    return Object.entries(TOOL_REGISTRY).filter(([key, info]) => {
-      const matchesCategory = toolCategory === 'All' || info.category === toolCategory
-      const matchesQuery = !query || info.name.toLowerCase().includes(query) || info.description.toLowerCase().includes(query)
-      return matchesCategory && matchesQuery
-    })
-  }, [toolSearch, toolCategory])
-
-  // Helpers for enriched role/tag display
-  const getSpecificRoleLabel = (agent: AgentConfig): { label: string; colorClass: string } => {
-    const name = (agent.name || '').toLowerCase()
-    if (agent.role === 'supervisor') return { label: 'Supervisor', colorClass: 'bg-pink-500/20 text-pink-300 border-pink-500/30' }
-    if (name.includes('toby')) return { label: 'Technical Specialist', colorClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }
-    if (name.includes('ami')) return { label: 'Creative Specialist', colorClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' }
-    if (name.includes('peter')) return { label: 'Logical Analyst', colorClass: 'bg-lime-500/20 text-lime-300 border-lime-500/30' }
-    const tags = (agent.tags || []).map(t => t.toLowerCase())
-    if (tags.some(t => ['technical','técnico','datos'].includes(t))) return { label: 'Technical Specialist', colorClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }
-    if (tags.some(t => ['creative','creativo','diseño','contenido'].includes(t))) return { label: 'Creative Specialist', colorClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' }
-    if (tags.some(t => ['logical','lógico','matemática','matemático'].includes(t))) return { label: 'Logical Analyst', colorClass: 'bg-lime-500/20 text-lime-300 border-lime-500/30' }
-    if (agent.role === 'evaluator') return { label: 'Evaluator', colorClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
-    if (agent.role === 'worker') return { label: 'Worker', colorClass: 'bg-slate-500/20 text-slate-300 border-slate-500/30' }
-    return { label: 'Specialist', colorClass: 'bg-violet-500/20 text-violet-300 border-violet-500/30' }
-  }
-
-  const AgentForm = ({ isEdit = false }: { isEdit?: boolean }) => {
-    const [promptView, setPromptView] = React.useState<'edit' | 'preview'>('edit')
-    return (
-  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+const AgentForm: React.FC<AgentFormProps> = ({
+  isEdit = false,
+  formData,
+  handleInputChange,
+  handleTextInputChange,
+  isComposingRef,
+  tagInput,
+  setTagInput,
+  addTag,
+  removeTag,
+  handleTagKeyDown,
+  models,
+  activeTab,
+  setActiveTab,
+  parentCandidates,
+  agents,
+  isUUID,
+  editingAgent,
+  toolSearch,
+  setToolSearch,
+  toolCategory,
+  setToolCategory,
+  allCategories,
+  filteredTools,
+  isDesktop,
+}) => {
+  const [promptView, setPromptView] = React.useState<'edit' | 'preview'>('edit')
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-4">
-    <TabsTrigger value="basic">Basic</TabsTrigger>
+        <TabsTrigger value="basic">Basic</TabsTrigger>
         <TabsTrigger value="tools">Tools</TabsTrigger>
         <TabsTrigger value="prompt">Prompt</TabsTrigger>
         <TabsTrigger value="config">Config</TabsTrigger>
       </TabsList>
 
       <TabsContent value="basic" className="space-y-4">
-        {/* Live Preview with Avatar and Icon/Emoji (real-time) */}
+        {/* Live Preview */}
         <Card className="bg-slate-900/40 border-slate-700/50">
           <CardContent className="pt-4">
             {(() => {
@@ -595,11 +402,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                       </AvatarFallback>
                     </Avatar>
                     {(isUrlIcon || isEmojiIcon) && (
-                      <div
-                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border border-white/20 bg-slate-900/90 flex items-center justify-center shadow ring-1 ring-black/20"
-                        style={{ outline: 'none' }}
-                        aria-hidden
-                      >
+                      <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border border-white/20 bg-slate-900/90 flex items-center justify-center shadow ring-1 ring-black/20" aria-hidden>
                         {isUrlIcon ? (
                           <Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />
                         ) : (
@@ -610,12 +413,8 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      {isEmojiIcon && (
-                        <span className="text-lg" aria-hidden>{iconVal}</span>
-                      )}
-                      {isUrlIcon && (
-                        <Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />
-                      )}
+                      {isEmojiIcon && (<span className="text-lg" aria-hidden>{iconVal}</span>)}
+                      {isUrlIcon && (<Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />)}
                       <span className="text-white font-medium">{formData.name || 'New Agent'}</span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-500/10 text-violet-300 border-violet-500/30">
                         {formData.role}
@@ -631,15 +430,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
         <div className="space-y-2">
           <Label htmlFor="name">Agent Name</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={handleTextInputChange('name')}
-            onCompositionStart={() => { isComposingRef.current = true }}
-            onCompositionEnd={() => { isComposingRef.current = false }}
-            placeholder="My Specialized Agent"
-            className="bg-white/10 border-white/20"
-          />
+          <Input id="name" value={formData.name} onChange={handleTextInputChange('name')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="My Specialized Agent" className="bg-white/10 border-white/20" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -665,50 +456,46 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
             <Label htmlFor="parent">Sub-agent of <span className="text-[11px] text-slate-400 font-normal">(only primary agents, not sub-agents)</span></Label>
             {(() => {
               const currentId = editingAgent?.id
-              // Prefer server-provided parentCandidates; fallback to local eligible agents
               const candidateIds = new Set(parentCandidates.map(p => p.id))
               let uuidAgents = (parentCandidates.length > 0)
-                ? parentCandidates
-                    .filter(p => isUUID(p.id))
-                    .map(p => ({ id: p.id, name: p.name } as any))
+                ? parentCandidates.filter(p => isUUID(p.id)).map(p => ({ id: p.id, name: p.name } as any))
                 : agents.filter(a => isUUID(a.id) && a.id !== currentId && !a.isSubAgent)
               const currentVal = isUUID(formData.parentAgentId) ? formData.parentAgentId : ''
               return (
                 <Select value={currentVal || 'none'} onValueChange={(v) => handleInputChange('parentAgentId', v === 'none' ? '' : v)}>
-              <SelectTrigger id="parent" className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="(Optional) Select parent agent" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
-                <SelectItem value="none">None</SelectItem>
-                {uuidAgents.map((a) => {
-                  const lower = (a.name || '').toLowerCase()
-                  const avatar = (a.avatar)
-                    || (lower.includes('toby') ? '/img/agents/toby4.png'
-                    : lower.includes('ami') ? '/img/agents/ami4.png'
-                    : lower.includes('peter') ? '/img/agents/peter4.png'
-                    : lower.includes('emma') ? '/img/agents/emma4.png'
-                    : lower.includes('apu') ? '/img/agents/apu4.png'
-                    : lower.includes('wex') ? '/img/agents/wex4.png'
-                    : lower.includes('cleo') ? '/img/agents/logocleo4.png'
-                    : '/img/agents/logocleo4.png')
-                  return (
-                    <SelectItem key={a.id} value={a.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-5 w-5">
-                          <AvatarImage src={avatar} alt={a.name} />
-                          <AvatarFallback className="text-[10px]">{(a.name || 'A').charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span>{a.name}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
+                  <SelectTrigger id="parent" className="bg-white/10 border-white/20 text-white">
+                    <SelectValue placeholder="(Optional) Select parent agent" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
+                    <SelectItem value="none">None</SelectItem>
+                    {uuidAgents.map((a) => {
+                      const lower = (a.name || '').toLowerCase()
+                      const avatar = (a.avatar)
+                        || (lower.includes('toby') ? '/img/agents/toby4.png'
+                        : lower.includes('ami') ? '/img/agents/ami4.png'
+                        : lower.includes('peter') ? '/img/agents/peter4.png'
+                        : lower.includes('emma') ? '/img/agents/emma4.png'
+                        : lower.includes('apu') ? '/img/agents/apu4.png'
+                        : lower.includes('wex') ? '/img/agents/wex4.png'
+                        : lower.includes('cleo') ? '/img/agents/logocleo4.png'
+                        : '/img/agents/logocleo4.png')
+                      return (
+                        <SelectItem key={a.id} value={a.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={avatar} alt={a.name} />
+                              <AvatarFallback className="text-[10px]">{(a.name || 'A').charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span>{a.name}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
                 </Select>
               )
             })()}
             {(() => {
-              // Small helper when there are no candidates available
               const hasCandidates = (parentCandidates && parentCandidates.length > 0) || agents.some(a => isUUID(a.id) && !a.isSubAgent)
               if (hasCandidates) return null
               return (
@@ -763,18 +550,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={formData.description}
-            onChange={handleTextInputChange('description')}
-            onCompositionStart={() => { isComposingRef.current = true }}
-            onCompositionEnd={() => { isComposingRef.current = false }}
-            placeholder="Describe this agent's capabilities and purpose..."
-            className="bg-white/10 border-white/20 min-h-[100px]"
-          />
+          <Textarea id="description" value={formData.description} onChange={handleTextInputChange('description')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="Describe this agent's capabilities and purpose..." className="bg-white/10 border-white/20 min-h-[100px]" />
         </div>
 
-        {/* Color and Icon (only on create) */}
         {!isEdit && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -783,7 +561,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
             </div>
             <div className="space-y-2">
               <Label htmlFor="icon">Icon/Emoji</Label>
-  <Input id="icon" value={formData.icon} onChange={handleTextInputChange('icon')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="🤖, 🧠, 🛠️..." className="bg-white/10 border-white/20" />
+              <Input id="icon" value={formData.icon} onChange={handleTextInputChange('icon')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="🤖, 🧠, 🛠️..." className="bg-white/10 border-white/20" />
             </div>
           </div>
         )}
@@ -791,30 +569,15 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         <div className="space-y-2">
           <Label htmlFor="tags">Tags</Label>
           <div className="bg-white/10 border border-white/20 rounded-md px-2 py-2 flex flex-wrap gap-2">
-            {(formData.tags || []).map((tag) => (
+            {(formData.tags || []).map((tag: string) => (
               <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/60 text-slate-100 border border-slate-600/60">
                 {tag}
-                <button
-                  type="button"
-                  aria-label={`Remove ${tag}`}
-                  onClick={() => removeTag(tag)}
-                  className="hover:text-red-300/90 text-slate-300/80"
-                >
+                <button type="button" aria-label={`Remove ${tag}`} onClick={() => removeTag(tag)} className="hover:text-red-300/90 text-slate-300/80">
                   <XIcon className="w-3.5 h-3.5" />
                 </button>
               </span>
             ))}
-            <input
-              id="tags"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKeyDown}
-              onCompositionStart={() => { isComposingRef.current = true }}
-              onCompositionEnd={() => { isComposingRef.current = false }}
-              onBlur={() => addTag(tagInput)}
-              placeholder={(formData.tags?.length ?? 0) === 0 ? 'Add tag and press Enter' : 'Add another tag'}
-              className="flex-1 min-w-[120px] bg-transparent outline-none text-sm text-slate-100 placeholder:text-slate-400"
-            />
+            <input id="tags" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} onBlur={() => addTag(tagInput)} placeholder={(formData.tags?.length ?? 0) === 0 ? 'Add tag and press Enter' : 'Add another tag'} className="flex-1 min-w-[120px] bg-transparent outline-none text-sm text-slate-100 placeholder:text-slate-400" />
           </div>
           <div className="text-[11px] text-slate-500">Tip: Press Enter or comma to add a tag. Backspace removes last.</div>
         </div>
@@ -836,90 +599,73 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         {/* Category filter */}
         <div className="flex flex-wrap gap-2">
           {allCategories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setToolCategory(cat)}
-              className={`px-2 py-1 rounded-full text-xs border transition-colors ${toolCategory === cat ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}
-            >
+            <button key={cat} type="button" onClick={() => setToolCategory(cat)} className={`px-2 py-1 rounded-full text-xs border transition-colors ${toolCategory === cat ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}>
               {cat}
             </button>
           ))}
         </div>
 
         {/* Search */}
-  <Input placeholder="Search tools by name or description..." value={toolSearch} onChange={(e) => setToolSearch(e.target.value)} className="bg-white/10 border-white/20" />
+        <Input placeholder="Search tools by name or description..." value={toolSearch} onChange={(e) => setToolSearch(e.target.value)} className="bg-white/10 border-white/20" />
 
-        {/* Tools list - vertical with invisible scroll to optimize space */}
+        {/* Tools list */}
         <div className="relative">
           <div className="flex flex-col gap-2 sm:gap-3 max-h-[60vh] sm:max-h-[55vh] overflow-y-auto no-scrollbar pr-1">
-          {filteredTools.map(([key, info]) => {
-            const enabled = (formData.tools || []).includes(key)
-            return (
-              <div
-                key={key}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  if (key === 'complete_task') return
-                  const next = new Set(formData.tools || [])
-                  if (enabled) next.delete(key); else next.add(key)
-                  next.add('complete_task')
-                  handleInputChange('tools', Array.from(next))
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
+            {filteredTools.map(([key, info]) => {
+              const enabled = (formData.tools || []).includes(key)
+              return (
+                <div key={key} role="button" tabIndex={0}
+                  onClick={() => {
                     if (key === 'complete_task') return
                     const next = new Set(formData.tools || [])
                     if (enabled) next.delete(key); else next.add(key)
                     next.add('complete_task')
                     handleInputChange('tools', Array.from(next))
-                  }
-                }}
-                className={`rounded-lg px-3 py-2 sm:px-4 sm:py-3 border transition-colors outline-none focus:ring-2 focus:ring-violet-400/40 ${enabled ? 'border-violet-500/40 bg-violet-500/5' : 'border-white/10 bg-white/5 hover:bg-white/8'}`}
-              >
-                <div className="flex items-center justify-between gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    {info.icon ? (
-                      <Image src={info.icon} alt={info.name} width={28} height={28} loading="lazy" className="rounded-md flex-shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-md bg-white/10 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <div className="text-sm text-white truncate">{info.name}</div>
-                      <div className="text-[11px] text-slate-400 truncate">{info.category}</div>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      if (key === 'complete_task') return
+                      const next = new Set(formData.tools || [])
+                      if (enabled) next.delete(key); else next.add(key)
+                      next.add('complete_task')
+                      handleInputChange('tools', Array.from(next))
+                    }
+                  }}
+                  className={`rounded-lg px-3 py-2 sm:px-4 sm:py-3 border transition-colors outline-none focus:ring-2 focus:ring-violet-400/40 ${enabled ? 'border-violet-500/40 bg-violet-500/5' : 'border-white/10 bg-white/5 hover:bg-white/8'}`}
+                >
+                  <div className="flex items-center justify-between gap-3 sm:gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      {info.icon ? (
+                        <Image src={info.icon} alt={info.name} width={28} height={28} loading="lazy" className="rounded-md flex-shrink-0" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-md bg-white/10 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-sm text-white truncate">{info.name}</div>
+                        <div className="text-[11px] text-slate-400 truncate">{info.category}</div>
+                      </div>
                     </div>
-                  </div>
-                  <Switch
-                    onClick={(e) => e.stopPropagation()}
-                    checked={enabled}
-                    disabled={key === 'complete_task'}
-                    onCheckedChange={(checked) => {
+                    <Switch onClick={(e) => e.stopPropagation()} checked={enabled} disabled={key === 'complete_task'} onCheckedChange={(checked) => {
                       if (key === 'complete_task') return
                       const next = new Set(formData.tools || [])
                       if (checked) next.add(key)
                       else next.delete(key)
                       next.add('complete_task')
                       handleInputChange('tools', Array.from(next))
-                    }}
-                  />
+                    }} />
+                  </div>
+                  {info.description && (
+                    <p className="text-[12px] sm:text-[11px] text-slate-400 mt-2 line-clamp-2">{info.description}</p>
+                  )}
                 </div>
-                {info.description && (
-                  <p className="text-[12px] sm:text-[11px] text-slate-400 mt-2 line-clamp-2">
-                    {info.description}
-                  </p>
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
           </div>
-          {/* subtle gradient masks top/bottom to hint scroll without visible bar */}
           <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
         </div>
 
-        {/* Invisible scrollbar utility (scoped) */}
         <style jsx global>{`
           .no-scrollbar::-webkit-scrollbar { display: none; }
           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -929,78 +675,48 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       <TabsContent value="prompt" className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="prompt">System Prompt</Label>
-
-          {/* Mobile: toggle between Edit and Preview */}
-          <div className="lg:hidden">
-            <div className="flex gap-2 mb-3">
-              <button
-                type="button"
-                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'edit' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
-                onClick={() => setPromptView('edit')}
-              >Edit</button>
-              <button
-                type="button"
-                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'preview' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`}
-                onClick={() => setPromptView('preview')}
-              >Preview</button>
-            </div>
-
-            {promptView === 'edit' ? (
+          {isDesktop ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="relative">
-                <Textarea
-                  id="prompt"
-                  value={formData.prompt}
-                  onChange={handleTextInputChange('prompt')}
-                  onCompositionStart={() => { isComposingRef.current = true }} 
-                  onCompositionEnd={() => { isComposingRef.current = false }}
-                  placeholder="You are a specialized assistant in..."
-                  className="bg-white/10 border-white/20 min-h-[180px] max-h-[55vh] overflow-y-auto no-scrollbar resize-none"
-                />
+                <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[180px] max-h-[50vh] overflow-y-auto no-scrollbar resize-none" />
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
               </div>
-            ) : (
-              <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3">
+              <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
                 <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
-                <div className="max-h-[55vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                <div className="max-h-[50vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
                   <Markdown>{formData.prompt}</Markdown>
                 </div>
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent rounded-b-lg" />
               </div>
-            )}
-          </div>
-
-          {/* Desktop: side-by-side */}
-          <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Editor */}
-            <div className="relative">
-              <Textarea
-                id="prompt"
-                value={formData.prompt}
-                onChange={handleTextInputChange('prompt')}
-                onCompositionStart={() => { isComposingRef.current = true }} 
-                onCompositionEnd={() => { isComposingRef.current = false }}
-                placeholder="You are a specialized assistant in..."
-                className="bg-white/10 border-white/20 min-h-[180px] max-h-[50vh] overflow-y-auto no-scrollbar resize-none"
-              />
-              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
             </div>
-
-            {/* Markdown Preview */}
-            <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
-              <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
-              <div className="max-h-[50vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
-                <Markdown>{formData.prompt}</Markdown>
+          ) : (
+            <div>
+              <div className="flex gap-2 mb-3">
+                <button type="button" className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'edit' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`} onClick={() => setPromptView('edit')}>Edit</button>
+                <button type="button" className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${promptView === 'preview' ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10'}`} onClick={() => setPromptView('preview')}>Preview</button>
               </div>
-              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent rounded-b-lg" />
+              {promptView === 'edit' ? (
+                <div className="relative">
+                  <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[180px] max-h-[55vh] overflow-y-auto no-scrollbar resize-none" />
+                  <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
+                </div>
+              ) : (
+                <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3">
+                  <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
+                  <div className="max-h-[55vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                    <Markdown>{formData.prompt}</Markdown>
+                  </div>
+                  <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent rounded-b-lg" />
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Invisible scrollbar utility (scoped) */}
         <style jsx global>{`
           .no-scrollbar::-webkit-scrollbar { display: none; }
           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -1027,42 +743,258 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
           <div className="space-y-2">
             <Label htmlFor="temperature">Temperature</Label>
-            <Input 
-              id="temperature" 
-              type="number" 
-              min="0" 
-              max="2" 
-              step="0.1" 
-              value={formData.temperature} 
-              onChange={(e) => {
-                const value = parseFloat(e.target.value) || 0
-                handleInputChange('temperature', value)
-              }} 
-              onCompositionStart={() => { isComposingRef.current = true }} 
-              onCompositionEnd={() => { isComposingRef.current = false }}
-              className="bg-white/10 border-white/20" 
-            />
+            <Input id="temperature" type="number" min="0" max="2" step="0.1" value={formData.temperature} onChange={(e) => { const value = parseFloat(e.target.value) || 0; handleInputChange('temperature', value) }} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} className="bg-white/10 border-white/20" />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="maxTokens">Max Tokens</Label>
-          <Input 
-            id="maxTokens" 
-            type="number" 
-            value={formData.maxTokens} 
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 0
-              handleInputChange('maxTokens', value)
-            }} 
-            onCompositionStart={() => { isComposingRef.current = true }} 
-            onCompositionEnd={() => { isComposingRef.current = false }}
-            className="bg-white/10 border-white/20" 
-          />
+          <Input id="maxTokens" type="number" value={formData.maxTokens} onChange={(e) => { const value = parseInt(e.target.value) || 0; handleInputChange('maxTokens', value) }} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} className="bg-white/10 border-white/20" />
         </div>
       </TabsContent>
     </Tabs>
   )
+}
+
+export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteAgent }: AgentCRUDPanelProps) {
+  // Pull server-provided parent candidates (eligible parents) from client store when available
+  const parentCandidates = useClientAgentStore((s) => s.parentCandidates)
+  // Simple UUID v4-ish check (accepts generic UUID formats)
+  const isUUID = (v: string | undefined | null): boolean => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+  const { models } = useModel()
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [editingAgent, setEditingAgent] = useState<AgentConfig | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [detailsAgent, setDetailsAgent] = useState<AgentConfig | null>(null)
+  const [toolSearch, setToolSearch] = useState('')
+  const [toolCategory, setToolCategory] = useState<string>('All')
+  // Guard for IME composition to prevent cursor jumps
+  const isComposingRef = React.useRef(false)
+  // Tags chip input local state
+  const [tagInput, setTagInput] = useState('')
+  // State for active tab to prevent jumping back to basic
+  const [activeTab, setActiveTab] = useState('basic')
+  // Responsive detection to avoid rendering both mobile and desktop prompt editors simultaneously
+  const [isDesktop, setIsDesktop] = React.useState(false)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(min-width: 1024px)')
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    setIsDesktop(mql.matches)
+    if (mql.addEventListener) mql.addEventListener('change', handler)
+    else if ((mql as any).addListener) (mql as any).addListener(handler)
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', handler)
+      else if ((mql as any).removeListener) (mql as any).removeListener(handler)
+    }
+  }, [])
+
+  // ----- Form state & handlers -----
+  type FormState = {
+    name: string
+    role: AgentRole | ''
+    description: string
+    color: string
+    icon: string
+    tags: string[]
+    specialization?: 'technical' | 'creative' | 'logical' | 'research' | 'custom'
+    parentAgentId?: string
+    model: string
+    temperature: number
+    maxTokens: number
+    prompt: string
+    tools: string[]
+  }
+
+  const initialFormState: FormState = {
+    name: '',
+    role: '' as any,
+    description: '',
+    color: '#7c3aed',
+    icon: '',
+    tags: [],
+    specialization: 'custom',
+    parentAgentId: '',
+    model: '',
+    temperature: 0.7,
+    maxTokens: 2048,
+    prompt: '',
+    tools: ['complete_task'],
+  }
+
+  const [formData, setFormData] = useState<FormState>(initialFormState)
+
+  const resetForm = () => {
+    setFormData(initialFormState)
+    setActiveTab('basic')
+    setTagInput('')
+    setToolSearch('')
+    setToolCategory('All')
+  }
+
+  const handleInputChange = (field: keyof FormState, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleTextInputChange = (field: keyof FormState) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const value = e.target.value
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const addTag = (t: string) => {
+    const tag = (t || '').trim()
+    if (!tag) return
+    setFormData((prev) => ({ ...prev, tags: Array.from(new Set([...(prev.tags || []), tag])) }))
+    setTagInput('')
+  }
+
+  const removeTag = (t: string) => {
+    setFormData((prev) => ({ ...prev, tags: (prev.tags || []).filter((x) => x !== t) }))
+  }
+
+  const handleTagKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addTag(tagInput)
+    } else if (e.key === 'Backspace' && !tagInput && (formData.tags || []).length > 0) {
+      e.preventDefault()
+      const last = formData.tags[formData.tags.length - 1]
+      removeTag(last)
+    }
+  }
+
+  // Tool filtering
+  const allCategories = React.useMemo(() => {
+    const cats = new Set<string>(['All'])
+    Object.values(TOOL_REGISTRY).forEach((t) => cats.add(t.category))
+    return Array.from(cats)
+  }, [])
+
+  const filteredTools = React.useMemo(() => {
+    const q = toolSearch.toLowerCase().trim()
+    return Object.entries(TOOL_REGISTRY).filter(([key, info]) => {
+      const matchCat = toolCategory === 'All' || info.category === toolCategory
+      const matchText = !q || key.toLowerCase().includes(q) || info.name.toLowerCase().includes(q) || (info.description || '').toLowerCase().includes(q)
+      return matchCat && matchText
+    })
+  }, [toolCategory, toolSearch])
+
+  // Role label helper
+  const getSpecificRoleLabel = (a: AgentConfig) => {
+    if ((a as any).isSubAgent) return { label: 'Sub-agent', colorClass: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40' }
+    switch (a.role) {
+      case 'supervisor':
+        return { label: 'Supervisor', colorClass: 'bg-violet-500/10 text-violet-300 border-violet-500/40' }
+      case 'specialist':
+        return { label: 'Specialist', colorClass: 'bg-sky-500/10 text-sky-300 border-sky-500/40' }
+      case 'worker':
+        return { label: 'Worker', colorClass: 'bg-slate-500/10 text-slate-300 border-slate-500/40' }
+      case 'evaluator':
+        return { label: 'Evaluator', colorClass: 'bg-amber-500/10 text-amber-300 border-amber-500/40' }
+      default:
+        return { label: 'Agent', colorClass: 'bg-slate-500/10 text-slate-300 border-slate-500/40' }
+    }
+  }
+
+  // CRUD handlers
+  const handleCreate = async () => {
+    const payload: Partial<AgentConfig> = {
+      name: formData.name,
+      role: (formData.role || undefined) as AgentRole | undefined,
+      description: formData.description,
+      color: formData.color as any,
+      icon: formData.icon as any,
+      tags: formData.tags,
+      model: formData.model,
+      temperature: formData.temperature as any,
+      maxTokens: formData.maxTokens as any,
+      prompt: formData.prompt,
+      tools: Array.from(new Set([...(formData.tools || []), 'complete_task'])),
+      parentAgentId: formData.parentAgentId || undefined,
+      ...(formData.specialization ? { specialization: formData.specialization as any } : {}),
+    }
+    onCreateAgent(payload)
+    // Try update Cleo with new agent delegation option
+    try {
+      const result = await updateCleoWithNewAgent(formData.name, agents)
+      if (result) {
+        onUpdateAgent?.('cleo-supervisor', { prompt: result.prompt, tools: result.tools } as any)
+      }
+    } catch (err) {
+      console.warn('Failed to update Cleo with new agent:', err)
+    }
+    setIsCreateDialogOpen(false)
+    resetForm()
+  }
+
+  const handleEdit = (agent: AgentConfig) => {
+    setEditingAgent(agent)
+    setFormData({
+      name: agent.name || '',
+      role: (agent.role as AgentRole) || ('' as any),
+      description: agent.description || '',
+      color: (agent as any).color || '#7c3aed',
+      icon: (agent as any).icon || '',
+      tags: agent.tags || [],
+      specialization: (agent as any).specialization || 'custom',
+      parentAgentId: (agent as any).parentAgentId || '',
+      model: agent.model || '',
+      temperature: (agent as any).temperature ?? 0.7,
+      maxTokens: (agent as any).maxTokens ?? 2048,
+      prompt: agent.prompt || '',
+      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
+    })
+    setActiveTab('basic')
+  }
+
+  const handleCopyFromAgent = (agent: AgentConfig) => {
+    setIsCreateDialogOpen(true)
+    setEditingAgent(null)
+    setFormData({
+      name: `${agent.name} Copy`,
+      role: (agent.role as AgentRole) || ('' as any),
+      description: agent.description || '',
+      color: (agent as any).color || '#7c3aed',
+      icon: (agent as any).icon || '',
+      tags: agent.tags || [],
+      specialization: (agent as any).specialization || 'custom',
+      parentAgentId: '',
+      model: agent.model || '',
+      temperature: (agent as any).temperature ?? 0.7,
+      maxTokens: (agent as any).maxTokens ?? 2048,
+      prompt: agent.prompt || '',
+      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
+    })
+    setActiveTab('basic')
+  }
+
+  const handleUpdate = async () => {
+    if (!editingAgent?.id) return
+    const payload: Partial<AgentConfig> = {
+      name: formData.name,
+      role: (formData.role || undefined) as AgentRole | undefined,
+      description: formData.description,
+      color: formData.color as any,
+      icon: formData.icon as any,
+      tags: formData.tags,
+      model: formData.model,
+      temperature: formData.temperature as any,
+      maxTokens: formData.maxTokens as any,
+      prompt: formData.prompt,
+      tools: Array.from(new Set([...(formData.tools || []), 'complete_task'])),
+      parentAgentId: formData.parentAgentId || undefined,
+      ...(formData.specialization ? { specialization: formData.specialization as any } : {}),
+    }
+    onUpdateAgent(editingAgent.id, payload)
+    setEditingAgent(null)
+    resetForm()
+  }
+
+  const handleDelete = async (id: string) => {
+    onDeleteAgent(id)
+    setDeleteConfirm(null)
   }
 
   const getAgentAvatar = (agent?: AgentConfig) => {
@@ -1314,7 +1246,32 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
           <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
             <div className="space-y-6">
-              <AgentForm />
+              <AgentForm
+                isEdit={false}
+                formData={formData}
+                handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                isComposingRef={isComposingRef}
+                tagInput={tagInput}
+                setTagInput={setTagInput}
+                addTag={addTag}
+                removeTag={removeTag}
+                handleTagKeyDown={handleTagKeyDown}
+                models={models}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                parentCandidates={parentCandidates as any}
+                agents={agents}
+                isUUID={isUUID}
+                editingAgent={editingAgent}
+                toolSearch={toolSearch}
+                setToolSearch={setToolSearch}
+                toolCategory={toolCategory}
+                setToolCategory={setToolCategory}
+                allCategories={allCategories}
+                filteredTools={filteredTools}
+                isDesktop={isDesktop}
+              />
             </div>
           </div>
 
@@ -1363,7 +1320,32 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
           <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
             <div className="space-y-6">
-              <AgentForm isEdit={true} />
+              <AgentForm
+                isEdit={true}
+                formData={formData}
+                handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                isComposingRef={isComposingRef}
+                tagInput={tagInput}
+                setTagInput={setTagInput}
+                addTag={addTag}
+                removeTag={removeTag}
+                handleTagKeyDown={handleTagKeyDown}
+                models={models}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                parentCandidates={parentCandidates as any}
+                agents={agents}
+                isUUID={isUUID}
+                editingAgent={editingAgent}
+                toolSearch={toolSearch}
+                setToolSearch={setToolSearch}
+                toolCategory={toolCategory}
+                setToolCategory={setToolCategory}
+                allCategories={allCategories}
+                filteredTools={filteredTools}
+                isDesktop={isDesktop}
+              />
             </div>
           </div>
 
