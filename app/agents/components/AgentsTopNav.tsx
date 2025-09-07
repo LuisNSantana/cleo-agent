@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { House, GearSix, ChartBar, ChatsCircle, TreeStructure, SquaresFour } from '@phosphor-icons/react'
 import { SettingsTrigger } from '@/app/components/layout/settings/settings-trigger'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 
 const navItems = [
   { href: '/agents', label: 'Home', icon: House },
@@ -51,20 +52,10 @@ export function AgentsTopNav() {
           })}
         </nav>
 
-        {/* Right: settings and metrics link (settings opens drawer/dialog) */}
-  <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/dashboard" className="hidden sm:inline-flex">
-                  <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                    <ChartBar className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>Analytics</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        {/* Right: notification bell and settings */}
+        <div className="flex items-center gap-2">
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* Quick Home icon */}
           <TooltipProvider>

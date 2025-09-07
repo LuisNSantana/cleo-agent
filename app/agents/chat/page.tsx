@@ -55,6 +55,7 @@ export default function AgentsChatPage() {
   // Track which executions we've already appended to avoid duplicates
   const appendedExecRef = useRef<Set<string>>(new Set())
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
+  const initHandledRef = useRef(false)
   
   
   const scrollToBottom = () => {
@@ -80,6 +81,43 @@ export default function AgentsChatPage() {
     }
     ensureCsrf()
   }, [])
+
+  // Read URL params for agent selection and message prefill
+  useEffect(() => {
+    if (initHandledRef.current) return
+    try {
+      const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+      const agentId = sp.get('agentId')
+      const prefill = sp.get('prefill')
+      const prefillKey = sp.get('prefillKey')
+
+      if (agents && agents.length > 0) {
+        if (agentId) {
+          const found = agents.find(a => a.id === agentId)
+          if (found) setSelectedAgent(found)
+        } else if (!selectedAgent) {
+          // Default to first agent for smoother UX
+          setSelectedAgent(agents[0])
+        }
+      }
+
+      let initial = ''
+      if (prefill) initial = prefill
+      if (!initial && prefillKey && typeof window !== 'undefined' && window.sessionStorage) {
+        const stored = window.sessionStorage.getItem(prefillKey)
+        if (stored) initial = stored
+      }
+      if (initial) setInputMessage(initial)
+      // Clear consumed prefill to avoid polluting future sessions
+      if (prefillKey && typeof window !== 'undefined' && window.sessionStorage) {
+        try { window.sessionStorage.removeItem(prefillKey) } catch {}
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      initHandledRef.current = true
+    }
+  }, [agents])
 
   // When an execution completes, append the AI messages from orchestrator
   useEffect(() => {

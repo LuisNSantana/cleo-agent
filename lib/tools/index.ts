@@ -382,13 +382,6 @@ export const tools = {
   listSerpapiKeys: serpapiCredentialTools.listSerpapiKeys,
   deleteSerpapiKey: serpapiCredentialTools.deleteSerpapiKey,
   testSerpapiKey: serpapiCredentialTools.testSerpapiKey,
-
-  // Delegation Tools - Agent-to-Agent Task Handoffs
-  delegate_to_toby: delegateToTobyTool,
-  delegate_to_ami: delegateToAmiTool,
-  delegate_to_peter: delegateToPeterTool,
-  delegate_to_emma: delegateToEmmaTool,
-  delegate_to_apu: delegateToApuTool,
 };
 
 export type ToolName = keyof typeof tools;

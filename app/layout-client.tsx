@@ -3,7 +3,6 @@
 import { API_ROUTE_CSRF } from "@/lib/routes"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter } from 'next/navigation'
-import SkyvernNotificationManager from '@/components/notifications/skyvern-notification-manager'
 
 export function LayoutClient() {
   const router = useRouter()
@@ -26,7 +25,7 @@ export function LayoutClient() {
 
   return (
     <>
-      <SkyvernNotificationManager onViewAllTasks={handleViewAllTasks} />
+      {/* NotificationBell is now integrated in AgentsTopNav */}
     </>
   )
 }

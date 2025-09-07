@@ -1,133 +1,126 @@
+
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import SkyvernNotifications from '@/components/skyvern/skyvern-notifications'
-import {
-  ListChecksIcon,
-  CalendarIcon,
-  ClockIcon,
-  RobotIcon,
-  CheckCircleIcon,
-  CircleIcon,
-  PlayIcon,
-  PauseIcon,
-  ArrowSquareOutIcon,
-  VideoIcon,
-  MonitorIcon,
-  BellIcon,
-  ArrowClockwiseIcon,
-  TrashIcon
-} from '@phosphor-icons/react'
+import { ListChecksIcon, CalendarIcon, ClockIcon, CheckCircleIcon, CircleIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, TrashIcon, ChatCircleIcon } from '@phosphor-icons/react'
+import { Inbox, Bell } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { DateTime } from 'luxon'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
-interface SkyvernTask {
+type AgentSummary = {
   id: string
+  name: string
+  icon?: string
+  color?: string
+}
+
+type AgentTask = {
   task_id: string
+  user_id: string
   title: string
-  url: string
-  instructions: string
+  description: string
+  agent_id: string
+  agent_name: string
+  agent_avatar?: string
   task_type: string
-  status: string
-  max_steps: number
+  priority?: number
+  task_config: Record<string, any>
+  context_data: Record<string, any>
+  scheduled_for?: string
+  scheduled_at?: string
+  status: 'pending' | 'scheduled' | 'running' | 'completed' | 'failed' | 'cancelled'
   created_at: string
   updated_at: string
   completed_at?: string
-  live_url?: string
-  recording_url?: string
-  dashboard_url?: string
-  steps_count: number
   error_message?: string
-  notification_sent: boolean
+  result_data?: any
+  execution_time_ms?: number
+  tags?: string[]
 }
 
-interface SkyvernNotification {
+type TaskNotification = {
   id: string
+  user_id: string
   task_id: string
-  notification_type: string
+  agent_id: string
+  agent_name: string
+  agent_avatar?: string
+  notification_type: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder'
+  title: string
   message: string
-  sent_at: string
+  task_result?: any
+  error_details?: string
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  read: boolean
+  read_at?: string
+  action_buttons?: Array<{
+    label: string
+    action: string
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary'
+  }>
+  metadata?: any
+  expires_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export default function AgentsTasksPage() {
-  const [skyvernTasks, setSkyvernTasks] = useState<SkyvernTask[]>([])
-  const [notifications, setNotifications] = useState<SkyvernNotification[]>([])
+  const [activeTab, setActiveTab] = useState('tasks')
+  const [tasks, setTasks] = useState<AgentTask[]>([])
+  const [notifications, setNotifications] = useState<TaskNotification[]>([])
+  const [agents, setAgents] = useState<AgentSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [includeCompleted, setIncludeCompleted] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [openResults, setOpenResults] = useState<Record<string, boolean>>({})
 
-  // Fetch Skyvern tasks
-  const fetchSkyvernTasks = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter)
-      }
-      params.append('includeCompleted', 'true')
-      
-      const response = await fetch(`/api/skyvern/tasks?${params}`)
-      const data = await response.json()
-      
-      if (data.success) {
-        setSkyvernTasks(data.tasks || [])
-        setNotifications(data.notifications || [])
-      } else {
-        console.error('Failed to fetch Skyvern tasks:', data.error)
-      }
-    } catch (error) {
-      console.error('Error fetching Skyvern tasks:', error)
-    } finally {
-      setLoading(false)
+  // Create-form state
+  const [formOpen, setFormOpen] = useState(false)
+  const [formAgentId, setFormAgentId] = useState('')
+  const [formTitle, setFormTitle] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [formTaskType, setFormTaskType] = useState<'manual' | 'scheduled' | 'recurring'>('manual')
+  const [formPriority, setFormPriority] = useState(5)
+  const [formScheduledAt, setFormScheduledAt] = useState('')
+  const [formCron, setFormCron] = useState('')
+  const [formTimezone, setFormTimezone] = useState('UTC')
+  const [formTags, setFormTags] = useState('')
+  const [notifyOnCompletion, setNotifyOnCompletion] = useState(true)
+  const [notifyOnFailure, setNotifyOnFailure] = useState(true)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState<TaskNotification | null>(null)
+  const [showRawResult, setShowRawResult] = useState(false)
+
+  const openDetails = (n: TaskNotification) => {
+    setSelectedNotification(n)
+    setDetailsOpen(true)
+  setShowRawResult(false)
+    if (!n.read) {
+      markNotificationAsRead(n.id)
     }
-  }
-
-  useEffect(() => {
-    fetchSkyvernTasks()
-  }, [statusFilter])
-
-  // Auto-refresh every 30 seconds for active tasks
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const hasActiveTasks = skyvernTasks.some(task => 
-        !['completed', 'failed', 'terminated'].includes(task.status)
-      )
-      if (hasActiveTasks) {
-        fetchSkyvernTasks()
-      }
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [skyvernTasks])
-
-  // Filter tasks based on search
-  const filteredTasks = skyvernTasks.filter(task =>
-    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    task.instructions.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    task.url.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  // Map delegated agent (scalable: fallback to Wex for Skyvern tasks)
-  const getAgentInfo = (task: SkyvernTask) => {
-    // Future: if API returns agent_id/agent_name/avatar, prefer that
-    const agentId = (task as any).agent_id || 'wex-automation'
-    const agentName = agentId.includes('wex') ? 'Wex' : 'Agent'
-    const avatar = agentId.includes('wex') ? '/img/agents/wex4.png' : '/img/agents/cleo4.png'
-    return { id: agentId, name: agentName, avatar }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-500/20 text-green-300 border-green-500/40'
       case 'failed': return 'bg-red-500/20 text-red-300 border-red-500/40'
-      case 'terminated': return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+      case 'cancelled': return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
       case 'running': return 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-      case 'queued': return 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+      case 'scheduled': return 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+      case 'pending': return 'bg-purple-500/20 text-purple-300 border-purple-500/40'
       default: return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
     }
   }
@@ -136,287 +129,965 @@ export default function AgentsTasksPage() {
     switch (status) {
       case 'completed': return <CheckCircleIcon className="w-4 h-4" />
       case 'failed': return <CircleIcon className="w-4 h-4" />
-      case 'terminated': return <PauseIcon className="w-4 h-4" />
+      case 'cancelled': return <PauseIcon className="w-4 h-4" />
       case 'running': return <PlayIcon className="w-4 h-4" />
-      case 'queued': return <ClockIcon className="w-4 h-4" />
+      case 'scheduled': return <ClockIcon className="w-4 h-4" />
+      case 'pending': return <CircleIcon className="w-4 h-4" />
       default: return <CircleIcon className="w-4 h-4" />
     }
   }
 
-  const handleDeleteTask = async (taskId: string) => {
-    try {
-      const confirmed = window.confirm('Delete this task? This cannot be undone.');
-      if (!confirmed) return;
-      const res = await fetch(`/api/skyvern/tasks?task_id=${encodeURIComponent(taskId)}&deleteNotifications=true`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (!data.success) {
-        console.error('Failed to delete task:', data.error);
-        return;
-      }
-      // Optimistic update
-      setSkyvernTasks(prev => prev.filter(t => t.task_id !== taskId));
-    } catch (e) {
-      console.error('Error deleting task:', e);
+  // Avatar resolver: prefer explicit URL, else map by agent name
+  const getAgentAvatarUrl = (agentName?: string, avatarField?: string) => {
+    if (avatarField && /\.(png|jpg|jpeg|gif|webp)$/i.test(avatarField)) return avatarField
+    // Accept values like "/img/agents/emma4.png" even without extension test above
+    if (avatarField && avatarField.startsWith('/img/agents/')) return avatarField
+    const map: Record<string, string> = {
+      'emma': '/img/agents/emma4.png',
+      'wex': '/img/agents/wex4.png',
+      'toby': '/img/agents/toby4.png',
+      'peter': '/img/agents/peter4.png',
+      'apu': '/img/agents/apu4.png',
+      'ami': '/img/agents/ami4.png',
+      // fallback brand avatar
+      'cleo': '/img/agents/logocleo4.png'
     }
+    const key = (agentName || '').toLowerCase().trim()
+    return map[key] || '/img/agents/logocleo4.png'
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString?: string, timezone?: string) => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    })
+      minute: '2-digit',
+      timeZoneName: 'short',
+      timeZone: timezone || 'UTC'
+    }).format(date)
+  }
+
+  // Helper function to format time ago
+  const formatTimeAgo = (date: string) => {
+    const now = new Date()
+    const past = new Date(date)
+    const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000)
+    
+    if (diffInSeconds < 60) return 'hace unos segundos'
+    if (diffInSeconds < 3600) return `hace ${Math.floor(diffInSeconds / 60)} min`
+    if (diffInSeconds < 86400) return `hace ${Math.floor(diffInSeconds / 3600)} h`
+    if (diffInSeconds < 2592000) return `hace ${Math.floor(diffInSeconds / 86400)} días`
+    return `hace ${Math.floor(diffInSeconds / 2592000)} meses`
+  }
+
+  const renderResultPreview = (result: any) => {
+    if (result == null) return null
+    if (typeof result === 'string') return <pre className="whitespace-pre-wrap text-slate-200 text-sm">{result}</pre>
+    try {
+      return (
+        <pre className="whitespace-pre-wrap text-slate-200 text-xs bg-slate-900/50 p-3 rounded border border-slate-700 overflow-x-auto">
+          {JSON.stringify(result, null, 2)}
+        </pre>
+      )
+    } catch {
+      return <pre className="whitespace-pre-wrap text-slate-200 text-sm">{String(result)}</pre>
+    }
+  }
+
+  const fetchAgents = async () => {
+    try {
+      const res = await fetch('/api/agents')
+      const data = await res.json()
+      if (Array.isArray(data.agents)) {
+        setAgents(data.agents.map((a: any) => ({ 
+          id: a.id, 
+          name: a.name, 
+          icon: a.icon || '🤖', 
+          color: a.color || '#6366f1' 
+        })))
+      }
+    } catch (e) {
+      console.error('Failed to load agents', e)
+    }
+  }
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') params.append('status', statusFilter)
+      if (includeCompleted) params.append('include_completed', 'true')
+      const res = await fetch(`/api/agent-tasks?${params.toString()}`)
+      const data = await res.json()
+      if (data.success) {
+        setTasks(data.tasks || [])
+      } else {
+        console.error('❌ Error fetching agent tasks:', data.error)
+      }
+    } catch (e) {
+      console.error('Failed to load tasks', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchNotifications = async () => {
+    try {
+      setNotificationsLoading(true)
+      const res = await fetch('/api/notifications?limit=50&unread_only=false')
+      const data = await res.json()
+      if (data.success) {
+        setNotifications(data.notifications || [])
+      } else {
+        console.error('❌ Error fetching notifications:', data.error)
+      }
+    } catch (e) {
+      console.error('Failed to load notifications', e)
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAgents()
+  }, [])
+
+  useEffect(() => {
+    fetchTasks()
+    if (activeTab === 'inbox') {
+      fetchNotifications()
+    }
+  }, [statusFilter, includeCompleted, activeTab])
+
+  // Auto-refresh active tasks every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const hasActive = tasks.some((t: AgentTask) => ['pending', 'scheduled', 'running'].includes(t.status))
+      if (hasActive) fetchTasks()
+      if (activeTab === 'inbox') fetchNotifications()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [tasks, activeTab])
+
+  const filtered = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) return tasks
+    return tasks.filter(t =>
+      t.title.toLowerCase().includes(term) ||
+      t.description.toLowerCase().includes(term) ||
+      t.agent_name.toLowerCase().includes(term)
+    )
+  }, [tasks, searchTerm])
+
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm('Delete this task? This cannot be undone.')
+    if (!confirmed) return
+    try {
+      const res = await fetch(`/api/agent-tasks?task_id=${encodeURIComponent(taskId)}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.success) {
+        console.error('Failed to delete task:', data.error)
+        return
+      }
+      setTasks(prev => prev.filter(t => t.task_id !== taskId))
+    } catch (e) {
+      console.error('Error deleting task:', e)
+    }
+  }
+
+  const submitCreate = async () => {
+    if (!formAgentId || !formTitle || !formDescription) return
+    setCreating(true)
+    try {
+      const agent = agents.find(a => a.id === formAgentId)
+      const body: any = {
+        agent_id: formAgentId,
+        agent_name: agent?.name || 'Agent',
+        // Use proper avatar URL instead of icon text
+        agent_avatar: getAgentAvatarUrl(agent?.name, agent?.icon),
+        title: formTitle,
+        description: formDescription,
+        task_type: formTaskType,
+        priority: formPriority,
+        timezone: formTimezone,
+        notify_on_completion: notifyOnCompletion,
+        notify_on_failure: notifyOnFailure,
+        tags: formTags ? formTags.split(',').map(t => t.trim()).filter(Boolean) : []
+      }
+      
+      // Convert datetime-local to ISO string with proper timezone handling
+      if (formTaskType === 'scheduled' && formScheduledAt) {
+        // Interpret the input as time in the SELECTED timezone, not the browser's
+        const zoned = DateTime.fromISO(formScheduledAt, { zone: formTimezone || 'UTC' })
+        const utcIso = zoned.toUTC().toISO()
+        body.scheduled_at = utcIso
+
+        console.log('📅 Scheduled task:', {
+          inputTime: formScheduledAt,
+          interpretedZone: formTimezone,
+          zonedISO: zoned.toISO(),
+          utcTime: utcIso,
+        })
+      }
+      if (formTaskType === 'recurring' && formCron) body.cron_expression = formCron
+
+      const res = await fetch('/api/agent-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+      if (!data.success) {
+        console.error('Failed to create task:', data.error)
+        return
+      }
+      // Reset and refresh
+      setFormOpen(false)
+      setFormTitle('')
+      setFormDescription('')
+      setFormTaskType('manual')
+      setFormPriority(5)
+      setFormScheduledAt('')
+      setFormCron('')
+      setFormTimezone('UTC')
+      setFormTags('')
+      await fetchTasks()
+    } catch (e) {
+      console.error('Create task error', e)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${notificationId}/mark-read`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setNotifications(prev => prev.map(n => 
+          n.id === notificationId ? { ...n, read: true, read_at: new Date().toISOString() } : n
+        ))
+      }
+    } catch (e) {
+      console.error('Error marking notification as read:', e)
+    }
+  }
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const res = await fetch('/api/notifications/mark-all-read', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true, read_at: new Date().toISOString() })))
+      }
+    } catch (e) {
+      console.error('Error marking all notifications as read:', e)
+    }
+  }
+
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length
+
+  // Build prefill handoff to chat using sessionStorage (avoids long URLs)
+  const continueChatWithTask = (task: AgentTask) => {
+    try {
+      const key = `prefill:task:${task.task_id}`
+      const preview = (() => {
+        const header = `Follow-up on task: ${task.title}\nAgent: ${task.agent_name}\nStatus: ${task.status}${task.completed_at ? ` (completed at ${formatDate(task.completed_at)})` : ''}`
+        const body = (() => {
+          const r = task.result_data
+          if (r == null) return ''
+          if (typeof r === 'string') return `\n\nResult:\n${r.slice(0, 2000)}`
+          try {
+            const json = JSON.stringify(r, null, 2)
+            return `\n\nResult (JSON):\n${json.slice(0, 2000)}`
+          } catch {
+            return `\n\nResult:\n${String(r).slice(0, 2000)}`
+          }
+        })()
+        return `${header}${body}\n\nPlease help me refine or act on this result.`
+      })()
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(key, preview)
+      }
+      const params = new URLSearchParams({ agentId: task.agent_id, prefillKey: key })
+      window.location.href = `/agents/chat?${params.toString()}`
+    } catch (e) {
+      console.warn('Failed to open chat with prefill:', e)
+    }
+  }
+
+  const continueChatFromNotification = (n: TaskNotification) => {
+    try {
+  // Mark as read optimistically
+  setNotifications(prev => prev.map(nn => nn.id === n.id ? { ...nn, read: true, read_at: new Date().toISOString() } : nn))
+  fetch(`/api/notifications/${n.id}/mark-read`, { method: 'POST' }).catch(() => {})
+      const key = `prefill:notification:${n.id}`
+      const preview = (() => {
+        const header = `Follow-up on completed task notification: ${n.title}\nAgent: ${n.agent_name}`
+        const body = (() => {
+          const r: any = (n as any).task_result
+          if (!r) return ''
+          if (typeof r === 'string') return `\n\nResult:\n${r.slice(0, 2000)}`
+          try {
+            const json = JSON.stringify(r, null, 2)
+            return `\n\nResult (JSON):\n${json.slice(0, 2000)}`
+          } catch {
+            return `\n\nResult:\n${String(r).slice(0, 2000)}`
+          }
+        })()
+        return `${header}${body}\n\nPlease help me refine or act on this result.`
+      })()
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(key, preview)
+      }
+      const params = new URLSearchParams({ agentId: n.agent_id, prefillKey: key })
+      window.location.href = `/agents/chat?${params.toString()}`
+    } catch (e) {
+      console.warn('Failed to open chat from notification:', e)
+    }
   }
 
   return (
-    <div className="w-full max-w-none space-y-0 min-h-screen bg-slate-900">
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        {/* Header Premium */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="relative overflow-hidden rounded-2xl bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 p-6 sm:p-8 mb-6 sm:mb-8"
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 via-red-600/10 to-orange-600/10" />
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-xl">
-                  <ListChecksIcon className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                    Skyvern Task Center
-                  </h1>
-                  <p className="text-lg text-slate-400 mt-2">
-                    Monitor and manage your web automation tasks
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <Button 
-                  onClick={fetchSkyvernTasks} 
-                  disabled={loading}
-                  className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0 shadow-lg"
-                >
-                  <ArrowClockwiseIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-                <div className="text-2xl font-bold text-green-400">{skyvernTasks.filter(t => t.status === 'completed').length}</div>
-                <div className="text-sm text-slate-400">Completed</div>
-              </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-                <div className="text-2xl font-bold text-blue-400">{skyvernTasks.filter(t => t.status === 'running').length}</div>
-                <div className="text-sm text-slate-400">Running</div>
-              </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-                <div className="text-2xl font-bold text-orange-400">{skyvernTasks.filter(t => t.status === 'queued').length}</div>
-                <div className="text-sm text-slate-400">Queued</div>
-              </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-                <div className="text-2xl font-bold text-purple-400">{skyvernTasks.length}</div>
-                <div className="text-sm text-slate-400">Total Tasks</div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Notifications */}
-        {notifications.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <Card className="mb-6 bg-slate-800/50 border-orange-500/20 backdrop-blur-xl">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-orange-300">
-                  <BellIcon className="w-5 h-5" />
-                  Recent Notifications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {notifications.slice(0, 3).map((notification) => (
-                    <div key={notification.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg border border-orange-500/20">
-                      <span className="text-sm text-slate-300">{notification.message}</span>
-                      <span className="text-xs text-orange-400">{formatDate(notification.sent_at)}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Filters */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="flex flex-col sm:flex-row gap-4 mb-6"
+          className="mb-8"
         >
-          <Input
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="sm:w-80 bg-slate-800/50 border-slate-600/50 text-slate-200 placeholder:text-slate-400 focus:border-orange-500/50"
-          />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="sm:w-48 bg-slate-800/50 border-slate-600/50 text-slate-200">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-600">
-              <SelectItem value="all" className="text-slate-200">All Tasks</SelectItem>
-              <SelectItem value="queued" className="text-slate-200">Queued</SelectItem>
-              <SelectItem value="running" className="text-slate-200">Running</SelectItem>
-              <SelectItem value="completed" className="text-slate-200">Completed</SelectItem>
-              <SelectItem value="failed" className="text-slate-200">Failed</SelectItem>
-              <SelectItem value="terminated" className="text-slate-200">Terminated</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/30">
+                <ListChecksIcon className="w-8 h-8 text-purple-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Agent Task Center</h1>
+                <p className="text-slate-300 mt-1">Manage and monitor your intelligent agents</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  fetchTasks()
+                  if (activeTab === 'inbox') fetchNotifications()
+                }}
+                className="gap-2 border-slate-600 hover:bg-slate-700"
+              >
+                <ArrowClockwiseIcon className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Badge variant="secondary" className="gap-2 bg-slate-700 text-slate-200">
+                <ListChecksIcon className="w-4 h-4" />
+                {filtered.length} tasks
+              </Badge>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-800 border border-slate-600">
+              <TabsTrigger 
+                value="tasks" 
+                className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+              >
+                <ListChecksIcon className="w-4 h-4" />
+                Tasks
+              </TabsTrigger>
+              <TabsTrigger 
+                value="inbox" 
+                className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+              >
+                <Inbox className="w-4 h-4" />
+                Inbox
+                {unreadNotificationsCount > 0 && (
+                  <Badge className="ml-1 bg-red-500 text-white text-xs px-1 min-w-5 h-5">
+                    {unreadNotificationsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tasks" className="mt-6">
+              {/* Task Controls */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6">
+                <div className="flex gap-3 flex-wrap">
+                  <Input
+                    placeholder="Search tasks..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-72 bg-slate-800 border-slate-600 placeholder:text-slate-400"
+                  />
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-48 bg-slate-800 border-slate-600">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="running">Running</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={() => setFormOpen(true)}
+                    className="bg-purple-600 hover:bg-purple-700 border-purple-500"
+                  >
+                    Create Task
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tasks Grid */}
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+                  <p className="text-slate-300 mt-4">Loading tasks...</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-12"
+                >
+                  <ListChecksIcon className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-200 mb-2">No tasks found</h3>
+                  <p className="text-slate-400">
+                    {searchTerm || statusFilter !== 'all'
+                      ? 'Try adjusting your search or filters'
+                      : 'Create your first agent task to get started'
+                    }
+                  </p>
+                </motion.div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {filtered.map((task, index) => (
+                    <motion.div
+                      key={task.task_id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Card className="h-full bg-slate-800/50 border-slate-600 hover:border-slate-500 transition-all duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-lg font-semibold mb-2 truncate text-white">
+                                {task.title}
+                              </CardTitle>
+                              <Badge className={`gap-1 ${getStatusColor(task.status)}`}>
+                                {getStatusIcon(task.status)}
+                                {task.status}
+                              </Badge>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTask(task.task_id)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <p className="text-sm text-slate-300 line-clamp-3">
+                              {task.description}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <img
+                                src={getAgentAvatarUrl(task.agent_name, task.agent_avatar)}
+                                alt={task.agent_name}
+                                className="w-5 h-5 rounded-full border border-slate-600 object-cover"
+                              />
+                              <span className="truncate">{task.agent_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <CalendarIcon className="w-4 h-4" />
+                              <span>{formatDate(task.created_at)}</span>
+                            </div>
+                            {task.completed_at && (
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <CheckCircleIcon className="w-4 h-4" />
+                                <span>Completed: {formatDate(task.completed_at)}</span>
+                              </div>
+                            )}
+                            {task.scheduled_at && (
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <ClockIcon className="w-4 h-4" />
+                                <span>Scheduled: {formatDate(task.scheduled_at, (task as any).timezone || 'UTC')}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {task.error_message && (
+                            <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-300">
+                              {task.error_message}
+                            </div>
+                          )}
+
+                          {task.status === 'completed' && task.result_data !== undefined && (
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-slate-300">Result</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2 py-1 text-xs border-slate-600 hover:bg-slate-700"
+                                  onClick={() => setOpenResults(prev => ({ ...prev, [task.task_id]: !prev[task.task_id] }))}
+                                >
+                                  {openResults[task.task_id] ? 'Hide' : 'View'}
+                                </Button>
+                              </div>
+                              {openResults[task.task_id] && (
+                                <div className="max-h-60 overflow-auto">
+                                  {renderResultPreview(task.result_data)}
+                                </div>
+                              )}
+                              {typeof task.execution_time_ms === 'number' && (
+                                <div className="mt-2 text-xs text-slate-400">Duration: {task.execution_time_ms} ms</div>
+                              )}
+                              <div className="mt-3 flex items-center gap-2">
+                                <Button
+                                  onClick={() => continueChatWithTask(task)}
+                                  className="bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2"
+                                  size="sm"
+                                >
+                                  <ChatCircleIcon className="w-4 h-4" />
+                                  Continue in Chat
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {task.tags && task.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {task.tags.map((tag, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs border-slate-500 text-slate-300">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="inbox" className="mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-white">Notification Inbox</h2>
+                {unreadNotificationsCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={markAllNotificationsAsRead}
+                    className="border-slate-600 hover:bg-slate-700"
+                  >
+                    Mark All Read
+                  </Button>
+                )}
+              </div>
+
+              {notificationsLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+                  <p className="text-slate-300 mt-4">Loading notifications...</p>
+                </div>
+              ) : notifications.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-12"
+                >
+                  <Bell className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-200 mb-2">No notifications</h3>
+                  <p className="text-slate-400">You're all caught up!</p>
+                </motion.div>
+              ) : (
+                <div className="space-y-4">
+                  {notifications.map((notification, index) => (
+                    <motion.div
+                      key={notification.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 ${
+                          notification.read 
+                            ? 'bg-slate-800/30 border-slate-700' 
+                            : 'bg-slate-800/70 border-slate-600 shadow-lg'
+                        }`}
+                        onClick={() => openDetails(notification)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <img
+                              src={getAgentAvatarUrl(notification.agent_name, notification.agent_avatar)}
+                              alt={notification.agent_name}
+                              className="w-10 h-10 rounded-full border border-slate-600 object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-white truncate">
+                                  {notification.title}
+                                </h4>
+                                <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
+                                  {formatTimeAgo(notification.created_at)}
+                                </span>
+                              </div>
+                              <div className="text-sm text-slate-300 mt-1 prose prose-invert prose-sm max-w-none line-clamp-3">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {notification.message}
+                                </ReactMarkdown>
+                              </div>
+                              {notification.notification_type === 'task_scheduled' && (notification as any).metadata?.scheduled_for && (
+                                <div className="mt-2 text-xs text-slate-400">
+                                  Scheduled: {formatDate((notification as any).metadata.scheduled_for, (notification as any).metadata.timezone || 'UTC')}
+                                </div>
+                              )}
+                              {notification.notification_type === 'task_completed' && (notification as any).task_result && (
+                                <div className="mt-2 text-xs text-slate-300">
+                                  {(() => {
+                                    const tr = (notification as any).task_result
+                                    const summary = typeof tr === 'object' && tr?.summary ? tr.summary : null
+                                    return (
+                                      <div>
+                                        <span className="text-slate-400 block mb-1">Summary:</span>
+                                        <div className="prose prose-invert prose-sm max-w-none line-clamp-4">
+                                          {summary ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {String(summary)}
+                                            </ReactMarkdown>
+                                          ) : (
+                                            <div className="mt-1">{renderResultPreview(tr)}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge 
+                                  variant="secondary" 
+                                  className="text-xs bg-slate-700 text-slate-300"
+                                >
+                                  {notification.agent_name}
+                                </Badge>
+                                {!notification.read && (
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="ml-auto h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); openDetails(notification) }}
+                                >
+                                  View details
+                                </Button>
+                                {notification.notification_type === 'task_completed' && (
+                                  <Button
+                                    size="sm"
+                                    className="ml-2 bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2"
+                                    onClick={(e) => { e.stopPropagation(); continueChatFromNotification(notification) }}
+                                  >
+                                    <ChatCircleIcon className="w-4 h-4" />
+                                    Open Chat
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </motion.div>
 
-      {/* Tasks Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <ArrowClockwiseIcon className="w-8 h-8 animate-spin text-orange-400" />
-        </div>
-      ) : filteredTasks.length === 0 ? (
-        <Card className="text-center py-12 bg-slate-800/50 border-slate-700/50 backdrop-blur-xl">
-          <CardContent>
-            <ListChecksIcon className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-300 mb-2">No tasks found</h3>
-            <p className="text-slate-500">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your filters or search term'
-                : 'Start creating automation tasks with Wex to see them here'
-              }
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTasks.map((task) => (
-            <motion.div
-              key={task.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="h-full bg-slate-800/50 border-slate-700/50 hover:border-orange-500/50 transition-colors backdrop-blur-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg font-semibold text-slate-100 mb-2 line-clamp-2">
-                        {task.title}
-                      </CardTitle>
-                      <Badge className={`${getStatusColor(task.status)} flex items-center gap-1 w-fit`}>
-                        {getStatusIcon(task.status)}
-                        {task.status}
-                      </Badge>
-                    </div>
-                    {/* Delegated Agent + Delete */}
-                    <div className="flex items-start gap-2 shrink-0">
-                      {(() => { const agent = getAgentInfo(task); return (
-                        <div className="flex items-center gap-2 bg-slate-700/40 px-2 py-1 rounded-full border border-slate-600/40">
-                          <img src={agent.avatar} alt={agent.name} className="w-6 h-6 rounded-full border border-slate-600/60" />
-                          <span className="text-xs text-slate-300 hidden sm:inline">{agent.name}</span>
+        {/* Notification Details Modal */}
+        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <DialogContent className="w-full max-w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden">
+            {selectedNotification && (
+              <div className="flex flex-col max-h-[80vh]">
+                {/* Header */}
+                <div className="px-5 pt-5 pb-3 border-b border-slate-700/60 bg-slate-900/60 backdrop-blur-sm">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={getAgentAvatarUrl(selectedNotification.agent_name, selectedNotification.agent_avatar)}
+                      alt={selectedNotification.agent_name}
+                      className="w-10 h-10 rounded-full border border-slate-600 object-cover"
+                    />
+                    <div className="min-w-0">
+                      <DialogTitle className="truncate">{selectedNotification.title}</DialogTitle>
+                      <DialogDescription asChild>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-400">
+                          <span>{formatTimeAgo(selectedNotification.created_at)}</span>
+                          <span>•</span>
+                          <span>{selectedNotification.agent_name}</span>
+                          <span>•</span>
+                          <Badge variant="outline" className="h-5 px-2 text-[10px]">
+                            {selectedNotification.priority}
+                          </Badge>
                         </div>
-                      )})()}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-slate-300 hover:text-red-300 hover:bg-red-500/10"
-                        onClick={() => handleDeleteTask(task.task_id)}
-                        title="Delete task"
-                      >
-                        <TrashIcon className="w-4 h-4" />
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="px-5 py-4 overflow-auto">
+                  <div className="prose prose-invert max-w-none prose-sm md:prose-base">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedNotification.message}
+                    </ReactMarkdown>
+                  </div>
+
+                  {(selectedNotification as any).task_result && (
+                    <div className="mt-5">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-slate-200">Task Result</h4>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={async () => {
+                              const tr: any = (selectedNotification as any).task_result
+                              const summary = typeof tr === 'object' && tr?.summary ? String(tr.summary) : null
+                              const text = showRawResult || !summary ?
+                                (typeof tr === 'string' ? tr : (() => { try { return JSON.stringify(tr, null, 2) } catch { return String(tr) } })())
+                                : summary
+                              try {
+                                await navigator.clipboard.writeText(text)
+                              } catch {}
+                            }}
+                          >
+                            Copy
+                          </Button>
+                          {(() => {
+                            const tr: any = (selectedNotification as any).task_result
+                            const hasSummary = typeof tr === 'object' && !!tr?.summary
+                            return hasSummary ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => setShowRawResult(prev => !prev)}
+                              >
+                                {showRawResult ? 'Show summary' : 'Show raw'}
+                              </Button>
+                            ) : null
+                          })()}
+                        </div>
+                      </div>
+                      {(() => {
+                        const tr: any = (selectedNotification as any).task_result
+                        const summary = typeof tr === 'object' && tr?.summary ? tr.summary : null
+                        if (summary && !showRawResult) {
+                          return (
+                            <div className="prose prose-invert max-w-none">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {String(summary)}
+                              </ReactMarkdown>
+                            </div>
+                          )
+                        }
+                        return (
+                          <div className="max-h-[50vh] overflow-auto rounded border border-slate-700/60 bg-slate-900/50 p-3">
+                            {renderResultPreview(tr)}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-3 border-t border-slate-700/60 bg-slate-900/60 backdrop-blur-sm sticky bottom-0">
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+                    <Button variant="outline" onClick={() => setDetailsOpen(false)} className="sm:min-w-[110px]">Close</Button>
+                    {selectedNotification.notification_type === 'task_completed' && (
+                      <Button className="bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2 sm:min-w-[140px]" onClick={() => { continueChatFromNotification(selectedNotification); setDetailsOpen(false) }}>
+                        <ChatCircleIcon className="w-4 h-4" /> Open Chat
                       </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-300 mb-1">Target URL:</p>
-                      <p className="text-sm text-slate-400 truncate">{task.url}</p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm font-medium text-slate-300 mb-1">Instructions:</p>
-                      <p className="text-sm text-slate-400 line-clamp-2">{task.instructions}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <CalendarIcon className="w-4 h-4" />
-                        {formatDate(task.created_at)}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <PlayIcon className="w-4 h-4" />
-                        {task.steps_count} steps
-                      </div>
-                    </div>
-
-                    {task.error_message && (
-                      <div className="p-2 bg-red-900/30 border border-red-500/30 rounded-lg">
-                        <p className="text-sm text-red-300">{task.error_message}</p>
-                      </div>
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-2 pt-2">
-                      {task.live_url && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-          asChild
-          className="flex-1 min-w-[140px] bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
-                        >
-                          <a href={task.live_url} target="_blank" rel="noopener noreferrer">
-                            <MonitorIcon className="w-4 h-4 mr-1" />
-                            Live View
-                            <ArrowSquareOutIcon className="w-3 h-3 ml-1" />
-                          </a>
-                        </Button>
-                      )}
-                      
-                      {task.recording_url && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-          asChild
-          className="flex-1 min-w-[140px] bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50 hover:text-orange-300"
-                        >
-                          <a href={task.recording_url} target="_blank" rel="noopener noreferrer">
-                            <VideoIcon className="w-4 h-4 mr-1" />
-                            Recording
-                            <ArrowSquareOutIcon className="w-3 h-3 ml-1" />
-                          </a>
-                        </Button>
-                      )}
+        {/* Create Task Modal */}
+        {formOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-slate-800 border border-slate-600 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <h2 className="text-xl font-semibold text-white mb-4">Create Agent Task</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Agent</label>
+                  <Select value={formAgentId} onValueChange={setFormAgentId}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600">
+                      <SelectValue placeholder="Select an agent" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {agents.map(agent => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Title</label>
+                  <Input
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="Task title"
+                    className="bg-slate-700 border-slate-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                  <Textarea
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Detailed task description"
+                    rows={3}
+                    className="bg-slate-700 border-slate-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Task Type</label>
+                    <Select value={formTaskType} onValueChange={(value: any) => setFormTaskType(value)}>
+                      <SelectTrigger className="bg-slate-700 border-slate-600">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-600">
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="recurring">Recurring</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Priority (1-10)</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={formPriority}
+                      onChange={(e) => setFormPriority(parseInt(e.target.value) || 5)}
+                      className="bg-slate-700 border-slate-600"
+                    />
+                  </div>
+                </div>
+
+                {formTaskType === 'scheduled' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Scheduled At</label>
+                      <Input
+                        type="datetime-local"
+                        value={formScheduledAt}
+                        onChange={(e) => setFormScheduledAt(e.target.value)}
+                        className="bg-slate-700 border-slate-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Timezone</label>
+                      <Select value={formTimezone} onValueChange={setFormTimezone}>
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-600">
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                          <SelectItem value="America/Chicago">Central Time</SelectItem>
+                          <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                          <SelectItem value="Europe/London">London</SelectItem>
+                          <SelectItem value="Europe/Madrid">Madrid</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                {formTaskType === 'recurring' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Cron Expression</label>
+                    <Input
+                      value={formCron}
+                      onChange={(e) => setFormCron(e.target.value)}
+                      placeholder="0 9 * * *"
+                      className="bg-slate-700 border-slate-600"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Tags (comma-separated)</label>
+                  <Input
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    placeholder="automation, web-scraping, daily"
+                    className="bg-slate-700 border-slate-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setFormOpen(false)}
+                  className="border-slate-600 hover:bg-slate-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={submitCreate}
+                  disabled={creating || !formAgentId || !formTitle || !formDescription}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {creating ? 'Creating...' : 'Create Task'}
+                </Button>
+              </div>
             </motion.div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
       </div>
     </div>
   )

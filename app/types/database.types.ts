@@ -141,6 +141,74 @@ export type Database = {
           },
         ]
       }
+      task_notifications: {
+        Row: {
+          id: string
+          user_id: string
+          task_id: string
+          agent_id: string
+          agent_name: string
+          agent_avatar: string | null
+          notification_type: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder'
+          title: string
+          message: string
+          task_result: Json | null
+          error_details: string | null
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          read: boolean
+          read_at: string | null
+          action_buttons: Json | null
+          metadata: Json | null
+          expires_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          task_id: string
+          agent_id: string
+          agent_name: string
+          agent_avatar?: string | null
+          notification_type: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder'
+          title: string
+          message: string
+          task_result?: Json | null
+          error_details?: string | null
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          read?: boolean
+          read_at?: string | null
+          action_buttons?: Json | null
+          metadata?: Json | null
+          expires_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          task_id?: string
+          agent_id?: string
+          agent_name?: string
+          agent_avatar?: string | null
+          notification_type?: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder'
+          title?: string
+          message?: string
+          task_result?: Json | null
+          error_details?: string | null
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          read?: boolean
+          read_at?: string | null
+          action_buttons?: Json | null
+          metadata?: Json | null
+          expires_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          // user_id references auth.users; keep as opaque string here
+        ]
+      }
       error_logs: {
         Row: {
           id: string

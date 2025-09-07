@@ -1,4 +1,4 @@
-import { Database } from "@/app/types/database.types"
+import { Database } from "@/types.d"
 import { createBrowserClient } from "@supabase/ssr"
 import { isSupabaseEnabled } from "./config"
 
