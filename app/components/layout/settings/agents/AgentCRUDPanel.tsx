@@ -125,6 +125,55 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
   useCases: ['File analysis', 'Metadata review', 'Version tracking'],
   icon: '/icons/google-drive.svg'
   },
+  'createGoogleDoc': {
+    name: 'Create Google Doc',
+    description: 'Create new Google Documents with content and formatting',
+    category: 'Google Workspace',
+  useCases: ['Document creation', 'Report generation', 'Content writing', 'Collaborative documents'],
+  icon: '/icons/google_docs.png'
+  },
+  'readGoogleDoc': {
+    name: 'Read Google Doc',
+    description: 'Extract content and metadata from Google Documents',
+    category: 'Google Workspace',
+  useCases: ['Content analysis', 'Document review', 'Text extraction', 'Information retrieval'],
+  icon: '/icons/google_docs.png'
+  },
+  'updateGoogleDoc': {
+    name: 'Update Google Doc',
+    description: 'Edit and update existing Google Documents',
+    category: 'Google Workspace',
+  useCases: ['Document editing', 'Content updates', 'Collaborative writing', 'Report updates'],
+  icon: '/icons/google_docs.png'
+  },
+  'createGoogleSheet': {
+    name: 'Create Google Sheet',
+    description: 'Create new Google Spreadsheets with data and formatting',
+    category: 'Google Workspace',
+  useCases: ['Data organization', 'Report creation', 'Financial tracking', 'Collaborative analysis'],
+  icon: '/icons/sheets.png'
+  },
+  'readGoogleSheet': {
+    name: 'Read Google Sheet',
+    description: 'Extract data and metadata from Google Spreadsheets',
+    category: 'Google Workspace',
+  useCases: ['Data analysis', 'Report generation', 'Information retrieval', 'Spreadsheet review'],
+  icon: '/icons/sheets.png'
+  },
+  'updateGoogleSheet': {
+    name: 'Update Google Sheet',
+    description: 'Edit and update existing Google Spreadsheets',
+    category: 'Google Workspace',
+  useCases: ['Data entry', 'Spreadsheet updates', 'Information management', 'Report updates'],
+  icon: '/icons/sheets.png'
+  },
+  'appendGoogleSheet': {
+    name: 'Append Google Sheet',
+    description: 'Add new rows of data to Google Spreadsheets',
+    category: 'Google Workspace',
+  useCases: ['Data collection', 'Log management', 'Progressive data entry', 'Record keeping'],
+  icon: '/icons/sheets.png'
+  },
   'listGmailMessages': {
     name: 'Gmail Messages',
     description: 'List and filter Gmail messages',
@@ -182,6 +231,36 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     category: 'E-commerce',
   useCases: ['Product discovery', 'Inventory search', 'Catalog filtering', 'Stock checking'],
   icon: '/icons/shopify.png'
+  },
+
+  // Emma's specialized tools
+  'shopify_admin': {
+    name: 'Shopify Admin',
+    description: 'Complete Shopify store administration and management',
+    category: 'E-commerce',
+    useCases: ['Store configuration', 'Admin operations', 'Bulk operations', 'Store maintenance'],
+    icon: '/icons/shopify.png'
+  },
+  'analytics_tracking': {
+    name: 'Analytics Tracking',
+    description: 'Track and analyze e-commerce metrics and performance',
+    category: 'Analytics',
+    useCases: ['Sales tracking', 'Performance monitoring', 'KPI analysis', 'Business intelligence'],
+    icon: '/icons/metrics.png'
+  },
+  'inventory_management': {
+    name: 'Inventory Management',
+    description: 'Manage stock levels, inventory tracking, and product availability',
+    category: 'E-commerce',
+    useCases: ['Stock control', 'Inventory tracking', 'Reorder management', 'Supply chain'],
+    icon: '/icons/shopify.png'
+  },
+  'customer_insights': {
+    name: 'Customer Insights',
+    description: 'Analyze customer behavior, preferences, and purchase patterns',
+    category: 'Analytics',
+    useCases: ['Customer analysis', 'Behavior tracking', 'Segmentation', 'Personalization'],
+    icon: '/icons/metrics.png'
   },
 
   // Document & Content Tools
@@ -263,8 +342,82 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     name: 'Complete Task',
     description: 'Mark task as complete and return to coordinator',
     category: 'Task Management',
-  useCases: ['Task completion', 'Workflow management', 'Process control', 'Status updates'],
-  icon: '/icons/completion_task.png'
+    useCases: ['Task completion', 'Workflow management', 'Process control', 'Status updates'],
+    icon: '/icons/completion_task.png'
+  },
+
+  // Basic utility tools
+  'getCurrentDateTime': {
+    name: 'Current Date & Time',
+    description: 'Get current date, time, and timezone information',
+    category: 'Utilities',
+    useCases: ['Time tracking', 'Scheduling', 'Timestamps', 'Date calculations'],
+    icon: '/icons/date_time.png'
+  },
+  'weatherInfo': {
+    name: 'Weather Information',
+    description: 'Get current weather conditions and forecasts',
+    category: 'Information',
+    useCases: ['Weather reports', 'Planning assistance', 'Travel planning', 'Event planning'],
+    icon: '/icons/weather.png'
+  },
+  'randomFact': {
+    name: 'Random Facts',
+    description: 'Generate interesting random facts and trivia',
+    category: 'Entertainment',
+    useCases: ['Conversation starters', 'Learning', 'Entertainment', 'Trivia'],
+    icon: '/icons/randomFact.png'
+  },
+  'cryptoPrices': {
+    name: 'Cryptocurrency Prices',
+    description: 'Get real-time cryptocurrency prices and market data',
+    category: 'Financial',
+    useCases: ['Investment tracking', 'Market analysis', 'Price monitoring', 'Trading decisions'],
+    icon: '/icons/cryptocurrency.png'
+  },
+
+  // Skyvern Automation Tools (for Wex)
+  'add_skyvern_credentials': {
+    name: 'Add Skyvern Credentials',
+    description: 'Configure Skyvern API credentials for web automation',
+    category: 'Automation',
+    useCases: ['Setup automation', 'Credential management', 'API configuration', 'Initial setup'],
+    icon: '/icons/web_scrapping.png'
+  },
+  'test_skyvern_connection': {
+    name: 'Test Skyvern Connection',
+    description: 'Verify Skyvern API connection and credentials',
+    category: 'Automation',
+    useCases: ['Connection testing', 'API validation', 'Troubleshooting', 'Setup verification'],
+    icon: '/icons/web_scrapping.png'
+  },
+  'create_skyvern_task': {
+    name: 'Create Skyvern Task',
+    description: 'Create automated browser tasks for web interactions',
+    category: 'Automation',
+    useCases: ['Web automation', 'Form filling', 'Data extraction', 'Browser workflows'],
+    icon: '/icons/web_scrapping.png'
+  },
+  'get_skyvern_task': {
+    name: 'Get Skyvern Task',
+    description: 'Retrieve status and results of automation tasks',
+    category: 'Automation',
+    useCases: ['Task monitoring', 'Result retrieval', 'Status checking', 'Progress tracking'],
+    icon: '/icons/web_scrapping.png'
+  },
+  'take_skyvern_screenshot': {
+    name: 'Take Skyvern Screenshot',
+    description: 'Capture screenshots during web automation',
+    category: 'Automation',
+    useCases: ['Visual debugging', 'Process monitoring', 'Documentation', 'Error analysis'],
+    icon: '/icons/web_scrapping.png'
+  },
+  'list_skyvern_tasks': {
+    name: 'List Skyvern Tasks',
+    description: 'View all automation tasks and their status',
+    category: 'Automation',
+    useCases: ['Task management', 'History review', 'Bulk monitoring', 'Task overview'],
+    icon: '/icons/web_scrapping.png'
   }
 }
 
@@ -930,7 +1083,14 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   }
 
   const handleEdit = (agent: AgentConfig) => {
+    console.log('🔧 [AGENT EDIT] Editing agent:', agent.name, 'Tools:', agent.tools)
     setEditingAgent(agent)
+    
+    // Ensure tools array includes agent's current tools plus complete_task
+    const agentTools = agent.tools || []
+    const initializedTools = Array.from(new Set([...agentTools, 'complete_task']))
+    console.log('🔧 [AGENT EDIT] Initialized tools:', initializedTools)
+    
     setFormData({
       name: agent.name || '',
       role: (agent.role as AgentRole) || ('' as any),
@@ -944,7 +1104,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       temperature: (agent as any).temperature ?? 0.7,
       maxTokens: (agent as any).maxTokens ?? 2048,
       prompt: agent.prompt || '',
-      tools: Array.from(new Set([...(agent.tools || []), 'complete_task'])),
+      tools: initializedTools,
     })
     setActiveTab('basic')
   }

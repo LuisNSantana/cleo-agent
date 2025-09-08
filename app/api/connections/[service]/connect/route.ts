@@ -50,6 +50,22 @@ export async function POST(
           "https://www.googleapis.com/auth/drive.file"
         ], statePayload)
         break
+      case "google-docs":
+        authUrl = generateGoogleOAuthUrl(redirectUri, [
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/documents",
+          "https://www.googleapis.com/auth/drive.file"
+        ], statePayload)
+        break
+      case "google-sheets":
+        authUrl = generateGoogleOAuthUrl(redirectUri, [
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/spreadsheets",
+          "https://www.googleapis.com/auth/drive.file"
+        ], statePayload)
+        break
       case "gmail":
         authUrl = generateGoogleOAuthUrl(redirectUri, [
           "https://www.googleapis.com/auth/userinfo.email",

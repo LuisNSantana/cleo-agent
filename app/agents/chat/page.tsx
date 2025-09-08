@@ -644,6 +644,87 @@ export default function AgentsChatPage() {
         }
       }
       
+      // Google Docs tools
+      if (name === 'creategoogledoc') {
+        return {
+          icon: '/icons/google_docs.png',
+          bgColor: 'bg-blue-500/15',
+          borderColor: 'border-blue-400/30',
+          textColor: 'text-blue-200',
+          badgeColor: 'bg-blue-400/20',
+          displayName: '📄 Create Google Doc',
+          description: 'Document creation'
+        }
+      }
+      if (name === 'readgoogledoc') {
+        return {
+          icon: '/icons/google_docs.png',
+          bgColor: 'bg-green-500/15',
+          borderColor: 'border-green-400/30',
+          textColor: 'text-green-200',
+          badgeColor: 'bg-green-400/20',
+          displayName: '📖 Read Google Doc',
+          description: 'Document reading'
+        }
+      }
+      if (name === 'updategoogledoc') {
+        return {
+          icon: '/icons/google_docs.png',
+          bgColor: 'bg-yellow-500/15',
+          borderColor: 'border-yellow-400/30',
+          textColor: 'text-yellow-200',
+          badgeColor: 'bg-yellow-400/20',
+          displayName: '✏️ Update Google Doc',
+          description: 'Document editing'
+        }
+      }
+      
+      // Google Sheets tools  
+      if (name === 'creategooglesheet') {
+        return {
+          icon: '/icons/sheets.png',
+          bgColor: 'bg-green-500/15',
+          borderColor: 'border-green-400/30',
+          textColor: 'text-green-200',
+          badgeColor: 'bg-green-400/20',
+          displayName: '📊 Create Google Sheet',
+          description: 'Spreadsheet creation'
+        }
+      }
+      if (name === 'readgooglesheet') {
+        return {
+          icon: '/icons/sheets.png',
+          bgColor: 'bg-blue-500/15',
+          borderColor: 'border-blue-400/30',
+          textColor: 'text-blue-200',
+          badgeColor: 'bg-blue-400/20',
+          displayName: '📈 Read Google Sheet',
+          description: 'Spreadsheet reading'
+        }
+      }
+      if (name === 'updategooglesheet') {
+        return {
+          icon: '/icons/sheets.png',
+          bgColor: 'bg-yellow-500/15',
+          borderColor: 'border-yellow-400/30',
+          textColor: 'text-yellow-200',
+          badgeColor: 'bg-yellow-400/20',
+          displayName: '✏️ Update Google Sheet',
+          description: 'Spreadsheet editing'
+        }
+      }
+      if (name === 'appendgooglesheet') {
+        return {
+          icon: '/icons/sheets.png',
+          bgColor: 'bg-purple-500/15',
+          borderColor: 'border-purple-400/30',
+          textColor: 'text-purple-200',
+          badgeColor: 'bg-purple-400/20',
+          displayName: '➕ Append Google Sheet',
+          description: 'Add data to spreadsheet'
+        }
+      }
+      
       // SerpAPI/Google search tools
       if (name.includes('serp') || name.includes('google') || name.includes('search')) {
         return {
@@ -696,11 +777,43 @@ export default function AgentsChatPage() {
       }
     }
 
-    // First try to get toolCalls from the message directly (for historical messages)
+    // Extract tool invocations from persisted message parts (for historical messages)
+    const extractToolsFromParts = (message: any) => {
+      if (!message || !message.parts) return []
+      
+      try {
+        const parts = Array.isArray(message.parts) ? message.parts : JSON.parse(message.parts)
+        const toolInvocations = parts.filter((part: any) => 
+          part.type === 'tool-invocation' && 
+          part.toolInvocation && 
+          part.toolInvocation.toolName
+        )
+        
+        return toolInvocations.map((part: any) => ({
+          id: part.toolInvocation.toolCallId || Math.random().toString(),
+          name: part.toolInvocation.toolName,
+          args: part.toolInvocation.args || {},
+          result: part.toolInvocation.result
+        }))
+      } catch (error) {
+        console.warn('Error parsing tool invocations from parts:', error)
+        return []
+      }
+    }
+
+    // Get tools from message.toolCalls (runtime) or extract from parts (historical)
+    let toolCalls = []
     if (message && message.toolCalls && message.toolCalls.length > 0) {
+      toolCalls = message.toolCalls
+    } else if (message) {
+      toolCalls = extractToolsFromParts(message)
+    }
+
+    // First try to get toolCalls from the message directly or extracted from parts
+    if (toolCalls.length > 0) {
       return (
         <div className="mt-2 flex flex-wrap gap-2">
-          {message.toolCalls.map((tc, idx) => {
+          {toolCalls.map((tc: any, idx: number) => {
             const key = `${messageId}_tool_${idx}`
             const open = !!expandedTools[key]
             const display = getToolDisplay(tc.name)

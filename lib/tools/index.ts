@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { webSearchTool } from './web-search';
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar';
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive';
+import { createGoogleDocTool, readGoogleDocTool, updateGoogleDocTool } from './google-docs';
+import { createGoogleSheetTool, readGoogleSheetTool, updateGoogleSheetTool, appendGoogleSheetTool } from './google-sheets';
 import { createDocumentTool } from './create-document';
 import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
@@ -343,6 +345,17 @@ export const tools = {
   getDriveFileDetails: getDriveFileDetailsTool,
   createDriveFolder: createDriveFolderTool,
   uploadFileToDrive: uploadFileToDriveTool,
+
+  // Google Tools - Docs
+  createGoogleDoc: createGoogleDocTool,
+  readGoogleDoc: readGoogleDocTool,
+  updateGoogleDoc: updateGoogleDocTool,
+
+  // Google Tools - Sheets
+  createGoogleSheet: createGoogleSheetTool,
+  readGoogleSheet: readGoogleSheetTool,
+  updateGoogleSheet: updateGoogleSheetTool,
+  appendGoogleSheet: appendGoogleSheetTool,
 
   // Google Tools - Gmail
   listGmailMessages: listGmailMessagesTool,

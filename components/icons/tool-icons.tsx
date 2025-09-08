@@ -27,6 +27,15 @@ export const toolIconMap = {
   getDriveFileDetails: GoogleDriveIcon,
   createDriveFolder: GoogleDriveIcon,
   uploadFileToDrive: GoogleDriveIcon,
+  // Google Docs tools
+  createGoogleDoc: GoogleDocsIcon,
+  readGoogleDoc: GoogleDocsIcon,
+  updateGoogleDoc: GoogleDocsIcon,
+  // Google Sheets tools
+  createGoogleSheet: GoogleSheetsIcon,
+  readGoogleSheet: GoogleSheetsIcon,
+  updateGoogleSheet: GoogleSheetsIcon,
+  appendGoogleSheet: GoogleSheetsIcon,
   // Gmail tools
   listGmailMessages: GmailIcon,
   getGmailMessage: GmailIcon,
@@ -77,6 +86,34 @@ export function GmailIcon({ className }: { className?: string }) {
     <Image 
       src="/icons/gmail-icon.svg" 
       alt="Gmail"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom Google Docs SVG icon component using the official icon
+export function GoogleDocsIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/google_docs.png" 
+      alt="Google Docs"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom Google Sheets SVG icon component using the official icon
+export function GoogleSheetsIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/sheets.png" 
+      alt="Google Sheets"
       className={className}
       width={16}
       height={16}
