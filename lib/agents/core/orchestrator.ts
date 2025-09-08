@@ -13,6 +13,7 @@ import { EventEmitter } from './event-emitter'
 import { globalErrorHandler, AgentErrorHandler } from './error-handler'
 import { MemoryManager } from './memory-manager'
 import { MetricsCollector } from './metrics-collector'
+import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgents } from '../config'
 
@@ -619,24 +620,20 @@ export class AgentOrchestrator {
 
   private addDelegationProgressStep(progressData: any) {
     // Add delegation progress as execution step for client tracking
-    console.log('🔍 [ORCHESTRATOR DEBUG] Adding delegation progress step:', {
-      sourceExecutionId: progressData.sourceExecutionId,
-      stage: progressData.stage,
-      progress: progressData.progress,
-      activeExecutionsCount: this.activeExecutions.size,
-      activeExecutionIds: Array.from(this.activeExecutions.keys())
-    })
-    
     if (progressData.sourceExecutionId) {
       const sourceExecution = this.activeExecutions.get(progressData.sourceExecutionId)
       if (sourceExecution && sourceExecution.steps) {
         const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+        
+        // Get agent metadata for display names
+        const targetMetadata = getAgentMetadata(progressData.targetAgent)
+        
         const newStep = {
           id: stepId,
           timestamp: new Date(),
           agent: progressData.targetAgent,
           action: 'delegating' as const,
-          content: progressData.message || `${progressData.targetAgent} working on task`,
+          content: progressData.message || `${targetMetadata.name} working on task`,
           progress: progressData.progress || 0,
           metadata: {
             sourceAgent: progressData.sourceAgent,
@@ -648,8 +645,11 @@ export class AgentOrchestrator {
           }
         }
         sourceExecution.steps.push(newStep)
-        console.log('📝 [ORCHESTRATOR] Added delegation progress step:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
-        console.log('🔍 [ORCHESTRATOR DEBUG] Step added:', stepId, 'to execution:', progressData.sourceExecutionId)
+        
+        // Keep only essential logs
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📝 [DELEGATION] Progress step added:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
+        }
       } else {
         console.warn('❌ [ORCHESTRATOR] Could not find source execution or steps array:', {
           sourceExecutionId: progressData.sourceExecutionId,
@@ -668,19 +668,23 @@ export class AgentOrchestrator {
   private async handleDelegation(delegationData: any): Promise<void> {
     try {
       console.log(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
-      console.log(`🔍 [DEBUG] sourceExecutionId:`, delegationData.sourceExecutionId)
       
       // Add delegation step to original execution for UI tracking
       if (delegationData.sourceExecutionId) {
         const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
         if (sourceExecution) {
           if (!sourceExecution.steps) sourceExecution.steps = []
+          
+          // Get agent metadata for display names
+          const sourceMetadata = getAgentMetadata(delegationData.sourceAgent)
+          const targetMetadata = getAgentMetadata(delegationData.targetAgent)
+          
           sourceExecution.steps.push({
             id: `delegation_${Date.now()}`,
             timestamp: new Date(),
             agent: delegationData.sourceAgent,
             action: 'delegating',
-            content: `Delegating to ${delegationData.targetAgent}: ${delegationData.task}`,
+            content: `${sourceMetadata.name} delegating to ${targetMetadata.name}: ${delegationData.task}`,
             progress: 0,
             metadata: {
               sourceAgent: delegationData.sourceAgent,
@@ -690,7 +694,10 @@ export class AgentOrchestrator {
               stage: 'initializing'
             }
           })
-          console.log(`📝 [STEP] Added delegation step to execution ${delegationData.sourceExecutionId}`)
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📝 [DELEGATION] Step added: ${sourceMetadata.name} → ${targetMetadata.name}`)
+          }
         }
       }
       

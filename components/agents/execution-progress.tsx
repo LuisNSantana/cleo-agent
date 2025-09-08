@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { Clock, Zap, Search, Brain, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getAgentMetadata } from '@/lib/agents/agent-metadata'
 
 interface ExecutionProgressProps {
   stage: string
@@ -105,6 +106,11 @@ export function ExecutionProgress({
   const colors = getStageColor(stage)
   const icon = getStageIcon(stage)
 
+  // Get agent metadata if agentId is provided
+  const agentMetadata = agentId ? getAgentMetadata(agentId) : null
+  const displayName = agentName || agentMetadata?.name || 'Agent'
+  const displayAvatar = agentAvatar || agentMetadata?.avatar
+
   if (!isActive) return null
 
   return (
@@ -127,14 +133,12 @@ export function ExecutionProgress({
       />
       
       {/* Agent avatar */}
-      {agentAvatar && (
-        <Avatar className="w-6 h-6">
-          <AvatarImage src={agentAvatar} alt={agentName || 'Agent'} />
-          <AvatarFallback className="bg-violet-600 text-[10px]">
-            {agentName?.[0] || 'A'}
-          </AvatarFallback>
-        </Avatar>
-      )}
+      <Avatar className="w-6 h-6">
+        <AvatarImage src={displayAvatar} alt={displayName} />
+        <AvatarFallback className="bg-violet-600 text-[10px]">
+          {agentMetadata?.emoji || displayName[0] || 'A'}
+        </AvatarFallback>
+      </Avatar>
       
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -144,11 +148,9 @@ export function ExecutionProgress({
             <span className="text-sm font-medium capitalize">{stage}</span>
           </div>
           
-          {agentName && (
-            <span className="text-xs text-slate-400">
-              • {agentName}
-            </span>
-          )}
+          <span className="text-xs text-slate-400">
+            • {displayName}
+          </span>
         </div>
         
         <p className={cn("text-sm", colors.text)}>

@@ -4,9 +4,11 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { DelegationProgress, DelegationTimelineEvent } from '@/lib/agents/types'
+import { getAgentMetadata } from '@/lib/agents/agent-metadata'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,14 +44,15 @@ export function DelegationProgressComponent({
   }
 
   const getStageMessage = (stage: DelegationProgress['stage'], targetAgent: string) => {
+    const targetMetadata = getAgentMetadata(targetAgent)
     switch (stage) {
-      case 'initializing': return `Preparando delegación a ${targetAgent}...`
-      case 'analyzing': return `${targetAgent} está analizando la tarea...`
-      case 'researching': return `${targetAgent} está investigando...`
-      case 'processing': return `${targetAgent} está procesando los datos...`
-      case 'synthesizing': return `${targetAgent} está sintetizando resultados...`
-      case 'finalizing': return `${targetAgent} está finalizando la respuesta...`
-      default: return `${targetAgent} está trabajando...`
+      case 'initializing': return `Preparando delegación a ${targetMetadata.name}...`
+      case 'analyzing': return `${targetMetadata.name} está analizando la tarea...`
+      case 'researching': return `${targetMetadata.name} está investigando...`
+      case 'processing': return `${targetMetadata.name} está procesando los datos...`
+      case 'synthesizing': return `${targetMetadata.name} está sintetizando resultados...`
+      case 'finalizing': return `${targetMetadata.name} está finalizando la respuesta...`
+      default: return `${targetMetadata.name} está trabajando...`
     }
   }
 
@@ -78,9 +81,34 @@ export function DelegationProgressComponent({
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
+                <div className="flex items-center space-x-2">
+                  {/* Source Agent Avatar */}
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage 
+                      src={getAgentMetadata(currentDelegation.sourceAgent).avatar} 
+                      alt={getAgentMetadata(currentDelegation.sourceAgent).name} 
+                    />
+                    <AvatarFallback className="text-xs">
+                      {getAgentMetadata(currentDelegation.sourceAgent).emoji}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <span className="text-xs">→</span>
+                  
+                  {/* Target Agent Avatar */}
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage 
+                      src={getAgentMetadata(currentDelegation.targetAgent).avatar} 
+                      alt={getAgentMetadata(currentDelegation.targetAgent).name} 
+                    />
+                    <AvatarFallback className="text-xs">
+                      {getAgentMetadata(currentDelegation.targetAgent).emoji}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
                 <div>
                   <CardTitle className="text-sm font-medium">
-                    {currentDelegation.sourceAgent} → {currentDelegation.targetAgent}
+                    {getAgentMetadata(currentDelegation.sourceAgent).name} → {getAgentMetadata(currentDelegation.targetAgent).name}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     {getStageMessage(currentDelegation.stage, currentDelegation.targetAgent)}

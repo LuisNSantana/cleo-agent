@@ -115,8 +115,6 @@ export function getAgentOrchestrator() {
     },
     // Execution getters - combine legacy and core
     getExecution(executionId: string) {
-      console.log(`🔍 [ADAPTER DEBUG] Getting execution: ${executionId}`);
-      
       // Try core orchestrator first (where delegation steps are stored)
       try {
         const legacyOrch = (globalThis as any).__cleoOrchestrator
@@ -124,23 +122,16 @@ export function getAgentOrchestrator() {
         
         if (coreInstance && typeof coreInstance.getExecutionStatus === 'function') {
           const e = coreInstance.getExecutionStatus(executionId)
-          console.log(`🔍 [ADAPTER DEBUG] Core orchestrator execution ${executionId}:`, {
-            found: !!e,
-            stepsCount: e?.steps?.length || 0,
-            steps: e?.steps?.map((s: any) => ({ id: s.id, action: s.action, stage: s.metadata?.stage })) || []
-          })
+          
           // If found in core AND has steps, return it
           if (e && e.steps && e.steps.length > 0) {
-            console.log(`✅ [ADAPTER DEBUG] Returning core execution with ${e.steps.length} steps`);
             return e as AgentExecution
           }
           // If found in core but no steps, merge with legacy for messages
           if (e) {
-            console.log(`🔍 [ADAPTER DEBUG] Core execution found but no steps, merging with legacy...`);
             try {
               const legacyE = legacyOrch.getExecution(executionId)
               if (legacyE && legacyE.messages) {
-                console.log(`🔄 [ADAPTER DEBUG] Merging core steps with legacy messages`);
                 return {
                   ...e,
                   messages: legacyE.messages,
@@ -150,12 +141,6 @@ export function getAgentOrchestrator() {
             } catch {}
             return e as AgentExecution
           }
-        } else {
-          console.log(`🔍 [ADAPTER DEBUG] Core orchestrator not available:`, {
-            legacyOrch: !!legacyOrch,
-            core: !!legacyOrch?.core,
-            hasGetExecutionStatus: !!(legacyOrch?.core && typeof legacyOrch.core.getExecutionStatus === 'function')
-          });
         }
       } catch (err) {
         console.error('Error getting execution from core:', err)
@@ -166,17 +151,11 @@ export function getAgentOrchestrator() {
         const lorch = (globalThis as any).__cleoOrchestrator
         if (lorch && typeof lorch.getExecution === 'function') {
           const e = lorch.getExecution(executionId)
-          console.log(`🔍 [ADAPTER DEBUG] Legacy orchestrator execution ${executionId}:`, {
-            found: !!e,
-            stepsCount: e?.steps?.length || 0,
-            messagesCount: e?.messages?.length || 0
-          })
           if (e) return e as AgentExecution
         }
       } catch {}
       
       // Fallback to adapter registry
-      console.log(`🔍 [ADAPTER DEBUG] Execution ${executionId} not found in any orchestrator, checking registry`);
       return execRegistry.find(e => e.id === executionId) || null
     },
     getAllExecutions(): AgentExecution[] {

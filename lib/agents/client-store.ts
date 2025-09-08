@@ -33,6 +33,7 @@ import {
   DelegationStatus,
   DelegationStage
 } from './types'
+import { getAgentMetadata } from './agent-metadata'
 import { getAllAgents } from './config'
 
 interface ClientAgentStore {
@@ -489,7 +490,6 @@ export const useClientAgentStore = create<ClientAgentStore>()(
               // Process delegation steps from execution to update delegation state
               if (data.execution.steps && data.execution.steps.length > 0) {
                 const delegationSteps = data.execution.steps.filter((step: any) => step.action === 'delegating')
-                console.log(`🔄 [POLL-${attempt}] Found ${delegationSteps.length} delegation steps`)
                 if (delegationSteps.length > 0) {
                   get().processDelegationSteps(delegationSteps)
                 }
@@ -760,6 +760,10 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       const id = `delegation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       const now = new Date()
       
+      // Get agent metadata for display names
+      const sourceMetadata = getAgentMetadata(delegation.sourceAgent)
+      const targetMetadata = getAgentMetadata(delegation.targetAgent)
+      
       const fullDelegation: DelegationProgress = {
         ...delegation,
         id,
@@ -771,7 +775,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           id: `event-${Date.now()}`,
           timestamp: now,
           stage: 'initializing',
-          message: `Delegating task to ${delegation.targetAgent}`,
+          message: `${sourceMetadata.name} delegating task to ${targetMetadata.name}`,
           agent: delegation.sourceAgent,
           icon: '🔄',
           progress: 0
@@ -883,8 +887,6 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     },
 
     processDelegationSteps: (steps) => {
-      console.log('🔄 [CLIENT-STORE] Processing delegation steps:', steps.length)
-      
       const store = get()
       let currentDelegationId = store.currentDelegationId
       
@@ -893,10 +895,13 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       
       for (const step of steps) {
         const metadata = step.metadata || {}
-        console.log('📝 [CLIENT-STORE] Processing step:', step.id, metadata.status, metadata.stage)
         
         // Create new delegation if this is the first step
         if (metadata.status === 'requested' && metadata.stage === 'initializing') {
+          // Get agent metadata for display names
+          const sourceMetadata = getAgentMetadata(metadata.sourceAgent || step.agent)
+          const targetMetadata = getAgentMetadata(metadata.delegatedTo)
+          
           currentDelegationId = store.startDelegation({
             sourceAgent: metadata.sourceAgent || step.agent,
             targetAgent: metadata.delegatedTo,
@@ -905,19 +910,28 @@ export const useClientAgentStore = create<ClientAgentStore>()(
             stage: 'initializing',
             startTime: new Date(step.timestamp)
           })
-          console.log('🆕 [CLIENT-STORE] Created delegation from step:', currentDelegationId)
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🆕 [DELEGATION] Created:', `${sourceMetadata.name} → ${targetMetadata.name}`)
+          }
         } 
         // Update existing delegation
         else if (currentDelegationId && metadata.status && metadata.stage) {
           store.updateDelegationStatus(currentDelegationId, metadata.status, metadata.stage)
-          console.log('🔄 [CLIENT-STORE] Updated delegation from step:', currentDelegationId, metadata.status, metadata.stage)
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔄 [DELEGATION] Updated:', currentDelegationId, metadata.status, metadata.stage)
+          }
         }
         
         // Complete delegation if this is the final step
         if (metadata.status === 'completed') {
           if (currentDelegationId) {
             store.completeDelegation(currentDelegationId, metadata.result || 'Task completed')
-            console.log('✅ [CLIENT-STORE] Completed delegation from step:', currentDelegationId)
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [DELEGATION] Completed:', currentDelegationId)
+            }
           }
         }
       }

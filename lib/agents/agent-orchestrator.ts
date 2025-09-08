@@ -30,31 +30,25 @@ function getCore(): CoreOrchestrator {
 		
 		// Listen for delegation progress events from core and propagate to window
 		coreInstance.on('delegation.progress', (data: any) => {
-			console.log('🔍 [LEGACY] Core delegation progress event:', data)
 			if (typeof window !== 'undefined') {
 				const event = new CustomEvent('delegation-progress', { detail: data })
 				window.dispatchEvent(event)
-				console.log('🔍 [LEGACY] Dispatched delegation-progress to window')
 			}
 		})
 		
 		// Listen for delegation requested events
 		coreInstance.on('delegation.requested', (data: any) => {
-			console.log('🔍 [LEGACY] Core delegation requested event:', data)
 			if (typeof window !== 'undefined') {
 				const event = new CustomEvent('agent-delegation', { detail: { ...data, type: 'requested' } })
 				window.dispatchEvent(event)
-				console.log('🔍 [LEGACY] Dispatched agent-delegation to window')
 			}
 		})
 		
 		// Listen for delegation completed events  
 		coreInstance.on('delegation.completed', (data: any) => {
-			console.log('🔍 [LEGACY] Core delegation completed event:', data)
 			if (typeof window !== 'undefined') {
 				const event = new CustomEvent('agent-delegation', { detail: { ...data, type: 'completed' } })
 				window.dispatchEvent(event)
-				console.log('🔍 [LEGACY] Dispatched agent-delegation completed to window')
 			}
 		})
 	}
