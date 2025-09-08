@@ -297,22 +297,38 @@ export class GraphBuilder {
                   }, 120000)
                   
                   const onCompleted = (result: any) => {
-                    if (result.sourceAgent === agentConfig.id && 
-                        result.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                    // Compare using execution context ID instead of agent names for more reliable matching
+                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
+                    if (result.sourceExecutionId === currentExecutionId) {
+                      console.log('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       resolve(result)
+                    } else {
+                      console.log('🔍 [DELEGATION] Ignoring completion for different execution:', {
+                        resultExecutionId: result.sourceExecutionId,
+                        currentExecutionId: currentExecutionId,
+                        sourceAgent: result.sourceAgent,
+                        targetAgent: result.targetAgent
+                      })
                     }
                   }
                   
                   const onFailed = (error: any) => {
-                    if (error.sourceAgent === agentConfig.id && 
-                        error.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                    // Compare using execution context ID instead of agent names
+                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
+                    if (error.sourceExecutionId === currentExecutionId) {
+                      console.log('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       reject(new Error(error.error || 'Delegation failed'))
+                    } else {
+                      console.log('🔍 [DELEGATION] Ignoring failure for different execution:', {
+                        errorExecutionId: error.sourceExecutionId,
+                        currentExecutionId: currentExecutionId
+                      })
                     }
                   }
                   
@@ -612,22 +628,38 @@ export class GraphBuilder {
                   }, 120000)
 
                   const onCompleted = (result: any) => {
-                    if (result.sourceAgent === agentConfig.id && 
-                        result.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                    // Compare using execution context ID instead of agent names for more reliable matching
+                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
+                    if (result.sourceExecutionId === currentExecutionId) {
+                      console.log('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       resolve(result)
+                    } else {
+                      console.log('🔍 [DELEGATION] Ignoring completion for different execution:', {
+                        resultExecutionId: result.sourceExecutionId,
+                        currentExecutionId: currentExecutionId,
+                        sourceAgent: result.sourceAgent,
+                        targetAgent: result.targetAgent
+                      })
                     }
                   }
 
                   const onFailed = (error: any) => {
-                    if (error.sourceAgent === agentConfig.id && 
-                        error.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                    // Compare using execution context ID instead of agent names
+                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
+                    if (error.sourceExecutionId === currentExecutionId) {
+                      console.log('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       reject(new Error(error.error || 'Delegation failed'))
+                    } else {
+                      console.log('🔍 [DELEGATION] Ignoring failure for different execution:', {
+                        errorExecutionId: error.sourceExecutionId,
+                        currentExecutionId: currentExecutionId
+                      })
                     }
                   }
 
@@ -649,9 +681,9 @@ export class GraphBuilder {
                 })
 
                 try {
-                  console.log('⏳ [DELEGATION] Waiting for delegated task to complete...')
+                  console.log('⏳ [DELEGATION] Waiting for delegated task to complete... executionId:', currentExecutionId)
                   const delegationResult: any = await delegationPromise
-                  console.log('✅ [DELEGATION] Completed, injecting result into conversation')
+                  console.log('✅ [DELEGATION] Completed, injecting result into conversation. ExecutionId:', currentExecutionId)
                   const contentStr = typeof (delegationResult?.result) === 'string' 
                     ? delegationResult.result 
                     : JSON.stringify(delegationResult?.result || {})
@@ -662,6 +694,7 @@ export class GraphBuilder {
                       tool_call_id: String(callId) 
                     })
                   ]
+                  console.log('🔄 [DELEGATION] ToolMessage injected, continuing graph execution...')
                 } catch (delegationError) {
                   console.error('❌ [DELEGATION] Delegation failed in buildGraph:', delegationError)
                   messages = [

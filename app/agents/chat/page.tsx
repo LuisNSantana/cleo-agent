@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { AgentConfig } from '@/lib/agents/types'
+import { useExecutionProgress } from './hooks/use-execution-progress'
+import ExecutionProgress from '@/components/agents/execution-progress'
 import {
   ChatCircleIcon,
   PaperPlaneIcon,
@@ -38,8 +40,18 @@ interface ChatMessage {
   agentName?: string
   isDelegated?: boolean
   delegatedFrom?: string | null
-  metadata?: Record<string, any>
+  metadata?: Record<string, any> & {
+    messageType?: 'delegated_result' | 'supervisor_synthesis'
+    sender?: string
+  }
   toolCalls?: Array<{ id: string; name: string; args: any; result?: any; error?: string }>
+  delegationResults?: Array<{
+    agentId: string
+    agentName: string
+    content: string
+    timestamp: Date
+    toolCalls?: Array<{ id: string; name: string; args: any; result?: any; error?: string }>
+  }>
 }
 
 export default function AgentsChatPage() {
@@ -51,8 +63,51 @@ export default function AgentsChatPage() {
     error, 
     clearError, 
     delegationEvents,
-    currentDelegationId
+    currentDelegationId,
+    activeDelegations
   } = useClientAgentStore()
+
+  // Execution progress hook
+  const { progress, setProgress, clearProgress, simulateProgress } = useExecutionProgress()
+  
+  // Calculate real delegation progress from store
+  const delegationProgress = useMemo(() => {
+    console.log('🔍 [DELEGATION PROGRESS CALC] currentDelegationId:', currentDelegationId)
+    console.log('🔍 [DELEGATION PROGRESS CALC] activeDelegations:', activeDelegations)
+    
+    if (!currentDelegationId || !activeDelegations[currentDelegationId]) {
+      return null
+    }
+    
+    const delegation = activeDelegations[currentDelegationId]
+    console.log('🔍 [DELEGATION PROGRESS] Current delegation:', delegation)
+    
+    // Find the agent by ID to get the friendly name
+    const agent = agents.find(a => a.id === delegation.targetAgent)
+    const agentName = agent?.name || delegation.targetAgent
+    
+    // Map delegation stages to messages
+    const stageMessages = {
+      'initializing': `${agentName} está inicializando`,
+      'analyzing': `${agentName} está analizando la tarea`,
+      'researching': `${agentName} está investigando`,
+      'processing': `${agentName} está procesando la tarea`,
+      'synthesizing': `${agentName} está sintetizando resultados`,
+      'finalizing': `${agentName} está finalizando respuesta`
+    }
+    
+    const result = {
+      isActive: delegation.status === 'in_progress' || delegation.status === 'completing',
+      stage: delegation.stage,
+      message: stageMessages[delegation.stage] || `${agentName} está trabajando`,
+      agentId: delegation.targetAgent,
+      progress: delegation.progress || 0
+    }
+    
+    console.log('🔍 [DELEGATION PROGRESS] Calculated result:', result)
+    
+    return result
+  }, [currentDelegationId, activeDelegations, agents])
   
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -142,7 +197,9 @@ export default function AgentsChatPage() {
       messages: currentExecution.messages?.map(m => ({
         id: m.id,
         type: m.type,
-        contentPreview: m.content.slice(0, 100)
+        contentPreview: m.content.slice(0, 100),
+        sender: m.metadata?.sender,
+        source: m.metadata?.source
       }))
     })
 
@@ -155,36 +212,100 @@ export default function AgentsChatPage() {
     
     if (aiMessages.length === 0) return
 
-    const mapped = aiMessages.map((m) => {
+    // Group messages: delegated results + final synthesis
+    const delegatedMessages: any[] = []
+    let finalSynthesisMessage: any = null
+    
+    for (const m of aiMessages) {
       const senderId = (m.metadata && (m.metadata as any).sender) || currentExecution.agentId || selectedAgent?.id
-      const sender = agents.find((a) => a.id === senderId) || selectedAgent || null
+      const isDelegatedMessage = senderId && senderId !== currentExecution.agentId && senderId !== 'cleo-supervisor'
       
-      console.log('🔍 [CHAT DEBUG] Mapping execution message:', {
+      console.log('🔍 [DELEGATION DEBUG] Processing message:', {
         messageId: m.id,
-        originalMetadata: m.metadata,
+        originalSender: m.metadata?.sender,
         extractedSenderId: senderId,
         currentExecutionAgentId: currentExecution.agentId,
-        selectedAgentId: selectedAgent?.id,
-        finalSender: sender?.name,
-        finalSenderId: sender?.id
+        isDelegatedMessage,
+        content: m.content.slice(0, 50)
       })
       
-      return {
-        id: m.id,
-        type: 'agent' as const,
-        content: m.content,
-        timestamp: new Date(m.timestamp as any),
-        agentId: sender?.id,
-        agentName: sender?.name,
-        metadata: (m.metadata as any) || {},
-        toolCalls: m.toolCalls || [], // Include toolCalls from execution
+      if (isDelegatedMessage) {
+        // This is a delegated agent result - store for inclusion as delegation result
+        const sender = agents.find((a) => a.id === senderId) || null
+        
+        console.log('🔍 [DELEGATION DEBUG] Found delegated message:', {
+          senderId,
+          senderName: sender?.name,
+          agentFound: !!sender
+        })
+        
+        delegatedMessages.push({
+          agentId: senderId,
+          agentName: sender?.name || `Agent ${senderId}`,
+          content: m.content,
+          timestamp: new Date(m.timestamp as any),
+          toolCalls: m.toolCalls || []
+        })
+      } else {
+        // This is the final synthesis message from supervisor
+        finalSynthesisMessage = m
       }
+    }
+    
+    console.log('🔍 [CHAT DEBUG] Grouped messages:', {
+      delegatedCount: delegatedMessages.length,
+      hasFinalSynthesis: !!finalSynthesisMessage,
+      delegatedAgents: delegatedMessages.map(d => d.agentName)
     })
+    
+    // Create the final chat message (synthesis + delegation results)
+    const mapped: ChatMessage[] = []
+    
+    if (finalSynthesisMessage) {
+      const supervisorId = currentExecution.agentId || selectedAgent?.id
+      const supervisor = agents.find((a) => a.id === supervisorId) || selectedAgent || null
+      
+      mapped.push({
+        id: finalSynthesisMessage.id,
+        type: 'agent' as const,
+        content: finalSynthesisMessage.content,
+        timestamp: new Date(finalSynthesisMessage.timestamp as any),
+        agentId: supervisor?.id,
+        agentName: supervisor?.name,
+        isDelegated: false,
+        delegatedFrom: null,
+        metadata: { 
+          ...(finalSynthesisMessage.metadata as any) || {},
+          messageType: 'supervisor_synthesis'
+        },
+        toolCalls: finalSynthesisMessage.toolCalls || [],
+        // Include delegation results as expandable content
+        delegationResults: delegatedMessages
+      })
+    } else if (delegatedMessages.length > 0) {
+      // Fallback: if no synthesis, show the last delegated message as main with others as delegation results
+      const lastDelegated = delegatedMessages[delegatedMessages.length - 1]
+      const otherDelegated = delegatedMessages.slice(0, -1)
+      
+      mapped.push({
+        id: `fallback_${Date.now()}`,
+        type: 'agent' as const,
+        content: lastDelegated.content,
+        timestamp: lastDelegated.timestamp,
+        agentId: lastDelegated.agentId,
+        agentName: lastDelegated.agentName,
+        isDelegated: true,
+        delegatedFrom: currentExecution.agentId,
+        metadata: { messageType: 'delegated_result' },
+        toolCalls: lastDelegated.toolCalls,
+        delegationResults: otherDelegated
+      })
+    }
 
     console.log('🔍 [CHAT DEBUG] Adding mapped messages to chat:', mapped.length)
     setMessages((prev) => [...prev, ...mapped])
     appendedExecRef.current.add(currentExecution.id)
-  }, [currentExecution, agents, selectedAgent])
+  }, [currentExecution?.id, currentExecution?.status])
 
   // Surface execution errors into the chat as a system message
   useEffect(() => {
@@ -199,6 +320,95 @@ export default function AgentsChatPage() {
     // Clear store error after surfacing
     clearError?.()
   }, [error, clearError])
+
+  // Simulate execution progress when currentExecution status changes
+  useEffect(() => {
+    if (!currentExecution) {
+      clearProgress()
+      return
+    }
+
+    if (currentExecution.status === 'running') {
+      // Determine target agent from delegation events or default to selected agent
+      const lastDelegationStep = (currentExecution?.steps || [])
+        .filter(st => st.action === 'delegating' && st.metadata?.delegatedTo)
+        .slice(-1)[0]
+      
+      const recentMessages = (currentExecution?.messages || [])
+        .filter(m => m.type === 'ai' && m.metadata?.sender && m.metadata.sender !== 'cleo-supervisor')
+      const lastDelegatedMessage = recentMessages.slice(-1)[0]
+      
+      let targetAgentId = selectedAgent?.id
+      let targetAgentName = selectedAgent?.name
+      
+      if (lastDelegationStep) {
+        targetAgentId = lastDelegationStep.metadata.delegatedTo
+        targetAgentName = agents.find(a => a.id === targetAgentId)?.name || 'Agent'
+      } else if (lastDelegatedMessage && lastDelegatedMessage.metadata?.sender) {
+        targetAgentId = lastDelegatedMessage.metadata.sender
+        targetAgentName = agents.find(a => a.id === targetAgentId)?.name || 'Agent'
+      }
+      
+      // Define realistic progression stages
+      const progressStages = [
+        {
+          stage: 'initializing',
+          message: `Starting task analysis...`,
+          agentId: 'cleo-supervisor',
+          duration: 1000
+        },
+        {
+          stage: 'analyzing',
+          message: `${targetAgentName} analyzing request...`,
+          agentId: targetAgentId,
+          duration: 2000
+        }
+      ]
+      
+      // Add delegation-specific stages if there was delegation
+      if (lastDelegationStep || lastDelegatedMessage) {
+        progressStages.push(
+          {
+            stage: 'researching',
+            message: `${targetAgentName} researching and gathering information...`,
+            agentId: targetAgentId,
+            duration: 3000
+          },
+          {
+            stage: 'processing',
+            message: `${targetAgentName} processing findings...`,
+            agentId: targetAgentId,
+            duration: 2500
+          },
+          {
+            stage: 'finalizing',
+            message: `Cleo synthesizing results...`,
+            agentId: 'cleo-supervisor',
+            duration: 1500
+          }
+        )
+      } else {
+        progressStages.push(
+          {
+            stage: 'processing',
+            message: `${targetAgentName} processing request...`,
+            agentId: targetAgentId,
+            duration: 3000
+          },
+          {
+            stage: 'finalizing',
+            message: `${targetAgentName} finalizing response...`,
+            agentId: targetAgentId,
+            duration: 1500
+          }
+        )
+      }
+
+      simulateProgress(progressStages)
+    } else if (currentExecution.status === 'completed') {
+      clearProgress()
+    }
+  }, [currentExecution?.status, currentExecution?.id, simulateProgress, clearProgress])
 
   // Load historical messages for the latest thread of the selected agent with mode segregation
   useEffect(() => {
@@ -292,6 +502,8 @@ export default function AgentsChatPage() {
   }, [selectedAgent, forceSupervised]) // Re-load when mode changes
 
   // Refresh messages when execution completes to ensure DB persistence
+  // TEMPORARILY DISABLED to prevent race condition with execution message processing
+  /*
   useEffect(() => {
     const refreshMessagesAfterExecution = async () => {
       if (!currentExecution || currentExecution.status !== 'completed' || !selectedAgent) return
@@ -335,6 +547,7 @@ export default function AgentsChatPage() {
     
     refreshMessagesAfterExecution()
   }, [currentExecution?.status, currentExecution?.id, selectedAgent, forceSupervised])
+  */
 
   
   // Effective agent will be computed after lastDelegation is defined below
@@ -561,6 +774,107 @@ export default function AgentsChatPage() {
                 <div className="absolute top-full left-0 z-10 mt-1 w-80 text-[10px] bg-slate-900/95 border border-slate-700 rounded-lg p-3 text-slate-300 shadow-lg backdrop-blur-sm">
                   <div className="font-medium text-slate-200 mb-2">Tool Arguments:</div>
                   <pre className="whitespace-pre-wrap break-words overflow-auto max-h-40">{JSON.stringify(tc.args, null, 2)}</pre>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Helper to render delegation results as expandible chips
+  const renderDelegationResults = (messageId: string, delegationResults?: Array<{
+    agentId: string
+    agentName: string
+    content: string
+    timestamp: Date
+    toolCalls?: Array<{ id: string; name: string; args: any; result?: any; error?: string }>
+  }>) => {
+    if (!delegationResults || delegationResults.length === 0) return null
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {delegationResults.map((result, idx) => {
+          const key = `${messageId}_delegation_${idx}`
+          const open = !!expandedTools[key]
+          const agent = agents.find(a => a.id === result.agentId)
+          const agentAvatar = agent ? getAgentAvatar(agent) : null
+          
+          return (
+            <div 
+              key={key} 
+              className="group relative inline-flex items-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 px-3 py-1.5 text-[11px] shadow-sm transition-all hover:shadow-md"
+            >
+              <div className="flex items-center gap-1.5">
+                {agentAvatar ? (
+                  <img src={agentAvatar} alt="" className="w-6 h-6 rounded-full opacity-90" />
+                ) : (
+                  <Avatar className="w-6 h-6">
+                    <AvatarFallback className="bg-emerald-600 text-[8px]">
+                      {result.agentName?.[0] || 'A'}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                <span className="inline-block bg-emerald-400/20 rounded-full px-2 py-0.5 text-[9px] uppercase font-medium tracking-wide">
+                  delegated
+                </span>
+              </div>
+              <span className="font-medium">Tarea realizada por {result.agentName}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-5 px-2 text-emerald-200 hover:text-emerald-100 transition-colors" 
+                onClick={() => setExpandedTools((prev) => ({ ...prev, [key]: !open }))}
+              >
+                <span className="text-[10px]">{open ? '▼' : '▶'}</span>
+              </Button>
+              {open && (
+                <div className="absolute top-full left-0 z-10 mt-1 w-96 text-[12px] bg-slate-900/95 border border-slate-700 rounded-lg p-4 text-slate-300 shadow-lg backdrop-blur-sm max-h-80 overflow-y-auto">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-700">
+                    {agentAvatar ? (
+                      <img src={agentAvatar} alt="" className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="bg-emerald-600 text-xs">
+                          {result.agentName?.[0] || 'A'}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div>
+                      <div className="font-medium text-slate-200">{result.agentName}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {result.timestamp.toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="font-medium text-slate-200 mb-2">Resultado del Agente:</div>
+                    <div className="bg-slate-800/50 rounded p-2 border border-slate-700">
+                      <Markdown className="prose prose-invert max-w-none text-[11px] leading-relaxed">
+                        {result.content}
+                      </Markdown>
+                    </div>
+                  </div>
+                  
+                  {result.toolCalls && result.toolCalls.length > 0 && (
+                    <div>
+                      <div className="font-medium text-slate-200 mb-2">Tools Utilizados:</div>
+                      <div className="space-y-1">
+                        {result.toolCalls.map((tc, tcIdx) => (
+                          <div key={tcIdx} className="bg-slate-800/50 rounded p-2 border border-slate-700">
+                            <div className="font-medium text-[10px] text-slate-300 mb-1">{tc.name}</div>
+                            {tc.args && (
+                              <pre className="text-[9px] text-slate-400 whitespace-pre-wrap break-words">
+                                {JSON.stringify(tc.args, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -992,7 +1306,7 @@ export default function AgentsChatPage() {
                                 
                                 {/* Agent Identity Chip - Always show for agent messages */}
                                 {message.type === 'agent' && (
-                                  <div className="mb-2">
+                                  <div className="mb-2 flex items-center gap-2">
                                     <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border bg-violet-500/15 border-violet-500/30 text-violet-300">
                                       {displayAgent ? (
                                         <>
@@ -1019,6 +1333,13 @@ export default function AgentsChatPage() {
                                         </>
                                       )}
                                     </div>
+                                    {/* Delegation indicator */}
+                                    {message.isDelegated && message.delegatedFrom && (
+                                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-medium bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                                        <span>🔗</span>
+                                        <span>Delegated task</span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 
@@ -1055,6 +1376,8 @@ export default function AgentsChatPage() {
                                 </p>
                                 {/* Tools used for this message (if any) */}
                                 {renderToolChips(message.id, message)}
+                                {/* Delegation results for this message (if any) */}
+                                {renderDelegationResults(message.id, message.delegationResults)}
                               </div>
                             </motion.div>
                           )
@@ -1073,40 +1396,61 @@ export default function AgentsChatPage() {
                       </div>
                     )}
                     
-                    {/* Delegation progress indicator */}
-                    <DelegationStatus className="mb-3" />
-                    
-                    {/* Fallback typing indicator when execution is running but no delegation */}
-                    {currentExecution && currentExecution.status === 'running' && !currentDelegationId && (
-                      <div className="mb-2 flex items-center gap-2 text-slate-300">
-                        {(() => {
-                          // Prefer the most recent delegation step target as typing agent
-                          const lastStepDelegation = (currentExecution?.steps || [])
-                            .filter(st => st.action === 'delegating' && st.metadata?.delegatedTo)
-                            .slice(-1)[0]
-                          const lastEvent = delegationEvents.slice(-1)[0]
-                          const targetId = lastStepDelegation?.metadata?.delegatedTo || lastEvent?.to || selectedAgent?.id
-                          const agentForTyping = agents.find(a => a.id === targetId) || selectedAgent
-                          const avatar = agentForTyping ? getAgentAvatar(agentForTyping) : null
-                          return (
-                            <>
-                              <Avatar className="w-6 h-6">
-                                {avatar ? <AvatarImage src={avatar} alt={agentForTyping?.name || 'Agent'} /> : null}
-                                <AvatarFallback className="bg-violet-600 text-[10px]">
-                                  {agentForTyping?.name?.[0] || 'A'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs">
-                                {agentForTyping?.name || 'Agent'} is working...
-                              </span>
-                              <span className="flex gap-1 ml-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.2s]"></span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.1s]"></span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"></span>
-                              </span>
-                            </>
-                          )
-                        })()}
+                    {/* Enhanced execution progress indicator */}
+                    {currentExecution && currentExecution.status === 'running' && (
+                      <div className="mb-3">
+                        {/* Show delegation progress if available, otherwise fallback to simulated progress */}
+                        {delegationProgress && delegationProgress.isActive ? (
+                          <ExecutionProgress
+                            stage={delegationProgress.stage}
+                            message={delegationProgress.message}
+                            agentId={delegationProgress.agentId}
+                            agentName={agents.find(a => a.id === delegationProgress.agentId)?.name}
+                            agentAvatar={(() => {
+                              const agent = agents.find(a => a.id === delegationProgress.agentId)
+                              return agent ? getAgentAvatar(agent) || undefined : undefined
+                            })()}
+                            progress={delegationProgress.progress}
+                            isActive={delegationProgress.isActive}
+                          />
+                        ) : progress && progress.isActive ? (
+                          <ExecutionProgress
+                            stage={progress.stage}
+                            message={progress.message}
+                            agentId={progress.agentId}
+                            agentName={agents.find(a => a.id === progress.agentId)?.name}
+                            agentAvatar={(() => {
+                              const agent = agents.find(a => a.id === progress.agentId)
+                              return agent ? getAgentAvatar(agent) || undefined : undefined
+                            })()}
+                            progress={progress.progress}
+                            isActive={progress.isActive}
+                          />
+                        ) : currentDelegationId ? (
+                          <DelegationStatus className="mb-0" />
+                        ) : (
+                          <div className="flex items-center gap-3 px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                            <Avatar className="w-6 h-6">
+                              {selectedAgent && getAgentAvatar(selectedAgent) ? (
+                                <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} />
+                              ) : null}
+                              <AvatarFallback className="bg-violet-600 text-[10px]">
+                                {selectedAgent?.name?.[0] || 'A'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="text-sm text-slate-200">
+                                <span className="font-medium">{selectedAgent?.name || 'Agent'}</span> is working...
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.2s]"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.1s]"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"></span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="flex gap-2 sm:gap-3">

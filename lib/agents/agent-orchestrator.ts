@@ -285,8 +285,12 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 // Public API (legacy-compatible)
 // ----------------------------------------------------------------------------
 export function getAgentOrchestrator() {
+	const core = getCore() // Ensure core is available
 	const api = {
 		__id: 'modular-legacy-orchestrator',
+		
+		// EXPOSE CORE ORCHESTRATOR for adapter access
+		core: core,
 
 		executeAgent(input: string, agentId?: string) {
 			return createAndRunExecution(input, agentId, [])

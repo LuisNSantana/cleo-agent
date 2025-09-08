@@ -31,6 +31,12 @@ export async function GET(
       )
     }
 
+    console.log(`🔍 [API/execution] Execution ${executionId} steps:`, {
+      stepsCount: exec.steps?.length || 0,
+      steps: exec.steps?.map(s => ({ id: s.id, action: s.action, stage: s.metadata?.stage, progress: s.progress })) || [],
+      messagesCount: exec.messages?.length || 0
+    })
+
     // Normalize dates to ISO for transport
     const normalized = {
       ...exec,

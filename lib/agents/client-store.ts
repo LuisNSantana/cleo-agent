@@ -91,6 +91,7 @@ interface ClientAgentStore {
   addDelegationTimelineEvent: (delegationId: string, event: Omit<DelegationTimelineEvent, 'id' | 'timestamp'>) => void
   completeDelegation: (delegationId: string, success: boolean) => void
   clearActiveDelegations: () => void
+  processDelegationSteps: (steps: any[]) => void
   // Graph layout persistence
   setNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   setNodePositions: (positions: Record<string, { x: number; y: number }>) => void
@@ -481,8 +482,18 @@ export const useClientAgentStore = create<ClientAgentStore>()(
               console.log(`📊 [POLL-${attempt}] Execution ${executionId}:`, {
                 status: data.execution.status,
                 messages: data.execution.messages?.length || 0,
+                steps: data.execution.steps?.length || 0,
                 delay: backoffDelay
               })
+              
+              // Process delegation steps from execution to update delegation state
+              if (data.execution.steps && data.execution.steps.length > 0) {
+                const delegationSteps = data.execution.steps.filter((step: any) => step.action === 'delegating')
+                console.log(`🔄 [POLL-${attempt}] Found ${delegationSteps.length} delegation steps`)
+                if (delegationSteps.length > 0) {
+                  get().processDelegationSteps(delegationSteps)
+                }
+              }
               
               // Force state update using Zustand's explicit setter
               set((state) => {
@@ -498,9 +509,25 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                 }
               })
 
+              // Process delegation steps from execution to update delegation state
+              if (data.execution.steps && data.execution.steps.length > 0) {
+                const delegationSteps = data.execution.steps.filter((step: any) => step.action === 'delegating')
+                if (delegationSteps.length > 0) {
+                  get().processDelegationSteps(delegationSteps)
+                }
+              }
+
               // Stop polling if execution is complete
               if (data.execution.status !== 'running') {
                 console.log(`✅ [POLL-COMPLETE] Execution ${executionId}: ${data.execution.status}`)
+                
+                // Force final state update to ensure UI shows completion
+                set((state) => ({
+                  ...state,
+                  currentExecution: { ...data.execution },
+                  isLoading: false,
+                  _lastUpdate: Date.now()
+                }))
                 
                 if (data.execution.status === 'completed') {
                   try {
@@ -853,6 +880,47 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         activeDelegations: {},
         currentDelegationId: null
       })
+    },
+
+    processDelegationSteps: (steps) => {
+      console.log('🔄 [CLIENT-STORE] Processing delegation steps:', steps.length)
+      
+      const store = get()
+      let currentDelegationId = store.currentDelegationId
+      
+      // Process steps in chronological order
+      steps.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      
+      for (const step of steps) {
+        const metadata = step.metadata || {}
+        console.log('📝 [CLIENT-STORE] Processing step:', step.id, metadata.status, metadata.stage)
+        
+        // Create new delegation if this is the first step
+        if (metadata.status === 'requested' && metadata.stage === 'initializing') {
+          currentDelegationId = store.startDelegation({
+            sourceAgent: metadata.sourceAgent || step.agent,
+            targetAgent: metadata.delegatedTo,
+            task: metadata.task || step.content,
+            status: 'requested',
+            stage: 'initializing',
+            startTime: new Date(step.timestamp)
+          })
+          console.log('🆕 [CLIENT-STORE] Created delegation from step:', currentDelegationId)
+        } 
+        // Update existing delegation
+        else if (currentDelegationId && metadata.status && metadata.stage) {
+          store.updateDelegationStatus(currentDelegationId, metadata.status, metadata.stage)
+          console.log('🔄 [CLIENT-STORE] Updated delegation from step:', currentDelegationId, metadata.status, metadata.stage)
+        }
+        
+        // Complete delegation if this is the final step
+        if (metadata.status === 'completed') {
+          if (currentDelegationId) {
+            store.completeDelegation(currentDelegationId, metadata.result || 'Task completed')
+            console.log('✅ [CLIENT-STORE] Completed delegation from step:', currentDelegationId)
+          }
+        }
+      }
     }
   }))
 )
@@ -860,6 +928,60 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 // Initialize agents on store creation (client-only to avoid server fetch of relative URLs)
 if (typeof window !== 'undefined') {
   useClientAgentStore.getState().initializeAgents()
+
+  // Set up delegation event listeners to capture backend events
+  window.addEventListener('delegation-progress', (event: any) => {
+    const detail = event.detail
+    console.log('🔥 [CLIENT-STORE] Received delegation-progress:', detail)
+    
+    const store = useClientAgentStore.getState()
+    
+    if (detail.stage === 'initializing' && detail.status === 'requested') {
+      // Create new delegation
+      const delegationId = store.startDelegation({
+        sourceAgent: detail.sourceAgent,
+        targetAgent: detail.targetAgent,
+        task: detail.task || 'Delegated task',
+        status: 'requested',
+        stage: 'initializing',
+        startTime: new Date()
+      })
+      console.log('🆕 [CLIENT-STORE] Created delegation:', delegationId)
+    } else {
+      // Update existing delegation
+      const currentDelegationId = store.currentDelegationId
+      if (currentDelegationId) {
+        store.updateDelegationStatus(currentDelegationId, detail.status, detail.stage)
+        console.log('🔄 [CLIENT-STORE] Updated delegation:', currentDelegationId, detail.status, detail.stage)
+      }
+    }
+  })
+
+  window.addEventListener('delegation-completed', (event: any) => {
+    const detail = event.detail
+    console.log('✅ [CLIENT-STORE] Received delegation-completed:', detail)
+    
+    const store = useClientAgentStore.getState()
+    const currentDelegationId = store.currentDelegationId
+    if (currentDelegationId) {
+      store.completeDelegation(currentDelegationId, detail.result || 'Task completed')
+      console.log('✅ [CLIENT-STORE] Completed delegation:', currentDelegationId)
+    }
+  })
+
+  window.addEventListener('delegation-failed', (event: any) => {
+    const detail = event.detail
+    console.log('❌ [CLIENT-STORE] Received delegation-failed:', detail)
+    
+    const store = useClientAgentStore.getState()
+    const currentDelegationId = store.currentDelegationId
+    if (currentDelegationId) {
+      store.updateDelegationStatus(currentDelegationId, 'failed', 'finalizing')
+      console.log('❌ [CLIENT-STORE] Failed delegation:', currentDelegationId)
+    }
+  })
+
+  console.log('🎧 [CLIENT-STORE] Delegation event listeners registered')
 }
 
 function getStageIcon(stage: string): string {

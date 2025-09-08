@@ -181,6 +181,11 @@ export class AgentOrchestrator {
       await this.handleDelegation(delegationData)
     })
 
+    // Listen to all delegation progress events and add them as steps for client tracking
+    this.eventEmitter.on('delegation.progress', (progressData: any) => {
+      this.addDelegationProgressStep(progressData)
+    })
+
     // Memory management events
     if (this.memoryManager) {
       this.eventEmitter.on('messages.loaded', (context: ExecutionContext) => {
@@ -612,6 +617,51 @@ export class AgentOrchestrator {
     return await this.subAgentManager.updateSubAgent(subAgentId, updates)
   }
 
+  private addDelegationProgressStep(progressData: any) {
+    // Add delegation progress as execution step for client tracking
+    console.log('🔍 [ORCHESTRATOR DEBUG] Adding delegation progress step:', {
+      sourceExecutionId: progressData.sourceExecutionId,
+      stage: progressData.stage,
+      progress: progressData.progress,
+      activeExecutionsCount: this.activeExecutions.size,
+      activeExecutionIds: Array.from(this.activeExecutions.keys())
+    })
+    
+    if (progressData.sourceExecutionId) {
+      const sourceExecution = this.activeExecutions.get(progressData.sourceExecutionId)
+      if (sourceExecution && sourceExecution.steps) {
+        const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+        const newStep = {
+          id: stepId,
+          timestamp: new Date(),
+          agent: progressData.targetAgent,
+          action: 'delegating' as const,
+          content: progressData.message || `${progressData.targetAgent} working on task`,
+          progress: progressData.progress || 0,
+          metadata: {
+            sourceAgent: progressData.sourceAgent,
+            delegatedTo: progressData.targetAgent,
+            task: progressData.task,
+            status: progressData.status,
+            stage: progressData.stage,
+            message: progressData.message
+          }
+        }
+        sourceExecution.steps.push(newStep)
+        console.log('📝 [ORCHESTRATOR] Added delegation progress step:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
+        console.log('🔍 [ORCHESTRATOR DEBUG] Step added:', stepId, 'to execution:', progressData.sourceExecutionId)
+      } else {
+        console.warn('❌ [ORCHESTRATOR] Could not find source execution or steps array:', {
+          sourceExecutionId: progressData.sourceExecutionId,
+          executionFound: !!sourceExecution,
+          stepsArrayExists: !!(sourceExecution?.steps)
+        })
+      }
+    } else {
+      console.warn('❌ [ORCHESTRATOR] No sourceExecutionId in progress data:', progressData)
+    }
+  }
+
   /**
    * Handle delegation requests from agents
    */
@@ -619,6 +669,30 @@ export class AgentOrchestrator {
     try {
       console.log(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
       console.log(`🔍 [DEBUG] sourceExecutionId:`, delegationData.sourceExecutionId)
+      
+      // Add delegation step to original execution for UI tracking
+      if (delegationData.sourceExecutionId) {
+        const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+        if (sourceExecution) {
+          if (!sourceExecution.steps) sourceExecution.steps = []
+          sourceExecution.steps.push({
+            id: `delegation_${Date.now()}`,
+            timestamp: new Date(),
+            agent: delegationData.sourceAgent,
+            action: 'delegating',
+            content: `Delegating to ${delegationData.targetAgent}: ${delegationData.task}`,
+            progress: 0,
+            metadata: {
+              sourceAgent: delegationData.sourceAgent,
+              delegatedTo: delegationData.targetAgent,
+              task: delegationData.task,
+              status: 'requested',
+              stage: 'initializing'
+            }
+          })
+          console.log(`📝 [STEP] Added delegation step to execution ${delegationData.sourceExecutionId}`)
+        }
+      }
       
       // Emit delegation progress events for UI
       this.eventEmitter.emit('delegation.progress', {
@@ -628,7 +702,8 @@ export class AgentOrchestrator {
         stage: 'initializing',
         status: 'requested',
         message: `Starting delegation to ${delegationData.targetAgent}`,
-        progress: 0
+        progress: 0,
+        sourceExecutionId: delegationData.sourceExecutionId
       })
       
       // Also emit browser event for UI
@@ -670,6 +745,28 @@ export class AgentOrchestrator {
       
       console.log(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
       
+      // Add progress step: agent found and accepted
+      if (delegationData.sourceExecutionId) {
+        const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+        if (sourceExecution && sourceExecution.steps) {
+          sourceExecution.steps.push({
+            id: `delegation_accepted_${Date.now()}`,
+            timestamp: new Date(),
+            agent: delegationData.targetAgent,
+            action: 'delegating',
+            content: `${delegationData.targetAgent} accepted the task`,
+            progress: 10,
+            metadata: {
+              sourceAgent: delegationData.sourceAgent,
+              delegatedTo: delegationData.targetAgent,
+              task: delegationData.task,
+              status: 'accepted',
+              stage: 'analyzing'
+            }
+          })
+        }
+      }
+      
       // Emit progress: agent found
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -678,7 +775,8 @@ export class AgentOrchestrator {
         stage: 'analyzing',
         status: 'accepted',
         message: `${delegationData.targetAgent} acepta la tarea`,
-        progress: 10
+        progress: 10,
+        sourceExecutionId: delegationData.sourceExecutionId
       })
       
       emitBrowserEvent('delegation-progress', {
@@ -722,7 +820,8 @@ export class AgentOrchestrator {
         stage: 'processing',
         status: 'in_progress',
         message: `${delegationData.targetAgent} está procesando la tarea`,
-        progress: 25
+        progress: 25,
+        sourceExecutionId: delegationData.sourceExecutionId
       })
       
       emitBrowserEvent('delegation-progress', {
@@ -741,6 +840,28 @@ export class AgentOrchestrator {
         // Execute sub-agent as a real agent by mapping to AgentConfig
         console.log(`📋 [SUB-AGENT] Delegating to sub-agent: ${targetAgentConfig.name}`)
 
+        // Add progress step: sub-agent analyzing
+        if (delegationData.sourceExecutionId) {
+          const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+          if (sourceExecution && sourceExecution.steps) {
+            sourceExecution.steps.push({
+              id: `delegation_analyzing_${Date.now()}`,
+              timestamp: new Date(),
+              agent: delegationData.targetAgent,
+              action: 'delegating',
+              content: `${delegationData.targetAgent} analyzing context`,
+              progress: 40,
+              metadata: {
+                sourceAgent: delegationData.sourceAgent,
+                delegatedTo: delegationData.targetAgent,
+                task: delegationData.task,
+                status: 'in_progress',
+                stage: 'researching'
+              }
+            })
+          }
+        }
+
         // Emit progress: working on sub-agent
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
@@ -749,7 +870,8 @@ export class AgentOrchestrator {
           stage: 'researching',
           status: 'in_progress',
           message: `Sub-agente ${delegationData.targetAgent} analizando contexto`,
-          progress: 40
+          progress: 40,
+          sourceExecutionId: delegationData.sourceExecutionId
         })
         
         emitBrowserEvent('delegation-progress', {
@@ -786,6 +908,28 @@ export class AgentOrchestrator {
         // Ensure graph exists and execute
         await this.initializeAgent(subAgentConfig)
         
+        // Add progress step: sub-agent executing
+        if (delegationData.sourceExecutionId) {
+          const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+          if (sourceExecution && sourceExecution.steps) {
+            sourceExecution.steps.push({
+              id: `delegation_executing_${Date.now()}`,
+              timestamp: new Date(),
+              agent: delegationData.targetAgent,
+              action: 'delegating',
+              content: `${delegationData.targetAgent} executing specialized tools`,
+              progress: 70,
+              metadata: {
+                sourceAgent: delegationData.sourceAgent,
+                delegatedTo: delegationData.targetAgent,
+                task: delegationData.task,
+                status: 'in_progress',
+                stage: 'synthesizing'
+              }
+            })
+          }
+        }
+        
         // Emit progress: executing sub-agent
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
@@ -818,6 +962,28 @@ export class AgentOrchestrator {
       } else {
         // Execute regular agent with delegated task
         
+        // Add progress step: main agent working
+        if (delegationData.sourceExecutionId) {
+          const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+          if (sourceExecution && sourceExecution.steps) {
+            sourceExecution.steps.push({
+              id: `delegation_researching_${Date.now()}`,
+              timestamp: new Date(),
+              agent: delegationData.targetAgent,
+              action: 'delegating',
+              content: `${delegationData.targetAgent} executing tools`,
+              progress: 60,
+              metadata: {
+                sourceAgent: delegationData.sourceAgent,
+                delegatedTo: delegationData.targetAgent,
+                task: delegationData.task,
+                status: 'in_progress',
+                stage: 'researching'
+              }
+            })
+          }
+        }
+        
         // Emit progress: executing main agent
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
@@ -826,7 +992,8 @@ export class AgentOrchestrator {
           stage: 'researching',
           status: 'in_progress',
           message: `${delegationData.targetAgent} ejecutando herramientas`,
-          progress: 60
+          progress: 60,
+          sourceExecutionId: delegationData.sourceExecutionId
         })
         
         emitBrowserEvent('delegation-progress', {
@@ -851,6 +1018,28 @@ export class AgentOrchestrator {
       
       console.log(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
       
+      // Add progress step: delegation completing
+      if (delegationData.sourceExecutionId) {
+        const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+        if (sourceExecution && sourceExecution.steps) {
+          sourceExecution.steps.push({
+            id: `delegation_finalizing_${Date.now()}`,
+            timestamp: new Date(),
+            agent: delegationData.targetAgent,
+            action: 'delegating',
+            content: `${delegationData.targetAgent} finalizing response`,
+            progress: 90,
+            metadata: {
+              sourceAgent: delegationData.sourceAgent,
+              delegatedTo: delegationData.targetAgent,
+              task: delegationData.task,
+              status: 'completing',
+              stage: 'finalizing'
+            }
+          })
+        }
+      }
+      
       // Emit progress: finalizing
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -859,7 +1048,8 @@ export class AgentOrchestrator {
         stage: 'finalizing',
         status: 'completing',
         message: `${delegationData.targetAgent} finalizando respuesta`,
-        progress: 90
+        progress: 90,
+        sourceExecutionId: delegationData.sourceExecutionId
       })
       
       emitBrowserEvent('delegation-progress', {
@@ -871,6 +1061,30 @@ export class AgentOrchestrator {
         message: `${delegationData.targetAgent} finalizing response`,
         progress: 90
       })
+      
+      // Add final step: delegation completed
+      if (delegationData.sourceExecutionId) {
+        const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+        if (sourceExecution && sourceExecution.steps) {
+          sourceExecution.steps.push({
+            id: `delegation_completed_${Date.now()}`,
+            timestamp: new Date(),
+            agent: delegationData.targetAgent,
+            action: 'delegating',
+            content: `${delegationData.targetAgent} completed the task`,
+            progress: 100,
+            metadata: {
+              sourceAgent: delegationData.sourceAgent,
+              delegatedTo: delegationData.targetAgent,
+              task: delegationData.task,
+              status: 'completed',
+              stage: 'finalizing',
+              result: delegationResult.content,
+              executionTime: delegationResult.executionTime
+            }
+          })
+        }
+      }
       
       // Emit delegation completed event with result
       this.eventEmitter.emit('delegation.completed', {
