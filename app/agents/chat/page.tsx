@@ -27,6 +27,7 @@ import {
   ArrowRightIcon
 } from '@phosphor-icons/react'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import DelegationStatus from '@/components/agents/delegation-status'
 
 interface ChatMessage {
   id: string
@@ -42,7 +43,16 @@ interface ChatMessage {
 }
 
 export default function AgentsChatPage() {
-  const { agents, executeAgent, isLoading, currentExecution, error, clearError, delegationEvents } = useClientAgentStore()
+  const { 
+    agents, 
+    executeAgent, 
+    isLoading, 
+    currentExecution, 
+    error, 
+    clearError, 
+    delegationEvents,
+    currentDelegationId
+  } = useClientAgentStore()
   
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -929,7 +939,7 @@ export default function AgentsChatPage() {
                           // Extract the correct agent ID from metadata first, fallback to message agentId
                           const actualAgentId = message.metadata?.sender || message.agentId
                           const displayAgent = message.type === 'agent' && actualAgentId
-                            ? agents.find(a => a.id === actualAgentId) || null
+                            ? (agents.find(a => a.id === actualAgentId) || selectedAgent || null)
                             : null
                           
                           // DEBUG: Log message metadata
@@ -1062,8 +1072,12 @@ export default function AgentsChatPage() {
                         Next message will be handled by <span className="font-medium">{effectiveAgent.name}</span>
                       </div>
                     )}
-                    {/* Typing indicator when execution is running */}
-                    {currentExecution && currentExecution.status === 'running' && (
+                    
+                    {/* Delegation progress indicator */}
+                    <DelegationStatus className="mb-3" />
+                    
+                    {/* Fallback typing indicator when execution is running but no delegation */}
+                    {currentExecution && currentExecution.status === 'running' && !currentDelegationId && (
                       <div className="mb-2 flex items-center gap-2 text-slate-300">
                         {(() => {
                           // Prefer the most recent delegation step target as typing agent
@@ -1083,7 +1097,7 @@ export default function AgentsChatPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <span className="text-xs">
-                                {agentForTyping?.name || 'Agent'} is typing
+                                {agentForTyping?.name || 'Agent'} is working...
                               </span>
                               <span className="flex gap-1 ml-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.2s]"></span>

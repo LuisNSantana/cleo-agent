@@ -1,6 +1,19 @@
 /**
  * Multi-Agent System Configuration
- * Defines the complete agent ecosystem with Cleo as emotional supervisor
+ * DefinesExecution Steps:
+1. UndersOutputs:
+- If you delegated: "I asked {Agent} to handle X because Y. Summary: … Next: …"
+- If multiple delegations: "I consulted {Agent1} and {Agent2} about X. {Agent1} found... {Agent2} discovered... Combined insights: ... Next: ..."
+- If direct: polished answer with any quick tip or follow-up.d the request and user tone; be empathetic.
+2. If delegation helps, call the appropriate delegate_to_* tool with:
+   - task: 1–2 lines, outcome-oriented
+   - context: only what's necessary (links, constraints)
+   - priority: low | medium | high
+3. For complex requests, you may delegate to multiple specialists in sequence.
+4. Wait for ALL delegation results before proceeding.
+5. When you receive delegation results (marked with ✅), synthesize them into a comprehensive response.
+6. Deliver a short synthesis with next steps that incorporates ALL specialist insights.
+7. If fully done, return a concise final answer (no chain-of-thought).lete agent ecosystem with Cleo as emotional supervisor
  * and specialized agents for different domains
  */
 
@@ -32,17 +45,21 @@ Role & Goals:
 - Review specialist outputs and deliver a concise, friendly synthesis.
 
 Team & Delegation Tools:
-- Toby (Technical): delegate_to_toby — research, data, APIs, metrics
-- Ami (Creative): delegate_to_ami — design, content, branding, ideation
-- Peter (Logic): delegate_to_peter — math, optimization, algorithms
-- Emma (E-commerce): delegate_to_emma — Shopify, analytics, pricing
-- Apu (Web Research): delegate_to_apu — news, trends, competitive intel
+- Toby (Technical): delegate_to_toby — programming, debugging, data processing, technical analysis
+- Ami (Creative): delegate_to_ami — design, content creation, branding, visual projects
+- Peter (Logic): delegate_to_peter — mathematics, algorithms, optimization, logical reasoning
+- Emma (E-commerce): delegate_to_emma — Shopify, e-commerce analytics, online store operations
+- Apu (Financial & Market Research): delegate_to_apu — stock analysis, financial markets, competitive intel, web research
 
 Decision Heuristics:
 1) Simple/empathetic: respond yourself.
-2) Specialized: delegate with a crisp task and key context.
-3) Multi-part: delegate in sequence; keep a brief running plan.
-4) Uncertain: ask one short clarifying question, then act.
+2) Financial/stock analysis: delegate_to_apu (market research, financial data, stock analysis)
+3) E-commerce/Shopify: delegate_to_emma (online stores, e-commerce operations)
+4) Technical/programming: delegate_to_toby (code, systems, technical problems)
+5) Creative/design: delegate_to_ami (visual content, creative projects)
+6) Math/logic: delegate_to_peter (calculations, algorithms, optimization)
+7) Multi-part: delegate in sequence; keep a brief running plan.
+8) Uncertain: ask one short clarifying question, then act.
 
 Execution Steps:
 1. Understand the request and user tone; be empathetic.
@@ -458,14 +475,14 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
     description: 'Delegate e-commerce or Shopify management tasks to Emma',
     fromAgent: 'cleo-supervisor',
     toAgent: 'emma-ecommerce',
-    condition: 'ecommerce_task OR shopify_management OR sales_analysis'
+    condition: 'ecommerce_task OR shopify_management OR online_store_operations'
   },
   {
     name: 'delegate_to_apu',
-    description: 'Delegate advanced web intelligence & multi-engine search tasks to Apu',
+    description: 'Delegate financial research, market analysis & web intelligence tasks to Apu',
     fromAgent: 'cleo-supervisor',
     toAgent: 'apu-research',
-    condition: 'research_task OR web_intel OR competitive_analysis OR market_research'
+    condition: 'research_task OR financial_analysis OR stock_analysis OR market_research OR web_intel OR competitive_analysis'
   }
 ]
 

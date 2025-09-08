@@ -16,6 +16,25 @@ import { MetricsCollector } from './metrics-collector'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgents } from '../config'
 
+// Helper function to emit browser events for UI updates
+function emitBrowserEvent(eventName: string, detail: any) {
+  if (typeof window !== 'undefined') {
+    const event = new CustomEvent(eventName, { detail })
+    window.dispatchEvent(event)
+  }
+}
+
+// Global counter for unique ID generation
+let orchestratorMessageIdCounter = 0
+
+// Generate unique message ID to prevent conflicts
+function generateUniqueOrchestratorMessageId(): string {
+  const timestamp = Date.now()
+  const counter = ++orchestratorMessageIdCounter
+  const random = Math.random().toString(36).substr(2, 6)
+  return `orch_msg_${timestamp}_${counter}_${random}`
+}
+
 export interface OrchestratorConfig {
   enableMetrics?: boolean
   enableMemory?: boolean
@@ -128,8 +147,28 @@ export class AgentOrchestrator {
     })
 
     this.eventEmitter.on('execution.completed', (execution: AgentExecution) => {
-      this.activeExecutions.delete(execution.id)
+      // Executions are now cleaned up explicitly when they complete
+      // No automatic cleanup timeout needed
       this.metricsCollector?.recordExecutionComplete(execution)
+      
+      // Emit browser event for UI
+      emitBrowserEvent('execution-completed', {
+        executionId: execution.id,
+        agentId: execution.agentId,
+        result: execution.result,
+        executionTime: execution.metrics?.executionTime,
+        tokensUsed: execution.metrics?.tokensUsed
+      })
+      
+      // CRITICAL FIX: Notify Legacy Orchestrator of completion
+      try {
+        const legacyOrch = (globalThis as any).__cleoOrchestrator
+        if (legacyOrch?.handleExecutionCompletion) {
+          legacyOrch.handleExecutionCompletion(execution)
+        }
+      } catch (error) {
+        console.warn('Failed to notify legacy orchestrator of completion:', error)
+      }
     })
 
     this.eventEmitter.on('execution.failed', (execution: AgentExecution) => {
@@ -139,7 +178,6 @@ export class AgentOrchestrator {
 
     // Delegation events - handle multi-agent handoffs
     this.eventEmitter.on('delegation.requested', async (delegationData: any) => {
-      console.log('🔄 [ORCHESTRATOR] Delegation requested:', delegationData)
       await this.handleDelegation(delegationData)
     })
 
@@ -200,7 +238,6 @@ export class AgentOrchestrator {
         agentName: agentConfig.name
       })
 
-  console.log(`[Orchestrator] Initialized agent: ${agentConfig.name} (${agentConfig.id}) with tools: ${uniqueTools.join(', ')}`)
     } catch (error) {
       this.errorHandler.recordError(error as Error)
       throw new Error(`Failed to initialize agent ${agentConfig.id}: ${error}`)
@@ -216,8 +253,8 @@ export class AgentOrchestrator {
     context: ExecutionContext,
     options: ExecutionOptions = {}
   ): Promise<ExecutionResult> {
-    console.log('🔍 [DEBUG] Core executeAgent - Starting execution for:', agentConfig.id)
-    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Use existing executionId from context if available, otherwise generate new one
+    const executionId = (context.metadata?.executionId as string) || `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const execution: AgentExecution = {
       id: executionId,
@@ -225,9 +262,9 @@ export class AgentOrchestrator {
       threadId: context.threadId,
       userId: context.userId,
       status: 'running',
-  startTime: new Date(),
-  input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
-  result: undefined,
+      startTime: new Date(),
+      input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
+      result: undefined,
       messages: [],
       options,
       metrics: {
@@ -245,23 +282,19 @@ export class AgentOrchestrator {
       }
     }
 
-    try {
-      console.log('🔍 [DEBUG] Core executeAgent - Checking if supervisor:', agentConfig.id === 'cleo-supervisor')
-      // Use routing logic for supervisor agent
+    // Wrap entire execution in AsyncLocalStorage context
+    return ExecutionManager.runWithExecutionId(executionId, async () => {
+      try {
+        // Use routing logic for supervisor agent
       if (agentConfig.id === 'cleo-supervisor') {
-        console.log('🔍 [DEBUG] Core executeAgent - Using routing for supervisor')
         return await this.executeWithRouting(agentConfig, context, execution, options)
       }
 
-      console.log('🔍 [DEBUG] Core executeAgent - Direct execution for specialist')
       // Direct execution for specialist agents
       await this.initializeAgent(agentConfig)
-      console.log('🔍 [DEBUG] Core executeAgent - Agent initialized')
       
       const processedContext = await this.prepareExecutionContext(context)
-      console.log('🔍 [DEBUG] Core executeAgent - Context prepared')
 
-      console.log('🔍 [DEBUG] Core executeAgent - About to call errorHandler.withRetry')
       const result = await this.errorHandler.withRetry(
         () => this.executionManager.executeWithHistory(
           agentConfig,
@@ -277,25 +310,42 @@ export class AgentOrchestrator {
         }
       )
 
-      console.log('🔍 [DEBUG] Core executeAgent - errorHandler.withRetry completed successfully')
-      console.log('🔍 [DEBUG] Core executeAgent - Result type:', typeof result)
-      console.log('🔍 [DEBUG] Core executeAgent - Result preview:', result ? JSON.stringify(result).slice(0, 200) : 'null')
-
       execution.status = 'completed'
       execution.endTime = new Date()
-  execution.result = (result as ExecutionResult).content
+      execution.result = (result as ExecutionResult).content
       execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
 
-      console.log('🔍 [DEBUG] Core executeAgent - About to emit execution.completed')
+      // For normal executions, emit completion immediately
       this.eventEmitter.emit('execution.completed', execution)
-      console.log('🔍 [DEBUG] Core executeAgent - Returning result')
+      
+      // Emit browser event for UI updates
+      emitBrowserEvent('execution-completed', {
+        executionId: execution.id,
+        status: 'completed',
+        result: execution.result,
+        agentId: execution.agentId,
+        threadId: execution.threadId
+      })
+      
+      // Clean up execution context for completed execution
+      if (this.executionManager?.cleanupExecutionContext) {
+        this.executionManager.cleanupExecutionContext(execution.id)
+      }
+      
+      // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
+      setTimeout(() => {
+        this.activeExecutions.delete(execution.id)
+        console.log('🧹 [CLEANUP] Removed completed execution from memory:', execution.id)
+      }, 60000) // 60 seconds
+      
       return result as ExecutionResult
-    } catch (error) {
-      console.log('🔍 [DEBUG] Core executeAgent - Error caught:', error)
-      await this.errorHandler.handleExecutionError(execution, error as Error)
-      this.eventEmitter.emit('execution.failed', execution)
-      throw error
-    }
+      } catch (error) {
+        console.error('🔍 [DEBUG] Core executeAgent - Error caught:', error)
+        await this.errorHandler.handleExecutionError(execution, error as Error)
+        this.eventEmitter.emit('execution.failed', execution)
+        throw error
+      }
+    }) // Close AsyncLocalStorage context
   }
 
   /**
@@ -310,8 +360,10 @@ export class AgentOrchestrator {
   ): Promise<ExecutionResult> {
     const userMessage = String(context.messageHistory[context.messageHistory.length - 1]?.content || '')
     
-    console.log(`[Smart Supervisor] Message received: "${userMessage.substring(0, 50)}..."`)
-    console.log(`[Smart Supervisor] Cleo will analyze and decide on delegation`)
+    // Set execution context for delegation tracking throughout supervisor execution
+    if (this.executionManager?.setExecutionContext) {
+      this.executionManager.setExecutionContext(execution.id)
+    }
     
     // Always execute Cleo as intelligent supervisor
     // He has delegation tools and will decide if specialist help is needed
@@ -328,8 +380,34 @@ export class AgentOrchestrator {
       ),
       execution.id
     )
+    
+    // For supervisor executions, mark as completed and clean up properly
+    execution.status = 'completed'
+    execution.endTime = new Date()
+    execution.result = (result as ExecutionResult).content
+    execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
 
-    console.log(`[Smart Supervisor] Cleo completed analysis and execution`)
+    // Emit completion for supervisor execution
+    this.eventEmitter.emit('execution.completed', execution)
+    
+    // Emit browser event for UI updates when supervisor completes
+    emitBrowserEvent('execution-completed', {
+      executionId: execution.id,
+      status: 'completed',
+      result: execution.result,
+      agentId: execution.agentId,
+      threadId: execution.threadId
+    })
+    
+    // Clean up execution context for supervisor AFTER all delegations are complete
+    if (this.executionManager?.cleanupExecutionContext) {
+      this.executionManager.cleanupExecutionContext(execution.id)
+    }
+    
+    // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
+    setTimeout(() => {
+      this.activeExecutions.delete(execution.id)
+    }, 60000) // 60 seconds
     
     return result
   }
@@ -540,7 +618,30 @@ export class AgentOrchestrator {
   private async handleDelegation(delegationData: any): Promise<void> {
     try {
       console.log(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
-      console.log(`📋 [DELEGATION] Task: ${delegationData.task}`)
+      console.log(`🔍 [DEBUG] sourceExecutionId:`, delegationData.sourceExecutionId)
+      
+      // Emit delegation progress events for UI
+      this.eventEmitter.emit('delegation.progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'initializing',
+        status: 'requested',
+        message: `Starting delegation to ${delegationData.targetAgent}`,
+        progress: 0
+      })
+      
+      // Also emit browser event for UI
+      emitBrowserEvent('delegation-progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'initializing',
+        status: 'requested',
+        message: `Starting delegation to ${delegationData.targetAgent}`,
+        progress: 0
+      })
+      
       const normalizedPriority: 'low' | 'normal' | 'high' =
         delegationData.priority === 'medium' ? 'normal' : (delegationData.priority || 'normal')
       
@@ -569,6 +670,27 @@ export class AgentOrchestrator {
       
       console.log(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
       
+      // Emit progress: agent found
+      this.eventEmitter.emit('delegation.progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'analyzing',
+        status: 'accepted',
+        message: `${delegationData.targetAgent} acepta la tarea`,
+        progress: 10
+      })
+      
+      emitBrowserEvent('delegation-progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'analyzing',
+        status: 'accepted',
+        message: `${delegationData.targetAgent} accepts the task`,
+        progress: 10
+      })
+      
       // Create execution context for delegated task
       const delegationContext: ExecutionContext = {
         threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -592,11 +714,53 @@ export class AgentOrchestrator {
       
       console.log(`🚀 [DELEGATION] Executing ${targetAgentConfig.name} with delegated task`)
       
+      // Emit progress: starting execution
+      this.eventEmitter.emit('delegation.progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'processing',
+        status: 'in_progress',
+        message: `${delegationData.targetAgent} está procesando la tarea`,
+        progress: 25
+      })
+      
+      emitBrowserEvent('delegation-progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'processing',
+        status: 'in_progress',
+        message: `${delegationData.targetAgent} is processing the task`,
+        progress: 25
+      })
+      
       let delegationResult: ExecutionResult
 
       if (isSubAgent && 'isSubAgent' in targetAgentConfig) {
         // Execute sub-agent as a real agent by mapping to AgentConfig
         console.log(`📋 [SUB-AGENT] Delegating to sub-agent: ${targetAgentConfig.name}`)
+
+        // Emit progress: working on sub-agent
+        this.eventEmitter.emit('delegation.progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'researching',
+          status: 'in_progress',
+          message: `Sub-agente ${delegationData.targetAgent} analizando contexto`,
+          progress: 40
+        })
+        
+        emitBrowserEvent('delegation-progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'researching',
+          status: 'in_progress',
+          message: `Sub-agent ${delegationData.targetAgent} analyzing context`,
+          progress: 40
+        })
 
         const sub = targetAgentConfig as SubAgent
         // Build a minimal AgentConfig from SubAgent record
@@ -621,27 +785,92 @@ export class AgentOrchestrator {
 
         // Ensure graph exists and execute
         await this.initializeAgent(subAgentConfig)
+        
+        // Emit progress: executing sub-agent
+        this.eventEmitter.emit('delegation.progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'synthesizing',
+          status: 'in_progress',
+          message: `Sub-agente ejecutando herramientas especializadas`,
+          progress: 70
+        })
+        
+        emitBrowserEvent('delegation-progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'synthesizing',
+          status: 'in_progress',
+          message: `Sub-agent executing specialized tools`,
+          progress: 70
+        })
+        
         delegationResult = await this.executeAgent(
           subAgentConfig,
           delegationContext,
           {
-            timeout: 30000,
+            timeout: 90000, // 90 seconds timeout for sub-agents (was 30 seconds)
             priority: normalizedPriority
           }
         )
       } else {
         // Execute regular agent with delegated task
+        
+        // Emit progress: executing main agent
+        this.eventEmitter.emit('delegation.progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'researching',
+          status: 'in_progress',
+          message: `${delegationData.targetAgent} ejecutando herramientas`,
+          progress: 60
+        })
+        
+        emitBrowserEvent('delegation-progress', {
+          sourceAgent: delegationData.sourceAgent,
+          targetAgent: delegationData.targetAgent,
+          task: delegationData.task,
+          stage: 'researching',
+          status: 'in_progress',
+          message: `${delegationData.targetAgent} executing tools`,
+          progress: 60
+        })
+        
         delegationResult = await this.executeAgent(
           targetAgentConfig as AgentConfig,
           delegationContext,
           {
-            timeout: 30000, // 30 seconds timeout for delegated tasks
+            timeout: 120000, // 2 minutes timeout for delegated tasks (was 30 seconds)
             priority: normalizedPriority
           }
         )
       }
       
       console.log(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
+      
+      // Emit progress: finalizing
+      this.eventEmitter.emit('delegation.progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'finalizing',
+        status: 'completing',
+        message: `${delegationData.targetAgent} finalizando respuesta`,
+        progress: 90
+      })
+      
+      emitBrowserEvent('delegation-progress', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        task: delegationData.task,
+        stage: 'finalizing',
+        status: 'completing',
+        message: `${delegationData.targetAgent} finalizing response`,
+        progress: 90
+      })
       
       // Emit delegation completed event with result
       this.eventEmitter.emit('delegation.completed', {
@@ -651,12 +880,71 @@ export class AgentOrchestrator {
         result: delegationResult.content,
         executionTime: delegationResult.executionTime,
         tokensUsed: delegationResult.tokensUsed,
-        isSubAgentDelegation: isSubAgent
+        isSubAgentDelegation: isSubAgent,
+        sourceExecutionId: delegationData.sourceExecutionId
       })
+      
+      // Also emit browser event for UI
+      emitBrowserEvent('delegation-completed', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        status: 'completed',
+        result: delegationResult.content,
+        executionTime: delegationResult.executionTime,
+        tokensUsed: delegationResult.tokensUsed,
+        isSubAgentDelegation: isSubAgent,
+        sourceExecutionId: delegationData.sourceExecutionId
+      })
+
+      // CRITICAL FIX: Update the original execution with delegation result
+      if (delegationData.sourceExecutionId) {
+        console.log('🔄 [DELEGATION] Looking for original execution:', delegationData.sourceExecutionId)
+        console.log('🔄 [DELEGATION] Active executions keys:', Array.from(this.activeExecutions.keys()))
+        
+        const originalExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
+        if (originalExecution) {
+          console.log('🔄 [DELEGATION] Found original execution, adding delegation result:', delegationData.sourceExecutionId)
+          
+          // Add delegation result as a message to the execution (but DON'T mark as completed yet)
+          const delegationMessage = {
+            id: generateUniqueOrchestratorMessageId(),
+            type: 'ai' as const,
+            content: `✅ Task completed by ${delegationData.targetAgent}:\n\n${delegationResult.content}`,
+            timestamp: new Date(),
+            metadata: {
+              sender: delegationData.targetAgent,
+              isDelegationResult: true,
+              sourceAgent: delegationData.sourceAgent
+            }
+          }
+          
+          originalExecution.messages.push(delegationMessage)
+          
+          // Update metrics (cumulative)
+          originalExecution.metrics.executionTime += delegationResult.executionTime || 0
+          originalExecution.metrics.tokensUsed += delegationResult.tokensUsed || 0
+          
+          console.log('🔄 [DELEGATION] Delegation result added to original execution, keeping it active for more delegations')
+          
+          // DO NOT mark as completed or remove from activeExecutions yet
+          // The original agent (Cleo) may have more delegations to do
+          // It will be completed when the agent's graph execution finishes
+          
+        } else {
+          console.warn('🔄 [DELEGATION] Original execution not found:', delegationData.sourceExecutionId)
+        }
+      }
       
     } catch (error) {
       console.error('❌ [DELEGATION] Error handling delegation:', error)
       this.eventEmitter.emit('delegation.failed', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      
+      // Also emit browser event for UI
+      emitBrowserEvent('delegation-failed', {
         sourceAgent: delegationData.sourceAgent,
         targetAgent: delegationData.targetAgent,
         error: error instanceof Error ? error.message : String(error)

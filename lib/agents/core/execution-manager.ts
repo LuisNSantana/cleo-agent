@@ -8,6 +8,10 @@ import { AgentConfig, AgentExecution, ExecutionResult, ExecutionOptions } from '
 import { EventEmitter } from './event-emitter'
 import { AgentErrorHandler } from './error-handler'
 import { SystemMessage } from '@langchain/core/messages'
+import { AsyncLocalStorage } from 'async_hooks'
+
+// AsyncLocalStorage for execution context
+const executionContext = new AsyncLocalStorage<string>()
 
 export interface ExecutionManagerConfig {
   eventEmitter: EventEmitter
@@ -38,6 +42,20 @@ export class ExecutionManager {
     this.errorHandler = config.errorHandler
   }
 
+  /**
+   * Get current execution ID from AsyncLocalStorage
+   */
+  static getCurrentExecutionId(): string | undefined {
+    return executionContext.getStore()
+  }
+
+  /**
+   * Set execution context using AsyncLocalStorage
+   */
+  static runWithExecutionId<T>(executionId: string, fn: () => T): T {
+    return executionContext.run(executionId, fn)
+  }
+
   async executeWithHistory(
     agentConfig: AgentConfig,
     graph: any, // Use any for compatibility
@@ -50,13 +68,17 @@ export class ExecutionManager {
     try {
       this.eventEmitter.emit('execution.started', execution)
 
+      // Store execution ID in global context for delegation tracking
+      ;(globalThis as any).__currentExecutionId = execution.id
+
       // Filter out standalone ToolMessages which cause LangChain errors
       // ToolMessages must only follow same-turn tool_calls
       const filteredMessages = this.filterStaleToolMessages(context.messageHistory)
 
       // Prepare initial state compatible with MessagesAnnotation
       const initialState = {
-        messages: filteredMessages
+        messages: filteredMessages,
+        executionId: execution.id
       }
 
       // Compile and execute graph
@@ -70,7 +92,11 @@ export class ExecutionManager {
 
       const executionResult: ExecutionResult = {
         content: content as string,
-        metadata: result.metadata || {},
+        // Preserve sender attribution from the last AIMessage for UI and adapters
+        metadata: {
+          ...(result.metadata || {}),
+          sender: (lastMessage as any)?.additional_kwargs?.sender
+        },
         toolCalls: lastMessage?.tool_calls || [],
         executionTime: Date.now() - startTime,
         tokensUsed: this.estimateTokens(finalMessages)
@@ -84,9 +110,18 @@ export class ExecutionManager {
 
       this.eventEmitter.emit('execution.completed', execution)
 
+      // Don't clean up global execution ID immediately - keep it for delegation tracking
+      // It will be cleaned up when the execution context is fully disposed
+      // delete (globalThis as any).__currentExecutionId
+
       return executionResult
     } catch (error) {
       await this.errorHandler.handleExecutionError(execution, error as Error)
+      
+      // Don't clean up global execution ID immediately on error - keep it for delegation tracking
+      // It will be cleaned up when the execution context is fully disposed
+      // delete (globalThis as any).__currentExecutionId
+      
       throw error
     }
   }
@@ -162,5 +197,25 @@ export class ExecutionManager {
       }
       return msg
     })
+  }
+
+  /**
+   * Clean up execution context when all delegations are complete
+   * Only cleanup when explicitly called by orchestrator
+   */
+  cleanupExecutionContext(executionId: string): void {
+    if ((globalThis as any).__currentExecutionId === executionId) {
+      delete (globalThis as any).__currentExecutionId
+      console.log(`🧹 [EXECUTION] Cleaned up execution context for: ${executionId}`)
+    }
+  }
+
+  /**
+   * Set execution context for delegation tracking
+   * @deprecated Use ExecutionManager.runWithExecutionId instead
+   */
+  setExecutionContext(executionId: string): void {
+    (globalThis as any).__currentExecutionId = executionId
+    console.log(`🔄 [EXECUTION] Set execution context for: ${executionId}`)
   }
 }

@@ -66,7 +66,7 @@ export const delegateToPeterTool = tool({
 });
 
 export const delegateToEmmaTool = tool({
-  description: 'Delegate e-commerce, Shopify management, or business tasks to Emma specialist. Use for store management, sales analysis, product optimization, or business operations.',
+  description: 'Delegate e-commerce and Shopify management tasks to Emma specialist. Use for online store operations, e-commerce sales analytics, Shopify product management, inventory optimization, or business operations related to online retail.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return {
@@ -84,7 +84,7 @@ export const delegateToEmmaTool = tool({
 });
 
 export const delegateToApuTool = tool({
-  description: 'Delegate advanced web intelligence, multi-engine search, or comprehensive research tasks to Apu specialist. Use for market research, competitive analysis, web scraping, news analysis, academic research, or real-time information gathering.',
+  description: 'Delegate advanced web research, financial market analysis, and comprehensive information gathering tasks to Apu specialist. Use for stock market research, financial analysis, competitive intelligence, web scraping, news analysis, academic research, or real-time information gathering about markets, companies, and trends.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return {

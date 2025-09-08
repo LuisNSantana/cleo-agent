@@ -48,8 +48,6 @@ export class GraphBuilder {
   private filterStaleToolMessages(messages: BaseMessage[]): BaseMessage[] {
     const result: BaseMessage[] = []
     
-    console.log('🔍 [DEBUG] Filtering messages. Input count:', messages.length)
-    
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i]
       
@@ -58,11 +56,9 @@ export class GraphBuilder {
         const prevMsg = result[result.length - 1]
         if (prevMsg && prevMsg.constructor.name === 'AIMessage' && (prevMsg as any).tool_calls?.length > 0) {
           // Valid ToolMessage - keep it
-          console.log('🔍 [DEBUG] Keeping valid ToolMessage at index', i)
           result.push(msg)
         } else {
           // Invalid/stale ToolMessage - convert to SystemMessage
-          console.log('🔍 [DEBUG] Converting stale ToolMessage to SystemMessage at index', i)
           result.push(new SystemMessage(`[tool:${(msg as any).tool_call_id || 'unknown'}] ${msg.content.toString().slice(0, 400)}`))
         }
       } else {
@@ -70,7 +66,6 @@ export class GraphBuilder {
       }
     }
     
-    console.log('🔍 [DEBUG] Filtering complete. Output count:', result.length)
     return result
   }
 
@@ -203,6 +198,16 @@ export class GraphBuilder {
         state
       })
 
+      // Ensure executionId is preserved in state metadata
+      if (!state.metadata) {
+        state.metadata = {}
+      }
+      if (!state.metadata.executionId) {
+        state.metadata.executionId = ExecutionManager.getCurrentExecutionId()
+      }
+      
+      console.log('🔍 [DEBUG] Agent node starting with executionId:', state.metadata.executionId)
+
       // Filter out stale ToolMessages that don't follow LangChain's rules
       // ToolMessages must immediately follow AIMessages with tool_calls
       const filteredStateMessages = this.filterStaleToolMessages(state.messages)
@@ -224,29 +229,18 @@ export class GraphBuilder {
         const systemMessage = new SystemMessage(agentConfig.prompt)
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
-  // Execution safety caps
+  // Execution safety caps - higher for supervisor agents with delegation
   const EXECUTION_START = Date.now()
-  const MAX_EXECUTION_MS = 45_000
-  const MAX_TOOL_CALLS = 6
+  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' ? 180_000 : 45_000 // 3 minutes for supervisors, 45s for others
+  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' ? 15 : 6 // More tool calls for supervisors
   let totalToolCalls = 0
 
-        // DEBUG: Log the messages being sent to LangChain
-        console.log('🔍 [DEBUG] Messages being sent to LangChain:', messages.map((m, i) => ({
-          index: i,
-          type: m.constructor.name,
-          role: m.role || 'unknown',
-          hasToolCalls: !!(m.tool_calls && m.tool_calls.length > 0),
-          contentPreview: m.content.toString().slice(0, 100)
-        })))
-
         // Execute model with basic tool loop (max 3 iterations)
-        console.log('🔍 [DEBUG] About to invoke model for the first time')
         let response
         try {
           response = await model.invoke(messages)
-          console.log('🔍 [DEBUG] First model invocation successful')
         } catch (error) {
-          console.log('🔍 [DEBUG] First model invocation failed:', error)
+          console.error('🔍 [DEBUG] First model invocation failed:', error)
           throw error
         }
 
@@ -254,8 +248,6 @@ export class GraphBuilder {
   for (let i = 0; i < 3; i++) {
           const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
           if (!toolCalls || toolCalls.length === 0) break
-
-          console.log('🔍 [DEBUG] Processing tool calls iteration', i, 'with', toolCalls.length, 'tools')
 
           this.eventEmitter.emit('tools.called', {
             agentId: agentConfig.id,
@@ -301,8 +293,8 @@ export class GraphBuilder {
                 // Create promise to wait for delegation completion
                 const delegationPromise = new Promise((resolve, reject) => {
                   const timeout = setTimeout(() => {
-                    reject(new Error('Delegation timeout after 60 seconds'))
-                  }, 60000)
+                    reject(new Error('Delegation timeout after 120 seconds'))
+                  }, 120000)
                   
                   const onCompleted = (result: any) => {
                     if (result.sourceAgent === agentConfig.id && 
@@ -329,13 +321,16 @@ export class GraphBuilder {
                 })
                 
                 // Emit handoff event for external processing
+                const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
+                console.log('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
                   targetAgent: delegationData.agentId || delegationData.targetAgent,
                   task: delegationData.delegatedTask || delegationData.task,
                   context: delegationData.context,
                   handoffMessage: delegationData.handoffMessage,
-                  priority: delegationData.priority || 'normal'
+                  priority: delegationData.priority || 'normal',
+                  sourceExecutionId: currentExecutionId
                 })
                 
                 try {
@@ -362,7 +357,6 @@ export class GraphBuilder {
                   ]
                 }
               } else {
-                console.log('🔍 [DEBUG] Before adding ToolMessage. Current messages count:', messages.length)
                 messages = [
                   ...messages,
                   new ToolMessage({ content: String(output), tool_call_id: String(callId) })
@@ -370,15 +364,12 @@ export class GraphBuilder {
               }
               
               totalToolCalls++
-              console.log('🔍 [DEBUG] After adding ToolMessage. New messages count:', messages.length)
               this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
             } catch (err) {
-              console.log('🔍 [DEBUG] Before adding ToolMessage (error). Current messages count:', messages.length)
               messages = [
                 ...messages,
                 new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
               ]
-              console.log('🔍 [DEBUG] After adding ToolMessage (error). New messages count:', messages.length)
               this.eventEmitter.emit('tool.failed', { agentId: agentConfig.id, name, callId, error: err })
             }
           }
@@ -391,13 +382,8 @@ export class GraphBuilder {
               new HumanMessage({ content: 'Por favor, entrega la respuesta final ahora. Resume los hallazgos con 5 opciones y enlaces. No llames más herramientas.' })
             ]
           }
-          console.log('🔍 [DEBUG] About to re-invoke model with', messages.length, 'messages')
-          console.log('🔍 [DEBUG] Last 3 messages types:', messages.slice(-3).map(m => m.constructor.name))
-          
           // Re-invoke model with tool outputs
           response = await model.invoke(messages)
-          
-          console.log('🔍 [DEBUG] Model re-invoked successfully')
         }
 
         this.eventEmitter.emit('node.completed', {
@@ -534,35 +520,22 @@ export class GraphBuilder {
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
 
-        console.log(`🧩 [Graph] Agent ${agentConfig.id} using ${toolRuntime.lcTools.length} tools:`, toolRuntime.lcTools.map(t => t.name))
-
   // Prepare messages with agent prompt
         const systemMessage = new SystemMessage(agentConfig.prompt)
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
-  // Execution safety caps
+  // Execution safety caps - higher for supervisor agents with delegation
   const EXECUTION_START = Date.now()
-  const MAX_EXECUTION_MS = 45_000
-  const MAX_TOOL_CALLS = 6
+  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' ? 180_000 : 45_000 // 3 minutes for supervisors, 45s for others
+  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' ? 15 : 6 // More tool calls for supervisors
   let totalToolCalls = 0
 
-        // DEBUG: Log the messages being sent to LangChain (buildGraph method)
-        console.log('🔍 [DEBUG] BuildGraph - Messages being sent to LangChain:', messages.map((m, i) => ({
-          index: i,
-          type: m.constructor.name,
-          role: m.role || 'unknown',
-          hasToolCalls: !!(m.tool_calls && m.tool_calls.length > 0),
-          contentPreview: m.content.toString().slice(0, 100)
-        })))
-
         // Execute model with basic tool loop (max 3 iterations)
-        console.log('🔍 [DEBUG] BuildGraph - About to invoke model for the first time')
         let response
         try {
           response = await model.invoke(messages)
-          console.log('🔍 [DEBUG] BuildGraph - First model invocation successful')
         } catch (error) {
-          console.log('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
+          console.error('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
           throw error
         }
 
@@ -570,17 +543,14 @@ export class GraphBuilder {
         const toolCallHistory: string[] = []
   for (let i = 0; i < 3; i++) {
           const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
-          console.log(`🔍 [DEBUG] BuildGraph - Tool loop iteration ${i + 1}, tool_calls found:`, toolCalls.length)
           
           if (!toolCalls || toolCalls.length === 0) {
-            console.log(`🔍 [DEBUG] BuildGraph - No tool calls in iteration ${i + 1}, breaking loop`)
             break
           }
 
           // Check for repeated tool calls (potential infinite loop)
           const currentToolNames = toolCalls.map((t: any) => t?.name).join(',')
           if (toolCallHistory.includes(currentToolNames) && toolCalls.length === 1) {
-            console.log(`🔍 [DEBUG] BuildGraph - Detected repeated tool call pattern: ${currentToolNames}, breaking loop`)
             // Force a final response by clearing tool calls and asking for summary
             messages.push(new AIMessage({
               content: "I need to provide a summary of the current task status and results."
@@ -588,9 +558,6 @@ export class GraphBuilder {
             break
           }
           toolCallHistory.push(currentToolNames)
-
-          console.log('🔍 [DEBUG] BuildGraph - Adding AIMessage with tool_calls to messages array')
-          console.log('🔍 [DEBUG] BuildGraph - tool_calls found:', toolCalls.length)
           
           // Add the AI response with tool calls to messages
           messages.push(response)
@@ -600,20 +567,19 @@ export class GraphBuilder {
             count: toolCalls.length,
             tools: toolCalls.map((t: any) => t?.name)
           })
-          console.log(`🛠️  [Graph] ${agentConfig.id} invoked tools:`, toolCalls.map((t: any) => t?.name))
+          console.log(`🛠️  [Graph] ${agentConfig.id} invoked ${toolCalls.length} tools:`, toolCalls.map((t: any) => t?.name).join(', '))
 
           for (const call of toolCalls) {
             // Stop if we are running out of budget
             if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
-              messages.push(new HumanMessage({ content: 'Finaliza ahora con un resumen claro de los resultados con 5 mejores opciones y enlaces. No uses más herramientas.' }))
-              try {
-                response = await model.invoke(messages)
-              } catch (err) {
-                console.log('🔍 [DEBUG] BuildGraph - Forced finalization failed, using fallback')
-                response = new AIMessage({ content: 'Resumen: herramientas agotadas o tiempo límite alcanzado. Presenta los mejores resultados encontrados hasta ahora.' }) as any
-              }
-              break
+              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Adding fallback tool response.')
+              // Add fallback tool response for this call to maintain LangChain message structure
+              const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
+              messages.push(new ToolMessage({ 
+                content: 'Tool execution cancelled due to time/budget limits. Using available results.', 
+                tool_call_id: String(callId) 
+              }))
+              continue // Continue to handle remaining tool calls
             }
             const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
             const name = call?.name || call?.function?.name
@@ -631,28 +597,95 @@ export class GraphBuilder {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args) } catch {}
               }
-              console.log(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args)})`)
+              console.log(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args).slice(0, 100)}...)`)
               const output = await toolRuntime.run(String(name), args)
               console.log(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
-              console.log('🔍 [DEBUG] BuildGraph - Before adding ToolMessage. Current messages count:', messages.length)
-              console.log('🔍 [DEBUG] BuildGraph - Previous message type before adding ToolMessage:', messages[messages.length - 1]?.constructor?.name)
-              console.log('🔍 [DEBUG] BuildGraph - Previous message has tool_calls:', !!messages[messages.length - 1]?.tool_calls?.length)
-              console.log('🔍 [DEBUG] BuildGraph - Previous message tool_calls:', messages[messages.length - 1]?.tool_calls)
-              
-              messages = [
-                ...messages,
-                new ToolMessage({ content: String(output), tool_call_id: String(callId) })
-              ]
+              // Delegation-aware handling: if tool output indicates a handoff, orchestrate delegation
+              if (this.isDelegationToolResponse(output)) {
+                console.log('� [HANDOFF] Delegation detected in buildGraph:', output)
+                const delegationData = this.parseDelegationResponse(output)
+
+                // Create promise to await delegation completion
+                const delegationPromise = new Promise((resolve, reject) => {
+                  const timeout = setTimeout(() => {
+                    reject(new Error('Delegation timeout after 120 seconds'))
+                  }, 120000)
+
+                  const onCompleted = (result: any) => {
+                    if (result.sourceAgent === agentConfig.id && 
+                        result.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                      clearTimeout(timeout)
+                      this.eventEmitter.off('delegation.completed', onCompleted)
+                      this.eventEmitter.off('delegation.failed', onFailed)
+                      resolve(result)
+                    }
+                  }
+
+                  const onFailed = (error: any) => {
+                    if (error.sourceAgent === agentConfig.id && 
+                        error.targetAgent === (delegationData.agentId || delegationData.targetAgent)) {
+                      clearTimeout(timeout)
+                      this.eventEmitter.off('delegation.completed', onCompleted)
+                      this.eventEmitter.off('delegation.failed', onFailed)
+                      reject(new Error(error.error || 'Delegation failed'))
+                    }
+                  }
+
+                  this.eventEmitter.on('delegation.completed', onCompleted)
+                  this.eventEmitter.on('delegation.failed', onFailed)
+                })
+
+                // Emit request
+                const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
+                console.log('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
+                this.eventEmitter.emit('delegation.requested', {
+                  sourceAgent: agentConfig.id,
+                  targetAgent: delegationData.agentId || delegationData.targetAgent,
+                  task: delegationData.delegatedTask || delegationData.task,
+                  context: delegationData.context,
+                  handoffMessage: delegationData.handoffMessage,
+                  priority: delegationData.priority || 'normal',
+                  sourceExecutionId: currentExecutionId
+                })
+
+                try {
+                  console.log('⏳ [DELEGATION] Waiting for delegated task to complete...')
+                  const delegationResult: any = await delegationPromise
+                  console.log('✅ [DELEGATION] Completed, injecting result into conversation')
+                  const contentStr = typeof (delegationResult?.result) === 'string' 
+                    ? delegationResult.result 
+                    : JSON.stringify(delegationResult?.result || {})
+                  messages = [
+                    ...messages,
+                    new ToolMessage({ 
+                      content: `✅ Task completed by ${delegationData.targetAgent || delegationData.agentId}:\n\n${contentStr}`, 
+                      tool_call_id: String(callId) 
+                    })
+                  ]
+                } catch (delegationError) {
+                  console.error('❌ [DELEGATION] Delegation failed in buildGraph:', delegationError)
+                  messages = [
+                    ...messages,
+                    new ToolMessage({ 
+                      content: `❌ Delegation to ${delegationData.targetAgent || delegationData.agentId} failed: ${delegationError instanceof Error ? delegationError.message : String(delegationError)}`, 
+                      tool_call_id: String(callId) 
+                    })
+                  ]
+                }
+              } else {
+                const outputStr = typeof output === 'string' ? output : JSON.stringify(output)
+                messages = [
+                  ...messages,
+                  new ToolMessage({ content: outputStr, tool_call_id: String(callId) })
+                ]
+              }
               totalToolCalls++
-              console.log('🔍 [DEBUG] BuildGraph - After adding ToolMessage. New messages count:', messages.length)
               this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
             } catch (err) {
-              console.log('🔍 [DEBUG] BuildGraph - Before adding ToolMessage (error). Current messages count:', messages.length)
               messages = [
                 ...messages,
                 new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
               ]
-              console.log('🔍 [DEBUG] BuildGraph - After adding ToolMessage (error). New messages count:', messages.length)
               console.error(`❌ [Tool] ${name} failed:`, err)
               this.eventEmitter.emit('tool.failed', { agentId: agentConfig.id, name, callId, error: err })
             }
@@ -661,18 +694,73 @@ export class GraphBuilder {
           // Check budgets before re-invocation
           if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
             console.log('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
+            
+            // CRITICAL: Ensure all tool_calls are resolved before forcing finalization
+            const lastMessage = messages[messages.length - 1]
+            if (lastMessage && 'tool_calls' in lastMessage && lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
+              console.log('🔧 [SAFEGUARD] Found unresolved tool_calls, adding fallback ToolMessages')
+              const existingToolCallIds = new Set()
+              
+              // Collect all existing tool_call_ids from ToolMessages
+              for (const msg of messages) {
+                if (msg instanceof ToolMessage && msg.tool_call_id) {
+                  existingToolCallIds.add(msg.tool_call_id)
+                }
+              }
+              
+              // Add fallback ToolMessages for any unresolved tool_calls
+              for (const toolCall of lastMessage.tool_calls) {
+                if (!existingToolCallIds.has(toolCall.id)) {
+                  console.log(`🔧 [SAFEGUARD] Adding fallback ToolMessage for unresolved tool_call: ${toolCall.id}`)
+                  messages.push(new ToolMessage({
+                    content: 'Budget exceeded. Task completed with available resources.',
+                    tool_call_id: toolCall.id
+                  }))
+                }
+              }
+            }
+            
             messages.push(new HumanMessage({ content: 'Ahora entrega la respuesta final. Resume claramente y enlaza a las fuentes. Evita más herramientas.' }))
           }
-          console.log('🔍 [DEBUG] BuildGraph - About to re-invoke model with', messages.length, 'messages')
-          console.log('🔍 [DEBUG] BuildGraph - Last 3 messages types:', messages.slice(-3).map(m => m.constructor.name))
-          
           // Re-invoke model with tool outputs
           try {
             response = await model.invoke(messages)
-            console.log('🔍 [DEBUG] BuildGraph - Model re-invoked successfully')
           } catch (error) {
-            console.log('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
+            console.error('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
             throw error
+          }
+        }
+
+        // FINAL SAFEGUARD: Ensure all tool_calls are resolved before finalizing
+        const finalMessage = messages[messages.length - 1]
+        if (finalMessage && 'tool_calls' in finalMessage && finalMessage.tool_calls && finalMessage.tool_calls.length > 0) {
+          console.log('🚨 [FINAL SAFEGUARD] Unresolved tool_calls detected at end of loop, resolving them')
+          const existingToolCallIds = new Set()
+          
+          // Collect all existing tool_call_ids from ToolMessages
+          for (const msg of messages) {
+            if (msg instanceof ToolMessage && msg.tool_call_id) {
+              existingToolCallIds.add(msg.tool_call_id)
+            }
+          }
+          
+          // Add fallback ToolMessages for any unresolved tool_calls
+          for (const toolCall of finalMessage.tool_calls) {
+            if (!existingToolCallIds.has(toolCall.id)) {
+              console.log(`🚨 [FINAL SAFEGUARD] Adding final fallback ToolMessage for: ${toolCall.id}`)
+              messages.push(new ToolMessage({
+                content: 'Tool execution completed.',
+                tool_call_id: toolCall.id
+              }))
+            }
+          }
+          
+          // Re-invoke model one last time to get proper response
+          try {
+            response = await model.invoke(messages)
+            console.log('🚨 [FINAL SAFEGUARD] Model re-invoked after resolving tool_calls')
+          } catch (error) {
+            console.log('🚨 [FINAL SAFEGUARD] Final re-invocation failed, using existing response')
           }
         }
 

@@ -27,7 +27,11 @@ import {
   AgentNode,
   AgentEdge,
   SystemMetrics,
-  AgentActivity
+  AgentActivity,
+  DelegationProgress,
+  DelegationTimelineEvent,
+  DelegationStatus,
+  DelegationStage
 } from './types'
 import { getAllAgents } from './config'
 
@@ -50,17 +54,22 @@ interface ClientAgentStore {
     query: string
     timestamp: string
   }>
-
-  // Actions
-  initializeAgents: () => Promise<void>
-  syncAgents: () => Promise<void>
-  executeAgent: (input: string, agentId?: string, forceSupervised?: boolean) => Promise<void>
+  // Delegation Progress State
+  activeDelegations: Record<string, DelegationProgress>
+  currentDelegationId: string | null
   // Thread mapping per agent to keep conversation context across confirms
   _agentThreadMap?: Record<string, string>
   // Map execution id -> thread id used for that run (to persist final message reliably)
   _executionThreadMap?: Record<string, string>
   // Track which executions have already posted their final assistant message
   _finalPosted?: Record<string, boolean>
+  // Force re-render trigger
+  _lastUpdate?: number
+
+  // Actions
+  initializeAgents: () => Promise<void>
+  syncAgents: () => Promise<void>
+  executeAgent: (input: string, agentId?: string, forceSupervised?: boolean) => Promise<void>
   selectAgent: (agent: AgentConfig | null) => void
   updateGraphData: () => void
   clearError: () => void
@@ -68,12 +77,20 @@ interface ClientAgentStore {
   addExecution: (execution: AgentExecution) => void
   updateMetrics: (metrics: Partial<SystemMetrics>) => void
   pollExecutionStatus: (executionId: string) => Promise<void>
+  // Fallback: finalize an execution from its thread if polling fails/timeouts
+  finalizeExecutionFromThread: (executionId: string) => Promise<void>
   persistFinalAssistantMessage: (execution: AgentExecution) => Promise<void>
   addAgent: (agent: AgentConfig) => void
   updateAgent: (id: string, updates: Partial<AgentConfig>) => void
   deleteAgent: (id: string) => void
   addDelegationEvent: (event: any) => void
   resetGraph: () => void
+  // Delegation Progress Actions
+  startDelegation: (delegation: Omit<DelegationProgress, 'id' | 'timeline' | 'lastUpdate' | 'progress'>) => string
+  updateDelegationStatus: (delegationId: string, status: DelegationStatus, stage?: DelegationStage) => void
+  addDelegationTimelineEvent: (delegationId: string, event: Omit<DelegationTimelineEvent, 'id' | 'timestamp'>) => void
+  completeDelegation: (delegationId: string, success: boolean) => void
+  clearActiveDelegations: () => void
   // Graph layout persistence
   setNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   setNodePositions: (positions: Record<string, { x: number; y: number }>) => void
@@ -101,9 +118,12 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     isLoading: false,
     error: null,
     delegationEvents: [],
+    activeDelegations: {},
+    currentDelegationId: null,
   _agentThreadMap: {},
     _executionThreadMap: {},
   _finalPosted: {},
+    _lastUpdate: 0,
 
     // Actions
     initializeAgents: async () => {
@@ -224,11 +244,17 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           throw new Error(data.error || 'Execution failed')
         }
 
-        set((state) => ({
-          executions: [...state.executions, data.execution],
-          currentExecution: data.execution,
-          isLoading: false
-        }))
+        // Force explicit state update to guarantee re-render
+        set((state) => {
+          const newExecution = { ...data.execution }
+          return {
+            executions: [...state.executions, newExecution],
+            currentExecution: newExecution,
+            isLoading: false,
+            // Force timestamp to trigger subscribers
+            _lastUpdate: Date.now()
+          }
+        })
 
         // Persist thread mapping per agent for subsequent messages
         if (data.thread?.id && agentId) {
@@ -386,64 +412,148 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       }))
     },
 
+    // Fallback finalization: inspect the execution's thread for an assistant message and mark execution as completed
+    finalizeExecutionFromThread: async (executionId: string) => {
+      try {
+        const execs = get().executions
+        const exec = execs.find(e => e.id === executionId)
+        if (!exec) return
+        // If it's already completed, nothing to do
+        if (exec.status === 'completed') return
+        const execMap = get()._executionThreadMap || {}
+        const threadId = execMap[executionId]
+        if (!threadId) return
+
+        const mr = await fetch(`/api/agents/threads/${threadId}/messages?limit=10`, { credentials: 'same-origin' })
+        if (!mr.ok) return
+        const md = await mr.json()
+        const msgs: any[] = md?.messages || []
+        const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant' && (m.content || '').trim().length > 0)
+        if (!lastAssistant) return
+
+        const aiMessage: any = {
+          id: String(lastAssistant.id || `${executionId}_final`),
+          type: 'ai',
+          content: lastAssistant.content || '',
+          timestamp: new Date(lastAssistant.created_at || Date.now()),
+          metadata: {
+            sender: lastAssistant.metadata?.sender || exec.agentId,
+            source: 'thread_fallback'
+          },
+          toolCalls: lastAssistant.tool_calls || []
+        }
+
+        set((state) => ({
+          executions: state.executions.map(e => e.id === executionId ? {
+            ...e,
+            status: 'completed',
+            endTime: new Date(),
+            messages: [...(e.messages || []), aiMessage]
+          } : e),
+          currentExecution: {
+            ...(exec as any),
+            status: 'completed',
+            endTime: new Date(),
+            messages: [...(exec.messages || []), aiMessage]
+          }
+        }))
+  // Clear any lingering delegation UI since execution has finalized
+  try { get().clearActiveDelegations() } catch {}
+      } catch (err) {
+        console.warn('finalizeExecutionFromThread failed:', err)
+      }
+    },
+
     pollExecutionStatus: async (executionId: string) => {
-      let pollCount = 0
-      const maxPolls = 60 // Increase to 60 seconds of polling for longer tasks
+      let attempt = 0
+      const maxAttempts = 20 // Reasonable cap to prevent infinite polling
+      let backoffDelay = 1000 // Start with 1 second
+      const maxDelay = 30000 // Max 30 seconds between polls
       
-      const pollInterval = setInterval(async () => {
-        pollCount++
+      const poll = async (): Promise<void> => {
+        attempt++
         
         try {
           const response = await fetch(`/api/agents/execution/${executionId}`, { credentials: 'same-origin' })
           if (response.ok) {
             const data = await response.json()
             if (data.execution) {
-              console.log(`📊 Polling execution ${executionId} [${pollCount}/${maxPolls}]:`, {
+              console.log(`📊 [POLL-${attempt}] Execution ${executionId}:`, {
                 status: data.execution.status,
-                messageCount: data.execution.messages?.length || 0,
-                stepCount: data.execution.steps?.length || 0,
-                currentStep: data.execution.currentStep,
-                lastMessageType: data.execution.messages?.[data.execution.messages?.length - 1]?.type,
-                lastMessageContent: data.execution.messages?.[data.execution.messages?.length - 1]?.content?.slice(0, 100)
+                messages: data.execution.messages?.length || 0,
+                delay: backoffDelay
               })
               
-              set((state) => ({
-                executions: state.executions.map(e => 
-                  e.id === executionId ? data.execution : e
-                ),
-                currentExecution: data.execution.status === 'running' ? data.execution : 
-                                 (data.execution.status === 'completed' ? data.execution : null)
-              }))
+              // Force state update using Zustand's explicit setter
+              set((state) => {
+                const updatedExecution = { ...data.execution }
+                return {
+                  executions: state.executions.map(e => 
+                    e.id === executionId ? updatedExecution : e
+                  ),
+                  currentExecution: updatedExecution,
+                  isLoading: data.execution.status === 'running',
+                  // Force timestamp to trigger subscribers
+                  _lastUpdate: Date.now()
+                }
+              })
 
-              // Stop polling if execution is complete or failed
+              // Stop polling if execution is complete
               if (data.execution.status !== 'running') {
-                clearInterval(pollInterval)
-                console.log(`✅ Polling stopped for ${executionId}: ${data.execution.status}`)
-
-                // On completion, persist assistant final message to the thread
+                console.log(`✅ [POLL-COMPLETE] Execution ${executionId}: ${data.execution.status}`)
+                
                 if (data.execution.status === 'completed') {
                   try {
                     await get().persistFinalAssistantMessage(data.execution)
+                    get().clearActiveDelegations()
                   } catch (e) {
                     console.warn('Persist final message failed:', e)
                   }
                 }
+                return // Stop polling
+              }
+              
+              // Continue polling with exponential backoff
+              if (attempt < maxAttempts) {
+                setTimeout(poll, backoffDelay)
+                backoffDelay = Math.min(backoffDelay * 2, maxDelay) // Double delay, max 30s
+              }
+            } else {
+              console.warn(`⚠️ [POLL-${attempt}] No execution data found for ${executionId}`)
+              // Try fallback after several failed attempts
+              if (attempt > 3) {
+                try { 
+                  await get().finalizeExecutionFromThread(executionId) 
+                } catch {}
               }
             }
           } else {
-            console.warn(`⚠️ Polling failed for ${executionId}: ${response.status}`)
+            console.warn(`⚠️ [POLL-${attempt}] API error ${response.status} for ${executionId}`)
+            if (attempt > 3) {
+              try { 
+                await get().finalizeExecutionFromThread(executionId) 
+              } catch {}
+            }
           }
         } catch (error) {
-          console.error('Error polling execution status:', error)
-          clearInterval(pollInterval)
+          console.error(`❌ [POLL-${attempt}] Network error:`, error)
+          try { 
+            await get().finalizeExecutionFromThread(executionId) 
+          } catch {}
+          return // Stop on network errors
         }
         
-        // Auto-stop after max polls to prevent infinite polling
-        if (pollCount >= maxPolls) {
-          clearInterval(pollInterval)
-          console.log(`⏰ Polling timeout for ${executionId} after ${maxPolls} attempts`)
+        // Auto-stop after max attempts
+        if (attempt >= maxAttempts) {
+          console.log(`⏰ [POLL-TIMEOUT] Max attempts reached for ${executionId}`)
+          try { 
+            await get().finalizeExecutionFromThread(executionId) 
+          } catch {}
         }
-      }, 1000) // Poll every second
+      }
+      
+      // Start polling immediately
+      poll()
     }
 
     ,
@@ -616,6 +726,133 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         }))
         return { nodes }
       })
+    },
+
+    // Delegation Progress Actions
+    startDelegation: (delegation) => {
+      const id = `delegation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const now = new Date()
+      
+      const fullDelegation: DelegationProgress = {
+        ...delegation,
+        id,
+        status: 'requested',
+        stage: 'initializing',
+        lastUpdate: now,
+        progress: 0,
+        timeline: [{
+          id: `event-${Date.now()}`,
+          timestamp: now,
+          stage: 'initializing',
+          message: `Delegating task to ${delegation.targetAgent}`,
+          agent: delegation.sourceAgent,
+          icon: '🔄',
+          progress: 0
+        }]
+      }
+
+      set((state) => ({
+        activeDelegations: {
+          ...state.activeDelegations,
+          [id]: fullDelegation
+        },
+        currentDelegationId: id
+      }))
+
+      return id
+    },
+
+    updateDelegationStatus: (delegationId, status, stage) => {
+      set((state) => {
+        const delegation = state.activeDelegations[delegationId]
+        if (!delegation) return state
+
+        const now = new Date()
+        let progress = delegation.progress
+
+        // Update progress based on status
+        switch (status) {
+          case 'accepted': progress = 10; break
+          case 'in_progress': progress = Math.max(progress, 25); break
+          case 'completing': progress = 80; break
+          case 'completed': progress = 100; break
+          case 'failed': 
+          case 'timeout': progress = delegation.progress; break
+        }
+
+        const updatedDelegation = {
+          ...delegation,
+          status,
+          stage: stage || delegation.stage,
+          lastUpdate: now,
+          progress
+        }
+
+        return {
+          activeDelegations: {
+            ...state.activeDelegations,
+            [delegationId]: updatedDelegation
+          }
+        }
+      })
+    },
+
+    addDelegationTimelineEvent: (delegationId, event) => {
+      set((state) => {
+        const delegation = state.activeDelegations[delegationId]
+        if (!delegation) return state
+
+        const newEvent: DelegationTimelineEvent = {
+          ...event,
+          id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          timestamp: new Date()
+        }
+
+        const updatedDelegation = {
+          ...delegation,
+          timeline: [...delegation.timeline, newEvent],
+          lastUpdate: new Date()
+        }
+
+        return {
+          activeDelegations: {
+            ...state.activeDelegations,
+            [delegationId]: updatedDelegation
+          }
+        }
+      })
+    },
+
+    completeDelegation: (delegationId, success) => {
+      const state = get()
+      const delegation = state.activeDelegations[delegationId]
+      if (!delegation) return
+
+      // Add final timeline event
+      state.addDelegationTimelineEvent(delegationId, {
+        stage: 'finalizing',
+  message: success ? 'Task completed successfully' : 'Task failed',
+        agent: delegation.targetAgent,
+        icon: success ? '✅' : '❌',
+        progress: success ? 100 : delegation.progress
+      })
+
+      // Update final status
+      state.updateDelegationStatus(delegationId, success ? 'completed' : 'failed')
+
+      // Clear current delegation after a delay
+      setTimeout(() => {
+        set((state) => ({
+          currentDelegationId: state.currentDelegationId === delegationId ? null : state.currentDelegationId
+        }))
+      }, 3000)
+    },
+
+    clearActiveDelegations: () => {
+      set({
+        activeDelegations: {},
+        currentDelegationId: null
+      })
     }
   }))
 )
@@ -625,10 +862,14 @@ if (typeof window !== 'undefined') {
   useClientAgentStore.getState().initializeAgents()
 }
 
-// Listen for delegation events from the orchestrator
-if (typeof window !== 'undefined') {
-  window.addEventListener('agent-delegation', (event: any) => {
-    console.log('🎯 UI received delegation event:', event.detail)
-    useClientAgentStore.getState().addDelegationEvent(event.detail)
-  })
+function getStageIcon(stage: string): string {
+  switch (stage) {
+    case 'initializing': return '🔄'
+    case 'analyzing': return '🔍'
+    case 'researching': return '📚'
+    case 'processing': return '⚙️'
+    case 'synthesizing': return '🧠'
+    case 'finalizing': return '✨'
+    default: return '⏳'
+  }
 }

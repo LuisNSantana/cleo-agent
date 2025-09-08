@@ -24,6 +24,39 @@ let coreInstance: CoreOrchestrator | null = null
 function getCore(): CoreOrchestrator {
 	if (!coreInstance) {
 		coreInstance = new CoreOrchestrator({ enableMetrics: true, enableMemory: true })
+		
+		// CRITICAL: Set up event propagation from core to legacy/UI
+		console.log('🔍 [LEGACY] Setting up core orchestrator event listeners')
+		
+		// Listen for delegation progress events from core and propagate to window
+		coreInstance.on('delegation.progress', (data: any) => {
+			console.log('🔍 [LEGACY] Core delegation progress event:', data)
+			if (typeof window !== 'undefined') {
+				const event = new CustomEvent('delegation-progress', { detail: data })
+				window.dispatchEvent(event)
+				console.log('🔍 [LEGACY] Dispatched delegation-progress to window')
+			}
+		})
+		
+		// Listen for delegation requested events
+		coreInstance.on('delegation.requested', (data: any) => {
+			console.log('🔍 [LEGACY] Core delegation requested event:', data)
+			if (typeof window !== 'undefined') {
+				const event = new CustomEvent('agent-delegation', { detail: { ...data, type: 'requested' } })
+				window.dispatchEvent(event)
+				console.log('🔍 [LEGACY] Dispatched agent-delegation to window')
+			}
+		})
+		
+		// Listen for delegation completed events  
+		coreInstance.on('delegation.completed', (data: any) => {
+			console.log('🔍 [LEGACY] Core delegation completed event:', data)
+			if (typeof window !== 'undefined') {
+				const event = new CustomEvent('agent-delegation', { detail: { ...data, type: 'completed' } })
+				window.dispatchEvent(event)
+				console.log('🔍 [LEGACY] Dispatched agent-delegation completed to window')
+			}
+		})
 	}
 	return coreInstance
 }
@@ -36,8 +69,6 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
 	// tool messages to directly follow a model message that has tool_calls in the SAME turn.
 	// Replaying old tool messages causes 400 errors. We skip them or convert to system notes.
 	
-	console.log('🔍 [DEBUG] Legacy toBaseMessages - Input count:', prior?.length || 0)
-	
 	const result = (prior || []).flatMap(m => {
 		switch (m.role) {
 			case 'user': return [new HumanMessage(m.content)]
@@ -45,7 +76,6 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
 			case 'system': return [new SystemMessage(m.content)]
 			case 'tool': {
 				// Keep a lightweight breadcrumb as a system note instead of a ToolMessage
-				console.log('🔍 [DEBUG] Converting tool message to system note:', m.content.slice(0, 100))
 				const note = `[tool:${m?.metadata?.name || m?.metadata?.tool_name || 'unknown'}] ${String(m.content).slice(0, 400)}`
 				return [new SystemMessage(note)]
 			}
@@ -53,7 +83,6 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
 		}
 	})
 	
-	console.log('🔍 [DEBUG] Legacy toBaseMessages - Output count:', result.length)
 	return result
 }
 
@@ -151,26 +180,13 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 	})
 	
 	Promise.race([executionPromise, timeoutPromise]).then(res => {
-		console.log('🔍 [DEBUG] core.executeAgent resolved successfully')
-		console.log('🔍 [DEBUG] Result type:', typeof res)
-		console.log('🔍 [DEBUG] Result keys:', res ? Object.keys(res) : 'null')
-		console.log('🔍 [DEBUG] Result content preview:', (res as any)?.content?.slice(0, 100) + '...')
-		
 		exec.status = 'completed'
 		exec.endTime = new Date()
 		const content = (res && (res as any).content) || ''
 		exec.messages = exec.messages || []
 		
-		console.log('🔍 [DEBUG] About to update exec status and messages')
-		
 		// CRITICAL FIX: Use the actual delegated agent from result metadata, not the original target
 		const actualSender = (res && (res as any).metadata?.sender) || target.id
-		console.log('🔍 [DEBUG] Legacy orchestrator - Final message sender:', {
-			originalTargetId: target.id,
-			resultSender: (res && (res as any).metadata?.sender),
-			finalSender: actualSender,
-			resultMetadata: (res && (res as any).metadata)
-		})
 		
 		try {
 			// Extract toolCalls from the result if available, or use captured tools
@@ -185,9 +201,6 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 			// Use captured tool calls if result doesn't have them
 			const finalToolCalls = resultToolCalls.length > 0 ? resultToolCalls : toolCallsUsed
 			
-			console.log('🔍 [DEBUG] Final toolCalls count:', finalToolCalls.length)
-			console.log('🔍 [DEBUG] Tool names used:', finalToolCalls.map((tc: any) => tc.name))
-			
 			exec.messages.push({ 
 				id: `${exec.id}_final`, 
 				type: 'ai', 
@@ -200,8 +213,6 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 			// Update metrics with tool call count
 			exec.metrics.toolCallsCount = finalToolCalls.length
 			
-			console.log('🔍 [DEBUG] Message pushed to exec.messages, count:', exec.messages.length)
-			
 			// Clean up listeners
 			core.off?.('tool.executing', toolExecutingListener)
 			core.off?.('tool.completed', toolCompletedListener)
@@ -211,21 +222,14 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 		
 		try {
 			listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
-			console.log('🔍 [DEBUG] Listeners notified, execution completed')
 		} catch (listenerError) {
 			console.error('🔍 [DEBUG] Error notifying listeners:', listenerError)
 		}
 	}).catch(err => {
-		console.log('🔍 [DEBUG] core.executeAgent rejected or timed out:', err)
-		
 		// For timeout errors, try to capture any partial results
 		if (err.message.includes('timeout')) {
-			console.log('🔍 [DEBUG] Timeout detected, attempting to capture partial results')
-			
 			// Check if we have any tool calls captured during execution
 			if (toolCallsUsed.length > 0) {
-				console.log('🔍 [DEBUG] Found partial results from', toolCallsUsed.length, 'tool calls')
-				
 				exec.status = 'completed' // Mark as completed since we have partial results
 				exec.endTime = new Date()
 				exec.messages = exec.messages || []
@@ -370,6 +374,64 @@ export function getAgentOrchestrator() {
 
 		cleanup() {
 			listeners.splice(0, listeners.length)
+		},
+
+		// CRITICAL FIX: Handle completion notifications from Core Orchestrator
+		handleExecutionCompletion(execution: any) {
+			console.log('🔍 [LEGACY] Received execution completion from core:', execution.id)
+			
+			// Find the execution in our registry and mark it completed
+			let exec = execRegistry.find((e: any) => e.id === execution.id)
+			
+			if (!exec) {
+				console.log('🔍 [LEGACY] Execution not found in registry, creating new entry:', execution.id)
+				// Create a new execution entry for delegated executions that weren't tracked
+				const newExec: AgentExecution = {
+					id: execution.id,
+					agentId: execution.agentId || 'unknown',
+					threadId: execution.threadId || 'unknown',
+					userId: execution.userId || 'unknown', 
+					status: 'completed' as const,
+					startTime: execution.startTime || new Date(),
+					endTime: execution.endTime || new Date(),
+					messages: execution.messages || [],
+					steps: execution.steps || [],
+					metrics: execution.metrics || { toolCallsCount: 0, tokensUsed: 0 }
+				}
+				execRegistry.push(newExec)
+				exec = newExec
+			} else {
+				exec.status = 'completed'
+				exec.endTime = execution.endTime || new Date()
+			}
+			
+			// Ensure final message is included
+			if (execution.messages && execution.messages.length > 0) {
+				const lastMessage = execution.messages[execution.messages.length - 1]
+				if (lastMessage.type === 'ai' && lastMessage.content && exec) {
+					// Check if we already have this message
+					const existingMessage = exec.messages.find((m: any) => m.id === lastMessage.id)
+					if (!existingMessage) {
+						exec.messages.push(lastMessage)
+						console.log('🔍 [LEGACY] Added final AI message to execution')
+					}
+				}
+			}
+			
+			// Notify listeners of completion
+			if (exec) {
+				try {
+					listeners.forEach(fn => fn({ 
+						type: 'execution_completed', 
+						agentId: exec!.agentId, 
+						timestamp: new Date(), 
+						data: { executionId: exec!.id } 
+					}))
+					console.log('🔍 [LEGACY] Listeners notified of completion for:', exec.id)
+				} catch (error) {
+					console.error('🔍 [LEGACY] Error notifying listeners:', error)
+				}
+			}
 		}
 	}
 

@@ -86,9 +86,30 @@ export class SubAgentService {
   }
 
   /**
+   * Helper to check if a string is a valid UUID
+   */
+  private static isValidUUID(str: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    return uuidRegex.test(str)
+  }
+
+  /**
    * Get a specific sub-agent by ID
    */
   static async getSubAgent(agentId: string, userId: string): Promise<SubAgent | null> {
+    // If agentId is not a valid UUID, it's likely a built-in agent name like "apu-research"
+    // Return null as it's not a sub-agent in the database
+    if (!this.isValidUUID(agentId)) {
+      console.log(`[SubAgentService] Skipping sub-agent lookup for non-UUID agent: ${agentId}`)
+      return null
+    }
+
+    // Also validate userId to prevent database errors
+    if (!this.isValidUUID(userId)) {
+      console.log(`[SubAgentService] Skipping sub-agent lookup for non-UUID user: ${userId}`)
+      return null
+    }
+
     const { data, error } = await supabase
       .from('agents')
       .select('*')
@@ -159,6 +180,16 @@ export class SubAgentService {
     subAgentsByParent: Record<string, number>
     createdToday: number
   }> {
+    // If userId is not a valid UUID, return empty statistics
+    if (!this.isValidUUID(userId)) {
+      console.log(`[SubAgentService] Skipping statistics for non-UUID user: ${userId}`)
+      return {
+        totalSubAgents: 0,
+        subAgentsByParent: {},
+        createdToday: 0
+      }
+    }
+
     // Get all sub-agents for the user
     const { data: subAgents, error } = await supabase
       .from('agents')

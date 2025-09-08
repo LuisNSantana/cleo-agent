@@ -21,6 +21,17 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const MAX_RETRY_ATTEMPTS = 3
 const RETRY_DELAY_BASE = 1000 // 1s base delay
 
+// Global counter for unique ID generation
+let messageIdCounter = 0
+
+// Generate unique message ID to prevent React key conflicts
+function generateUniqueMessageId(): string {
+  const timestamp = Date.now()
+  const counter = ++messageIdCounter
+  const random = Math.random().toString(36).substr(2, 6)
+  return `msg_${timestamp}_${counter}_${random}`
+}
+
 // File validation with logging
 function validateFiles(files: File[]): { isValid: boolean; errors: string[] } {
   const startTime = performance.now()
@@ -102,7 +113,7 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
   // Converted message with attachments for multimodal content
     
     return {
-      id: message.id || Date.now().toString(),
+      id: message.id || generateUniqueMessageId(),
       role: message.role,
       content: content as any, // Use multimodal array format for backend
       parts: message.parts,
@@ -126,7 +137,7 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
   }
 
   return {
-    id: message.id || Date.now().toString(),
+    id: message.id || generateUniqueMessageId(),
     role: message.role,
     content,
     parts: message.parts,
@@ -348,7 +359,7 @@ export function useChatCore({
     }) => {
       // Optimistically add the user message with attachments for display
       const userMessage: ChatMessage = {
-        id: Date.now().toString(),
+        id: generateUniqueMessageId(),
         role: "user",
         content: text,
         createdAt: new Date(),

@@ -49,6 +49,48 @@ export interface ExecutionStep {
   metadata?: any
 }
 
+// Delegation Progress Tracking
+export interface DelegationProgress {
+  id: string
+  sourceAgent: string
+  targetAgent: string
+  task: string
+  status: DelegationStatus
+  stage: DelegationStage
+  startTime: Date
+  lastUpdate: Date
+  estimatedDuration?: number
+  timeline: DelegationTimelineEvent[]
+  progress: number // 0-100
+}
+
+export type DelegationStatus = 
+  | 'requested'     // Just started
+  | 'accepted'      // Target agent accepted
+  | 'in_progress'   // Actively working
+  | 'completing'    // Finishing up
+  | 'completed'     // Successfully done
+  | 'failed'        // Failed
+  | 'timeout'       // Timed out
+
+export type DelegationStage = 
+  | 'initializing'  // Setting up the delegation
+  | 'analyzing'     // Target agent analyzing the task
+  | 'researching'   // Gathering information
+  | 'processing'    // Working on the task
+  | 'synthesizing'  // Combining results
+  | 'finalizing'    // Preparing final response
+
+export interface DelegationTimelineEvent {
+  id: string
+  timestamp: Date
+  stage: DelegationStage
+  message: string
+  agent: string
+  icon?: string
+  progress?: number
+}
+
 export type ConversationMode = 'direct' | 'supervised'
 
 export interface ConversationContext {

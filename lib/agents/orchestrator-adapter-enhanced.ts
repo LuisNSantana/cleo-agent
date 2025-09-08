@@ -115,7 +115,7 @@ export function getAgentOrchestrator() {
     },
     // Execution getters - combine legacy and core
     getExecution(executionId: string) {
-      // Try legacy first (authoritative), then adapter registry
+      // Try legacy first (authoritative)
       try {
         const lorch = (globalThis as any).__cleoOrchestrator
         if (lorch && typeof lorch.getExecution === 'function') {
@@ -123,6 +123,16 @@ export function getAgentOrchestrator() {
           if (e) return e as AgentExecution
         }
       } catch {}
+      
+      // Try core orchestrator
+      try {
+        if (coreOrchestrator && typeof (coreOrchestrator as any).getExecutionStatus === 'function') {
+          const e = (coreOrchestrator as any).getExecutionStatus(executionId)
+          if (e) return e as AgentExecution
+        }
+      } catch {}
+      
+      // Fallback to adapter registry
       return execRegistry.find(e => e.id === executionId) || null
     },
     getAllExecutions(): AgentExecution[] {
