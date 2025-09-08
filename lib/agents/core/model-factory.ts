@@ -3,6 +3,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai'
+import { ChatGroq } from '@langchain/groq'
 import { ChatOllama } from '@langchain/community/chat_models/ollama'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -30,6 +31,23 @@ export class ModelFactory {
 
   private createModel(modelName: string, config: ModelConfig): BaseChatModel {
     const { temperature = 0.7, maxTokens = 4000, streaming = false } = config
+
+    // Groq models (including GPT-OSS)
+    if (modelName.includes('gpt-oss') || modelName.includes('groq/') || modelName.startsWith('llama-3')) {
+      const resolvedModelName = modelName.includes('groq/') 
+        ? modelName.replace('groq/', '') 
+        : modelName === 'gpt-oss-120b' 
+          ? 'openai/gpt-oss-120b'
+          : modelName
+      
+      return new ChatGroq({
+        model: resolvedModelName,
+        temperature,
+        maxTokens,
+        streaming,
+        apiKey: process.env.GROQ_API_KEY
+      })
+    }
 
     // OpenAI models
     if (modelName.startsWith('gpt-') || modelName.includes('openai')) {

@@ -5,6 +5,14 @@ import { listCalendarEventsTool, createCalendarEventTool } from './google-calend
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive';
 import { createGoogleDocTool, readGoogleDocTool, updateGoogleDocTool } from './google-docs';
 import { createGoogleSheetTool, readGoogleSheetTool, updateGoogleSheetTool, appendGoogleSheetTool } from './google-sheets';
+import { 
+  createGoogleSlidesPresentationTool,
+  addGoogleSlideTool,
+  insertGoogleSlideTextBoxTool,
+  appendBulletedSlideTool,
+  readGoogleSlidesPresentationTool,
+  replaceGoogleSlidesTextTool
+} from './google-slides';
 import { createDocumentTool } from './create-document';
 import { openDocumentTool } from './open-document';
 import { memoryAddNoteTool } from './memory';
@@ -350,6 +358,14 @@ export const tools = {
   createGoogleDoc: createGoogleDocTool,
   readGoogleDoc: readGoogleDocTool,
   updateGoogleDoc: updateGoogleDocTool,
+
+  // Google Tools - Slides
+  createGoogleSlidesPresentation: createGoogleSlidesPresentationTool,
+  addGoogleSlide: addGoogleSlideTool,
+  insertGoogleSlideTextBox: insertGoogleSlideTextBoxTool,
+  appendBulletedSlide: appendBulletedSlideTool,
+  readGoogleSlidesPresentation: readGoogleSlidesPresentationTool,
+  replaceGoogleSlidesText: replaceGoogleSlidesTextTool,
 
   // Google Tools - Sheets
   createGoogleSheet: createGoogleSheetTool,

@@ -18,7 +18,7 @@ async function getGoogleDriveAccessToken(userId: string): Promise<string | null>
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
-      .eq('service_id', 'google-drive')
+      .eq('service_id', 'google-workspace')
       .eq('connected', true)
       .single()
 
@@ -65,7 +65,7 @@ async function getGoogleDriveAccessToken(userId: string): Promise<string | null>
             .from('user_service_connections')
             .update({ connected: false })
             .eq('user_id', userId)
-            .eq('service_id', 'google-drive')
+            .eq('service_id', 'google-workspace')
           return null
         }
 
@@ -81,7 +81,7 @@ async function getGoogleDriveAccessToken(userId: string): Promise<string | null>
             connected: true
           })
           .eq('user_id', userId)
-          .eq('service_id', 'google-drive')
+          .eq('service_id', 'google-workspace')
 
         if (updateError) {
           console.error('Failed to update refreshed token:', updateError)
@@ -97,7 +97,7 @@ async function getGoogleDriveAccessToken(userId: string): Promise<string | null>
           .from('user_service_connections')
           .update({ connected: false })
           .eq('user_id', userId)
-          .eq('service_id', 'google-drive')
+          .eq('service_id', 'google-workspace')
         return null
       }
     }

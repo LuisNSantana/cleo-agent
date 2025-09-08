@@ -161,7 +161,7 @@ export async function createAgentTask(
       'cleo': 'cleo-supervisor',
       'emma': 'emma-ecommerce',
       'ami': 'ami-creative',
-      'peter': 'peter-logical',
+      'peter': 'peter-google',
       'toby': 'toby-technical',
       'apu': 'apu-research',
       'wex': 'wex-automation'

@@ -16,41 +16,11 @@ import Image from 'next/image'
 type ServiceStatus = "connected" | "disconnected" | "connecting"
 type UserServiceConnection = Tables<'user_service_connections'>
 
-// Custom icon components using the SVG files
-const GoogleCalendarIcon = ({ className }: { className?: string }) => (
+// Google Workspace icon component
+const GoogleWorkspaceIcon = ({ className }: { className?: string }) => (
   <Image 
-    src="/icons/google-calendar.svg" 
-    alt="Google Calendar"
-    width={24}
-    height={24}
-    className={className}
-  />
-)
-
-const GoogleDriveIcon = ({ className }: { className?: string }) => (
-  <Image 
-    src="/icons/google-drive.svg" 
-    alt="Google Drive"
-    width={24}
-    height={24}
-    className={className}
-  />
-)
-
-const NotionIcon = ({ className }: { className?: string }) => (
-  <Image 
-    src="/icons/notion-icon.svg" 
-    alt="Notion"
-    width={24}
-    height={24}
-    className={className}
-  />
-)
-
-const GmailIcon = ({ className }: { className?: string }) => (
-  <Image 
-    src="/icons/gmail-icon.svg" 
-    alt="Gmail"
+    src="/icons/google.png" 
+    alt="Google Workspace"
     width={24}
     height={24}
     className={className}
@@ -70,36 +40,12 @@ interface ServiceConnection {
 export function ServiceConnections() {
   const [services, setServices] = useState<ServiceConnection[]>([
     {
-      id: "google-calendar",
-      name: "Google Calendar",
-      description: "Connect your Google Calendar to manage events and schedule meetings",
-      icon: GoogleCalendarIcon,
+      id: "google-workspace",
+      name: "Google Workspace",
+      description: "Connect your Google account to access Gmail, Drive, Calendar, Docs, Sheets, and Slides",
+      icon: GoogleWorkspaceIcon,
       status: "disconnected",
-      scopes: ["calendar.readonly", "calendar.events"]
-    },
-    {
-      id: "google-drive",
-      name: "Google Drive",
-      description: "Access and manage your Google Drive files and documents",
-      icon: GoogleDriveIcon,
-      status: "disconnected",
-      scopes: ["drive.readonly", "drive.file"]
-    },
-    {
-      id: "gmail",
-      name: "Gmail",
-      description: "Read, label, and send emails from your Gmail account",
-      icon: GmailIcon,
-      status: "disconnected",
-      scopes: ["gmail.readonly", "gmail.modify", "gmail.send"]
-    },
-    {
-      id: "notion",
-      name: "Notion",
-      description: "Connect to your Notion workspace to read and create pages",
-      icon: NotionIcon,
-      status: "disconnected",
-      scopes: ["read_content", "insert_content"]
+      scopes: ["gmail", "drive", "calendar", "docs", "sheets", "slides"]
     }
   ])
 

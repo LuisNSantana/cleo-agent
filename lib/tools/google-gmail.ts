@@ -20,7 +20,7 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
-      .eq('service_id', 'gmail')
+      .eq('service_id', 'google-workspace')
       .eq('connected', true)
       .single()
 
@@ -53,7 +53,7 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
         .from('user_service_connections')
         .update({ connected: false })
         .eq('user_id', userId)
-        .eq('service_id', 'gmail')
+        .eq('service_id', 'google-workspace')
       return null
     }
 
@@ -64,7 +64,7 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
       .from('user_service_connections')
       .update({ access_token: tokenData.access_token, token_expires_at: new Date(newExpiry).toISOString(), connected: true })
       .eq('user_id', userId)
-      .eq('service_id', 'gmail')
+      .eq('service_id', 'google-workspace')
 
     tokenCache[cacheKey] = { token: tokenData.access_token, expiry: newExpiry }
     return tokenData.access_token

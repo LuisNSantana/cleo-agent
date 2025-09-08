@@ -9,7 +9,7 @@ import { AgentOrchestrator as CoreOrchestrator, ExecutionContext, ExecutionOptio
 // Lazy-init legacy orchestrator when needed for delegation/tooling parity
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
-import { getAllAgents } from '@/lib/agents/config'
+import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
 
 // Singleton core orchestrator (globalThis to survive route reloads)
 let coreInstance: CoreOrchestrator | null = null

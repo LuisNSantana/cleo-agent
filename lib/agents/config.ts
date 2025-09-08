@@ -1,20 +1,20 @@
 /**
- * Multi-Agent System Configuration
- * DefinesExecution Steps:
-1. UndersOutputs:
-- If you delegated: "I asked {Agent} to handle X because Y. Summary: … Next: …"
-- If multiple delegations: "I consulted {Agent1} and {Agent2} about X. {Agent1} found... {Agent2} discovered... Combined insights: ... Next: ..."
-- If direct: polished answer with any quick tip or follow-up.d the request and user tone; be empathetic.
-2. If delegation helps, call the appropriate delegate_to_* tool with:
-   - task: 1–2 lines, outcome-oriented
-   - context: only what's necessary (links, constraints)
-   - priority: low | medium | high
-3. For complex requests, you may delegate to multiple specialists in sequence.
-4. Wait for ALL delegation results before proceeding.
-5. When you receive delegation results (marked with ✅), synthesize them into a comprehensive response.
-6. Deliver a short synthesis with next steps that incorporates ALL specialist insights.
-7. If fully done, return a concise final answer (no chain-of-thought).lete agent ecosystem with Cleo as emotional supervisor
- * and specialized agents for different domains
+ * LEGACY Static Agent Configuration
+ * 
+ * ⚠️  MIGRATION NOTE: This file is being phased out in favor of database-driven agents
+ * 
+ * Current Usage:
+ * - Legacy orchestrators (until async migration)
+ * - Default agent templates for new users
+ * - Static agent definitions export
+ * 
+ * DO NOT add new hardcoded agents here - use the database instead!
+ * 
+ * Migration Path:
+ * 1. ✅ All agent lookups now use unified-config.ts 
+ * 2. ✅ Database-first approach implemented
+ * 3. 🔄 Orchestrators still use sync versions (temporary)
+ * 4. ⏳ TODO: Migrate orchestrators to async, remove sync functions
  */
 
 import { AgentConfig, AgentRole, LangGraphConfig, HandoffTool } from './types'
@@ -32,7 +32,7 @@ export const CLEO_AGENT: AgentConfig = {
   role: 'supervisor',
   model: 'gpt-4o-mini',
   temperature: 0.7,
-  maxTokens: 8192,
+  maxTokens: 16384,
   tools: ['delegate_to_toby', 'delegate_to_ami', 'delegate_to_peter', 'delegate_to_emma', 'delegate_to_apu', 'getCurrentDateTime', 'weatherInfo', 'randomFact'],
   prompt: `You are Cleo, the advanced emotional intelligence supervisor and coordinator.
 
@@ -47,7 +47,7 @@ Role & Goals:
 Team & Delegation Tools:
 - Toby (Technical): delegate_to_toby — programming, debugging, data processing, technical analysis
 - Ami (Creative): delegate_to_ami — design, content creation, branding, visual projects
-- Peter (Logic): delegate_to_peter — mathematics, algorithms, optimization, logical reasoning
+- Peter (Google Workspace): delegate_to_peter — Google Docs, Sheets, Drive, Calendar, productivity automation
 - Emma (E-commerce): delegate_to_emma — Shopify, e-commerce analytics, online store operations
 - Apu (Financial & Market Research): delegate_to_apu — stock analysis, financial markets, competitive intel, web research
 
@@ -57,7 +57,7 @@ Decision Heuristics:
 3) E-commerce/Shopify: delegate_to_emma (online stores, e-commerce operations)
 4) Technical/programming: delegate_to_toby (code, systems, technical problems)
 5) Creative/design: delegate_to_ami (visual content, creative projects)
-6) Math/logic: delegate_to_peter (calculations, algorithms, optimization)
+6) Google Workspace/documents: delegate_to_peter (Google Docs, Sheets, Drive, Calendar, productivity)
 7) Multi-part: delegate in sequence; keep a brief running plan.
 8) Uncertain: ask one short clarifying question, then act.
 
@@ -259,54 +259,86 @@ Privacy: Don’t reveal chain-of-thought; present results.`,
 }
 
 /**
- * Peter - Advanced Logic & Mathematical Problem Solver
- * Expert in systematic reasoning, complex analysis, and algorithmic thinking
+ * Peter - Google Workspace & Productivity Specialist
+ * Expert in Google Docs, Sheets, Drive, Calendar and all Google productivity tools
  */
 export const PETER_AGENT: AgentConfig = {
-  id: 'peter-logical',
+  id: 'peter-google',
   name: 'Peter',
-  description: 'Advanced logic and mathematics specialist with expertise in systematic problem-solving, optimization, and algorithmic thinking',
+  description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
-  model: 'gpt-4o-mini',
-  temperature: 0.1,
-  maxTokens: 12288,
-  tools: ['calculator', 'webSearch', 'getCurrentDateTime', 'cryptoPrices', 'createDocument', 'complete_task'],
-  tags: ['logical', 'logic', 'mathematics', 'mathematical', 'problem', 'calculation', 'algorithm', 'structured', 'optimization', 'systematic'],
-  prompt: `You are Peter, the logic and mathematics specialist.
+  model: 'gpt-oss-120b',
+  temperature: 0.3,
+  maxTokens: 32768,
+  tools: [
+    'createGoogleDoc',
+    'readGoogleDoc', 
+    'updateGoogleDoc',
+    'createGoogleSheet',
+    'readGoogleSheet',
+    'updateGoogleSheet',
+    'listCalendarEvents',
+    'createCalendarEvent',
+    'listDriveFiles',
+    'searchDriveFiles',
+    'getDriveFileDetails',
+    'getCurrentDateTime',
+    'complete_task'
+  ],
+  tags: ['google', 'workspace', 'docs', 'sheets', 'drive', 'calendar', 'productivity', 'documents', 'spreadsheets', 'automation'],
+  prompt: `You are Peter, the Google Workspace and productivity specialist.
 
 Brand & Purpose (on request only):
 - If asked who created you or your broader mission, say: “I was created by Huminary Labs (https://huminarylabs.com) to make people’s lives easier with accessible, life‑changing applications.”
 
 Role & Goals:
-- Solve quantitative and logical problems accurately and efficiently.
-- Communicate clearly with minimal notation and high signal.
+- Master of Google Workspace tools: Docs, Sheets, Drive, Calendar
+- CREATE ACTUAL DOCUMENTS AND FILES, not just text content
+- Provide downloadable links to real Google Workspace documents
+- Transform data and ideas into accessible, shareable professional outputs
 
-Tools:
-- calculator, webSearch, getCurrentDateTime, cryptoPrices, createDocument
+🎯 CRITICAL: When asked to create documents:
+1. ALWAYS use createGoogleDoc (or createGoogleSheet) to create the ACTUAL file
+2. NEVER just provide formatted text content in the chat
+3. ALWAYS return the document link for download/access
+4. The user wants a real Google Doc/Sheet they can open, edit, and share
 
-Methodology:
-1) Define: restate the problem, inputs, and goal.
-2) Model: choose an approach (LP, DP, statistics, probability, etc.).
-3) Solve: compute key results; show only essential intermediate values.
-4) Validate: sanity checks, edge cases, and sensitivity.
-5) Optimize: time/space, tradeoffs.
-6) Deliver: crisp result + implications; call complete_task if finished.
+Core Tools & Priority:
+- Google Docs: createGoogleDoc, readGoogleDoc, updateGoogleDoc (USE THESE!)
+- Google Sheets: createGoogleSheet, readGoogleSheet, updateGoogleSheet (USE THESE!)
+- Google Drive: listDriveFiles, searchDriveFiles, getDriveFileDetails
+- Google Calendar: listCalendarEvents, createCalendarEvent
+- Productivity: getCurrentDateTime for scheduling and timestamps
 
-Delegation:
-- If a specialized sub-agent exists (e.g., numerical simulation, solver), delegate a bounded computation. Validate and integrate results before finalizing; then call complete_task.
+Document Creation Workflow:
+1) Assess: understand what type of document is needed (Doc vs Sheet)
+2) Create: Use createGoogleDoc or createGoogleSheet with the content
+3) Verify: Confirm the document was created successfully
+4) Share: Provide the direct link to the created document
+5) Complete: Call complete_task with the document link
+
+EXAMPLES OF CORRECT BEHAVIOR:
+❌ WRONG: "Here's the content for your Google Doc: [long formatted text]"
+✅ CORRECT: "I created your Google Doc. Access it here: [actual Google Docs link]"
+
+Document Creation Excellence:
+- Use proper headers, formatting, and structure when creating Google Docs
+- Create efficient formulas and data analysis in Google Sheets
+- Give documents clear, descriptive titles
+- Ensure documents have appropriate sharing permissions
 
 Collaboration:
-- Implementation/system integration → Toby.
-- Visualization/UX of complex outputs → Ami.
-- Ecommerce pricing/forecasting → Emma.
-- Market/financial data context → Apu.
+- Complex data analysis → delegate to appropriate specialist, then create real Sheets with results
+- Creative document design → collaborate with Ami for content, then create real Docs
+- Technical integration → work with Toby for API connections
 
-Output:
-- Given & Assumptions
-- Approach & Key Steps
-- Result(s)
-- Validation (edge cases)
-- Next steps
+Output Format:
+- Brief explanation of what was created
+- Direct link to the Google Workspace document
+- Instructions for access/download if needed
+- Call complete_task when document is successfully created
+
+🚨 REMEMBER: Users want REAL FILES they can download, not text in chat!
 
 Privacy: Don’t expose chain-of-thought beyond minimal reasoning needed for verification.`,
   color: '#96CEB4',
@@ -324,7 +356,7 @@ export const EMMA_AGENT: AgentConfig = {
   role: 'specialist',
   model: 'gpt-4o-mini',
   temperature: 0.4,
-  maxTokens: 6144,
+  maxTokens: 12288,
   tools: ['shopifyGetProducts', 'shopifyGetOrders', 'shopifyGetAnalytics', 'shopifyGetCustomers', 'shopifySearchProducts', 'shopifyUpdateProductPrice', 'complete_task'],
   tags: ['ecommerce', 'shopify', 'sales', 'inventory', 'store', 'analytics', 'business', 'customer'],
   prompt: `You are Emma, the e-commerce & Shopify specialist.
@@ -381,7 +413,7 @@ export const APU_AGENT: AgentConfig = {
   role: 'specialist',
   model: 'gpt-5-mini',
   temperature: 0.3,
-  maxTokens: 6144,
+  maxTokens: 12288,
   tools: [
     'serpGeneralSearch',
     'serpNewsSearch',
@@ -465,10 +497,10 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
   },
   {
     name: 'delegate_to_peter',
-    description: 'Delegate logical or mathematical tasks to Peter',
+    description: 'Delegate Google Workspace tasks to Peter',
     fromAgent: 'cleo-supervisor',
-    toAgent: 'peter-logical',
-    condition: 'logical_problem OR mathematics OR optimization'
+    toAgent: 'peter-google',
+    condition: 'google_workspace OR documents OR spreadsheets OR drive OR calendar'
   },
   {
     name: 'delegate_to_emma',
@@ -520,8 +552,8 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
         config: { agent: AMI_AGENT }
       },
       {
-        id: 'peter-logical',
-        name: 'Peter Logical',
+        id: 'peter-google',
+        name: 'Peter Google',
         type: 'agent',
         config: { agent: PETER_AGENT }
       },
@@ -536,12 +568,12 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
       // Supervisor to specialists
       { from: 'cleo-supervisor', to: 'toby-technical', condition: 'technical', label: 'Technical Task' },
       { from: 'cleo-supervisor', to: 'ami-creative', condition: 'creative', label: 'Creative Task' },
-      { from: 'cleo-supervisor', to: 'peter-logical', condition: 'logical', label: 'Logical Task' },
+      { from: 'cleo-supervisor', to: 'peter-google', condition: 'google_workspace', label: 'Google Workspace Task' },
       { from: 'cleo-supervisor', to: 'emma-ecommerce', condition: 'ecommerce', label: 'E-commerce Task' },
       // Specialists back to supervisor
       { from: 'toby-technical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'ami-creative', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
-      { from: 'peter-logical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
+      { from: 'peter-google', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
   { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
   { from: 'apu-research', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' }
     ],
@@ -562,35 +594,46 @@ export function getAllAgents(): AgentConfig[] {
 }
 
 /**
- * Find agent by ID
+ * All agents constant for compatibility
+// =============================================================================
+// LEGACY FUNCTIONS - Use unified-config.ts instead
+// =============================================================================
+
+/**
+ * Export all agents for unified-service seeding
+ */
+export const ALL_AGENTS = [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
+
+/**
+ * @deprecated Use unified-config getAgentById() instead
  */
 export function getAgentById(id: string): AgentConfig | undefined {
   return getAllAgents().find(agent => agent.id === id)
 }
 
 /**
- * Get agents filtered by role
+ * @deprecated Use unified-config with DB queries instead
  */
 export function getAgentsByRole(role: AgentRole): AgentConfig[] {
   return getAllAgents().filter(agent => agent.role === role)
 }
 
 /**
- * Get the supervisor agent
+ * @deprecated Use unified-config getAgentById('cleo-supervisor') instead
  */
 export function getSupervisorAgent(): AgentConfig {
   return CLEO_AGENT
 }
 
 /**
- * Get all specialist agents
+ * @deprecated Use unified-config with DB queries instead
  */
 export function getSpecialistAgents(): AgentConfig[] {
   return [TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
 }
 
 /**
- * Get agents by specialization tags
+ * @deprecated Use unified-config with DB queries instead
  */
 export function getAgentsByTag(tag: string): AgentConfig[] {
   return getAllAgents().filter(agent => 
@@ -599,7 +642,7 @@ export function getAgentsByTag(tag: string): AgentConfig[] {
 }
 
 /**
- * Get available tools across all agents
+ * @deprecated Use unified-config with DB queries instead
  */
 export function getAllAvailableTools(): string[] {
   const tools = new Set<string>()

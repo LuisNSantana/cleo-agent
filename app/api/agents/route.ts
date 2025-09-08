@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureDelegationToolForAgent } from '@/lib/tools'
-import { APU_AGENT, WEX_AGENT } from '@/lib/agents/config'
+import { APU_AGENT, WEX_AGENT, PETER_AGENT } from '@/lib/agents/config'
 
 export async function GET() {
   try {
@@ -101,7 +101,7 @@ export async function GET() {
       if (n === 'cleo') return 'cleo-supervisor'
       if (n === 'toby') return 'toby-technical'
       if (n === 'ami') return 'ami-creative'
-      if (n === 'peter') return 'peter-logical'
+      if (n === 'peter') return 'peter-google'
       if (n === 'emma') return 'emma-ecommerce'
       if (n === 'apu') return 'apu-research'
       if (n === 'wex') return 'wex-automation'
@@ -111,6 +111,7 @@ export async function GET() {
     // Helper: get builtin config by human-readable name
     const builtinConfigByName = (name?: string | null) => {
       const id = builtinIdByName(name)
+      if (id === 'peter-google') return PETER_AGENT
       if (id === 'apu-research') return APU_AGENT
       if (id === 'wex-automation') return WEX_AGENT
       return null

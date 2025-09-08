@@ -5,7 +5,7 @@
 
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
-import { getAllAgents } from '@/lib/agents/config'
+import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
 
 // Import legacy orchestrator as backup for complex delegation logic
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'

@@ -29,7 +29,7 @@ async function getGoogleSheetsAccessToken(userId: string): Promise<string | null
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
-      .eq('service_id', 'google-sheets')
+      .eq('service_id', 'google-workspace')
       .eq('connected', true)
       .single()
 
@@ -92,7 +92,7 @@ async function getGoogleSheetsAccessToken(userId: string): Promise<string | null
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId)
-        .eq('service_id', 'google-sheets')
+        .eq('service_id', 'google-workspace')
 
       if (updateError) {
         console.error('❌ Failed to update token in database:', updateError)

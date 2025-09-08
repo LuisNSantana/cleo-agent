@@ -15,7 +15,7 @@ import {
   AgentActivity,
   AgentStore as AgentStoreType
 } from './types'
-import { getAllAgents } from './config'
+import { getAllAgentsSync as getAllAgents } from './unified-config'
 // import { getAgentOrchestrator } from './agent-orchestrator' // Moved to dynamic import
 
 interface AgentStoreState extends AgentStoreType {

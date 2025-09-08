@@ -42,6 +42,15 @@ export type OpenAIModel =
   | "gpt-3.5-turbo-instruct"
   | "gpt-oss-120b"
 
+export type GroqModel =
+  | "gpt-oss-120b"
+  | "gpt-oss-20b"
+  | "llama-3.3-70b-versatile"
+  | "llama-3.1-8b-instant"
+  | "meta-llama/llama-4-maverick-17b-128e-instruct"
+  | "openai/gpt-oss-120b"
+  | "openai/gpt-oss-20b"
+
 export type MistralModel =
   | "ministral-3b-latest"
   | "ministral-8b-latest"
@@ -147,6 +156,7 @@ export type Provider =
   | "google"
   | "anthropic"
   | "xai"
+  | "groq"
   | "ollama"
   | "openrouter"
   | "langchain"
@@ -158,6 +168,7 @@ export type SupportedModel =
   | PerplexityModel
   | AnthropicModel
   | XaiModel
+  | GroqModel
   | OllamaModel
   | OpenRouterModel
   | LangChainModel

@@ -1,0 +1,270 @@
+import { createClient } from '@supabase/supabase-js'
+import { Database } from '@/lib/database.types'
+import { UnifiedAgent, transformDatabaseAgent, transformAgentConfig, transformToInsertAgent } from './unified-types'
+import { ALL_AGENTS } from './config'
+import { AgentConfig } from './types'
+
+export class UnifiedAgentService {
+  private supabase: ReturnType<typeof createClient<Database>>
+
+  constructor(supabaseUrl?: string, supabaseKey?: string) {
+    if (supabaseUrl && supabaseKey) {
+      this.supabase = createClient<Database>(supabaseUrl, supabaseKey)
+    } else {
+      // Use server-side environment variables
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      
+      if (!url || !key) {
+        throw new Error('Supabase configuration not found')
+      }
+      
+      this.supabase = createClient<Database>(url, key)
+    }
+  }
+
+  /**
+   * Get all agents for a user (includes both default system agents and user-created agents)
+   */
+  async getAllAgents(userId: string): Promise<UnifiedAgent[]> {
+    try {
+      // Get agents from database
+      const { data: dbAgents, error } = await this.supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('priority', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching agents from database:', error)
+        // Fallback to default agents if database fails
+        return this.getDefaultAgentsForUser(userId)
+      }
+
+      // If no agents found, create default agents for user
+      if (!dbAgents || dbAgents.length === 0) {
+        await this.createDefaultAgentsForUser(userId)
+        return this.getAllAgents(userId) // Recursive call to get newly created agents
+      }
+
+      return dbAgents.map(transformDatabaseAgent)
+    } catch (error) {
+      console.error('Error in getAllAgents:', error)
+      // Fallback to default agents
+      return this.getDefaultAgentsForUser(userId)
+    }
+  }
+
+  /**
+   * Get a specific agent by ID
+   */
+  async getAgentById(agentId: string, userId: string): Promise<UnifiedAgent | null> {
+    try {
+      const { data: agent, error } = await this.supabase
+        .from('agents')
+        .select('*')
+        .eq('id', agentId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single()
+
+      if (error || !agent) {
+        console.error('Agent not found in database:', agentId, error)
+        return null
+      }
+
+      return transformDatabaseAgent(agent)
+    } catch (error) {
+      console.error('Error getting agent by ID:', error)
+      return null
+    }
+  }
+
+  /**
+   * Create a new agent
+   */
+  async createAgent(agent: Partial<UnifiedAgent>): Promise<UnifiedAgent | null> {
+    try {
+      const insertData = transformToInsertAgent(agent)
+      
+      const { data: newAgent, error } = await this.supabase
+        .from('agents')
+        .insert(insertData)
+        .select()
+        .single()
+
+      if (error || !newAgent) {
+        console.error('Error creating agent:', error)
+        return null
+      }
+
+      return transformDatabaseAgent(newAgent)
+    } catch (error) {
+      console.error('Error in createAgent:', error)
+      return null
+    }
+  }
+
+  /**
+   * Update an existing agent
+   */
+  async updateAgent(agentId: string, updates: Partial<UnifiedAgent>): Promise<UnifiedAgent | null> {
+    try {
+      const updateData: Database['public']['Tables']['agents']['Update'] = {}
+      
+      if (updates.name !== undefined) updateData.name = updates.name
+      if (updates.description !== undefined) updateData.description = updates.description
+      if (updates.role !== undefined) updateData.role = updates.role
+      if (updates.model !== undefined) updateData.model = updates.model
+      if (updates.temperature !== undefined) updateData.temperature = updates.temperature
+      if (updates.maxTokens !== undefined) updateData.max_tokens = updates.maxTokens
+      if (updates.tools !== undefined) updateData.tools = updates.tools
+      if (updates.systemPrompt !== undefined) updateData.system_prompt = updates.systemPrompt
+      if (updates.color !== undefined) updateData.color = updates.color
+      if (updates.icon !== undefined) updateData.icon = updates.icon
+      if (updates.canDelegate !== undefined) updateData.can_delegate = updates.canDelegate
+      if (updates.isActive !== undefined) updateData.is_active = updates.isActive
+      if (updates.isDefault !== undefined) updateData.is_default = updates.isDefault
+      if (updates.priority !== undefined) updateData.priority = updates.priority
+      if (updates.tags !== undefined) updateData.tags = updates.tags
+
+      updateData.updated_at = new Date().toISOString()
+
+      const { data: updatedAgent, error } = await this.supabase
+        .from('agents')
+        .update(updateData)
+        .eq('id', agentId)
+        .select()
+        .single()
+
+      if (error || !updatedAgent) {
+        console.error('Error updating agent:', error)
+        return null
+      }
+
+      return transformDatabaseAgent(updatedAgent)
+    } catch (error) {
+      console.error('Error in updateAgent:', error)
+      return null
+    }
+  }
+
+  /**
+   * Delete an agent (soft delete by setting is_active = false)
+   */
+  async deleteAgent(agentId: string, userId: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase
+        .from('agents')
+        .update({ 
+          is_active: false, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', agentId)
+        .eq('user_id', userId)
+
+      if (error) {
+        console.error('Error deleting agent:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in deleteAgent:', error)
+      return false
+    }
+  }
+
+  /**
+   * Create default system agents for a new user
+   */
+  private async createDefaultAgentsForUser(userId: string): Promise<void> {
+    try {
+      console.log(`Creating default agents for user: ${userId}`)
+      
+      const defaultAgents = ALL_AGENTS.map((agent: AgentConfig) => 
+        transformAgentConfig(agent, userId)
+      )
+
+      const insertData = defaultAgents.map(transformToInsertAgent)
+
+      const { error } = await this.supabase
+        .from('agents')
+        .insert(insertData)
+
+      if (error) {
+        console.error('Error creating default agents:', error)
+      } else {
+        console.log(`Successfully created ${defaultAgents.length} default agents for user ${userId}`)
+      }
+    } catch (error) {
+      console.error('Error in createDefaultAgentsForUser:', error)
+    }
+  }
+
+  /**
+   * Get default agents as fallback
+   */
+  private getDefaultAgentsForUser(userId: string): UnifiedAgent[] {
+    return ALL_AGENTS.map((agent: AgentConfig) => transformAgentConfig(agent, userId))
+  }
+
+  /**
+   * Ensure default agents exist for a user
+   */
+  async ensureDefaultAgents(userId: string): Promise<void> {
+    const agents = await this.getAllAgents(userId)
+    
+    // Check if we have the core system agents
+    const hasSystemAgents = agents.some(agent => 
+      agent.id.includes('cleo-supervisor') || 
+      agent.role === 'supervisor'
+    )
+
+    if (!hasSystemAgents) {
+      await this.createDefaultAgentsForUser(userId)
+    }
+  }
+}
+
+// Singleton instance for server-side usage
+let unifiedAgentService: UnifiedAgentService | null = null
+
+export function getUnifiedAgentService(): UnifiedAgentService {
+  if (!unifiedAgentService) {
+    unifiedAgentService = new UnifiedAgentService()
+  }
+  return unifiedAgentService
+}
+
+// Convenience functions for common operations
+export async function getAllAgentsForUser(userId: string): Promise<UnifiedAgent[]> {
+  const service = getUnifiedAgentService()
+  return service.getAllAgents(userId)
+}
+
+export async function getAgentByIdForUser(agentId: string, userId: string): Promise<UnifiedAgent | null> {
+  const service = getUnifiedAgentService()
+  return service.getAgentById(agentId, userId)
+}
+
+export async function createAgentForUser(agent: Partial<UnifiedAgent>): Promise<UnifiedAgent | null> {
+  const service = getUnifiedAgentService()
+  return service.createAgent(agent)
+}
+
+export async function updateAgentForUser(agentId: string, updates: Partial<UnifiedAgent>): Promise<UnifiedAgent | null> {
+  const service = getUnifiedAgentService()
+  return service.updateAgent(agentId, updates)
+}
+
+export async function deleteAgentForUser(agentId: string, userId: string): Promise<boolean> {
+  const service = getUnifiedAgentService()
+  return service.deleteAgent(agentId, userId)
+}
+
+export async function ensureDefaultAgentsForUser(userId: string): Promise<void> {
+  const service = getUnifiedAgentService()
+  return service.ensureDefaultAgents(userId)
+}

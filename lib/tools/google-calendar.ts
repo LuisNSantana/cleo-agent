@@ -27,7 +27,7 @@ async function getGoogleCalendarAccessToken(userId: string): Promise<string | nu
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
-      .eq('service_id', 'google-calendar')
+      .eq('service_id', 'google-workspace')
       .eq('connected', true)
       .single()
 
@@ -63,7 +63,7 @@ async function getGoogleCalendarAccessToken(userId: string): Promise<string | nu
           const errText = await refreshResponse.text()
           console.error(`Refresh failed (attempt ${attempt}):`, errText)
           if (attempt === 2) {
-            await supabase.from('user_service_connections').update({ connected: false }).eq('user_id', userId).eq('service_id', 'google-calendar')
+            await supabase.from('user_service_connections').update({ connected: false }).eq('user_id', userId).eq('service_id', 'google-workspace')
             return null
           }
           await new Promise(r => setTimeout(r, 1000))  // 1s backoff
@@ -77,7 +77,7 @@ async function getGoogleCalendarAccessToken(userId: string): Promise<string | nu
           access_token: tokenData.access_token,
           token_expires_at: newExpiresAt,
           connected: true
-        }).eq('user_id', userId).eq('service_id', 'google-calendar')
+        }).eq('user_id', userId).eq('service_id', 'google-workspace')
 
         tokenCache[cacheKey] = { token: tokenData.access_token, expiry: now + tokenData.expires_in * 1000 }
         console.log('Token refreshed')

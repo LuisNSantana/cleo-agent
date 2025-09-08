@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllAgents } from '@/lib/agents/config'
+import { getAllAgents } from '@/lib/agents/unified-config'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 
 export async function GET() {
   try {
-    const agents = getAllAgents()
+    const agents = await getAllAgents()
     const orchestrator = getAgentOrchestrator()
     const executions = orchestrator.getAllExecutions()
 

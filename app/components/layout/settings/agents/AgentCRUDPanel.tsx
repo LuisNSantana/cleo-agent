@@ -196,6 +196,50 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
   icon: '/icons/gmail-icon.svg'
   },
 
+  // Google Slides Tools
+  'createGoogleSlidesPresentation': {
+    name: 'Create Google Slides',
+    description: 'Create new Google Slides presentations with title and initial content',
+    category: 'Google Workspace',
+    useCases: ['Presentation creation', 'Report slides', 'Business presentations', 'Educational content'],
+    icon: '/icons/slides.png'
+  },
+  'addGoogleSlide': {
+    name: 'Add Slide',
+    description: 'Add new slides to existing Google Slides presentations',
+    category: 'Google Workspace',
+    useCases: ['Presentation building', 'Content expansion', 'Slide templates', 'Layout creation'],
+    icon: '/icons/slides.png'
+  },
+  'insertGoogleSlideTextBox': {
+    name: 'Insert Text Box',
+    description: 'Insert text boxes with content into Google Slides',
+    category: 'Google Workspace',
+    useCases: ['Content addition', 'Text formatting', 'Information display', 'Slide annotation'],
+    icon: '/icons/slides.png'
+  },
+  'appendBulletedSlide': {
+    name: 'Create Bulleted Slide',
+    description: 'Create slides with bulleted lists and structured content',
+    category: 'Google Workspace',
+    useCases: ['Structured presentations', 'List creation', 'Summary slides', 'Key points display'],
+    icon: '/icons/slides.png'
+  },
+  'readGoogleSlidesPresentation': {
+    name: 'Read Slides Presentation',
+    description: 'Get metadata and structure from Google Slides presentations',
+    category: 'Google Workspace',
+    useCases: ['Content analysis', 'Presentation review', 'Slide counting', 'Structure analysis'],
+    icon: '/icons/slides.png'
+  },
+  'replaceGoogleSlidesText': {
+    name: 'Replace Slides Text',
+    description: 'Replace text content across Google Slides presentations',
+    category: 'Google Workspace',
+    useCases: ['Content updates', 'Bulk text changes', 'Template customization', 'Brand updates'],
+    icon: '/icons/slides.png'
+  },
+
   // Shopify E-commerce Tools
   'shopifyGetProducts': {
     name: 'Shopify Products',
@@ -763,7 +807,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
 
         {/* Tools list */}
         <div className="relative">
-          <div className="flex flex-col gap-2 sm:gap-3 max-h-[60vh] sm:max-h-[55vh] overflow-y-auto no-scrollbar pr-1">
+          <div className="flex flex-col gap-2 sm:gap-3 max-h-[40vh] sm:max-h-[35vh] overflow-y-auto no-scrollbar pr-1">
             {filteredTools.map(([key, info]) => {
               const enabled = (formData.tools || []).includes(key)
               return (
@@ -831,13 +875,13 @@ const AgentForm: React.FC<AgentFormProps> = ({
           {isDesktop ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="relative">
-                <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[180px] max-h-[50vh] overflow-y-auto no-scrollbar resize-none" />
+                <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[120px] max-h-[35vh] overflow-y-auto no-scrollbar resize-none" />
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
               </div>
               <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
                 <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
-                <div className="max-h-[50vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                <div className="max-h-[35vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
                   <Markdown>{formData.prompt}</Markdown>
                 </div>
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
@@ -852,7 +896,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
               </div>
               {promptView === 'edit' ? (
                 <div className="relative">
-                  <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[180px] max-h-[55vh] overflow-y-auto no-scrollbar resize-none" />
+                  <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[120px] max-h-[40vh] overflow-y-auto no-scrollbar resize-none" />
                   <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
                 </div>
@@ -1374,7 +1418,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       >
         <DialogContent 
           hasCloseButton={false}
-          className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col"
+          className="max-w-5xl w-[95vw] bg-slate-800 border-slate-700 sm:rounded-lg rounded-none max-h-[90vh] flex flex-col"
           onInteractOutside={(e) => {
             // Prevent dialog from closing when clicking on inputs or interacting inside
             e.preventDefault()

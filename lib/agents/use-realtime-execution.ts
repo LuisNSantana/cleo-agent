@@ -120,7 +120,7 @@ export function useRealTimeExecution() {
 
   // Get agent activity status
   const getAgentStatus = useCallback(() => {
-    const agentIds = ['cleo-supervisor', 'toby-technical', 'ami-creative', 'peter-logical']
+    const agentIds = ['cleo-supervisor', 'toby-technical', 'ami-creative', 'peter-google']
     
     return agentIds.map(agentId => {
       const agentExecutions = executions.filter(e => e.agentId === agentId)

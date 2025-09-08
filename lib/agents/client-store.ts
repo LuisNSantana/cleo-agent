@@ -34,7 +34,7 @@ import {
   DelegationStage
 } from './types'
 import { getAgentMetadata } from './agent-metadata'
-import { getAllAgents } from './config'
+import { getAllAgents } from './unified-config'
 
 interface ClientAgentStore {
   // State
@@ -134,7 +134,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       try {
         await get().syncAgents()
       } catch (e) {
-        const builtIns = getAllAgents()
+        const builtIns = await getAllAgents()
         set({ agents: builtIns })
       } finally {
         get().updateGraphData()
@@ -193,7 +193,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       } catch (err) {
         console.warn('Agent sync failed:', err)
         // Fallback to built-ins only if API fails
-        const builtIns = getAllAgents()
+        const builtIns = await getAllAgents()
   set({ agents: builtIns, parentCandidates: [] })
         get().updateGraphData()
       }

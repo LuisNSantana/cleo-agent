@@ -15,7 +15,7 @@ import { MemoryManager } from './memory-manager'
 import { MetricsCollector } from './metrics-collector'
 import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
-import { getAllAgents } from '../config'
+import { getAllAgentsSync as getAllAgents } from '../unified-config'
 
 // Helper function to emit browser events for UI updates
 function emitBrowserEvent(eventName: string, detail: any) {

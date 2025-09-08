@@ -10,7 +10,8 @@ const MODEL_MAPPING: Record<string, string> = {
   "llama-4-maverick": "meta-llama/llama-4-maverick-17b-128e-instruct", // Modelo con visión
   "llama-3-3-70b-groq": "llama-3.3-70b-versatile", // Solo texto
   "llama-3-1-8b-groq": "llama-3.1-8b-instant", // Solo texto
-  "gpt-oss-120b": "openai/gpt-oss-120b",
+  "gpt-oss-120b": "openai/gpt-oss-120b", // GPT-OSS 120B via Groq
+  "gpt-oss-20b": "openai/gpt-oss-20b", // GPT-OSS 20B via Groq
 }
 
 /**

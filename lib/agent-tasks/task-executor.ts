@@ -9,9 +9,10 @@ import { ModelFactory } from '@/lib/agents/core/model-factory';
 import { EventEmitter } from '@/lib/agents/core/event-emitter';
 import { ExecutionManager } from '@/lib/agents/core/execution-manager';
 import { globalErrorHandler } from '@/lib/agents/core/error-handler';
-import { getAgentById, getAllAgents } from '@/lib/agents/config';
+import { getAgentById, getAgentByName } from '@/lib/agents/unified-config';
 import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
+import { createClient } from '@/lib/supabase/server';
 
 export interface TaskExecutionResult {
   success: boolean;
@@ -52,11 +53,11 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     console.log(`📋 Task: ${task.title}`);
     console.log(`🔧 Config:`, task.task_config);
 
-    // Get agent configuration with fallback by name (handles legacy UUIDs stored in DB)
-    let agent = getAgentById(task.agent_id);
+    // Get agent configuration using unified function (supports both static and DB agents)
+    let agent = await getAgentById(task.agent_id, task.user_id);
     if (!agent && task.agent_name) {
       const lower = String(task.agent_name).toLowerCase().trim()
-      agent = getAllAgents().find(a => a.name.toLowerCase() === lower)
+      agent = await getAgentByName(lower, task.user_id);
     }
     if (!agent) {
       throw new Error(`Agent not found: ${task.agent_id}`);

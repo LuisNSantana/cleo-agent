@@ -4,6 +4,8 @@ import { langchainModels } from "./data/langchain"
 import { ModelConfig } from "./types"
 import { openaiModels } from "./data/openai.clean"
 import { openrouterModels } from "./data/openrouter"
+import { gptOssModels } from "./data/gpt-oss"
+import { groqModels } from "./data/groq"
 
 /**
  * Cleo Agent Models
@@ -19,6 +21,8 @@ import { openrouterModels } from "./data/openrouter"
 const STATIC_MODELS: ModelConfig[] = [
   ...grokModels, // Faster (Grok-3 Mini)
   ...openaiModels, // Smarter (GPT-5 mini)
+  ...groqModels, // High-speed models via Groq (GPT-OSS, Llama)
+  ...gptOssModels, // GPT-OSS models via Groq (legacy compatibility)
   ...langchainModels, // Multi-Model Orchestration
   // Add a single OpenRouter option for testing: Llama 4 Scout
   ...openrouterModels.filter((m) => m.id === "openrouter:meta-llama/llama-4-scout"),

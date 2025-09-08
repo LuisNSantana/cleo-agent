@@ -25,6 +25,8 @@ export const FREE_MODELS_IDS = [
   // Free tier: allow Balanced + Local and Fast
   "langchain:balanced-local",
   "langchain:fast",
+  // GPT-OSS models via Groq
+  "gpt-oss-120b",
 ]
 
 // Default authenticated model: use the local Cleo Llama model

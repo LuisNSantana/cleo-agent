@@ -3,12 +3,14 @@ import { anthropic, createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI, google } from "@ai-sdk/google"
 import { createMistral, mistral } from "@ai-sdk/mistral"
 import { createPerplexity, perplexity } from "@ai-sdk/perplexity"
+import { createGroq, groq } from "@ai-sdk/groq"
 import type { LanguageModel } from "ai"
 import { createXai, xai } from "@ai-sdk/xai"
 import { getProviderForModel } from "./provider-map"
 import type {
   AnthropicModel,
   GeminiModel,
+  GroqModel,
   MistralModel,
   OllamaModel,
   OpenAIModel,
@@ -93,6 +95,14 @@ export function openproviders<T extends SupportedModel>(modelId: T, _settings?: 
       return xaiProvider(modelId as XaiModel)
     }
     return xai(modelId as XaiModel)
+  }
+
+  if (provider === "groq") {
+    if (apiKey) {
+      const groqProvider = createGroq({ apiKey })
+      return groqProvider(modelId as GroqModel)
+    }
+    return groq(modelId as GroqModel)
   }
 
   if (provider === "ollama") {

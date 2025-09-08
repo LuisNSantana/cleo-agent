@@ -45,9 +45,17 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "o3-2025-04-16": "openai",
   "o4-mini": "openai",
   "o4-mini-2025-04-16": "openai",
-  "gpt-oss-120b": "openai",
   "gpt-5-nano": "openai",
   "gpt-5-mini-2025-08-07": "openai",
+
+  // Groq models (including OpenAI models hosted on Groq)
+  "gpt-oss-120b": "groq",
+  "gpt-oss-20b": "groq",
+  "openai/gpt-oss-120b": "groq",
+  "openai/gpt-oss-20b": "groq",
+  "llama-3.3-70b-versatile": "groq",
+  "llama-3.1-8b-instant": "groq",
+  "meta-llama/llama-4-maverick-17b-128e-instruct": "groq",
 
   // Mistral
   "ministral-3b-latest": "mistral",

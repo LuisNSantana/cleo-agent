@@ -6,7 +6,7 @@
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { AgentOrchestrator as CoreOrchestrator, ExecutionContext } from '@/lib/agents/core/orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
-import { getAllAgents } from '@/lib/agents/config'
+import { getAllAgentsSync as getAllAgents, getAgentByIdSync as getAgentById } from '@/lib/agents/unified-config'
 
 // ----------------------------------------------------------------------------
 // Global singletons/state (survives route reloads)
@@ -152,7 +152,8 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
 	core.on('tool.executing', toolExecutingListener)
 	core.on('tool.completed', toolCompletedListener)
 
-	const target = getAllAgents().find(a => a.id === (agentId || 'cleo-supervisor')) || getAllAgents().find(a => a.id === 'cleo-supervisor')!
+	const allAgents = getAllAgents()
+	const target = allAgents.find(a => a.id === (agentId || 'cleo-supervisor')) || allAgents.find(a => a.id === 'cleo-supervisor')!
 
 	const ctx: ExecutionContext = {
 		threadId: exec.threadId,
@@ -340,7 +341,8 @@ export function getAgentOrchestrator() {
 
 		getAgentConfigs(): Map<string, AgentConfig> {
 			const map = new Map<string, AgentConfig>()
-			getAllAgents().forEach(a => map.set(a.id, a))
+			const allAgents = getAllAgents()
+			allAgents.forEach(a => map.set(a.id, a))
 			runtimeAgents.forEach((a, id) => map.set(id, a))
 			return map
 		},

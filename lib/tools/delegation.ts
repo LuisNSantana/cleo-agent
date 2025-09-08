@@ -48,19 +48,19 @@ export const delegateToAmiTool = tool({
 });
 
 export const delegateToPeterTool = tool({
-  description: 'Delegate logical, mathematical, or optimization tasks to Peter specialist. Use for complex calculations, logic puzzles, algorithm optimization, or analytical problem-solving.',
+  description: 'Delegate Google Workspace tasks to Peter specialist. Use for Google Docs, Sheets, Drive, Calendar management, document creation, spreadsheet analysis, or productivity automation.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return {
       status: 'delegated',
-      targetAgent: 'peter-logical',
+      targetAgent: 'peter-google',
       delegatedTask: task,
       context: context || '',
       priority: priority || 'normal',
       requirements: requirements || '',
-      handoffMessage: `Task delegated to Peter (Logical Specialist): ${task}${context ? ` - Context: ${context}` : ''}`,
+      handoffMessage: `Task delegated to Peter (Google Workspace Specialist): ${task}${context ? ` - Context: ${context}` : ''}`,
       nextAction: 'handoff_to_agent',
-      agentId: 'peter-logical'
+      agentId: 'peter-google'
     };
   }
 });

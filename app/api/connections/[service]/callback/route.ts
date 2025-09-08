@@ -62,7 +62,8 @@ export async function GET(
       case "google-calendar":
       case "google-drive":
       case "gmail":
-  tokenData = await exchangeGoogleCode(code, service, baseUrl)
+      case "google-workspace":
+        tokenData = await exchangeGoogleCode(code, service, baseUrl)
         console.log('About to get Google user info with token:', tokenData.access_token ? 'present' : 'missing')
         accountInfo = await getGoogleUserInfo(tokenData.access_token)
         break
@@ -71,7 +72,7 @@ export async function GET(
         accountInfo = await getNotionUserInfo(tokenData.access_token)
         break
       default:
-  return NextResponse.redirect(`${returnTo}?error=unsupported_service`)
+        return NextResponse.redirect(`${returnTo}?error=unsupported_service`)
     }
 
     // Store connection data with explicit connected=true
