@@ -6,3 +6,4 @@
 
 export * from './dynamic-delegation'
 export * from './tools'
+export * from './routing-scorer'

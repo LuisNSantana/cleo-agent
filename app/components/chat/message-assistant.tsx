@@ -15,6 +15,9 @@ import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
 import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
 import { OpenDocumentToolDisplay } from '@/components/chat/open-document-tool-display'
+import { useMemo } from 'react'
+import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
+import { Loader } from '@/components/prompt-kit/loader'
 
 type MessageAssistantProps = {
   children: string
@@ -47,8 +50,43 @@ export function MessageAssistant({
   const sources = getSources(parts)
   
   const toolInvocationParts = parts?.filter(
-    (part: any) => part.type === "tool-invocation"
+    (part: any) => {
+      if (part.type !== "tool-invocation") return false
+      
+      // Filter out pipeline-related tool invocations
+      const toolName = part.toolInvocation?.toolName || ''
+      const toolCallId = part.toolInvocation?.toolCallId || ''
+      
+      // Skip if it's a pipeline step masquerading as a tool
+      const isPipelineStep = toolCallId.startsWith('pipeline-') || 
+                            toolCallId.includes('delegation_') ||
+                            toolName.startsWith('delegate:')
+      
+      if (isPipelineStep) {
+        console.log('🚫 [FRONTEND DEBUG] Filtering out pipeline tool:', {
+          toolName,
+          toolCallId,
+          reason: 'Pipeline step should not appear as tool'
+        })
+        return false
+      }
+      
+      return true
+    }
   )
+
+  // Extract execution steps (injected via SSE as { type: 'execution-step', step })
+  const pipelineSteps: PipelineStep[] = useMemo(() => {
+    try {
+      const steps = (parts || [])
+        .filter((p: any) => p && p.type === 'execution-step' && p.step)
+        .map((p: any) => p.step)
+        .filter(Boolean)
+      return steps as PipelineStep[]
+    } catch {
+      return []
+    }
+  }, [parts])
 
   // Extract openDocument result so we can render the document card inline in the assistant message
   const openDocumentResult = (() => {
@@ -169,13 +207,13 @@ export function MessageAssistant({
           />
         )}
 
+        {/* Pipeline timeline removed - now handled globally in conversation.tsx */}
+
         {toolInvocationParts &&
           toolInvocationParts.length > 0 &&
           preferences.showToolInvocations && (
             <ToolInvocation toolInvocations={toolInvocationParts as any} />
-          )}
-
-        {searchImageResults.length > 0 && (
+        )}        {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
         )}
 
@@ -186,7 +224,14 @@ export function MessageAssistant({
           </div>
         ) : null}
 
-        {contentNullOrEmpty ? null : (
+        {contentNullOrEmpty ? (
+          status === 'streaming' && pipelineSteps.length === 0 ? (
+            <div className="bg-white/70 dark:bg-zinc-900/50 md:bg-white/90 md:border md:border-white/20 md:backdrop-blur-md border border-white/30 dark:border-white/10 rounded-2xl p-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader />
+              <span>Escribiendo…</span>
+            </div>
+          ) : null
+        ) : (
           <AssistantMessageWithFiles 
             content={cleanedContent} 
             userMessage={userMessage}

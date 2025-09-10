@@ -2,6 +2,8 @@
 // Rebuilt clean version including all tool groups (Google, Gmail, Shopify, Skyvern, SerpAPI, Notion, Delegation, Utilities, Credentials)
 import { tool } from 'ai'
 import { z } from 'zod'
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Core single tools
 import { webSearchTool } from './web-search'
@@ -335,17 +337,60 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				priority: z.enum(['low','normal','high']).default('normal'),
 				requirements: z.string().optional(),
 			}),
-			execute: async ({ task, context, priority, requirements }) => ({
-				status: 'delegated',
-				targetAgent: agentId,
-				delegatedTask: task,
-				context: context || '',
-				priority: priority || 'normal',
-				requirements: requirements || '',
-				handoffMessage: `Task delegated to ${agentName}: ${task}${context ? ` - Context: ${context}` : ''}`,
-				nextAction: 'handoff_to_agent',
-				agentId,
-			})
+			execute: async ({ task, context, priority, requirements }) => {
+				const orchestrator = getAgentOrchestrator() as any
+				const userId = getCurrentUserId?.() || (globalThis as any).__currentUserId || '00000000-0000-0000-0000-000000000000'
+				const input = [
+					`Tarea: ${task}`,
+					context ? `Contexto: ${context}` : null,
+					requirements ? `Requisitos: ${requirements}` : null,
+					priority ? `Prioridad: ${priority}` : null,
+				].filter(Boolean).join('\n')
+
+				const exec = orchestrator.startAgentExecutionForUI?.(input, agentId, undefined, userId, [], true)
+					|| orchestrator.startAgentExecution?.(input, agentId)
+				const execId: string | undefined = exec?.id
+				const startedAt = Date.now()
+				const TIMEOUT_MS = 120_000
+				const POLL_MS = 600
+
+				let finalResult: string | null = null
+				let status: string = 'running'
+				while (Date.now() - startedAt < TIMEOUT_MS) {
+					// eslint-disable-next-line no-await-in-loop
+					await new Promise(r => setTimeout(r, POLL_MS))
+					try {
+						const snapshot = execId ? orchestrator.getExecution?.(execId) : null
+						status = snapshot?.status || status
+						if (snapshot?.status === 'completed') {
+							finalResult = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+							break
+						}
+						if (snapshot?.status === 'failed') {
+							finalResult = `Delegation failed: ${snapshot?.error || 'unknown error'}`
+							break
+						}
+					} catch {}
+				}
+
+				if (!finalResult) {
+					finalResult = 'Delegation timed out. Partial results may be available in the agent center.'
+				}
+
+				return {
+					status: 'delegated',
+					targetAgent: agentId,
+					delegatedTask: task,
+					context: context || '',
+					priority: priority || 'normal',
+					requirements: requirements || '',
+					handoffMessage: `Task delegated to ${agentName}: ${task}${context ? ` - Context: ${context}` : ''}`,
+					nextAction: 'handoff_to_agent',
+					agentId,
+					result: finalResult,
+					executionId: execId,
+				}
+			}
 		})
 		;(tools as any)[toolName] = newTool
 	}

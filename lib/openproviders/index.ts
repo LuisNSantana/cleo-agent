@@ -6,7 +6,7 @@ import { createPerplexity, perplexity } from "@ai-sdk/perplexity"
 import { createGroq, groq } from "@ai-sdk/groq"
 import type { LanguageModel } from "ai"
 import { createXai, xai } from "@ai-sdk/xai"
-import { getProviderForModel } from "./provider-map"
+import { getProviderForModel, normalizeModelId } from "./provider-map"
 import type {
   AnthropicModel,
   GeminiModel,
@@ -48,66 +48,67 @@ const createOllamaProvider = () => {
 
 export function openproviders<T extends SupportedModel>(modelId: T, _settings?: OpenProvidersOptions<T>, apiKey?: string): LanguageModel {
   const provider = getProviderForModel(modelId)
+  const normalized = normalizeModelId(modelId as string)
 
   if (provider === "openai") {
     if (apiKey) {
       const openaiProvider = createOpenAI({ apiKey })
-      return openaiProvider(modelId as OpenAIModel)
+      return openaiProvider(normalized as OpenAIModel)
     }
-    return openai(modelId as OpenAIModel)
+    return openai(normalized as OpenAIModel)
   }
 
   if (provider === "mistral") {
     if (apiKey) {
       const mistralProvider = createMistral({ apiKey })
-      return mistralProvider(modelId as MistralModel)
+      return mistralProvider(normalized as MistralModel)
     }
-    return mistral(modelId as MistralModel)
+    return mistral(normalized as MistralModel)
   }
 
   if (provider === "google") {
     if (apiKey) {
       const googleProvider = createGoogleGenerativeAI({ apiKey })
-      return googleProvider(modelId as GeminiModel)
+      return googleProvider(normalized as GeminiModel)
     }
-    return google(modelId as GeminiModel)
+    return google(normalized as GeminiModel)
   }
 
   if (provider === "perplexity") {
     if (apiKey) {
       const perplexityProvider = createPerplexity({ apiKey })
-      return perplexityProvider(modelId as PerplexityModel)
+      return perplexityProvider(normalized as PerplexityModel)
     }
-    return perplexity(modelId as PerplexityModel)
+    return perplexity(normalized as PerplexityModel)
   }
 
   if (provider === "anthropic") {
     if (apiKey) {
       const anthropicProvider = createAnthropic({ apiKey })
-      return anthropicProvider(modelId as AnthropicModel)
+      return anthropicProvider(normalized as AnthropicModel)
     }
-    return anthropic(modelId as AnthropicModel)
+    return anthropic(normalized as AnthropicModel)
   }
 
   if (provider === "xai") {
     if (apiKey) {
       const xaiProvider = createXai({ apiKey })
-      return xaiProvider(modelId as XaiModel)
+      return xaiProvider(normalized as XaiModel)
     }
-    return xai(modelId as XaiModel)
+    return xai(normalized as XaiModel)
   }
 
   if (provider === "groq") {
     if (apiKey) {
       const groqProvider = createGroq({ apiKey })
-      return groqProvider(modelId as GroqModel)
+      return groqProvider(normalized as GroqModel)
     }
-    return groq(modelId as GroqModel)
+    return groq(normalized as GroqModel)
   }
 
   if (provider === "ollama") {
     const ollamaProvider = createOllamaProvider()
-    return ollamaProvider(modelId as OllamaModel)
+  return ollamaProvider(normalized as OllamaModel)
   }
 
   throw new Error(`Unsupported model: ${modelId}`)

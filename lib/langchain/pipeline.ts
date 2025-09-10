@@ -98,13 +98,13 @@ export class MultiModelPipeline {
       originalMaxContext: metadata.maxContextChars
     })
 
-        // Base configuration
-    const optimized = {
-      maxContextChars: metadata.maxContextChars,
-      systemPromptVariant: metadata.systemPromptVariant,
-      enableTools: metadata.enableTools,
-      useRAG: metadata.useRAG
-    }
+  // Start from existing metadata to preserve fields like allowedTools, imageUrl, documentId, etc.
+  const optimized: any = { ...metadata }
+  // Initialize keys we may override below
+  optimized.maxContextChars = metadata.maxContextChars
+  optimized.systemPromptVariant = metadata.systemPromptVariant
+  optimized.enableTools = metadata.enableTools
+  optimized.useRAG = metadata.useRAG
 
     // Llama 3.1 specific optimization
     if (isLlama31) {
@@ -117,12 +117,12 @@ export class MultiModelPipeline {
         systemPromptVariant: optimized.systemPromptVariant,
         enableTools: optimized.enableTools
       })
-    } else if (isCloudModel) {
+  } else if (isCloudModel) {
       // Cloud models (balanced/fast) get full context and enhanced capabilities
-      optimized.maxContextChars = metadata.maxContextChars ?? 32000 // Much higher context
-      optimized.systemPromptVariant = metadata.systemPromptVariant || 'developer' // More capable prompt
-      optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
-      optimized.useRAG = metadata.useRAG ?? true // Enable RAG for better context
+  optimized.maxContextChars = metadata.maxContextChars ?? 32000 // Much higher context
+  optimized.systemPromptVariant = metadata.systemPromptVariant || 'developer' // More capable prompt
+  optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
+  optimized.useRAG = metadata.useRAG ?? true // Enable RAG for better context
       
       console.log(`☁️ Cloud model optimization applied:`, {
         maxContextChars: optimized.maxContextChars,
@@ -130,11 +130,11 @@ export class MultiModelPipeline {
         enableTools: optimized.enableTools,
         useRAG: optimized.useRAG
       })
-    } else if (modelId.includes('balanced-local')) {
+  } else if (modelId.includes('balanced-local')) {
       // Local models get moderate context to balance performance
-      optimized.maxContextChars = metadata.maxContextChars ?? 8000 // Moderate context
-      optimized.systemPromptVariant = metadata.systemPromptVariant || 'local' // Use the new local variant for flexibility
-      optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
+  optimized.maxContextChars = metadata.maxContextChars ?? 8000 // Moderate context
+  optimized.systemPromptVariant = metadata.systemPromptVariant || 'local' // Use the new local variant for flexibility
+  optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
       
       console.log(`🏠 Local model optimization applied:`, {
         maxContextChars: optimized.maxContextChars,

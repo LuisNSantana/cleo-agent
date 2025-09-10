@@ -618,6 +618,18 @@ export function useChatCore({
                     // Stream initialization events - no action needed
                     break
 
+                  case "execution-step": {
+                    // Bridge for orchestrator-backed SSE: push execution step as a part
+                    try {
+                      ensureParts(assistantMessageObj)
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step: (data as any).step,
+                      } as any)
+                    } catch {}
+                    break
+                  }
+
                   case "text-delta":
                     // Update text part
                     const textPart = assistantMessageObj.parts.findLast(

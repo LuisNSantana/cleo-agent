@@ -2,6 +2,7 @@ import type { ContentPart, Message } from "@/app/types/api.types"
 import type { Database, Json } from "@/app/types/database.types"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createGuestServerClient } from "@/lib/supabase/server-guest"
+import { normalizeModelId } from "@/lib/openproviders/provider-map"
 
 const DEFAULT_STEP = 0
 
@@ -24,6 +25,9 @@ export async function saveFinalAssistantMessage(
         if (part.type === "text") {
           textParts.push(part.text || "")
           parts.push(part)
+        } else if (part.type === "execution-step" && (part as any).step) {
+          // Preserve pipeline step for UI persistence
+          parts.push(part as any)
         } else if (part.type === "tool-invocation" && part.toolInvocation) {
           const { toolCallId, state } = part.toolInvocation
           if (!toolCallId) continue
@@ -83,7 +87,7 @@ export async function saveFinalAssistantMessage(
     content: finalPlainText || "",
     parts: parts as unknown as Json,
     message_group_id,
-  model,
+  model: model ? normalizeModelId(model) : undefined,
   user_id: userId,
     input_tokens: opts?.inputTokens ?? null,
     output_tokens: opts?.outputTokens ?? null,

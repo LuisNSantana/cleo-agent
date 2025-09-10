@@ -19,9 +19,13 @@ export type ToolRuntime = {
  * Build LangChain-compatible tools from the app's tool registry.
  */
 export function buildToolRuntime(selected?: string[]): ToolRuntime {
-  const entries = Object.entries(appTools) as Array<[string, AppTool]>
+  // Filter out any numeric-indexed entries (can appear when spreading arrays into the registry)
+  const allEntries = Object.entries(appTools) as Array<[string, AppTool]>
+  const entries = allEntries.filter(([name]) => !/^\d+$/.test(name))
   
-  const filtered = selected ? entries.filter(([name]) => selected.includes(name)) : entries
+  const filtered = selected && selected.length > 0
+    ? entries.filter(([name]) => selected.includes(name))
+    : entries
 
   const toolMap = new Map<string, AppTool>()
   const lcTools: DynamicStructuredTool[] = filtered.map(([name, t]) => {

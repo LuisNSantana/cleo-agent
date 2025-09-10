@@ -88,12 +88,12 @@ export default function AgentsChatPage() {
     
     // Map delegation stages to messages
     const stageMessages = {
-      'initializing': `${agentName} está inicializando`,
-      'analyzing': `${agentName} está analizando la tarea`,
-      'researching': `${agentName} está investigando`,
-      'processing': `${agentName} está procesando la tarea`,
-      'synthesizing': `${agentName} está sintetizando resultados`,
-      'finalizing': `${agentName} está finalizando respuesta`
+      'initializing': `${agentName} is initializing`,
+      'analyzing': `${agentName} is analyzing the task`,
+      'researching': `${agentName} is researching`,
+      'processing': `${agentName} is processing the task`,
+      'synthesizing': `${agentName} is synthesizing results`,
+      'finalizing': `${agentName} is finalizing response`
     }
     
     const result = {

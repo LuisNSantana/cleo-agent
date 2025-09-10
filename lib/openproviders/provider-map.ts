@@ -145,6 +145,20 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "qwen2.5-coder:latest": "ollama",
 }
 
+// Known provider prefixes we may receive in model IDs coming from routers or UI
+const KNOWN_PREFIX_PROVIDERS: Provider[] = [
+  "openai",
+  "mistral",
+  "perplexity",
+  "google",
+  "anthropic",
+  "xai",
+  "groq",
+  "ollama",
+  "openrouter",
+  "langchain",
+]
+
 // Function to check if a model is likely an Ollama model based on naming patterns
 function isOllamaModel(modelId: string): boolean {
   // Common Ollama model patterns
@@ -171,17 +185,37 @@ function isOllamaModel(modelId: string): boolean {
   return ollamaPatterns.some((pattern) => pattern.test(modelId))
 }
 
+/**
+ * Remove provider prefix like "groq:" or "openai:" from a model id.
+ * If no known prefix exists, returns the input unchanged.
+ */
+export function normalizeModelId(model: string): string {
+  const idx = model.indexOf(":")
+  if (idx > 0) {
+    const maybePrefix = model.slice(0, idx) as Provider
+    if (KNOWN_PREFIX_PROVIDERS.includes(maybePrefix)) {
+      return model.slice(idx + 1)
+    }
+  }
+  return model
+}
+
 export function getProviderForModel(model: SupportedModel): Provider {
-  if (model.startsWith("openrouter:")) {
-    return "openrouter"
+  // Prefer explicit prefix if present
+  const idx = (model as string).indexOf(":")
+  if (idx > 0) {
+    const maybePrefix = (model as string).slice(0, idx) as Provider
+    if (KNOWN_PREFIX_PROVIDERS.includes(maybePrefix)) {
+      return maybePrefix
+    }
   }
 
-  // First check the static mapping
+  // Then check the static mapping
   const provider = MODEL_PROVIDER_MAP[model]
   if (provider) return provider
 
-  // If not found in static mapping, check if it looks like an Ollama model
-  if (isOllamaModel(model)) {
+  // Finally, infer Ollama by pattern
+  if (isOllamaModel(model as string)) {
     return "ollama"
   }
 

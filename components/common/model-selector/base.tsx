@@ -35,7 +35,7 @@ import {
   MagnifyingGlassIcon,
   StarIcon,
 } from "@phosphor-icons/react"
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, useMemo } from "react"
 import { ProModelDialog } from "./pro-dialog"
 import { SubMenu } from "./sub-menu"
 
@@ -92,13 +92,15 @@ export function ModelSelector({
     }
   )
 
+  const getModelStableKey = (model: ModelConfig) => `${model.icon || "unknown"}::${model.id}`
+
   const renderModelItem = (model: ModelConfig) => {
     const isLocked = !model.accessible
     const provider = PROVIDERS.find((provider) => provider.id === model.icon)
 
     return (
       <div
-        key={model.id}
+        key={getModelStableKey(model)}
         className={cn(
           "flex w-full items-center justify-between px-3 py-2",
           selectedModelId === model.id && "bg-accent"
@@ -143,6 +145,20 @@ export function ModelSelector({
     searchQuery,
     isModelHidden
   )
+
+  // Ensure unique entries to avoid duplicate keys (some sources may introduce duplicates)
+  const dedupedModels = useMemo(() => {
+    const seen = new Set<string>()
+    const result: ModelConfig[] = []
+    for (const m of filteredModels) {
+      const k = getModelStableKey(m)
+      if (!seen.has(k)) {
+        seen.add(k)
+        result.push(m)
+      }
+    }
+    return result
+  }, [filteredModels])
 
   const trigger = (
     <Button
@@ -238,8 +254,8 @@ export function ModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : filteredModels.length > 0 ? (
-                filteredModels.map((model) => renderModelItem(model))
+              ) : dedupedModels.length > 0 ? (
+                dedupedModels.map((model) => renderModelItem(model))
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                   <p className="text-muted-foreground mb-2 text-sm">
@@ -315,8 +331,8 @@ export function ModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : filteredModels.length > 0 ? (
-                filteredModels.map((model) => {
+              ) : dedupedModels.length > 0 ? (
+                dedupedModels.map((model) => {
                   const isLocked = !model.accessible
                   const provider = PROVIDERS.find(
                     (provider) => provider.id === model.icon
@@ -324,7 +340,7 @@ export function ModelSelector({
 
                   return (
                     <DropdownMenuItem
-                      key={model.id}
+                      key={getModelStableKey(model)}
                       className={cn(
                         "flex w-full items-center justify-between px-3 py-2",
                         selectedModelId === model.id && "bg-accent"

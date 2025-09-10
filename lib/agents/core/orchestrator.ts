@@ -845,7 +845,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'processing',
         status: 'in_progress',
-        message: `${delegationData.targetAgent} está procesando la tarea`,
+        message: `${delegationData.targetAgent} is processing the task`,
         progress: 25,
         sourceExecutionId: delegationData.sourceExecutionId
       })

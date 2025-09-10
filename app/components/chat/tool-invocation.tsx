@@ -16,6 +16,7 @@ import { getToolIcon } from "@/components/icons/tool-icons"
 import { DocumentToolDisplay } from "@/components/chat/document-tool-display"
 import { OpenDocumentToolDisplay } from "@/components/chat/open-document-tool-display"
 import { GmailMessages, type GmailListItem } from "@/app/components/chat/gmail-messages"
+import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 
 // Define the tool invocation types based on how they're used in the codebase
 interface ToolInvocation {
@@ -230,6 +231,45 @@ function SingleToolCard({
   const isCompleted = state === "result"
   const result = isCompleted ? toolInvocation.result : undefined
 
+  // Try to resolve delegation target agent for nicer UI
+  const delegationAgentId: string | null = useMemo(() => {
+    try {
+      // Prefer explicit fields from result payload
+      let pr: any = null
+      if (isCompleted && result) {
+        if (Array.isArray(result)) {
+          pr = null
+        } else if (typeof result === 'object' && result !== null && 'content' in result) {
+          const textItem = (result as any).content?.find?.((i: any) => i?.type === 'text')
+          if (textItem?.text) {
+            try { pr = JSON.parse(textItem.text) } catch { pr = null }
+          }
+        } else if (typeof result === 'object' && result !== null) {
+          pr = result
+        }
+      }
+      const agentFromResult = pr?.agentId || pr?.targetAgent || null
+      if (agentFromResult) return String(agentFromResult)
+
+      // Infer from tool name like delegate_to_ami or delegate_to_ami_creative
+      if (toolName?.startsWith('delegate_to_')) {
+        const base = toolName.replace(/^delegate_to_/, '')
+        // Common short-name mapping
+        const shortMap: Record<string, string> = {
+          ami: 'ami-creative',
+          toby: 'toby-technical',
+          peter: 'peter-google',
+          emma: 'emma-ecommerce',
+          apu: 'apu-research',
+        }
+        if (shortMap[base]) return shortMap[base]
+        // Convert underscores back to hyphens
+        return base.replace(/_/g, '-')
+      }
+    } catch {}
+    return null
+  }, [isCompleted, result, toolName])
+
   // Parse the result JSON if available
   const { parsedResult, parseError } = useMemo(() => {
     if (!isCompleted || !result) return { parsedResult: null, parseError: null }
@@ -433,11 +473,24 @@ function SingleToolCard({
         className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
+          {delegationAgentId ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getAgentMetadata(delegationAgentId).avatar || ''}
+              alt={getAgentMetadata(delegationAgentId).name}
+              className="ring-border/60 hidden h-6 w-6 rounded-full ring sm:inline"
+            />
+          ) : null}
           {(() => {
             const ToolIcon = getToolIcon(toolName)
             return <ToolIcon className="text-muted-foreground size-4" />
           })()}
           <span className="font-mono text-sm">{toolName}</span>
+          {delegationAgentId ? (
+            <span className="text-muted-foreground hidden text-sm sm:inline">
+              · {getAgentMetadata(delegationAgentId).name}
+            </span>
+          ) : null}
           <AnimatePresence mode="popLayout" initial={false}>
             {isLoading ? (
               <motion.div

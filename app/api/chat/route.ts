@@ -2,8 +2,8 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 // RAG prompt construction is now centralized in lib/chat/prompt
 import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
 import { getAllModels } from "@/lib/models"
-import { getProviderForModel } from "@/lib/openproviders/provider-map"
-import { tools } from "@/lib/tools"
+import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
+import { tools, ensureDelegationToolForAgent } from "@/lib/tools"
 import { filterImagesForModel, MODEL_IMAGE_LIMITS } from "@/lib/image-management"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { stepCountIs, streamText } from "ai"
@@ -21,6 +21,9 @@ import { ChatRequest, ChatRequestSchema } from "./schema"
 import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
 import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
 import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
+import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
+import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
 export const runtime = "nodejs"
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const {
+  const {
       messages,
       chatId,
       userId,
@@ -50,7 +53,10 @@ export async function POST(req: Request) {
       debugRag,
     } = parsed.data as ChatRequest
 
-  console.log('[ChatAPI] Incoming model:', model, 'isAuthenticated:', isAuthenticated)
+  // Normalize model ID early and also keep original with prefix
+  const originalModel = model
+  const normalizedModel = normalizeModelId(model)
+  console.log('[ChatAPI] Incoming model:', originalModel, 'normalized:', normalizedModel, 'isAuthenticated:', isAuthenticated)
 
   // Auto-enable RAG for personalized responses - always try to retrieve user context
   const autoRagEnabled = true
@@ -65,7 +71,7 @@ export async function POST(req: Request) {
 
     const supabase = await validateAndTrackUsage({
       userId,
-      model,
+      model: originalModel,
       isAuthenticated,
     })
 
@@ -156,7 +162,7 @@ export async function POST(req: Request) {
         chatId,
         content: contentForDB,
         attachments: [],
-        model,
+  model: normalizedModel,
         isAuthenticated,
         message_group_id,
       })
@@ -164,20 +170,23 @@ export async function POST(req: Request) {
 
     // Resolve model config and establish effective system prompt
     const allModels = await getAllModels()
-    const modelConfig = allModels.find((m) => m.id === model)
+    const modelConfig = allModels.find((m) => m.id === originalModel) || allModels.find((m) => m.id === normalizedModel)
 
-    if (!modelConfig || !modelConfig.apiSdk) {
-      throw new Error(`Model ${model} not found`)
+    if (!modelConfig) {
+      throw new Error(`Model ${originalModel} not found`)
+    }
+    if (!modelConfig.apiSdk && !originalModel.startsWith('langchain:')) {
+      throw new Error(`Model ${modelConfig.id} has no API SDK configured`)
     }
 
     // Use reasoning-optimized prompt for GPT-5 models when no custom prompt
     let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
-    if (model.startsWith('gpt-5') && !systemPrompt) {
+    if (normalizedModel.startsWith('gpt-5') && !systemPrompt) {
       const { getCleoPrompt } = await import("@/lib/prompts")
-      baseSystemPrompt = getCleoPrompt(model, 'reasoning')
-      console.log(`[GPT-5] Using reasoning-optimized prompt for ${model}`)
+      baseSystemPrompt = getCleoPrompt(normalizedModel, 'reasoning')
+      console.log(`[GPT-5] Using reasoning-optimized prompt for ${normalizedModel}`)
     }
-    const effectiveSystemPrompt = baseSystemPrompt
+  const effectiveSystemPrompt = baseSystemPrompt
 
     // Attempt to parse personality type from system prompt for observability
     try {
@@ -192,10 +201,10 @@ export async function POST(req: Request) {
       console.log('[ChatAPI] Personality parse failed')
     }
 
-    // Convert multimodal messages to correct format for the model
+  // Convert multimodal messages to correct format for the model
     let convertedMessages = await convertUserMultimodalMessages(
       messages,
-      model,
+  normalizedModel,
       Boolean(modelConfig.vision)
     )
 
@@ -205,16 +214,16 @@ export async function POST(req: Request) {
     )
 
     // Apply intelligent image filtering to prevent API errors
-    const imageLimit = MODEL_IMAGE_LIMITS[model]?.maxImages || MODEL_IMAGE_LIMITS.default.maxImages
+  const imageLimit = MODEL_IMAGE_LIMITS[normalizedModel]?.maxImages || MODEL_IMAGE_LIMITS.default.maxImages
 
     // Intelligent image filtering by model limits
     const totalImages = convertedMessages.reduce(
       (acc, m) => acc + (Array.isArray(m.content) ? m.content.filter((p: any) => p.type === 'image').length : 0),
       0
     )
-    console.log(`[IMAGE MGMT] Model ${model}: ${totalImages} images found, limit: ${imageLimit}`)
+  console.log(`[IMAGE MGMT] Model ${normalizedModel}: ${totalImages} images found, limit: ${imageLimit}`)
     if (totalImages > imageLimit) {
-      convertedMessages = filterImagesByModelLimit(convertedMessages, model) as any
+  convertedMessages = filterImagesByModelLimit(convertedMessages, normalizedModel) as any
       console.log(`[IMAGE MGMT] Filtered to ${imageLimit} images with intelligent prioritization`)
     }
 
@@ -227,14 +236,14 @@ export async function POST(req: Request) {
     let apiKey: string | undefined
     {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
-      const provider = getProviderForModel(model)
+  const provider = getProviderForModel(originalModel as any)
       const maybeKey = await getEffectiveApiKey(
         isAuthenticated && userId ? userId : null,
         provider as ProviderWithoutOllama
       )
       apiKey = maybeKey || undefined
       // Lightweight debug (no secrets): confirm whether a key was resolved
-      if (provider === 'openrouter') {
+  if (provider === 'openrouter') {
         const hasKey = Boolean(apiKey || process.env.OPENROUTER_API_KEY)
         console.log('[ChatAPI] OpenRouter key present?', hasKey)
         if (!hasKey) {
@@ -254,12 +263,12 @@ export async function POST(req: Request) {
       }
     }
   ;(globalThis as any).__currentUserId = realUserId
-  ;(globalThis as any).__currentModel = model
+  ;(globalThis as any).__currentModel = normalizedModel
 
       // Build final system prompt using centralized prompt builder (handles RAG, personalization, and search guidance)
       const { finalSystemPrompt, usedContext } = await buildFinalSystemPrompt({
         baseSystemPrompt: effectiveSystemPrompt,
-        model,
+  model: normalizedModel,
         messages,
         supabase,
         realUserId,
@@ -294,7 +303,7 @@ export async function POST(req: Request) {
 
   // Configure tools and provider options per model
     // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
-    let toolsForRun = tools as typeof tools
+  let toolsForRun = tools as typeof tools
   let providerOptions: Record<string, any> | undefined
     let activeTools: string[] | undefined
   // Detect explicit document intent in the last user message
@@ -302,7 +311,7 @@ export async function POST(req: Request) {
   const docIntentRegex = /\b(open|abrir|mostrar|ver|view|edit|editar|work on|continuar|colaborar)\b.*\b(doc|document|documento|archivo|file)\b/i
   const explicitDocIntent = docIntentRegex.test(lastUserContent)
 
-  if (model === 'grok-3-mini') {
+  if (normalizedModel === 'grok-3-mini') {
       try {
         const { webSearch, ...rest } = tools as any
         toolsForRun = rest
@@ -333,12 +342,65 @@ export async function POST(req: Request) {
       } catch {}
     }
 
+    // Optional delegation-only toolset for general chat
+    // When CHAT_DELEGATION_ONLY=true, expose only delegate_to_* tools (+ minimal helpers)
+    try {
+      if (process.env.CHAT_DELEGATION_ONLY === 'true') {
+        const agents = await getAllAgentsUnified()
+        // Ensure delegation tools exist for all specialist agents
+        const delegateToolNames: string[] = []
+        for (const a of agents) {
+          if (a.role !== 'supervisor') {
+            const toolName = ensureDelegationToolForAgent(a.id, a.name)
+            delegateToolNames.push(toolName)
+          }
+        }
+        const allowed = new Set<string>([
+          'complete_task',
+          'memoryAddNote',
+          ...delegateToolNames,
+        ])
+        // Rebuild toolsForRun to include only allowed keys
+        const newRegistry: Record<string, any> = {}
+        for (const key of Object.keys(tools as any)) {
+          if (allowed.has(key)) {
+            newRegistry[key] = (tools as any)[key]
+          }
+        }
+        toolsForRun = newRegistry as any
+        activeTools = Object.keys(toolsForRun)
+      }
+    } catch (e) {
+      console.warn('[ChatAPI] Delegation-only tools setup failed:', e)
+    }
+
   // Note: For OpenRouter we set headers on the provider itself in its model config
   // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
   // leaking into the request body.
 
-    // If using LangChain orchestration models, forward to multi-model endpoint and pipe SSE
-    if (model && model.startsWith('langchain:')) {
+  // Check for orchestrator-backed mode FIRST (before LangChain forwarding)
+  // Triggered when model id starts with 'agents:' or when env flag is set
+  // Also enable orchestrator-backed mode when the user message clearly implies delegation/sub-agents
+  let impliesDelegation = false
+  try {
+    // Be robust to AI SDK v5: prefer parts[].text over content
+    const lastUserAny: any = [...messages].reverse().find((m) => m.role === 'user') as any
+    let lastUserText = ''
+    if (lastUserAny) {
+      if (Array.isArray(lastUserAny.parts)) {
+        lastUserText = (lastUserAny.parts.find((p: any) => p?.type === 'text')?.text || '')
+      }
+      if (!lastUserText && typeof lastUserAny.content === 'string') {
+        lastUserText = lastUserAny.content
+      }
+    }
+    const lm = String(lastUserText || '').toLowerCase()
+    impliesDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
+  } catch {}
+  const orchestratorBacked = model?.startsWith('agents:') || process.env.GLOBAL_CHAT_SUPERVISED === 'true' || impliesDelegation
+
+  // If using LangChain orchestration models BUT no delegation implied, forward to multi-model endpoint and pipe SSE
+  if (originalModel && originalModel.startsWith('langchain:') && !orchestratorBacked) {
       try {
         // Build message payload for /api/multi-model-chat
         const lastMsg: any = messages[messages.length - 1] || {}
@@ -393,7 +455,7 @@ export async function POST(req: Request) {
             userId: realUserId,
             isAuthenticated,
             systemPrompt: effectiveSystemPrompt,
-            originalModel: model,
+            originalModel: originalModel,
             message_group_id,
             documentId,
             debugRag,
@@ -436,6 +498,299 @@ export async function POST(req: Request) {
       }
     }
 
+  // Orchestrator-backed Cleo-supervised mode for global chat
+    if (orchestratorBacked) {
+      try {
+        const orchestrator = getAgentOrchestrator() as any
+        const lastMsg = messages[messages.length - 1]
+        const userText = Array.isArray((lastMsg as any)?.parts)
+          ? ((lastMsg as any).parts.find((p: any) => p.type === 'text')?.text || '')
+          : (typeof (lastMsg as any)?.content === 'string' ? (lastMsg as any).content : '')
+
+        // Ensure a thread for Cleo-supervisor (supervised)
+        let effectiveThreadId: string | null = null
+        if (supabase && realUserId) {
+          try {
+            const compositeAgentKey = `cleo-supervisor_supervised`
+            const { data } = await (supabase as any)
+              .from('agent_threads')
+              .select('id')
+              .eq('user_id', realUserId)
+              .eq('agent_key', compositeAgentKey)
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            effectiveThreadId = data?.id || null
+            if (!effectiveThreadId) {
+              const created = await (supabase as any)
+                .from('agent_threads')
+                .insert({ user_id: realUserId, agent_key: compositeAgentKey, agent_name: 'Cleo', title: 'Cleo (Supervised Chat)' })
+                .select('id')
+                .single()
+              effectiveThreadId = created?.data?.id || null
+            }
+            // Save the user message
+            if (effectiveThreadId && userText) {
+              await (supabase as any).from('agent_messages').insert({
+                thread_id: effectiveThreadId,
+                user_id: realUserId,
+                role: 'user',
+                content: userText,
+                metadata: { conversation_mode: 'supervised', source: 'global-chat' }
+              })
+            }
+          } catch {}
+        }
+
+        // Build minimal prior (we avoid replaying tool messages)
+        const prior: Array<{ role: 'user'|'assistant'|'system'; content: string; metadata?: any }> = []
+        const exec = orchestrator.startAgentExecutionForUI?.(
+          userText,
+          'cleo-supervisor',
+          effectiveThreadId || undefined,
+          realUserId || undefined,
+          prior,
+          true
+        ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor')
+
+  const execId: string | undefined = exec?.id
+        const startedAt = Date.now()
+
+        // Bridge execution progress to SSE for the chat UI
+        const encoder = new TextEncoder()
+  // Persisted parts accumulator (pipeline + tool chips)
+  const persistedParts: any[] = []
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            function send(obj: any) {
+              try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)) } catch {}
+            }
+            // Signal start
+            send({ type: 'start', executionId: execId })
+            // Emit an immediate initial step so the UI shows a pipeline right away
+            try {
+              const bootstrapStep = {
+                id: `bootstrap-${execId || Date.now()}`,
+                timestamp: new Date().toISOString(),
+                agent: 'cleo-supervisor',
+                action: 'routing',
+                content: 'Analyzing and deciding delegation strategy…',
+                metadata: { bootstrap: true }
+              }
+              send({ type: 'execution-step', step: bootstrapStep })
+              persistedParts.push({ type: 'execution-step', step: bootstrapStep })
+            } catch {}
+
+            let lastStepCount = 0
+            const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
+            const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
+            const POLL_MS = 400
+
+            const interval = setInterval(async () => {
+              try {
+                const snapshot = execId ? orchestrator.getExecution?.(execId) : null
+                if (!snapshot) return
+
+                // Stream new steps as execution-step events
+                const steps = Array.isArray(snapshot.steps) ? snapshot.steps : []
+                if (steps.length > lastStepCount) {
+                  for (let i = lastStepCount; i < steps.length; i++) {
+                    const step = steps[i]
+                    
+                    // Debug: Log step structure to understand what we're getting
+                    console.log('🔍 [PIPELINE DEBUG] Step received:', {
+                      id: step?.id,
+                      action: step?.action,
+                      agent: step?.agent,
+                      content: step?.content?.slice(0, 100),
+                      metadata: step?.metadata
+                    })
+                    
+                    send({ type: 'execution-step', step })
+                    // Accumulate for DB persistence
+                    try { persistedParts.push({ type: 'execution-step', step }) } catch {}
+                    
+                    // Enhanced delegation flow - trigger ONLY ONCE per unique delegation
+                    const stepContent = String(step?.content || '').toLowerCase()
+                    const isOriginalDelegationStep = (
+                      step?.action === 'delegating' && 
+                      !step?.metadata?.synthetic && // Don't generate for synthetic steps
+                      !step?.id?.startsWith('synthetic-') && // Don't generate for our synthetic steps
+                      stepContent.includes('delegat') &&
+                      step?.metadata?.delegatedTo
+                    )
+                    
+                    // Create a unique key for this delegation to prevent duplicates
+                    const delegationKey = step?.metadata?.delegatedTo ? 
+                      `${step.metadata.sourceAgent || 'cleo'}-${step.metadata.delegatedTo}` : 
+                      null
+                    
+                    if (isOriginalDelegationStep && delegationKey && !generatedSteps.has(delegationKey)) {
+                      console.log('🎯 [PIPELINE DEBUG] ORIGINAL delegation detected, generating live pipeline for:', delegationKey)
+                      generatedSteps.add(delegationKey)
+                      
+                      const target = step.metadata.delegatedTo
+                      const targetName = target === 'ami-creative' ? 'Ami' : (target || 'Agent')
+                      
+                      // Send a simple live update step that will evolve
+                      const liveStep = {
+                        id: `live-${delegationKey}-${Date.now()}`,
+                        timestamp: new Date().toISOString(),
+                        agent: target,
+                        action: 'analyzing' as const,
+                        content: `${targetName} processing delegation...`,
+                        metadata: { 
+                          synthetic: true, 
+                          pipelineStep: true,
+                          liveUpdate: true,
+                          delegationKey: delegationKey
+                        }
+                      }
+                      send({ type: 'execution-step', step: liveStep })
+                      try { persistedParts.push({ type: 'execution-step', step: liveStep }) } catch {}
+                      
+                      console.log('✅ [PIPELINE DEBUG] Live delegation step sent')
+                    }
+                  }
+                  lastStepCount = steps.length
+                }
+
+                // Handle completion
+                if (snapshot.status === 'completed' || snapshot.status === 'failed') {
+                  const finalText = String(
+                    snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content ||
+                    (snapshot.status === 'failed' ? `Could not complete delegation: ${snapshot?.error || 'unknown error'}` : '')
+                  )
+
+                  // Generate Cleo supervision step before final completion
+                  const supervisionStep = {
+                    id: `supervision-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    agent: 'cleo',
+                    action: 'reviewing' as const,
+                    content: 'Cleo reviewing and supervising final response for quality and accuracy',
+                    metadata: { 
+                      synthetic: true, 
+                      pipelineStep: true,
+                      supervision: true
+                    }
+                  }
+                  send({ type: 'execution-step', step: supervisionStep })
+                  try { persistedParts.push({ type: 'execution-step', step: supervisionStep }) } catch {}
+
+                  // Then add final synthesis step
+                  const synthesisStep = {
+                    id: `synthesis-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    agent: 'cleo',
+                    action: 'completing' as const,
+                    content: 'Cleo synthesizing and finalizing response delivery',
+                    metadata: { 
+                      synthetic: true, 
+                      pipelineStep: true,
+                      synthesis: true
+                    }
+                  }
+                  send({ type: 'execution-step', step: synthesisStep })
+                  try { persistedParts.push({ type: 'execution-step', step: synthesisStep }) } catch {}
+
+                  // Generate final delegation steps before completion
+                  openDelegations.forEach((delegation, stepId) => {
+                    const targetName = delegation.targetAgent === 'ami-creative' ? 'Ami' : (delegation.targetAgent || 'Agent')
+                    
+                    // Close delegation tool chips with detailed results
+                    send({
+                      type: 'tool-invocation',
+                      toolInvocation: {
+                        state: 'result',
+                        toolName: 'delegate',
+                        toolCallId: stepId,
+                        result: { 
+                          summary: `Delegation to ${targetName} completed`, 
+                          text: finalText.slice(0, 400),
+                          agent: targetName,
+                          status: 'success'
+                        }
+                      }
+                    })
+                    // Accumulate tool result for DB
+                    try {
+                      persistedParts.push({
+                        type: 'tool-invocation',
+                        toolInvocation: {
+                          state: 'result',
+                          toolName: 'delegate',
+                          toolCallId: stepId,
+                          result: { 
+                            summary: `Delegation to ${targetName} completed`, 
+                            text: finalText.slice(0, 400),
+                            agent: targetName,
+                            status: 'success'
+                          }
+                        }
+                      })
+                    } catch {}
+                  })
+
+                  // Send final assistant text
+                  send({ type: 'text-start' })
+                  if (finalText) {
+                    send({ type: 'text-delta', delta: finalText })
+                  }
+                  send({ type: 'finish' })
+
+                  // Persist assistant message
+                  if (supabase && finalText) {
+                    try {
+                      // Persist full assistant message with parts (pipeline + tools)
+                      const fullMessage = [
+                        { type: 'text', text: finalText },
+                        ...persistedParts
+                      ]
+                      await storeAssistantMessage({
+                        supabase,
+                        chatId,
+                        messages: [{ role: 'assistant', content: fullMessage }] as any,
+                        message_group_id,
+                        model: 'agents:cleo-supervised',
+                        userId: realUserId!,
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        responseTimeMs: Math.max(0, Date.now() - startedAt)
+                      })
+                    } catch {}
+                  }
+
+                  clearInterval(interval)
+                  try { controller.close() } catch {}
+                }
+              } catch (err) {
+                // Emit error and close
+                try { send({ type: 'finish', error: 'execution-bridge-failed' }) } catch {}
+                clearInterval(interval)
+                try { controller.close() } catch {}
+              }
+            }, POLL_MS)
+          },
+          cancel() {
+            // No-op
+          }
+        })
+
+        return new Response(stream, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive'
+          }
+        })
+      } catch (e) {
+        console.error('[ChatAPI] Orchestrator-backed path failed:', e)
+        // Fallback to normal streaming
+      }
+    }
+
     // Prepare additional parameters for reasoning models
   const resultStart = Date.now()
   const { onError, onFinish } = makeStreamHandlers({
@@ -449,9 +804,10 @@ export async function POST(req: Request) {
     resultStart,
   })
 
-  const additionalParams: any = {
+    const modelInstance = modelConfig.apiSdk ? modelConfig.apiSdk(apiKey, { enableSearch }) : undefined
+    const additionalParams: any = {
       // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
-      model: modelConfig.apiSdk(apiKey, { enableSearch }),
+      model: modelInstance!,
       system: finalSystemPrompt,
       messages: convertedMessages,
       tools: toolsForRun,
@@ -527,7 +883,7 @@ export async function POST(req: Request) {
           }
         }
         console.error(error)
-        return "Ocurrió un error procesando tu solicitud. Si subiste un archivo grande, intenta con uno más pequeño."
+        return "An error occurred processing your request. If you uploaded a large file, try with a smaller one."
       },
   })
   } catch (err: unknown) {

@@ -116,7 +116,7 @@ SELECT grantee, privilege_type
 FROM information_schema.role_table_grants
 WHERE table_name = 'sub_agents';
 ```
-````markdown
+
 # �️ Guía de migraciones (completa y práctica)
 
 Esta carpeta contiene las migraciones SQL para preparar la base de datos de Cleo Agent: esquema base, sistema de agentes (SAFE), chat/tareas, RAG/analytics, integraciones y siembra de agentes por defecto con prompts actualizados.
@@ -238,5 +238,24 @@ SELECT proname FROM pg_proc WHERE proname IN (
 Para una versión resumida, mira `migrations/README.md`.
 
 Última actualización: Septiembre 2025
-````
--- Obtener estadísticas
+
+---
+
+## 2025-09-10 Orchestrator Global Chat + Pipeline/Analytics
+
+Archivo: `20250910_orchestrator_chat_pipeline_analytics.sql`
+
+Qué hace:
+- Agrega índices para messages.parts y paginación de chat.
+- Crea el esquema `analytics` con una VISTA de línea de tiempo y dos VISTAS MATERIALIZADAS para uso de herramientas y delegaciones.
+- Agrega una función de actualización para refrescar las VISTAS MATERIALIZADAS (usa actualización concurrente cuando es posible).
+
+Cómo aplicar:
+- Ejecuta el archivo SQL contra tu instancia de Supabase/Postgres. Es idempotente (usa IF NOT EXISTS / CREATE OR REPLACE).
+- Opcionalmente, programa la actualización periódica con `pg_cron` (no incluido por defecto).
+
+Verificación:
+- `SELECT * FROM analytics.v_agent_execution_timeline LIMIT 5;`
+- `SELECT count(*) FROM analytics.mv_tool_usage_daily;`
+- `SELECT count(*) FROM analytics.mv_delegations_daily;`
+- `SELECT analytics.refresh_analytics_materialized_views();`

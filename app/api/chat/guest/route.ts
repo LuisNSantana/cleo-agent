@@ -41,7 +41,23 @@ export async function POST(req: Request) {
       },
     }
 
-    const baseUrl = new URL('/api/multi-model-chat', req.url)
+    // Detect delegation/sub-agent intent to leverage orchestrator pipeline in guest mode
+    let impliesDelegation = false
+    try {
+      const lastUserRaw = Array.isArray(body.messages)
+        ? [...body.messages].reverse().find((m: any) => m.role === 'user')
+        : null
+      const lastUserText = lastUserRaw
+        ? (Array.isArray(lastUserRaw.parts)
+            ? (lastUserRaw.parts.find((p: any) => p.type === 'text')?.text || '')
+            : (typeof lastUserRaw.content === 'string' ? lastUserRaw.content : ''))
+        : (typeof body.message === 'string' ? body.message : '')
+      const lm = String(lastUserText || '').toLowerCase()
+      impliesDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
+    } catch {}
+
+    const endpointPath = impliesDelegation ? '/api/chat' : '/api/multi-model-chat'
+    const baseUrl = new URL(endpointPath, req.url)
     try {
       const host = baseUrl.hostname
       if (host === 'localhost' || host === '127.0.0.1') {
@@ -51,7 +67,7 @@ export async function POST(req: Request) {
     const fRes = await fetch(baseUrl.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(impliesDelegation ? body : payload),
     })
 
     const contentType = fRes.headers.get('Content-Type') || 'text/event-stream; charset=utf-8'

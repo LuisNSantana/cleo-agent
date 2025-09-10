@@ -4,6 +4,17 @@ import { indexDocument } from '@/lib/rag/index-document'
 import { generatePersonalizedPrompt } from '@/lib/prompts/personality'
 import { defaultPreferences, type PersonalitySettings } from '@/lib/user-preference-store/utils'
 import { getCleoPrompt } from '@/lib/prompts'
+import { pickBestAgent } from '@/lib/agents/delegation'
+import type { AgentConfig } from '@/lib/agents/types'
+
+// Build a dynamic internal hint to steer delegation without exposing it to the user
+function buildInternalDelegationHint(recommended?: { name: string; toolName?: string; reasons?: string[] }) {
+  const base = `\n\nINTERNAL (DO NOT MENTION):\n- Delegation rubric and speed policy are active. Prefer concise answers, minimal context in tool calls, and quick synthesis.\n- Use specialized delegate tools when the user's request clearly matches an agent's expertise.`
+  if (!recommended) return base
+  const toolPart = recommended.toolName ? ` Prefer tool: ${recommended.toolName}.` : ''
+  const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
+  return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}`
+}
 
 // High-priority identity header (must be first to survive any trimming)
 const CLEO_IDENTITY_HEADER = `CLEO IDENTITY (TOP PRIORITY)
@@ -188,6 +199,59 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     }
   }
 
+  // Phase 1: lightweight routing recommendation (capability-based)
+  let routerHint: { name: string; toolName?: string; reasons?: string[] } | undefined
+  try {
+    const lastUser = messages.slice().reverse().find((m) => m.role === 'user')
+    let userPlain = ''
+    if (lastUser) {
+      if (typeof lastUser.content === 'string') userPlain = lastUser.content
+      else if (Array.isArray(lastUser.content)) {
+        userPlain = lastUser.content
+          .filter((p: any) => p?.type === 'text')
+          .map((p: any) => p.text || p.content || '')
+          .join('\n')
+      }
+    }
+
+    if (supabase && realUserId && userPlain.trim()) {
+      const { data: agents } = await (supabase as any)
+        .from('agents')
+        .select('id, name, description, role, tags, tools, is_active')
+        .eq('user_id', realUserId)
+        .eq('is_active', true)
+
+      const candidates: AgentConfig[] = (agents || [])
+        .filter((a: any) => (a.role || '').toLowerCase() !== 'supervisor')
+        .map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          description: a.description || '',
+          role: 'specialist' as any,
+          model: '',
+          temperature: 0.7,
+          maxTokens: 0,
+          tools: Array.isArray(a.tools) ? a.tools : [],
+          prompt: '',
+          color: '',
+          icon: '',
+          tags: Array.isArray(a.tags) ? a.tags : [],
+        }))
+
+      if (candidates.length) {
+        const ranked = pickBestAgent(userPlain, candidates)
+        if (ranked) {
+          // Prefer common default tool naming: delegate_to_<lowercased_name>
+          const normalized = ranked.agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+          const toolName = `delegate_to_${normalized}`
+          routerHint = { name: ranked.agent.name, toolName, reasons: ranked.reasons }
+        }
+      }
+    }
+  } catch (e) {
+    // Non-blocking
+  }
+
   // Fetch user personality settings (if available) and build a compact personalized header
   let personalitySettings: PersonalitySettings | undefined
   if (supabase && realUserId) {
@@ -229,9 +293,10 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
+  const internalHint = buildInternalDelegationHint(routerHint)
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
 
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
 }

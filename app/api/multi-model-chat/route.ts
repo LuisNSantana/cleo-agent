@@ -270,6 +270,16 @@ export async function POST(req: NextRequest) {
 
 		// Auto-enable tools if the message likely requires them and not explicitly disabled
 		const lowerMsg = (normalizedContent || '').toLowerCase()
+		// Detect explicit delegation or app/tool intents
+		const mentionsAmi = /\bami\b/.test(lowerMsg)
+		const mentionsPeter = /\bpeter\b/.test(lowerMsg)
+		const mentionsEmma = /\bemma\b/.test(lowerMsg)
+		const mentionsToby = /\btoby\b/.test(lowerMsg)
+		const mentionsApu = /\bapu\b/.test(lowerMsg)
+		const mentionsNotion = /\bnotion\b/.test(lowerMsg)
+		const mentionsWorkspace = /\bworkspace(s)?\b|\bespacio(s)?\s+de\s+trabajo\b/.test(lowerMsg)
+		const mentionsDelegate = /\bdeleg(a|ar|aci[oó]n)\b|\b(dile|di|puedes decir(le)?)\s+a\s+(ami|peter|emma|toby|apu)\b/.test(lowerMsg)
+
 		const likelyToolIntent = (
 			/\b(clima|tiempo|pron[oó]stico|weather|forecast)\b/.test(lowerMsg) ||
 			/\b(buscar|busca|b[uú]scame|b[uú]squeda|buscarme|search|google)\b/.test(lowerMsg) ||
@@ -277,9 +287,22 @@ export async function POST(req: NextRequest) {
 			/\b(precio|precios|crypto|cripto)\b/.test(lowerMsg) ||
 			/\b(calendario|evento|agenda|schedule)\b/.test(lowerMsg) ||
 			/\b(email|correo|gmail)\b/.test(lowerMsg) ||
-			/\b(drive|archivo|documento|abrir|open|crear|create)\b/.test(lowerMsg)
+			/\b(drive|archivo|documento|abrir|open|crear|create)\b/.test(lowerMsg) ||
+			mentionsNotion || mentionsWorkspace || mentionsDelegate || mentionsAmi || mentionsPeter || mentionsEmma || mentionsToby || mentionsApu
 		)
-		const enableToolsAuto = metadata.enableTools ?? likelyToolIntent
+
+		// If specific subagents are mentioned, prefer enabling only delegation tool(s)
+		const allowedToolsAuto: string[] = []
+		if (mentionsAmi) allowedToolsAuto.push('delegate_to_ami')
+		if (mentionsPeter) allowedToolsAuto.push('delegate_to_peter')
+		if (mentionsEmma) allowedToolsAuto.push('delegate_to_emma')
+		if (mentionsToby) allowedToolsAuto.push('delegate_to_toby')
+		if (mentionsApu) allowedToolsAuto.push('delegate_to_apu')
+
+		const enableToolsAuto = metadata.enableTools ?? (likelyToolIntent || allowedToolsAuto.length > 0)
+		if (enableToolsAuto) {
+			console.log('🧰 Tools enabled (auto):', { mentionsAmi, mentionsPeter, mentionsEmma, mentionsToby, mentionsApu, mentionsNotion, mentionsWorkspace, mentionsDelegate, allowedToolsAuto })
+		}
 
 		// Attach per-request context so tools can read userId/model
 		let reqId: string
@@ -303,7 +326,9 @@ export async function POST(req: NextRequest) {
 				useRAG: metadata.useRAG ?? options.enableSearch ?? false,
 				// Enable tool calling if requested (off by default)
 				enableTools: enableToolsAuto,
-				allowedTools: Array.isArray((metadata as any).allowedTools) ? (metadata as any).allowedTools : undefined,
+				allowedTools: Array.isArray((metadata as any).allowedTools)
+					? (metadata as any).allowedTools
+					: (allowedToolsAuto.length > 0 ? allowedToolsAuto : undefined),
 			},
 		}))
 

@@ -6,7 +6,7 @@ import type {
   SupabaseClientType,
 } from "@/app/types/api.types"
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS, MODEL_DEFAULT_GUEST } from "@/lib/config"
-import { getProviderForModel } from "@/lib/openproviders/provider-map"
+import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
 import { sanitizeUserInput } from "@/lib/sanitize"
 import { validateUserIdentity } from "@/lib/server/api"
 import { checkUsageByModel, incrementUsage } from "@/lib/usage"
@@ -17,22 +17,25 @@ export async function validateAndTrackUsage({
   model,
   isAuthenticated,
 }: ChatApiParams): Promise<SupabaseClientType | null> {
+  const normalizedModel = normalizeModelId(model)
   const supabase = await validateUserIdentity(userId, isAuthenticated)
   if (!supabase) return null
 
   // Check if user is authenticated
   if (!isAuthenticated) {
     // For unauthenticated users, only allow specific models or the guest default
-    if (!NON_AUTH_ALLOWED_MODELS.includes(model) && model !== MODEL_DEFAULT_GUEST) {
+    const allow = NON_AUTH_ALLOWED_MODELS.includes(normalizedModel) || NON_AUTH_ALLOWED_MODELS.includes(model)
+    if (!allow && normalizedModel !== MODEL_DEFAULT_GUEST && model !== MODEL_DEFAULT_GUEST) {
       throw new Error(
         "This model requires authentication. Please sign in to access more models."
       )
     }
   } else {
     // For authenticated users, check API key requirements
-    const provider = getProviderForModel(model)
+  const provider = getProviderForModel(model as any)
 
-    if (provider !== "ollama") {
+  // LangChain orchestrator doesn't require a direct provider key here
+  if (provider !== "ollama" && provider !== "langchain") {
       // Accept either a user-stored key or an environment key
       const effectiveKey = await getEffectiveApiKey(
         userId,
@@ -40,7 +43,8 @@ export async function validateAndTrackUsage({
       )
 
       // If no API key anywhere and model is not in free list, deny access
-      if (!effectiveKey && !FREE_MODELS_IDS.includes(model)) {
+  const isFree = FREE_MODELS_IDS.includes(normalizedModel) || FREE_MODELS_IDS.includes(model)
+  if (!effectiveKey && !isFree) {
         throw new Error(
           `This model requires an API key for ${provider}. Please add your API key in settings or use a free model.`
         )
@@ -49,7 +53,7 @@ export async function validateAndTrackUsage({
   }
 
   // Check usage limits for the model
-  await checkUsageByModel(supabase, userId, model, isAuthenticated)
+  await checkUsageByModel(supabase, userId, normalizedModel, isAuthenticated)
 
   return supabase
 }
@@ -90,6 +94,7 @@ export async function logUserMessage({
     experimental_attachments: attachments,
     user_id: userId,
     message_group_id,
+  model: normalizeModelId(model),
   })
 
   if (error) {
