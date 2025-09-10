@@ -5,7 +5,12 @@ import { NextResponse } from 'next/server'
 // mirrors the minimal payload the client sends in guest mode.
 export const runtime = 'nodejs'
 
-export async function POST(req: Request) {
+import { NextRequest } from "next/server"
+import { getCleoPrompt } from "@/lib/prompts"
+
+// Guest chat endpoint: forwards request to internal /api/multi-model-chat without
+// delegation capabilities - guests can only chat directly with Cleo
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
@@ -33,7 +38,7 @@ export async function POST(req: Request) {
         chatId: body.chatId || body.metadata?.chatId,
         userId: body.userId || body.metadata?.userId,
         isAuthenticated: false,
-        systemPrompt: body.systemPrompt || body.metadata?.systemPrompt,
+        systemPrompt: getCleoPrompt(body.model || 'langchain:fast', 'guest'), // Use guest-specific prompt
         originalModel: body.model || body.metadata?.originalModel || body.model,
         message_group_id: body.message_group_id || body.metadata?.message_group_id,
         documentId: body.documentId || body.metadata?.documentId,
@@ -41,22 +46,9 @@ export async function POST(req: Request) {
       },
     }
 
-    // Detect delegation/sub-agent intent to leverage orchestrator pipeline in guest mode
-    let impliesDelegation = false
-    try {
-      const lastUserRaw = Array.isArray(body.messages)
-        ? [...body.messages].reverse().find((m: any) => m.role === 'user')
-        : null
-      const lastUserText = lastUserRaw
-        ? (Array.isArray(lastUserRaw.parts)
-            ? (lastUserRaw.parts.find((p: any) => p.type === 'text')?.text || '')
-            : (typeof lastUserRaw.content === 'string' ? lastUserRaw.content : ''))
-        : (typeof body.message === 'string' ? body.message : '')
-      const lm = String(lastUserText || '').toLowerCase()
-      impliesDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
-    } catch {}
-
-    const endpointPath = impliesDelegation ? '/api/chat' : '/api/multi-model-chat'
+    // Guest mode: NEVER delegate to agents - always use direct Cleo conversation
+    // If user asks for delegation, Cleo will suggest them to sign in with Gmail
+    const endpointPath = '/api/multi-model-chat' // Always use direct chat, no delegation
     const baseUrl = new URL(endpointPath, req.url)
     try {
       const host = baseUrl.hostname
@@ -67,7 +59,7 @@ export async function POST(req: Request) {
     const fRes = await fetch(baseUrl.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(impliesDelegation ? body : payload),
+      body: JSON.stringify(payload), // Always use payload (no delegation) in guest mode
     })
 
     const contentType = fRes.headers.get('Content-Type') || 'text/event-stream; charset=utf-8'

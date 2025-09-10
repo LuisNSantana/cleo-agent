@@ -757,6 +757,23 @@ export class AgentFactory {
         maxTokens: 4096,
         contextWindow: 32768
       },
+      'groq:llama-3.3-70b-versatile': {
+        id: 'groq:llama-3.3-70b-versatile',
+        name: 'Llama 3.3 70B Versatile',
+        provider: 'groq',
+        costPerToken: {
+          input: 0.0000005, // $0.5 per 1M tokens
+          output: 0.0000008  // $0.8 per 1M tokens
+        },
+        capabilities: {
+          text: true,
+          vision: false,
+          functionCalling: true,
+          reasoning: true
+        },
+        maxTokens: 32768,
+        contextWindow: 131072
+      },
       'openai:gpt-4o-mini': {
         id: 'openai:gpt-4o-mini',
         name: 'GPT-4o-mini',

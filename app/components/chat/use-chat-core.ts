@@ -704,6 +704,124 @@ export function useChatCore({
                   case "finish-step":
                     break
 
+                  case "delegation-start":
+                    // Convert delegation start to execution step
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const step = {
+                        id: `delegation-start-${data.agentId}-${Date.now()}`,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        agent: data.agentName || data.agentId,
+                        action: 'delegation' as const,
+                        content: `Starting delegation to ${data.agentName}: ${data.task}`,
+                        metadata: { 
+                          delegation: true, 
+                          targetAgent: data.agentId,
+                          task: data.task
+                        }
+                      }
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step,
+                      } as any)
+                    } catch {}
+                    break
+
+                  case "delegation-processing":
+                    // Convert delegation processing to execution step
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const step = {
+                        id: `delegation-processing-${data.agentId}-${Date.now()}`,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        agent: data.agentName || data.agentId,
+                        action: 'delegation' as const,
+                        content: `${data.agentName} is processing the task...`,
+                        metadata: { 
+                          delegation: true, 
+                          targetAgent: data.agentId,
+                          status: data.status
+                        }
+                      }
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step,
+                      } as any)
+                    } catch {}
+                    break
+
+                  case "delegation-progress":
+                    // Update existing delegation step or create new one
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const step = {
+                        id: `delegation-progress-${data.agentId}-${Date.now()}`,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        agent: data.agentName || data.agentId,
+                        action: 'delegation' as const,
+                        content: `${data.agentName} progress: ${data.status}${data.progress ? ` (${data.progress}%)` : ''}`,
+                        metadata: { 
+                          delegation: true, 
+                          targetAgent: data.agentId,
+                          status: data.status,
+                          progress: data.progress
+                        }
+                      }
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step,
+                      } as any)
+                    } catch {}
+                    break
+
+                  case "delegation-complete":
+                    // Convert delegation completion to execution step
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const step = {
+                        id: `delegation-complete-${data.agentId}-${Date.now()}`,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        agent: data.agentName || data.agentId,
+                        action: 'delegation' as const,
+                        content: `${data.agentName} completed the task successfully`,
+                        metadata: { 
+                          delegation: true, 
+                          targetAgent: data.agentId,
+                          result: data.result,
+                          status: 'completed'
+                        }
+                      }
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step,
+                      } as any)
+                    } catch {}
+                    break
+
+                  case "delegation-error":
+                    // Convert delegation error to execution step
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const step = {
+                        id: `delegation-error-${data.agentId}-${Date.now()}`,
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        agent: data.agentName || data.agentId,
+                        action: 'delegation' as const,
+                        content: `${data.agentName} failed: ${data.error}`,
+                        metadata: { 
+                          delegation: true, 
+                          targetAgent: data.agentId,
+                          error: data.error,
+                          status: 'failed'
+                        }
+                      }
+                      assistantMessageObj.parts.push({
+                        type: 'execution-step',
+                        step,
+                      } as any)
+                    } catch {}
+                    break
+
                   default:
                     break
                 }

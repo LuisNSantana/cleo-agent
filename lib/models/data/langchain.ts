@@ -14,12 +14,12 @@ const createLangChainSdk = () => createOpenAI({
 export const langchainModels: ModelConfig[] = [
   {
     id: "langchain:balanced-local",
-    name: "Cleo v1 (llama3 8B)",
+    name: "Balanced (llama3 8B)",
     provider: "LangChain",
     providerId: "langchain",
     baseProviderId: "langchain",
-    description: "Cleo local model (Llama 3.1 8B) used as the primary on-prem inference for fast, empathetic responses; cloud fallback available for larger tasks.",
-    tags: ["cleo", "local-first", "ollama", "llama3", "cost-effective"],
+    description: "Balanced local model (Llama 3.1 8B) used as primary on-prem inference for fast, empathetic responses; cloud fallback available for larger tasks.",
+    tags: ["balanced", "local-first", "ollama", "llama3", "cost-effective"],
     contextWindow: 32000, // Enhanced context for better tool support
     inputCost: 0.01, // Very low cost due to local processing
     outputCost: 0.05,

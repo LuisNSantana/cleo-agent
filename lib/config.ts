@@ -16,7 +16,8 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (solo Llama)
 export const NON_AUTH_ALLOWED_MODELS = [
-  // Guest mode: only allow Balanced + Local
+  // Guest mode: allow Fast + Balanced + Local
+  "langchain:fast",
   "langchain:balanced-local",
 ]
 
@@ -30,14 +31,14 @@ export const FREE_MODELS_IDS = [
 ]
 
 // Default authenticated model: use the local Cleo Llama model
-export const MODEL_DEFAULT = "langchain:balanced-local"
+export const MODEL_DEFAULT = "langchain:fast"
 
 // Modelo predeterminado para invitados (guest)
-export const MODEL_DEFAULT_GUEST = "langchain:balanced-local"
+export const MODEL_DEFAULT_GUEST = "langchain:fast"
 
 // Globally disabled model IDs (hidden from selectors and not selectable)
 export const DISABLED_MODEL_IDS: string[] = [
-  // none
+  "langchain:balanced-local" // Temporarily hidden - keeping only fast and balanced
 ]
 
 export const APP_NAME = "Cleo"

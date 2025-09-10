@@ -4,16 +4,48 @@ import { indexDocument } from '@/lib/rag/index-document'
 import { generatePersonalizedPrompt } from '@/lib/prompts/personality'
 import { defaultPreferences, type PersonalitySettings } from '@/lib/user-preference-store/utils'
 import { getCleoPrompt } from '@/lib/prompts'
-import { pickBestAgent } from '@/lib/agents/delegation'
+import { pickBestAgent, analyzeDelegationIntent } from '@/lib/agents/delegation'
 import type { AgentConfig } from '@/lib/agents/types'
 
 // Build a dynamic internal hint to steer delegation without exposing it to the user
-function buildInternalDelegationHint(recommended?: { name: string; toolName?: string; reasons?: string[] }) {
+function buildInternalDelegationHint(userMessage?: string, recommended?: { name: string; toolName?: string; reasons?: string[] }) {
   const base = `\n\nINTERNAL (DO NOT MENTION):\n- Delegation rubric and speed policy are active. Prefer concise answers, minimal context in tool calls, and quick synthesis.\n- Use specialized delegate tools when the user's request clearly matches an agent's expertise.`
-  if (!recommended) return base
-  const toolPart = recommended.toolName ? ` Prefer tool: ${recommended.toolName}.` : ''
-  const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
-  return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}`
+  
+  // Use intelligent analyzer if we have a user message
+  if (userMessage && !recommended) {
+    try {
+      console.log(`🧠 [DELEGATION] Analyzing user message: "${userMessage.substring(0, 100)}..."`)
+      const analysis = analyzeDelegationIntent(userMessage)
+      if (analysis && analysis.confidence > 0.5) {
+        console.log(`🎯 [DELEGATION] Auto-detected agent:`, {
+          agent: analysis.agentName,
+          agentId: analysis.agentId,
+          confidence: Math.round(analysis.confidence * 100) + '%',
+          reasons: analysis.reasoning.slice(0, 3),
+          toolName: analysis.toolName
+        })
+        const toolPart = ` Prefer tool: ${analysis.toolName}.`
+        const reasonPart = analysis.reasoning.length ? ` Reasons: ${analysis.reasoning.slice(0, 3).join(', ')}.` : ''
+        const confidencePart = ` (confidence: ${Math.round(analysis.confidence * 100)}%)`
+        return `${base}\n- Auto-detected agent: ${analysis.agentName}.${toolPart}${reasonPart}${confidencePart}`
+      } else {
+        console.log(`❓ [DELEGATION] No clear delegation match found for: "${userMessage.substring(0, 50)}..."`)
+      }
+    } catch (error) {
+      console.warn('⚠️ [DELEGATION] Analysis failed:', error)
+    }
+  }
+  
+  // Fallback to provided recommendation
+  if (recommended) {
+    console.log(`📋 [DELEGATION] Using router recommendation:`, recommended)
+    const toolPart = recommended.toolName ? ` Prefer tool: ${recommended.toolName}.` : ''
+    const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
+    return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}`
+  }
+  
+  console.log(`🔄 [DELEGATION] No delegation hints available`)
+  return base
 }
 
 // High-priority identity header (must be first to survive any trimming)
@@ -287,13 +319,26 @@ If the user asks about something that is in the CONTEXT, use it directly to resp
 
 SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate", "expand", "continue", "review" a document found in the context, ALWAYS suggest opening the document in the Canvas Editor. Use phrases like: "Would you like me to open [document name] in the collaborative editor so we can work on it together?"`
 
+  // Extract user message for delegation analysis
+  const lastUser = messages.slice().reverse().find((m) => m.role === 'user')
+  let userMessage = ''
+  if (lastUser) {
+    if (typeof lastUser.content === 'string') userMessage = lastUser.content
+    else if (Array.isArray(lastUser.content)) {
+      userMessage = lastUser.content
+        .filter((p: any) => p?.type === 'text')
+        .map((p: any) => p.text || p.content || '')
+        .join('\n')
+    }
+  }
+
   const searchGuidance = (model === 'grok-3-mini' && enableSearch)
     ? `\n\nSEARCH MODE: For Faster (grok-3-mini), use native Live Search (built into the model). Do NOT call the webSearch tool. Include citations when available.`
     : ''
 
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
-  const internalHint = buildInternalDelegationHint(routerHint)
+  const internalHint = buildInternalDelegationHint(userMessage, routerHint)
   const finalSystemPrompt = ragSystemAddon
     ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
     : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`

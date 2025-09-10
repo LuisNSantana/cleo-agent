@@ -203,7 +203,7 @@ export class ModelRouter {
 
   /**
    * Route for fast configuration
-   * Primary: groq:gpt-oss-120b, Backup: openai:gpt-4o-mini
+   * Primary: groq:gpt-oss-120b, Backup: groq:llama-3.3-70b-versatile
    */
   private routeFast(input: TaskInput): RoutingDecision {
     console.log('⚡ Routing with fast configuration')
@@ -217,18 +217,18 @@ export class ModelRouter {
         selectedModel: 'openai:gpt-4o-mini',
         reasoning: 'Fast: Vision task requires multimodal - using fastest multimodal model with full context support',
         confidence: 0.9,
-        fallbackModel: 'groq:gpt-oss-120b'
+        fallbackModel: 'groq:llama-3.3-70b-versatile'
       }
     }
     
-    // All text/tool tasks prioritize speed with Groq but get enhanced context and tools
+    // All text/tool tasks prioritize speed with Groq GPT-OSS-120B - NO LOCAL ROUTING FOR FAST
     return {
       selectedModel: 'groq:gpt-oss-120b',
       reasoning: hasTools 
         ? 'Fast: Tool task routed to Groq GPT-OSS-120B for ultra-fast inference with full tool support and context'
         : 'Fast: Task routed to Groq GPT-OSS-120B for ultra-fast inference with enhanced context support',
       confidence: 0.95,
-      fallbackModel: 'openai:gpt-4o-mini'
+      fallbackModel: 'groq:llama-3.3-70b-versatile'
     }
   }
 

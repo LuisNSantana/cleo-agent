@@ -23,9 +23,13 @@ export async function validateAndTrackUsage({
 
   // Check if user is authenticated
   if (!isAuthenticated) {
-    // For unauthenticated users, only allow specific models or the guest default
-    const allow = NON_AUTH_ALLOWED_MODELS.includes(normalizedModel) || NON_AUTH_ALLOWED_MODELS.includes(model)
-    if (!allow && normalizedModel !== MODEL_DEFAULT_GUEST && model !== MODEL_DEFAULT_GUEST) {
+    // For unauthenticated users, check both original and normalized model names
+    const allow = NON_AUTH_ALLOWED_MODELS.includes(model) || 
+                  NON_AUTH_ALLOWED_MODELS.includes(normalizedModel) ||
+                  model === MODEL_DEFAULT_GUEST ||
+                  normalizedModel === MODEL_DEFAULT_GUEST
+    
+    if (!allow) {
       throw new Error(
         "This model requires authentication. Please sign in to access more models."
       )

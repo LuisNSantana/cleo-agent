@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Drawer, DrawerContent as SheetContent, DrawerHeader as SheetHeader, DrawerTitle as SheetTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -743,17 +744,49 @@ const AgentForm: React.FC<AgentFormProps> = ({
   isDesktop,
 }) => {
   const [promptView, setPromptView] = React.useState<'edit' | 'preview'>('edit')
+  // Mobile-focused UI toggles
+  const [showRoleHelp, setShowRoleHelp] = React.useState(false)
+  const [showParentHelp, setShowParentHelp] = React.useState(false)
+  const [showPreview, setShowPreview] = React.useState(true)
+  // Deduplicate models by id to avoid duplicate keys in Select
+  const uniqueModels = React.useMemo(() => {
+    const seen = new Set<string>()
+    const out: { id: string; name?: string }[] = []
+    for (const m of models || []) {
+      const id = String(m?.id ?? '').trim()
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, name: m?.name })
+    }
+    return out
+  }, [models])
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="basic">Basic</TabsTrigger>
-        <TabsTrigger value="tools">Tools</TabsTrigger>
-        <TabsTrigger value="prompt">Prompt</TabsTrigger>
-        <TabsTrigger value="config">Config</TabsTrigger>
+      <TabsList className="sticky top-0 z-20 flex w-full overflow-x-auto no-scrollbar gap-2 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-2 py-1 border-b border-slate-700">
+        <TabsTrigger className="whitespace-nowrap text-xs sm:text-sm px-3 py-2 flex-shrink-0" value="basic">Basic</TabsTrigger>
+        <TabsTrigger className="whitespace-nowrap text-xs sm:text-sm px-3 py-2 flex-shrink-0" value="tools">Tools</TabsTrigger>
+        <TabsTrigger className="whitespace-nowrap text-xs sm:text-sm px-3 py-2 flex-shrink-0" value="prompt">Prompt</TabsTrigger>
+        <TabsTrigger className="whitespace-nowrap text-xs sm:text-sm px-3 py-2 flex-shrink-0" value="config">Config</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="basic" className="space-y-4">
+      <TabsContent value="basic" className="space-y-3 sm:space-y-4">
+        {/* Mobile toolbar: preview toggle */}
+        {!isDesktop && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">Preview</span>
+            <button
+              type="button"
+              onClick={() => setShowPreview(v => !v)}
+              aria-expanded={showPreview}
+              className={`text-xs px-2 py-1 rounded border ${showPreview ? 'border-violet-500/40 text-violet-200 bg-violet-500/10' : 'border-white/10 text-slate-300 bg-white/5'}`}
+            >
+              {showPreview ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        )}
+
         {/* Live Preview */}
+        {(isDesktop || showPreview) && (
         <Card className="bg-slate-900/40 border-slate-700/50">
           <CardContent className="pt-4">
             {(() => {
@@ -804,13 +837,14 @@ const AgentForm: React.FC<AgentFormProps> = ({
             })()}
           </CardContent>
         </Card>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="name">Agent Name</Label>
           <Input id="name" value={formData.name} onChange={handleTextInputChange('name')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="My Specialized Agent" className="bg-white/10 border-white/20" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="role">Agent Role</Label>
             <Select value={formData.role} onValueChange={(v) => handleInputChange('role', v as AgentRole)}>
@@ -825,7 +859,17 @@ const AgentForm: React.FC<AgentFormProps> = ({
               </SelectContent>
             </Select>
             <div className="text-xs text-slate-400">Select “Specialist” to enable <span className="font-medium">Specialization</span>.</div>
-            <div className="text-[11px] text-slate-500">Note: A sub‑agent cannot be a parent. For example, Sofi can be "Sub‑agent of Emma", but Emma can never be a "sub‑agent of Sofi".</div>
+            <div className="text-[11px] text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowRoleHelp(v => !v)}
+                aria-expanded={showRoleHelp}
+                className="underline decoration-dotted underline-offset-2 text-slate-400"
+              >More details</button>
+              {showRoleHelp && (
+                <p className="mt-1">Note: A sub‑agent cannot be a parent. For example, Sofi can be "Sub‑agent of Emma", but Emma can never be a "sub‑agent of Sofi".</p>
+              )}
+            </div>
           </div>
 
           {/* Parent (optional) for sub-agent relationship */}
@@ -872,13 +916,21 @@ const AgentForm: React.FC<AgentFormProps> = ({
                 </Select>
               )
             })()}
-            {(() => {
-              const hasCandidates = (parentCandidates && parentCandidates.length > 0) || agents.some(a => isUUID(a.id) && !a.isSubAgent)
-              if (hasCandidates) return null
-              return (
-                <div className="text-[11px] text-amber-400/90">No primary agents available yet. Create a primary agent first to assign as a parent.</div>
-              )
-            })()}
+            <div className="text-[11px] text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowParentHelp(v => !v)}
+                aria-expanded={showParentHelp}
+                className="underline decoration-dotted underline-offset-2 text-slate-400"
+              >Tips</button>
+              {showParentHelp && (() => {
+                const hasCandidates = (parentCandidates && parentCandidates.length > 0) || agents.some(a => isUUID(a.id) && !a.isSubAgent)
+                if (hasCandidates) return null
+                return (
+                  <p className="mt-1 text-amber-400/90">No primary agents available yet. Create a primary agent first to assign as a parent.</p>
+                )
+              })()}
+            </div>
             {formData.parentAgentId && (() => { const pAny: any = (agents.find(x => x.id === formData.parentAgentId) as any) || (parentCandidates.find((pc:any)=>pc.id===formData.parentAgentId) as any); if (!pAny) return null; const lower=(pAny.name||'').toLowerCase(); const avatar = pAny.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/agents/logocleo4.png' : '/img/agents/logocleo4.png'); return (
               <div className="flex items-center gap-2 text-xs text-slate-300">
                 <Avatar className="h-5 w-5">
@@ -925,7 +977,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
           )}
         </div>
 
-        <div className="space-y-2">
+  <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" value={formData.description} onChange={handleTextInputChange('description')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="Describe this agent's capabilities and purpose..." className="bg-white/10 border-white/20 min-h-[100px]" />
         </div>
@@ -960,7 +1012,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       </TabsContent>
 
-      <TabsContent value="tools" className="space-y-3">
+  <TabsContent value="tools" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <Label className="m-0">Tools</Label>
           <div className="flex gap-2">
@@ -987,7 +1039,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
 
         {/* Tools list */}
         <div className="relative">
-          <div className="flex flex-col gap-2 sm:gap-3 max-h-[40vh] sm:max-h-[35vh] overflow-y-auto no-scrollbar pr-1">
+          <div className="flex flex-col gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[35vh] overflow-y-auto no-scrollbar pr-1">
             {filteredTools.map(([key, info]) => {
               const enabled = (formData.tools || []).includes(key)
               return (
@@ -1055,13 +1107,13 @@ const AgentForm: React.FC<AgentFormProps> = ({
           {isDesktop ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="relative">
-                <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[120px] max-h-[35vh] overflow-y-auto no-scrollbar resize-none" />
+                <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[120px] max-h-[45vh] overflow-y-auto no-scrollbar resize-none" />
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
               </div>
               <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
                 <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
-                <div className="max-h-[35vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
+                <div className="max-h-[45vh] overflow-y-auto no-scrollbar text-slate-200 text-sm leading-relaxed">
                   <Markdown>{formData.prompt}</Markdown>
                 </div>
                 <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent rounded-t-lg" />
@@ -1106,14 +1158,14 @@ const AgentForm: React.FC<AgentFormProps> = ({
             <Label htmlFor="model">Model</Label>
             <Select value={formData.model} onValueChange={(v) => handleInputChange('model', v)}>
               <SelectTrigger id="model" className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder={models.length ? 'Select a model' : 'Loading models...'} />
+                <SelectValue placeholder={uniqueModels.length ? 'Select a model' : 'Loading models...'} />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 text-white border-slate-700 max-h-64">
-                {models.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.id}
-                  </SelectItem>
-                ))}
+                  {uniqueModels.map((m, i) => (
+                    <SelectItem key={m.id || String(i)} value={m.id}>
+                      {m.name || m.id}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -1134,6 +1186,9 @@ const AgentForm: React.FC<AgentFormProps> = ({
 }
 
 export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteAgent }: AgentCRUDPanelProps) {
+  // Avoid hydration mismatches on SSR by rendering only after mount
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
   // Pull server-provided parent candidates (eligible parents) from client store when available
   const parentCandidates = useClientAgentStore((s) => s.parentCandidates)
   // Simple UUID v4-ish check (accepts generic UUID formats)
@@ -1151,6 +1206,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   const [tagInput, setTagInput] = useState('')
   // State for active tab to prevent jumping back to basic
   const [activeTab, setActiveTab] = useState('basic')
+  // Top-level filters (moved from inline IIFE to keep hooks order stable)
+  const [viewFilter, setViewFilter] = React.useState<'all'|'mine'|'defaults'|'subagents'>('all')
+  const [search, setSearch] = React.useState('')
+  const [toolFilter, setToolFilter] = React.useState('')
   // Responsive detection to avoid rendering both mobile and desktop prompt editors simultaneously
   const [isDesktop, setIsDesktop] = React.useState(false)
   React.useEffect(() => {
@@ -1165,6 +1224,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       else if ((mql as any).removeListener) (mql as any).removeListener(handler)
     }
   }, [])
+
+  // Note: We avoid returning early on !mounted to keep hooks order identical across renders.
+  // Use the "mounted" flag only for minor UI tweaks if needed, not for skipping hook execution.
 
   // ----- Form state & handlers -----
   type FormState = {
@@ -1396,6 +1458,31 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     return null
   }
 
+  // ----- Derived data for filters & grouping -----
+  const normalized = (s?: string) => (s || '').toLowerCase().trim()
+  const matchesSearch = (a: any) => {
+    const q = normalized(search)
+    if (!q) return true
+    return normalized(a.name).includes(q) || normalized(a.description).includes(q) || normalized(a.model).includes(q)
+  }
+  const matchesTool = (a: any) => {
+    const q = normalized(toolFilter)
+    if (!q) return true
+    const tools = Array.isArray(a.tools) ? a.tools : []
+    return tools.some((t: string) => normalized(t).includes(q))
+  }
+  const defaults = agents.filter((a: any) => (a as any).isDefault === true)
+  const subAgents = agents.filter(a => a.isSubAgent)
+  const myAgents = agents.filter(a => !subAgents.includes(a) && !defaults.includes(a))
+  let sections = [
+    { title: 'Default Agents', items: defaults },
+    { title: 'My Agents', items: myAgents },
+    { title: 'Sub-agents', items: subAgents }
+  ]
+  if (viewFilter === 'defaults') sections = sections.filter(s => s.title === 'Default Agents')
+  if (viewFilter === 'mine') sections = sections.filter(s => s.title === 'My Agents')
+  if (viewFilter === 'subagents') sections = sections.filter(s => s.title === 'Sub-agents')
+
   return (
   <div className="space-y-6 w-full max-w-none">
       {/* Header */}
@@ -1418,322 +1505,336 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       </div>
 
       {/* Filters & Grouped Agents: Default, My Agents, Sub-agents */}
-      {(() => {
-        // Simple filters: view (all/mine/defaults/subagents) + search + tool filter
-        // Local state via URL-less inputs to avoid prop drilling
-        const [viewFilter, setViewFilter] = React.useState<'all'|'mine'|'defaults'|'subagents'>('all')
-        const [search, setSearch] = React.useState('')
-        const [toolFilter, setToolFilter] = React.useState('')
+      <div className="space-y-8">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <select
+              value={viewFilter}
+              onChange={e => setViewFilter(e.target.value as any)}
+              className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1"
+            >
+              <option value="all">View: All</option>
+              <option value="defaults">View: Default Agents</option>
+              <option value="mine">View: My Agents</option>
+              <option value="subagents">View: Sub-agents</option>
+            </select>
+            <input
+              placeholder="Search by name/model..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-48"
+            />
+            <input
+              placeholder="Filter by tool (e.g. shopify)"
+              value={toolFilter}
+              onChange={e => setToolFilter(e.target.value)}
+              className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-56"
+            />
+          </div>
+        </div>
 
-        const normalized = (s?: string) => (s || '').toLowerCase().trim()
-        const matchesSearch = (a: any) => {
-          const q = normalized(search)
-          if (!q) return true
-          return normalized(a.name).includes(q) || normalized(a.description).includes(q) || normalized(a.model).includes(q)
-        }
-        const matchesTool = (a: any) => {
-          const q = normalized(toolFilter)
-          if (!q) return true
-          const tools = Array.isArray(a.tools) ? a.tools : []
-          return tools.some((t: string) => normalized(t).includes(q))
-        }
-
-        const defaults = agents.filter((a: any) => (a as any).isDefault === true)
-        const subAgents = agents.filter(a => a.isSubAgent)
-        const myAgents = agents.filter(a => !subAgents.includes(a) && !defaults.includes(a))
-        let sections = [
-          { title: 'Default Agents', items: defaults },
-          { title: 'My Agents', items: myAgents },
-          { title: 'Sub-agents', items: subAgents }
-        ]
-
-        // Apply view filter by narrowing sections
-        if (viewFilter === 'defaults') sections = sections.filter(s => s.title === 'Default Agents')
-        if (viewFilter === 'mine') sections = sections.filter(s => s.title === 'My Agents')
-        if (viewFilter === 'subagents') sections = sections.filter(s => s.title === 'Sub-agents')
-
-        // Render filter controls
-        const FilterBar = (
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <select
-                value={viewFilter}
-                onChange={e => setViewFilter(e.target.value as any)}
-                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1"
-              >
-                <option value="all">View: All</option>
-                <option value="defaults">View: Default Agents</option>
-                <option value="mine">View: My Agents</option>
-                <option value="subagents">View: Sub-agents</option>
-              </select>
-              <input
-                placeholder="Search by name/model..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-48"
-              />
-              <input
-                placeholder="Filter by tool (e.g. shopify)"
-                value={toolFilter}
-                onChange={e => setToolFilter(e.target.value)}
-                className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1 w-56"
-              />
+        {sections.map(({ title, items }) => (
+          <div key={title} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">{title}</h3>
+              <span className="text-xs text-slate-400">{items.filter(a => matchesSearch(a) && matchesTool(a)).length} items</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6 w-full">
+              <AnimatePresence>
+                {items.filter(a => matchesSearch(a) && matchesTool(a)).map((agent) => (
+                  <motion.div
+                    key={`${title}_${agent.id}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                  >
+                    <Card 
+                      className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden cursor-pointer"
+                      onClick={() => setDetailsAgent(agent)}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                      <div className="relative z-10">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="relative group">
+                              <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
+                                {getAgentAvatar(agent) ? (
+                                  <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover rounded-xl" />
+                                ) : null}
+                                <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: agent.color }}>
+                                  <BrainIcon className="w-8 h-8 text-white" />
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl" style={{ backgroundColor: agent.color }} />
+                            </div>
+                            <div className="flex-1">
+                              <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
+                              <div className="mb-2">
+                                {(() => { const info = getSpecificRoleLabel(agent); return (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
+                                    {info.label}
+                                  </span>
+                                )})()}
+                              </div>
+                              {agent.description && (
+                                <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="space-y-4">
+                        {agent.tags && agent.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {agent.tags.slice(0, 3).map((tag, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {agent.tags.length > 3 && (
+                              <Badge variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                                +{agent.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                          <div className="text-xs text-slate-400">
+                            <span className="font-medium">{agent.model}</span>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20" title="Copy agent">
+                              <CopyIcon className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20">
+                              <PencilIcon className="w-3 h-3" />
+                            </Button>
+                            {/* Hide delete for default agents */}
+                            {!(agent as any).isDefault && (agent.id !== 'cleo-supervisor') && (
+                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(agent.id!) }} className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300">
+                                <TrashIcon className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
-        )
-        return (
-          <div className="space-y-8">
-            {FilterBar}
-            {sections.map(({ title, items }) => (
-              <div key={title} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">{title}</h3>
-                  <span className="text-xs text-slate-400">{items.filter(a => matchesSearch(a) && matchesTool(a)).length} items</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6 w-full">
-                  <AnimatePresence>
-                    {items.filter(a => matchesSearch(a) && matchesTool(a)).map((agent) => (
-                      <motion.div
-                        key={`${title}_${agent.id}`}
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                      >
-                        <Card 
-                          className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden cursor-pointer"
-                          onClick={() => setDetailsAgent(agent)}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
-                          <div className="relative z-10">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center space-x-4">
-                                <div className="relative group">
-                                  <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
-                                    {getAgentAvatar(agent) ? (
-                                      <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover rounded-xl" />
-                                    ) : null}
-                                    <AvatarFallback className="rounded-xl text-lg" style={{ backgroundColor: agent.color }}>
-                                      <BrainIcon className="w-8 h-8 text-white" />
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl" style={{ backgroundColor: agent.color }} />
-                                </div>
-                                <div className="flex-1">
-                                  <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
-                                  <div className="mb-2">
-                                    {(() => { const info = getSpecificRoleLabel(agent); return (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
-                                        {info.label}
-                                      </span>
-                                    )})()}
-                                  </div>
-                                  {agent.description && (
-                                    <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          
-                          <CardContent className="space-y-4">
-                            {agent.tags && agent.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {agent.tags.slice(0, 3).map((tag, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {agent.tags.length > 3 && (
-                                  <Badge variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
-                                    +{agent.tags.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
-                              <div className="text-xs text-slate-400">
-                                <span className="font-medium">{agent.model}</span>
-                              </div>
-                              
-                              <div className="flex space-x-2">
-                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20" title="Copy agent">
-                                  <CopyIcon className="w-3 h-3" />
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20">
-                                  <PencilIcon className="w-3 h-3" />
-                                </Button>
-                                {/* Hide delete for default agents */}
-                                {!(agent as any).isDefault && (agent.id !== 'cleo-supervisor') && (
-                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(agent.id!) }} className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300">
-                                    <TrashIcon className="w-3 h-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
+        ))}
+      </div>
 
-      {/* Create Dialog */}
-      <Dialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={(open) => {
-          // Only allow closing via explicit user action, not from focus events
-          if (!open && !isComposingRef.current) {
-            setIsCreateDialogOpen(false)
-          }
-        }}
-      >
-        <DialogContent 
-          hasCloseButton={false}
-          className="max-w-5xl w-[95vw] bg-slate-800 border-slate-700 sm:rounded-lg rounded-none max-h-[90vh] flex flex-col"
-          onInteractOutside={(e) => {
-            // Prevent dialog from closing when clicking on inputs or interacting inside
-            e.preventDefault()
-          }}
-          onEscapeKeyDown={(e) => {
-            // Only close on explicit Escape key when not composing
-            if (isComposingRef.current) {
-              e.preventDefault()
+      {/* Create (Dialog on desktop, Bottom Sheet on mobile) */}
+      {isDesktop ? (
+        <Dialog 
+          open={isCreateDialogOpen} 
+          onOpenChange={(open) => {
+            if (!open && !isComposingRef.current) {
+              setIsCreateDialogOpen(false)
             }
           }}
         >
-          <DialogHeader>
-            <div className="relative">
-              <DialogTitle className="text-xl font-bold text-white flex items-center">
-                <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
-                Create New Agent
-              </DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCreateDialogOpen(false)}
-                className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
-                aria-label="Close"
-              >
-                <XIcon className="w-4 h-4" />
-              </Button>
-            </div>
-          </DialogHeader>
+          <DialogContent 
+            hasCloseButton={false}
+            className="max-w-5xl w-[100vw] sm:w-[95vw] bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[72dvh] max-h-[75dvh] sm:h-[90vh] grid grid-rows-[auto,1fr,auto] min-h-0 my-2 sm:my-0"
+          >
+            <DialogHeader className="row-start-1 sticky top-0 z-20 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70">
+              <div className="relative">
+                <DialogTitle className="text-xl font-bold text-white flex items-center">
+                  <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
+                  Create New Agent
+                </DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                  aria-label="Close"
+                >
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
-            <div className="space-y-6">
-              <AgentForm
-                isEdit={false}
-                formData={formData}
-                handleInputChange={(f, v) => handleInputChange(f as any, v)}
-                handleTextInputChange={(f) => handleTextInputChange(f as any)}
-                isComposingRef={isComposingRef}
-                tagInput={tagInput}
-                setTagInput={setTagInput}
-                addTag={addTag}
-                removeTag={removeTag}
-                handleTagKeyDown={handleTagKeyDown}
-                models={models}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                parentCandidates={parentCandidates as any}
-                agents={agents}
-                isUUID={isUUID}
-                editingAgent={editingAgent}
-                toolSearch={toolSearch}
-                setToolSearch={setToolSearch}
-                toolCategory={toolCategory}
-                setToolCategory={setToolCategory}
-                allCategories={allCategories}
-                filteredTools={filteredTools}
-                isDesktop={isDesktop}
-              />
+            <div className="row-start-2 min-h-0 overflow-y-auto no-scrollbar pr-1 pb-[max(env(safe-area-inset-bottom),16px)] overscroll-contain [-webkit-overflow-scrolling:touch]">
+              <div className="space-y-6">
+                <AgentForm
+                  isEdit={false}
+                  formData={formData}
+                  handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                  handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                  isComposingRef={isComposingRef}
+                  tagInput={tagInput}
+                  setTagInput={setTagInput}
+                  addTag={addTag}
+                  removeTag={removeTag}
+                  handleTagKeyDown={handleTagKeyDown}
+                  models={models}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  parentCandidates={parentCandidates as any}
+                  agents={agents}
+                  isUUID={isUUID}
+                  editingAgent={editingAgent}
+                  toolSearch={toolSearch}
+                  setToolSearch={setToolSearch}
+                  toolCategory={toolCategory}
+                  setToolCategory={setToolCategory}
+                  allCategories={allCategories}
+                  filteredTools={filteredTools}
+                  isDesktop={isDesktop}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700 bg-slate-800">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreateDialogOpen(false)
-                  resetForm()
-                }}
-                className="border-slate-600 text-slate-300 hover:bg-slate-700"
-              >
+            <div className="row-start-3 z-20 flex justify-end space-x-3 pt-3 border-t border-slate-700 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false)
+                    resetForm()
+                  }}
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!formData.name || !formData.role || !formData.model}
+                  className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Agent
+                </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Drawer open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} direction="bottom">
+          <SheetContent ensureTitle srTitle="Create New Agent" className="rounded-t-lg border-t border-slate-700 h-[68dvh] max-h-[72dvh] grid grid-rows-[auto,1fr,auto] min-h-0">
+            <SheetHeader className="row-start-1 sticky top-0 z-20 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-4 pt-3 pb-2">
+              <div className="relative">
+                <SheetTitle className="text-base font-semibold text-white flex items-center">
+                  <RobotIcon className="w-5 h-5 mr-2 text-violet-400" />
+                  Create New Agent
+                </SheetTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                  aria-label="Close"
+                >
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </SheetHeader>
+
+            <div className="row-start-2 min-h-0 overflow-y-auto no-scrollbar pr-1 pb-[max(env(safe-area-inset-bottom),16px)] overscroll-contain [-webkit-overflow-scrolling:touch] px-4">
+              <div className="space-y-6">
+                <AgentForm
+                  isEdit={false}
+                  formData={formData}
+                  handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                  handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                  isComposingRef={isComposingRef}
+                  tagInput={tagInput}
+                  setTagInput={setTagInput}
+                  addTag={addTag}
+                  removeTag={removeTag}
+                  handleTagKeyDown={handleTagKeyDown}
+                  models={models}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  parentCandidates={parentCandidates as any}
+                  agents={agents}
+                  isUUID={isUUID}
+                  editingAgent={editingAgent}
+                  toolSearch={toolSearch}
+                  setToolSearch={setToolSearch}
+                  toolCategory={toolCategory}
+                  setToolCategory={setToolCategory}
+                  allCategories={allCategories}
+                  filteredTools={filteredTools}
+                  isDesktop={isDesktop}
+                />
+              </div>
+            </div>
+
+            <div className="row-start-3 z-20 flex justify-end gap-3 pt-2 border-t border-slate-700 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
+              <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm() }} className="border-slate-600 text-slate-300 hover:bg-slate-700">
                 Cancel
               </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={!formData.name || !formData.role || !formData.model}
-                className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button onClick={handleCreate} disabled={!formData.name || !formData.role || !formData.model} className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
                 Create Agent
               </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)}>
-        <DialogContent hasCloseButton={false} className="max-w-2xl bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[95vh] sm:h-auto flex flex-col">
-          <DialogHeader>
-            <div className="relative">
-              <DialogTitle className="text-xl font-bold text-white flex items-center">
-                <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
-                Edit Agent
-              </DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setEditingAgent(null)}
-                className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
-                aria-label="Close"
-              >
-                <XIcon className="w-4 h-4" />
-              </Button>
             </div>
-          </DialogHeader>
+          </SheetContent>
+        </Drawer>
+      )}
 
-          <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
-            <div className="space-y-6">
-              <AgentForm
-                isEdit={true}
-                formData={formData}
-                handleInputChange={(f, v) => handleInputChange(f as any, v)}
-                handleTextInputChange={(f) => handleTextInputChange(f as any)}
-                isComposingRef={isComposingRef}
-                tagInput={tagInput}
-                setTagInput={setTagInput}
-                addTag={addTag}
-                removeTag={removeTag}
-                handleTagKeyDown={handleTagKeyDown}
-                models={models}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                parentCandidates={parentCandidates as any}
-                agents={agents}
-                isUUID={isUUID}
-                editingAgent={editingAgent}
-                toolSearch={toolSearch}
-                setToolSearch={setToolSearch}
-                toolCategory={toolCategory}
-                setToolCategory={setToolCategory}
-                allCategories={allCategories}
-                filteredTools={filteredTools}
-                isDesktop={isDesktop}
-              />
+      {/* Edit (Dialog desktop, Bottom Sheet mobile) */}
+      {isDesktop ? (
+        <Dialog open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)}>
+          <DialogContent hasCloseButton={false} className="max-w-2xl w-[100vw] sm:w-auto bg-slate-800 border-slate-700 sm:rounded-lg rounded-none h-[68dvh] max-h-[72dvh] sm:h-auto grid grid-rows-[auto,1fr,auto] min-h-0 my-2 sm:my-0">
+            <DialogHeader className="row-start-1 sticky top-0 z-20 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70">
+              <div className="relative">
+                <DialogTitle className="text-xl font-bold text-white flex items-center">
+                  <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
+                  Edit Agent
+                </DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setEditingAgent(null)}
+                  className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                  aria-label="Close"
+                >
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="row-start-2 min-h-0 overflow-y-auto no-scrollbar pr-1 pb-[max(env(safe-area-inset-bottom),16px)] overscroll-contain [-webkit-overflow-scrolling:touch]">
+              <div className="space-y-6">
+                <AgentForm
+                  isEdit={true}
+                  formData={formData}
+                  handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                  handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                  isComposingRef={isComposingRef}
+                  tagInput={tagInput}
+                  setTagInput={setTagInput}
+                  addTag={addTag}
+                  removeTag={removeTag}
+                  handleTagKeyDown={handleTagKeyDown}
+                  models={models}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  parentCandidates={parentCandidates as any}
+                  agents={agents}
+                  isUUID={isUUID}
+                  editingAgent={editingAgent}
+                  toolSearch={toolSearch}
+                  setToolSearch={setToolSearch}
+                  toolCategory={toolCategory}
+                  setToolCategory={setToolCategory}
+                  allCategories={allCategories}
+                  filteredTools={filteredTools}
+                  isDesktop={isDesktop}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700 bg-slate-800">
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700 bg-slate-800">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1751,9 +1852,72 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
               >
                 Update Agent
               </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Drawer open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)} direction="bottom">
+          <SheetContent ensureTitle srTitle="Edit Agent" className="rounded-t-lg border-t border-slate-700 h-[64dvh] max-h-[68dvh] grid grid-rows-[auto,1fr,auto] min-h-0">
+            <SheetHeader className="row-start-1 sticky top-0 z-20 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-4 pt-3 pb-2">
+              <div className="relative">
+                <SheetTitle className="text-base font-semibold text-white flex items-center">
+                  <PencilIcon className="w-5 h-5 mr-2 text-violet-400" />
+                  Edit Agent
+                </SheetTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setEditingAgent(null)}
+                  className="absolute right-0 top-0 h-8 w-8 p-0 text-slate-300 hover:text-white"
+                  aria-label="Close"
+                >
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </SheetHeader>
+
+            <div className="row-start-2 min-h-0 overflow-y-auto no-scrollbar pr-1 pb-[max(env(safe-area-inset-bottom),16px)] overscroll-contain [-webkit-overflow-scrolling:touch] px-4">
+              <div className="space-y-6">
+                <AgentForm
+                  isEdit={true}
+                  formData={formData}
+                  handleInputChange={(f, v) => handleInputChange(f as any, v)}
+                  handleTextInputChange={(f) => handleTextInputChange(f as any)}
+                  isComposingRef={isComposingRef}
+                  tagInput={tagInput}
+                  setTagInput={setTagInput}
+                  addTag={addTag}
+                  removeTag={removeTag}
+                  handleTagKeyDown={handleTagKeyDown}
+                  models={models}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  parentCandidates={parentCandidates as any}
+                  agents={agents}
+                  isUUID={isUUID}
+                  editingAgent={editingAgent}
+                  toolSearch={toolSearch}
+                  setToolSearch={setToolSearch}
+                  toolCategory={toolCategory}
+                  setToolCategory={setToolCategory}
+                  allCategories={allCategories}
+                  filteredTools={filteredTools}
+                  isDesktop={isDesktop}
+                />
+              </div>
+            </div>
+
+            <div className="row-start-3 z-20 flex justify-end gap-3 pt-2 border-t border-slate-700 bg-slate-800/95 backdrop-blur supports-[backdrop-filter]:bg-slate-800/70 px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
+              <Button variant="outline" onClick={() => { setEditingAgent(null); resetForm() }} className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                Cancel
+              </Button>
+              <Button onClick={handleUpdate} disabled={!formData.name || !formData.role || !formData.model} className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+                Update Agent
+              </Button>
+            </div>
+          </SheetContent>
+        </Drawer>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>

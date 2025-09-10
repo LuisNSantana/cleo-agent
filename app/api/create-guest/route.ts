@@ -39,7 +39,7 @@ export async function POST(request: Request) {
           message_count: 0,
           premium: false,
           created_at: new Date().toISOString(),
-          favorite_models: [MODEL_DEFAULT_GUEST, "grok-3-mini", "gpt-5-mini-2025-08-07"],
+          favorite_models: [MODEL_DEFAULT_GUEST, "langchain:balanced-local"],
         })
         .select("*")
         .single()

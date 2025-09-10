@@ -16,6 +16,8 @@ import {
 	validateAndTrackUsage,
 } from '../chat/api'
 import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
+import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
+import { analyzeDelegationIntent } from '@/lib/agents/delegation'
 
 // Request schema compatible with main chat endpoint
 const PromptVariantSchema = z.enum([
@@ -280,6 +282,23 @@ export async function POST(req: NextRequest) {
 		const mentionsWorkspace = /\bworkspace(s)?\b|\bespacio(s)?\s+de\s+trabajo\b/.test(lowerMsg)
 		const mentionsDelegate = /\bdeleg(a|ar|aci[oó]n)\b|\b(dile|di|puedes decir(le)?)\s+a\s+(ami|peter|emma|toby|apu)\b/.test(lowerMsg)
 
+		// Use intelligent delegation analyzer for automatic agent detection
+		let intelligentDelegation: { agentId: string; toolName: string; confidence: number } | null = null
+		try {
+			console.log('🧠 [MULTI-MODEL] Analyzing for delegation:', normalizedContent?.substring(0, 100))
+			const analysis = analyzeDelegationIntent(normalizedContent || '')
+			if (analysis && analysis.confidence > 0.4) { // Lower threshold for multi-model endpoint
+				intelligentDelegation = {
+					agentId: analysis.agentId,
+					toolName: analysis.toolName,
+					confidence: analysis.confidence
+				}
+				console.log('🎯 [MULTI-MODEL] Auto-detected delegation:', intelligentDelegation)
+			}
+		} catch (error) {
+			console.warn('⚠️ [MULTI-MODEL] Delegation analysis failed:', error)
+		}
+
 		const likelyToolIntent = (
 			/\b(clima|tiempo|pron[oó]stico|weather|forecast)\b/.test(lowerMsg) ||
 			/\b(buscar|busca|b[uú]scame|b[uú]squeda|buscarme|search|google)\b/.test(lowerMsg) ||
@@ -288,7 +307,8 @@ export async function POST(req: NextRequest) {
 			/\b(calendario|evento|agenda|schedule)\b/.test(lowerMsg) ||
 			/\b(email|correo|gmail)\b/.test(lowerMsg) ||
 			/\b(drive|archivo|documento|abrir|open|crear|create)\b/.test(lowerMsg) ||
-			mentionsNotion || mentionsWorkspace || mentionsDelegate || mentionsAmi || mentionsPeter || mentionsEmma || mentionsToby || mentionsApu
+			mentionsNotion || mentionsWorkspace || mentionsDelegate || mentionsAmi || mentionsPeter || mentionsEmma || mentionsToby || mentionsApu ||
+			Boolean(intelligentDelegation) // Include intelligent delegation detection
 		)
 
 		// If specific subagents are mentioned, prefer enabling only delegation tool(s)
@@ -298,10 +318,25 @@ export async function POST(req: NextRequest) {
 		if (mentionsEmma) allowedToolsAuto.push('delegate_to_emma')
 		if (mentionsToby) allowedToolsAuto.push('delegate_to_toby')
 		if (mentionsApu) allowedToolsAuto.push('delegate_to_apu')
+		
+		// Add intelligent delegation tool if detected
+		if (intelligentDelegation && !allowedToolsAuto.includes(intelligentDelegation.toolName)) {
+			allowedToolsAuto.push(intelligentDelegation.toolName)
+			console.log('🤖 [MULTI-MODEL] Added intelligent delegation tool:', intelligentDelegation.toolName)
+		}
 
 		const enableToolsAuto = metadata.enableTools ?? (likelyToolIntent || allowedToolsAuto.length > 0)
 		if (enableToolsAuto) {
-			console.log('🧰 Tools enabled (auto):', { mentionsAmi, mentionsPeter, mentionsEmma, mentionsToby, mentionsApu, mentionsNotion, mentionsWorkspace, mentionsDelegate, allowedToolsAuto })
+			console.log('🧰 Tools enabled (auto):', { 
+				mentionsAmi, mentionsPeter, mentionsEmma, mentionsToby, mentionsApu, 
+				mentionsNotion, mentionsWorkspace, mentionsDelegate, 
+				allowedToolsAuto,
+				intelligentDelegation: intelligentDelegation ? {
+					agent: intelligentDelegation.agentId,
+					tool: intelligentDelegation.toolName,
+					confidence: Math.round(intelligentDelegation.confidence * 100) + '%'
+				} : null
+			})
 		}
 
 		// Attach per-request context so tools can read userId/model
@@ -410,6 +445,9 @@ export async function POST(req: NextRequest) {
 				const readable = new ReadableStream<Uint8Array>({
 			start(controller) {
 				try {
+					// Set up pipeline event controller for delegation events
+					setPipelineEventController(controller, encoder)
+
 					const fullText = pipelineResult.result || ''
 
 					// Notify start of text stream
@@ -489,9 +527,15 @@ export async function POST(req: NextRequest) {
 					controller.enqueue(encoder.encode(`data: ${JSON.stringify(finishEvent)}\n\n`))
 					// SSE terminator for clients that expect it
 					controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+					
+					// Clean up pipeline event controller
+					clearPipelineEventController()
+					
 					controller.close()
 				} catch (streamError) {
 					console.error('❌ Streaming error:', streamError)
+					// Clean up pipeline event controller on error
+					clearPipelineEventController()
 					controller.error(streamError as any)
 				}
 			},

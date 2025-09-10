@@ -294,8 +294,8 @@ export function ChatInput({
                 setSelectedModelIdAction={onSelectModelAction}
                 isUserAuthenticated={isUserAuthenticated}
               />
-              {/* Mobile Draw Button */}
-              {isMobile && (
+              {/* Mobile Draw Button - DISABLED TEMPORARILY */}
+              {/* {isMobile && (
                 <Button
                   onClick={openCanvas}
                   size="sm"
@@ -305,7 +305,7 @@ export function ChatInput({
                 >
                   <PencilSimple className="size-4" />
                 </Button>
-              )}
+              )} */}
               {/* Mobile Integrations Drawer Trigger */}
               {isMobile && isUserAuthenticated && (
                 <Drawer open={isIntegrationsOpen} onOpenChange={setIsIntegrationsOpen} direction="bottom">

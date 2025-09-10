@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
 import dynamic from "next/dynamic"
 import { redirect } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useChatCore } from "./use-chat-core"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
@@ -31,6 +31,8 @@ const DialogAuth = dynamic(
 )
 
 export function Chat() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const { chatId } = useChatSession()
   const {
     createNewChat,
@@ -196,10 +198,12 @@ export function Chat() {
 
   const showOnboarding = !chatId && messages.length === 0
 
+  if (!mounted) return null
+
   return (
     <div
       className={cn(
-        "@container/main relative flex h-full flex-col items-center justify-end md:justify-center"
+        "@container/main relative flex h-full flex-col items-center justify-end md:justify-center overflow-hidden"
       )}
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
@@ -237,7 +241,7 @@ export function Chat() {
 
       <motion.div
         className={cn(
-          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl"
+          "fixed md:relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl pb-[max(env(safe-area-inset-bottom),0px)] bg-gradient-to-t from-background/80 to-transparent md:bg-transparent"
         )}
         layout="position"
         layoutId="chat-input-container"

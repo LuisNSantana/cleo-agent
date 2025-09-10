@@ -18,6 +18,7 @@ import {
 } from "./api"
 import { createErrorResponse } from "./utils"
 import { ChatRequest, ChatRequestSchema } from "./schema"
+import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
 import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
 import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
 import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
@@ -382,6 +383,8 @@ export async function POST(req: Request) {
   // Triggered when model id starts with 'agents:' or when env flag is set
   // Also enable orchestrator-backed mode when the user message clearly implies delegation/sub-agents
   let impliesDelegation = false
+  let intelligentDelegation: { agentId: string; toolName: string; confidence: number } | null = null
+  
   try {
     // Be robust to AI SDK v5: prefer parts[].text over content
     const lastUserAny: any = [...messages].reverse().find((m) => m.role === 'user') as any
@@ -394,8 +397,25 @@ export async function POST(req: Request) {
         lastUserText = lastUserAny.content
       }
     }
+    
+    // Use intelligent delegation analyzer for better detection
+    const { analyzeDelegationIntent } = await import('@/lib/agents/delegation')
+    intelligentDelegation = analyzeDelegationIntent(lastUserText || '')
+    
+    // Basic regex fallback + intelligent analysis
     const lm = String(lastUserText || '').toLowerCase()
-    impliesDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
+    const basicDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
+  const intelligentFlag = !!intelligentDelegation && intelligentDelegation.confidence > 0.6
+  impliesDelegation = basicDelegation || intelligentFlag
+    
+    if (intelligentDelegation && intelligentDelegation.confidence > 0.5) {
+      console.log('🎯 Intelligent delegation detected:', {
+        agent: intelligentDelegation.agentId,
+        tool: intelligentDelegation.toolName,
+        confidence: Math.round(intelligentDelegation.confidence * 100) + '%',
+        userMessage: lastUserText?.substring(0, 100) + '...'
+      })
+    }
   } catch {}
   const orchestratorBacked = model?.startsWith('agents:') || process.env.GLOBAL_CHAT_SUPERVISED === 'true' || impliesDelegation
 
@@ -464,7 +484,7 @@ export async function POST(req: Request) {
             // Allowlist tools for safety
             allowedTools,
             // Extract router type from langchain model ID for proper routing
-            routerType: model?.replace('langchain:', '').replace('-router', ''),
+            routerType: originalModel?.replace('langchain:', '').replace('-router', ''),
           },
         }
 
@@ -562,6 +582,9 @@ export async function POST(req: Request) {
   const persistedParts: any[] = []
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
+            // Set up pipeline event controller for delegation events
+            setPipelineEventController(controller, encoder)
+            
             function send(obj: any) {
               try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)) } catch {}
             }
@@ -762,12 +785,16 @@ export async function POST(req: Request) {
                   }
 
                   clearInterval(interval)
+                  // Clean up pipeline event controller
+                  clearPipelineEventController()
                   try { controller.close() } catch {}
                 }
               } catch (err) {
                 // Emit error and close
                 try { send({ type: 'finish', error: 'execution-bridge-failed' }) } catch {}
                 clearInterval(interval)
+                // Clean up pipeline event controller on error
+                clearPipelineEventController()
                 try { controller.close() } catch {}
               }
             }, POLL_MS)

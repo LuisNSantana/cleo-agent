@@ -31,6 +31,8 @@ type GroupedMessage = {
 }
 
 export function MultiChat() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const [prompt, setPrompt] = useState("")
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
   const [files, setFiles] = useState<File[]>([])
@@ -81,9 +83,11 @@ export function MultiChat() {
     return availableModels.filter((model) => combined.includes(model.id))
   }, [availableModels, selectedModelIds, modelsFromPersisted])
 
-  if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
-    setSelectedModelIds(modelsFromLastGroup)
-  }
+  useEffect(() => {
+    if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
+      setSelectedModelIds(modelsFromLastGroup)
+    }
+  }, [selectedModelIds.length, modelsFromLastGroup])
 
   const modelChats = useMultiChat(allModelsToMaintain)
   const [enableSearch, setEnableSearch] = useState(false)
@@ -392,10 +396,12 @@ export function MultiChat() {
 
   const showOnboarding = messageGroups.length === 0 && !messagesLoading
 
+  if (!mounted) return null
+
   return (
     <div
       className={cn(
-        "@container/main relative flex h-full flex-col items-center",
+        "@container/main relative flex h-full flex-col items-center overflow-hidden",
         showOnboarding ? "justify-end md:justify-center" : "justify-end"
       )}
     >
@@ -436,7 +442,7 @@ export function MultiChat() {
       <motion.div
         className={cn(
           "z-50 mx-auto w-full max-w-3xl",
-          showOnboarding ? "relative" : "absolute right-0 bottom-0 left-0"
+          showOnboarding ? "relative" : "fixed md:absolute right-0 bottom-0 left-0 pb-[max(env(safe-area-inset-bottom),0px)]"
         )}
         layout="position"
         layoutId="multi-chat-input-container"

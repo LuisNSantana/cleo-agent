@@ -17,6 +17,14 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     // Speed up import resolution for large UI/icon libs
     optimizePackageImports: ["@phosphor-icons/react", "lucide-react"],
   },
+  // Allow ngrok origins in development
+  ...(!isProd && {
+    allowedOrigins: [
+      "*.ngrok-free.app",
+      "*.ngrok.app", 
+      "localhost:3000"
+    ]
+  }),
   // Ensure server bundles don't try to include native/heavy packages
   serverExternalPackages: ["shiki", "vscode-oniguruma", "canvas", "jsdom", "@langchain/langgraph", "@langchain/core"],
     // Keep Webpack customization only for production builds to avoid Turbopack warnings in dev

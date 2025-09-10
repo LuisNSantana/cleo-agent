@@ -3,6 +3,46 @@ import { z } from 'zod';
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
+// Global event controller for pipeline streaming
+let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
+let globalEventEncoder: TextEncoder | null = null
+
+// Set the event controller for pipeline streaming
+export function setPipelineEventController(controller: ReadableStreamDefaultController<Uint8Array>, encoder: TextEncoder) {
+  globalEventController = controller
+  globalEventEncoder = encoder
+}
+
+// Clear the event controller
+export function clearPipelineEventController() {
+  globalEventController = null
+  globalEventEncoder = null
+}
+
+// Helper to emit pipeline events
+function emitPipelineEvent(event: any) {
+  if (globalEventController && globalEventEncoder) {
+    try {
+      globalEventController.enqueue(globalEventEncoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+    } catch (error) {
+      console.warn('Failed to emit pipeline event:', error)
+    }
+  }
+}
+
+// Helper to get display name for agents
+function getAgentDisplayName(agentId: string): string {
+  const agentNames: Record<string, string> = {
+    'toby-technical': 'Toby',
+    'ami-assistant': 'Ami', 
+    'peter-workspace': 'Peter',
+    'emma-ecommerce': 'Emma',
+    'apu-research': 'Apu',
+    'wex-automation': 'Wex'
+  }
+  return agentNames[agentId] || agentId
+}
+
 // Delegation tool schema
 const delegationSchema = z.object({
   task: z.string().describe('The specific task to delegate to the specialist agent'),
@@ -44,6 +84,15 @@ async function runDelegation(params: {
   normPriority ? `Prioridad: ${normPriority}` : null,
   ].filter(Boolean).join('\n')
 
+  // Emit delegation start event
+  emitPipelineEvent({
+    type: 'delegation-start',
+    agentId,
+    agentName: getAgentDisplayName(agentId),
+    task,
+    timestamp: new Date().toISOString()
+  })
+
   // Start execution (UI variant propagates user/thread when present)
   const exec = orchestrator.startAgentExecutionForUI?.(input, agentId, undefined, userId, [], true)
     || orchestrator.startAgentExecution?.(input, agentId)
@@ -53,9 +102,20 @@ async function runDelegation(params: {
   const TIMEOUT_MS = 120_000
   const POLL_MS = 600
 
+  // Emit processing event
+  emitPipelineEvent({
+    type: 'delegation-processing',
+    agentId,
+    agentName: getAgentDisplayName(agentId),
+    status: 'running',
+    timestamp: new Date().toISOString()
+  })
+
   // Poll until completion/timeout
   let finalResult: string | null = null
   let status: string = 'running'
+  let lastStatus = ''
+  
   while (Date.now() - startedAt < TIMEOUT_MS) {
     // Small delay
     // eslint-disable-next-line no-await-in-loop
@@ -64,12 +124,44 @@ async function runDelegation(params: {
     try {
       const snapshot = execId ? orchestrator.getExecution?.(execId) : null
       status = snapshot?.status || status
+      
+      // Emit progress events when status changes
+      if (status !== lastStatus) {
+        emitPipelineEvent({
+          type: 'delegation-progress',
+          agentId,
+          agentName: getAgentDisplayName(agentId),
+          status,
+          progress: snapshot?.progress || 0,
+          timestamp: new Date().toISOString()
+        })
+        lastStatus = status
+      }
+      
       if (snapshot?.status === 'completed') {
         finalResult = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+        
+        // Emit completion event
+        emitPipelineEvent({
+          type: 'delegation-complete',
+          agentId,
+          agentName: getAgentDisplayName(agentId),
+          result: finalResult,
+          timestamp: new Date().toISOString()
+        })
         break
       }
       if (snapshot?.status === 'failed') {
         finalResult = `Delegation failed: ${snapshot?.error || 'unknown error'}`
+        
+        // Emit failure event
+        emitPipelineEvent({
+          type: 'delegation-error',
+          agentId,
+          agentName: getAgentDisplayName(agentId),
+          error: snapshot?.error || 'unknown error',
+          timestamp: new Date().toISOString()
+        })
         break
       }
     } catch (e) {

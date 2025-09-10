@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       created_at: new Date().toISOString(),
       message_count: 0,
       premium: false,
-  favorite_models: [MODEL_DEFAULT, "grok-3-mini", "gpt-5-mini-2025-08-07"],
+  favorite_models: [MODEL_DEFAULT, "grok-3-mini", "langchain:balanced-local"],
     })
 
     if (insertError && insertError.code !== "23505") {
@@ -90,10 +90,22 @@ export async function GET(request: Request) {
     console.error("Error ensuring MODEL_DEFAULT in favorites:", err)
   }
 
-  const host = request.headers.get("host")
-  const protocol = host?.includes("localhost") ? "http" : "https"
+  // Use NEXT_PUBLIC_APP_URL if available (for ngrok), otherwise construct from host
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (() => {
+    const host = request.headers.get("host")
+    const protocol = host?.includes("localhost") ? "http" : "https"
+    return `${protocol}://${host}`
+  })()
 
-  const redirectUrl = `${protocol}://${host}${next}`
+  const redirectUrl = `${baseUrl}${next}`
+  
+  // Debug logging for ngrok issues
+  console.log('🔍 [AUTH CALLBACK DEBUG]')
+  console.log('NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL)
+  console.log('Host header:', request.headers.get("host"))
+  console.log('Constructed baseUrl:', baseUrl)
+  console.log('Next path:', next)
+  console.log('Final redirectUrl:', redirectUrl)
 
   return NextResponse.redirect(redirectUrl)
 }

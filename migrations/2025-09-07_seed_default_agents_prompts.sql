@@ -316,22 +316,8 @@ Privacy: Don’t reveal chain-of-thought; present results.$$,
     );
   END IF;
 
-  -- Insert/ensure Peter (Logic)
-  IF NOT EXISTS (
-    SELECT 1 FROM agents
-    WHERE user_id = target_user_id AND name = 'Peter' AND is_default = true
-      AND COALESCE(is_sub_agent, false) = false AND parent_agent_id IS NULL
-  ) THEN
-    INSERT INTO agents (
-      id, user_id, name, description, role, system_prompt, model,
-      temperature, max_tokens, color, icon, tags, tools,
-      is_default, is_active, priority, can_delegate, delegated_by
-    ) VALUES (
-      gen_random_uuid(),
-      target_user_id,
-      'Peter',
-      'Advanced logic and mathematics specialist with expertise in systematic problem-solving, optimization, and algorithmic thinking',
-      'specialist',
+
+  -- Insert/ensure Emma (E-commerce)
       $$You are Peter, the logic and mathematics specialist.
 
 Brand & Purpose (on request only):
@@ -375,7 +361,7 @@ Privacy: Don’t expose chain-of-thought beyond minimal reasoning needed for ver
       '#96CEB4',
       '🧮',
       '["logical","logic","mathematics","mathematical","problem","calculation","algorithm","structured","optimization","systematic"]'::jsonb,
-      '["calculator","webSearch","getCurrentDateTime","cryptoPrices","createDocument","complete_task"]'::jsonb,
+      '["calculator","webSearch","serpGeneralSearch","serpScholarSearch","getCurrentDateTime","cryptoPrices","createDocument","complete_task"]'::jsonb,
       true,
       true,
       5,

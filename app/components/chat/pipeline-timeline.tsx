@@ -10,7 +10,7 @@ export type PipelineStep = {
   id: string
   timestamp: string | Date
   agent: string
-  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing'
+  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing' | 'delegation'
   content: string
   progress?: number
   metadata?: any
@@ -31,6 +31,7 @@ function actionLabel(action: PipelineStep['action']) {
     case 'analyzing': return 'Analyzing'
     case 'thinking': return 'Processing'
     case 'delegating': return 'Delegating'
+    case 'delegation': return 'Agent Task'
     case 'responding': return 'Responding'
     case 'completing': return 'Finalizing'
     case 'reviewing': return 'Supervising'
@@ -175,6 +176,7 @@ function StatusDot({ action }: { action: PipelineStep['action'] }) {
       case 'analyzing': return 'bg-amber-500'
       case 'thinking': return 'bg-purple-500'
       case 'delegating': return 'bg-cyan-500'
+      case 'delegation': return 'bg-indigo-500'
       case 'responding': return 'bg-emerald-500'
       case 'completing': return 'bg-slate-500'
       default: return 'bg-slate-400'

@@ -307,7 +307,13 @@ export const AMI_AGENT: AgentConfig = {
     'searchDriveFiles',
     'getDriveFileDetails',
     'listGmailMessages',
-    'getGmailMessage',
+  'getGmailMessage',
+  'sendGmailMessage',
+  // SerpAPI tools for richer search workflows (restaurants, flights, LinkedIn, news)
+  'serpGeneralSearch',
+  'serpNewsSearch',
+  'serpLocationSearch',
+  'serpAutocomplete',
     // Notion Tools for workspace management
     'get-notion-page',
     'create-notion-page',
@@ -360,12 +366,30 @@ Professional Tone & Approach:
 
 Tools & Capabilities:
 - webSearch: Research people, companies, market trends, contact information, industry insights
+- SerpAPI (Google):
+  - serpLocationSearch → local places (restaurants, cafés, venues). Provide 3–5 options with name, rating, price level, address, phone, website, opening hours, and a short why-this option note.
+  - serpGeneralSearch → flights (use site filters like site:google.com/travel/flights, site:skyscanner.com), LinkedIn lookups (site:linkedin.com/in OR site:linkedin.com/company), general info.
+  - serpNewsSearch → current news by timeframe (e.g., last 24h/7d). Always cite sources succinctly.
+  - serpAutocomplete → expand/clarify queries when needed.
 - Google Workspace Reading: Read and analyze Google Docs, Sheets, Slides for meeting prep, content review, data extraction
-- Email Management: Read Gmail messages, organize inbox, extract action items and important information
+- Email Management: Read Gmail messages, organize inbox, extract action items and important information; draft replies and send after explicit confirmation.
 - Calendar Management: Review calendar events, schedule coordination, meeting preparation
 - Drive Management: Search and locate files, organize document access, file review and summarization
 - Notion workspace management: Create organized pages, databases, project trackers, meeting notes
 - Contact management: Maintain client databases, relationship tracking, communication logs
+
+Email Triage & Reply (Gmail):
+- Triage: Use listGmailMessages (e.g., q: "is:unread newer_than:7d" or label filters). For details, call getGmailMessage.
+- Draft then Confirm: Propose a short, professional draft first. Only call sendGmailMessage after user confirms or clearly instructs to send. Use threadId and proper subject.
+- Organize: When helpful, suggest labels or follow-ups (do not modify labels automatically unless asked).
+
+Restaurants, Flights, LinkedIn:
+- Restaurants: Prefer serpLocationSearch with city/area keyword (or infer from context). Return a compact ranked list with practical details and a quick recommendation.
+- Flights: Use serpGeneralSearch with site filters (Google Flights/Skyscanner/Kayak). Extract routes, dates, price ranges, airlines, and key constraints. If the user has strict dates/budget, confirm them.
+- LinkedIn: Use serpGeneralSearch with site:linkedin.com filters. Provide likely profile/company links with role/title and 1–2 key highlights.
+
+News Briefings (on request):
+- Use serpNewsSearch with timeframe (e.g., last 24h) and 4–8 articles. Provide a 5–8 bullet digest with source tags (Outlet – date). Do not self-schedule; users can create periodic tasks.
 
 Secretary & Administrative Functions:
 You excel at traditional secretarial tasks including:
@@ -446,15 +470,18 @@ export const PETER_AGENT: AgentConfig = {
     'createGoogleDoc',
     'readGoogleDoc', 
     'updateGoogleDoc',
+    'listGoogleDocs',
     'createGoogleSheet',
     'readGoogleSheet',
     'updateGoogleSheet',
-    'listCalendarEvents',
-    'createCalendarEvent',
-    'listDriveFiles',
-    'searchDriveFiles',
-    'getDriveFileDetails',
+    'createGoogleSlides',
+    'scheduleGoogleCalendarEvent',
+    'serpGeneralSearch',
+    'serpScholarSearch',
+    'calculator',
     'getCurrentDateTime',
+    'cryptoPrices',
+    'createDocument',
     'complete_task'
   ],
   tags: ['google', 'workspace', 'docs', 'sheets', 'drive', 'calendar', 'productivity', 'documents', 'spreadsheets', 'automation'],
@@ -524,7 +551,7 @@ Privacy: Don’t expose chain-of-thought beyond minimal reasoning needed for ver
 export const EMMA_AGENT: AgentConfig = {
   id: 'emma-ecommerce',
   name: 'Emma',
-  description: 'Specialist in ecommerce and sales with expertise in Shopify management, analytics, and customer insights',
+  description: 'E-commerce Revenue Optimizer specializing in Shopify analytics, customer insights, inventory management, and automated store optimizations',
   role: 'specialist',
   model: 'gpt-4o-mini',
   temperature: 0.4,
@@ -538,7 +565,15 @@ Brand & Purpose (on request only):
 
 Role & Goals:
 - Analyze store data, propose improvements, and execute safe, confirmed changes.
-- Optimize for ROI, conversion, and customer experience.
+- Optimize for ROI, conversion, and customer experience through data-driven insights.
+- Provide actionable recommendations with clear KPIs and automated workflows.
+- ALWAYS respond in the user's language (English, Spanish, etc.)
+
+**Core Workflows**:
+
+📈 **Store Analysis**: shopifyGetAnalytics → shopifyGetProducts → shopifyGetOrders → Insights
+💰 **Price Changes**: shopifySearchProducts → Preview → Confirmation → Execute → Monitor  
+🎯 **Customer Analysis**: shopifyGetCustomers → shopifyGetOrders → Behavior patterns
 
 Tools:
 - shopifyGetProducts, shopifyGetOrders, shopifyGetAnalytics, shopifyGetCustomers

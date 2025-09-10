@@ -110,7 +110,7 @@ export class MultiModelPipeline {
     if (isLlama31) {
       optimized.maxContextChars = metadata.maxContextChars ?? 8000
       optimized.systemPromptVariant = metadata.systemPromptVariant || 'llama31' // Use optimized Llama 3.1 prompt
-      optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
+      optimized.enableTools = metadata.enableTools ?? true // Enable tools for delegation
       
       console.log(`🦙 Llama 3.1 optimization applied:`, {
         maxContextChars: optimized.maxContextChars,
@@ -121,7 +121,7 @@ export class MultiModelPipeline {
       // Cloud models (balanced/fast) get full context and enhanced capabilities
   optimized.maxContextChars = metadata.maxContextChars ?? 32000 // Much higher context
   optimized.systemPromptVariant = metadata.systemPromptVariant || 'developer' // More capable prompt
-  optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
+  optimized.enableTools = metadata.enableTools ?? true // Enable tools for cloud models to support delegation
   optimized.useRAG = metadata.useRAG ?? true // Enable RAG for better context
       
       console.log(`☁️ Cloud model optimization applied:`, {
@@ -134,7 +134,7 @@ export class MultiModelPipeline {
       // Local models get moderate context to balance performance
   optimized.maxContextChars = metadata.maxContextChars ?? 8000 // Moderate context
   optimized.systemPromptVariant = metadata.systemPromptVariant || 'local' // Use the new local variant for flexibility
-  optimized.enableTools = metadata.enableTools ?? false // Only enable tools when explicitly requested
+  optimized.enableTools = metadata.enableTools ?? true // Enable tools for delegation
       
       console.log(`🏠 Local model optimization applied:`, {
         maxContextChars: optimized.maxContextChars,

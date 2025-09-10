@@ -2,7 +2,7 @@ import { toast } from "@/components/ui/toast"
 import { Chats } from "@/lib/chat-store/types"
 import { MODEL_DEFAULT, MODEL_DEFAULT_GUEST } from "@/lib/config"
 import type { UserProfile } from "@/lib/user/types"
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 
 interface UseModelProps {
   currentChat: Chats | null
@@ -26,17 +26,29 @@ export function useModel({
   updateChatModel,
   chatId,
 }: UseModelProps) {
+  // Prevent hydration mismatch by using consistent default
+  const [isMounted, setIsMounted] = useState(false)
+  
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   // Calculate the effective model based on priority: chat model > default > first favorite model
   const getEffectiveModel = useCallback((): string => {
+    // During SSR/hydration, always return fast model to prevent mismatch
+    if (!isMounted) {
+      return MODEL_DEFAULT_GUEST
+    }
+    
     const firstFavoriteModel = user?.favorite_models?.[0]
     // If no authenticated user, use guest default
     if (!user) {
       return (currentChat?.model ?? MODEL_DEFAULT_GUEST) as string
     }
   // Authenticated user: prefer the app's default model (MODEL_DEFAULT) before user's favorites
-  // This ensures logged-in users see Cleo (local model) by default unless the chat has an explicit model
+  // This ensures logged-in users see Fast model by default unless the chat has an explicit model
   return (currentChat?.model ?? MODEL_DEFAULT ?? firstFavoriteModel) as string
-  }, [currentChat?.model, user?.favorite_models, user])
+  }, [currentChat?.model, user?.favorite_models, user, isMounted])
 
   // Use local state only for temporary overrides, derive base value from props
   const [localSelectedModel, setLocalSelectedModel] = useState<string | null>(

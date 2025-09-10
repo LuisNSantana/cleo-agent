@@ -73,21 +73,9 @@ const GmailIcon = ({ className }: { className?: string }) => (
 export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
   const [services, setServices] = useState<ServiceConnection[]>([
     {
-      id: "google-calendar",
-      name: "Google Calendar",
-      icon: GoogleCalendarIcon,
-      status: "disconnected"
-    },
-    {
-      id: "google-drive", 
-      name: "Google Drive",
-      icon: GoogleDriveIcon,
-      status: "disconnected"
-    },
-    {
-      id: "gmail",
-      name: "Gmail",
-      icon: GmailIcon,
+      id: "google-workspace",
+      name: "Google Workspace",
+      icon: GoogleDriveIcon, // Using Drive icon to represent workspace
       status: "disconnected"
     },
     {
@@ -279,6 +267,7 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
   const connectedCount = services.filter(s => s.status === "connected").length
   const connectingCount = services.filter(s => s.status === "connecting").length
   const totalCount = services.length
+  const allServicesConnected = connectedCount === totalCount && totalCount === 2 // Both Workspace and Notion
 
   const getStatusColor = (status: ServiceStatus) => {
     switch (status) {
@@ -356,15 +345,15 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
       <div className="mt-4 pt-3 border-t">
         <p className="text-xs text-muted-foreground mb-2">
           {connectedCount === 0 
-            ? "Connect services to unlock powerful integrations with your data."
-            : connectedCount === totalCount 
-              ? "🎉 All integrations active! Your data is fully connected."
-              : `${connectedCount} of ${totalCount} integrations connected. Connect more for full functionality.`
+            ? "Connect Workspace and Notion to unlock powerful integrations with your data."
+            : allServicesConnected 
+              ? "🎉 All integrations active! Your workspace is fully connected."
+              : `${connectedCount} of ${totalCount} integrations connected. Connect both for full functionality.`
           }
         </p>
         {connectedCount > 0 && (
           <p className="text-xs text-green-600 dark:text-green-400">
-            💡 Try asking: "Show my unread emails", "Show my recent files", or "What's on my calendar today?"
+            💡 Try asking: "Show my recent files", "What's on my calendar?", or "Search my Notion workspace"
           </p>
         )}
       </div>
@@ -396,17 +385,17 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
               ? 'border-orange-200 hover:border-orange-300 dark:border-orange-800 dark:hover:border-orange-700 animate-pulse' 
               : connectedCount === 0 
                 ? 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700' 
-                : connectedCount < totalCount
-                  ? 'border-orange-200 hover:border-orange-300 dark:border-orange-800 dark:hover:border-orange-700' 
-                  : 'border-green-200 hover:border-green-300 dark:border-green-800 dark:hover:border-green-700'
+                : allServicesConnected
+                  ? 'border-green-200 hover:border-green-300 dark:border-green-800 dark:hover:border-green-700 bg-green-50 dark:bg-green-950' 
+                  : 'border-orange-200 hover:border-orange-300 dark:border-orange-800 dark:hover:border-orange-700'
           }`}
           aria-label={
             connectingCount > 0
               ? `Service integrations - ${connectingCount} connecting, ${connectedCount} active`
               : connectedCount === 0 
                 ? "Service integrations - No connections active"
-                : connectedCount === totalCount 
-                  ? `Service integrations - All ${totalCount} services connected`
+                : allServicesConnected 
+                  ? "Service integrations - Workspace and Notion connected"
                   : `Service integrations - ${connectedCount} of ${totalCount} services connected`
           }
         >
@@ -414,10 +403,10 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
             <CirclesFourIcon className="size-4 text-orange-500 dark:text-orange-400 animate-pulse" />
           ) : connectedCount === 0 ? (
             <PuzzlePieceIcon className="size-4 text-gray-500 dark:text-gray-400" />
-          ) : connectedCount < totalCount ? (
-            <CirclesFourIcon className="size-4 text-orange-500 dark:text-orange-400" />
-          ) : (
+          ) : allServicesConnected ? (
             <CirclesFourIcon className="size-4 text-green-600 dark:text-green-400" />
+          ) : (
+            <CirclesFourIcon className="size-4 text-orange-500 dark:text-orange-400" />
           )}
           {(connectedCount > 0 || connectingCount > 0) && (
             <Badge 
@@ -425,7 +414,7 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
               className={`absolute -top-1 -right-1 size-4 p-0 text-[10px] border-0 ${
                 connectingCount > 0 
                   ? 'bg-orange-500 text-white animate-pulse' 
-                  : connectedCount === totalCount 
+                  : allServicesConnected 
                     ? 'bg-green-500 text-white' 
                     : 'bg-orange-500 text-white'
               }`}
