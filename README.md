@@ -1,153 +1,70 @@
 
-# Cleo v4.0 – Complete Modular Multi-Agent AI System
+# 🤖 Cleo - Multi-Agent AI System
 
-**Cleo by Huminary Labs is a revolutionary AI system with complete modular architecture, advanced multi-agent coordination, and enterprise-grade reliability.**
+**An intelligent multi-agent AI platform tha## 🤝 Contributing
 
-![cleo cover](./public/logocleo.png)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
----
+## 📄 License
 
-## 🚀 Revolutionary Changes in v4.0
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-- **🏗️ Complete Modular Core Architecture:** Fully integrated modular orchestrator with advanced error handling, execution management, and real-time monitoring
-- **🎯 Enhanced Agent Specializations:** Dramatically improved capabilities for all agents with advanced tools, methodologies, and domain expertise
-- **⚡ Enhanced Adapter System:** Seamless integration of modular core with legacy delegation for optimal performance
-- **🛡️ Enterprise-Grade Reliability:** Advanced error classification, circuit breaker patterns, and automatic recovery strategies
-- **📊 Comprehensive Observability:** Real-time metrics, performance analytics, and predictive insights
-- **🔧 Optimized Tool Integration:** Enhanced tool runtime with intelligent caching and execution optimization
+## 🙏 Acknowledgments
 
----
-
-## 🤖 Advanced Multi-Agent Team
-
-### 💝 Cleo - Advanced Emotional Intelligence Supervisor
-- **Enhanced Role**: Sophisticated emotional detection and intelligent task orchestration
-- **Advanced Capabilities**: Context preservation, quality assurance, empathetic interaction
-- **Tools**: `getCurrentDateTime`, `weatherInfo`, `randomFact`
-- **Specializations**: Emotional AI, delegation optimization, user experience excellence
-
-### 🔬 Toby - Advanced Technical Research Specialist  
-- **Enhanced Role**: Deep technical analysis and comprehensive research excellence
-- **Advanced Capabilities**: Statistical analysis, API documentation research, performance optimization
-- **Tools**: `webSearch`, `calculator`, `getCurrentDateTime`, `cryptoPrices`, `complete_task`
-- **Specializations**: Data analysis, technical feasibility, system architecture evaluation
-
-### 🎨 Ami - Advanced Creative Design & Innovation Specialist
-- **Enhanced Role**: Strategic creativity and design thinking leadership
-- **Advanced Capabilities**: Design thinking processes, content strategy, brand development
-- **Tools**: `webSearch`, `randomFact`, `createDocument`, `getCurrentDateTime`, `complete_task`
-- **Specializations**: User-centered design, creative campaigns, innovation facilitation
-
-### 🧮 Peter - Advanced Logic & Mathematical Problem Solver
-- **Enhanced Role**: Systematic reasoning and complex optimization
-- **Advanced Capabilities**: Statistical modeling, algorithmic design, financial mathematics
-- **Tools**: `calculator`, `webSearch`, `getCurrentDateTime`, `cryptoPrices`, `createDocument`, `complete_task`
-- **Specializations**: Mathematical proofs, optimization algorithms, risk assessment
-
-### 🛍️ Emma - Enhanced E-commerce & Business Intelligence Specialist
-- **Enhanced Role**: Advanced Shopify management and business optimization
-- **Advanced Capabilities**: Multi-store operations, predictive analytics, customer segmentation
-- **Tools**: All Shopify tools + `complete_task` (Products, Orders, Analytics, Customers, Search, Price Updates)
-- **Specializations**: Sales optimization, inventory management, conversion strategies
+- Built with [Next.js](https://nextjs.org/) and [LangChain](https://langchain.com/)
+- Powered by [Supabase](https://supabase.com/) for backend services
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
 
 ---
 
-## 🏗️ Complete Modular Architecture
+<div align="center">
+  <strong>Made with ❤️ by Huminary Labs</strong>
+</div>lized agents for complex tasks and workflows.**
 
-### Core System Components
-- **🧠 Orchestrator**: Central coordination hub with lifecycle management
-- **⚠️ Error Handler**: Advanced error classification and recovery patterns  
-- **📊 Graph Builder**: LangGraph construction with full compatibility
-- **🎯 Execution Manager**: Comprehensive agent and tool coordination
-- **🏭 Model Factory**: Intelligent model instantiation with caching
-- **📡 Event Emitter**: Real-time monitoring and event system
-- **🧠 Memory Manager**: Persistent state and context management
-- **📈 Metrics Collector**: Performance analytics and optimization insights
+![Cleo Logo](./public/logocleo.png)
 
-### Enhanced Integration
-```typescript
-// Complete modular integration
-import { globalOrchestrator } from '@/lib/agents/core'
+## � Quick Start
 
-const result = await globalOrchestrator.executeAgent(
-  agentConfig,
-  context,
-  { 
-    enableMetrics: true, 
-    retryPolicy: 'exponential',
-    enableStreaming: true,
-    errorRecovery: 'advanced'
-  }
-)
+```bash
+# Clone and install
+git clone https://github.com/LuisNSantana/cleo-agent.git
+cd cleo-agent
+pnpm install
+
+# Development with Docker (Recommended)
+pnpm docker:dev       # Start development environment
+pnpm docker:dev-logs  # View logs in real-time
+pnpm docker:dev-down  # Stop and cleanup
+
+# Local development  
+pnpm dev              # Start without Docker
 ```
 
----
+## 🤖 AI Agents
 
-## 🎯 Advanced Features & Benefits
-
-### 🛡️ **Enterprise-Grade Reliability**
-- Circuit breaker patterns for fault tolerance
-- Exponential backoff with intelligent retry logic
-- Graceful degradation and fallback strategies
-- Comprehensive error classification and recovery
-
-### ⚡ **Performance Excellence**
-- Intelligent model and execution caching
-- Optimized execution paths and parallel processing
-- Advanced memory management and resource optimization
-- Real-time performance monitoring and bottleneck detection
-
-### 📊 **Comprehensive Observability**
-- Real-time execution tracking and system health monitoring
-- Advanced analytics with performance trends and insights
-- Complete audit trails and decision tracking
-- Predictive analytics for proactive optimization
-
-### 🔧 **Developer Experience**
-- Full TypeScript integration with comprehensive type safety
-- Hot reloading and advanced debugging capabilities
-- Detailed logging with configurable verbosity levels
-- Built-in testing utilities and comprehensive mock framework
-
----
-
-## 🧠 Enhanced Technologies
-
-- **Multi-Agent System**: LangGraph orchestration with specialized agents
-- **Supabase Backend**: Real-time agent persistence, RLS security, analytics
-- **LangChain**: Multi-model routing, tool calling, and context management
-- **Ollama**: Local model runner (recommended: `llama3.1:8b` for best local experience)
-- **HuminaryLabs Models**: Custom local models for privacy and speed
-- **Cloud Providers**: OpenAI (GPT-4o-mini), Groq, Gemini, Anthropic, Perplexity
-- **Shopify Integration**: Per-user credential management and e-commerce analytics
-
----
-
-## 🧠 Key Technologies
-
-- **LangChain**: Multi-model routing, tool calling, and context management.
-- **Ollama**: Local model runner (recommended: `llama3.1:8b` for best local experience).
-- **HuminaryLabs Models**: Custom local models for privacy and speed.
-- **Cloud Providers**: OpenAI (GPT-5-mini), Groq (GPT-OSS-120B), Gemini, Anthropic, Perplexity.
-- **Archon**: Task-driven workflow, knowledge management, and project orchestration.
-- **Supabase**: Secure, scalable backend for chat, files, and analytics.
-
----
+- **🎯 Cleo**: Main coordinator and emotional intelligence
+- **🛍️ Emma**: Shopify e-commerce specialist  
+- **📊 Peter**: Google Workspace and research expert
+- **🔍 Apu**: Web research specialist
+- **🌐 Ami**: Web assistance and support
 
 ## ⚡ Performance Modes
 
-| Mode              | Primary Model           | Use Case                | Context | Cost/1M tokens |
-|-------------------|------------------------|-------------------------|---------|---------------|
-| Cleo v3 (llama3.1 8B)   | ollama:llama3.1:8b     | Local dev, privacy      | 32k     | $0.01-0.05    |
-| Balanced          | openai:gpt-4o-mini     | Reasoning, analysis     | 131k    | $1.5-4.0      |
-| Fast              | groq:llama3.1-70b      | Speed, bulk tasks       | 131k    | $0.1-0.3      |
+| Mode      | Model              | Use Case            | Speed  |
+|-----------|-------------------|---------------------|--------|
+| Fast      | Groq Llama 3.1    | Quick responses     | ⚡⚡⚡   |
+| Balanced  | GPT-4o-mini       | Quality + Speed     | ⚡⚡    |
 
----
+## 🛠️ Tech Stack
 
-## ✨ Features
-
-- **Multi-agent orchestration** with specialized expertise
-- **Real-time agent management** with database persistence
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: LangChain, Supabase, Server-Sent Events
+- **AI**: OpenAI, Groq, Anthropic, local Ollama models
+- **Tools**: Shopify API, Google Workspace, SerpAPI
 - **Emma E-commerce agent** with Shopify integration
 - **Per-user credential management** for secure API access
 - **Local + cloud hybrid** (Ollama, HuminaryLabs, OpenAI, Groq, etc.)
@@ -252,110 +169,79 @@ cp .env.example .env.local
 
 # Run the development server
 pnpm dev
-```
+## 🐋 Docker Commands (Recommended)
 
-#### Español
+### Development
 ```bash
-# Clona el repositorio
-git clone https://github.com/LuisNSantana/cleo-agent.git
-cd cleo-agent
-
-# Instala las dependencias (recomendado: pnpm)
-pnpm install
-
-# Si tienes problemas con la versión estable de Next.js, instala la versión canary:
-pnpm add next@canary
-
-# Instala cualquier dependencia faltante que indique el build (por ejemplo, framer-motion):
-pnpm add framer-motion
-
-# Configura las variables de entorno
-cp .env.example .env.local
-# Edita .env.local con tus credenciales y API keys
-
-# Ejecuta el servidor de desarrollo
-pnpm dev
+pnpm docker:dev       # Start development server with hot reload
+pnpm docker:dev-logs  # View real-time logs
+pnpm docker:dev-down  # Stop and cleanup volumes automatically
 ```
 
-### Environment Variables
+### Production  
+```bash
+pnpm docker:prod      # Build and run production
+pnpm docker:logs      # View production logs
+```
 
-Create a `.env.local` file with:
+### Maintenance
+```bash
+pnpm docker:clean     # Clean system + volumes
+pnpm docker:clean-all # Deep clean everything  
+pnpm docker:reset     # Complete reset (nuclear option)
+```
+
+> **💡 Pro Tip**: Always use `pnpm docker:dev-down` instead of `docker-compose down` to prevent disk space issues.
+
+## ⚙️ Environment Setup
 
 ```env
-# Supabase
+# Required
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# AI Models
-XAI_API_KEY=your_xai_api_key
+OPENAI_API_KEY=your_openai_api_key
 GROQ_API_KEY=your_groq_api_key
-OPENAI_API_KEY=your_openai_api_key  # Required for RAG embeddings
 
-# RAG Enhancement (optional - significantly improves retrieval accuracy)
-HUGGINGFACE_API_KEY=your_huggingface_api_key  # For cross-encoder reranking
-
-# App
+# Optional OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# For ngrok development
+NEXT_PUBLIC_APP_URL=https://your-tunnel.ngrok-free.app
 ```
 
-### Database Setup
+## 📚 Documentation
 
-1. Create a new Supabase project
-2. Run the database migrations:
+- [📖 Installation Guide](./INSTALL.md)
+- [📋 Cleo User Guide](./docs/cleo-guide.md)  
+- [🏗️ Agent Architecture](./docs/multi-agent-architecture.md)
+- [🔧 Local Model Setup](./docs/cleo-local-model-guide.md)
    - Execute `supabase_schema.sql` for basic tables
    - Execute `supabase_schema_add_documents.sql` for document management
-   - Execute `supabase_schema_rag.sql` for RAG functionality (requires pgvector extension)
-   - Execute `supabase_schema_hybrid_rag.sql` for enhanced hybrid search capabilities
-3. Update your environment variables
+## 🤝 Contributing
 
-## Personalization with RAG
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Cleo features an advanced **Retrieval-Augmented Generation (RAG)** system that learns from your personal documents to provide truly personalized responses:
+## 📄 License
 
-### How it Works
-- **Automatic Learning**: Upload documents through Settings → Files and Cleo automatically indexes them
-- **Hybrid Search**: Combines semantic vector search with keyword matching for maximum relevance
-- **Smart Reranking**: Uses cross-encoder models to reorder results by actual relevance
-- **Intelligent Retrieval**: Searches your documents for relevant context automatically
-- **Personalized Responses**: Cleo uses your information to tailor responses to your preferences, interests, and needs
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Getting Started with RAG
-1. **Upload Personal Info**: Create a document with your preferences, interests, and personal details
-2. **Structure for Best Results**: Use clear headers like "Name:", "Favorite Food:", "Interests:", "Work:"
-3. **Chat Naturally**: Ask questions about your preferences and watch Cleo respond with your personal context
+## 🙏 Acknowledgments
 
-### Advanced Features
-- **Hybrid Retrieval**: Automatically combines vector similarity and full-text search
-- **Cross-Encoder Reranking**: Reorders results using advanced relevance models
-- **Multi-Pass Retrieval**: Searches both specific content and general profile information
-- **Automatic Fallbacks**: Robust error handling and graceful degradation
+- Built with [Next.js](https://nextjs.org/) and [LangChain](https://langchain.com/)
+- Powered by [Supabase](https://supabase.com/) for backend services
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
 
-### Example Use Cases
-- "What's my favorite type of cuisine?" → Cleo knows from your documents
-- "Suggest something based on my interests" → Cleo references your uploaded preferences  
-- "How should I be addressed?" → Cleo uses your preferred name and communication style
+---
 
-*The RAG system works automatically with significant accuracy improvements over basic vector search - no configuration needed. Just upload your documents and start chatting!*
-
-Open [http://localhost:3000](http://localhost:3000) to start chatting with Cleo!
-
-## Personality & Memory (Preferences → Prompt + RAG)
-
-Cleo adapts to your style using two complementary layers:
-
-- Prompt Layer: Your personality settings (empathetic, playful, professional, creative, analytical, friendly) and sliders (formality, creativity, enthusiasm, helpfulness), plus customStyle, are embedded directly into the system prompt for every chat.
-- Memory Layer (RAG): When you update preferences, Cleo auto-updates a per-user document `user_profile_auto.md` (summarizing your personality and custom instructions) and indexes it into the vector store. Chat retrieval automatically pulls this profile context and prepends it to the model prompt.
-
-Verification
-- Change personality in Settings → Models. The server logs should show:
-  - `[Prefs][PUT] Saved preferences { personalityType: '...' }`
-  - `[Prefs][PUT] Updated profile doc: <doc-id>` and `[CHUNK] ... Created 1 chunks ...`
-  - On chat, `[ChatAPI] Active personality { personalityType: '...' }`
-  - `[RAG] Using context? true` with a final prompt length indicating context was prepended.
-
-Where this lives
-- Prompt generation: `lib/prompts/personality.ts`, used by `app/components/chat/use-chat-core.ts`
+<div align="center">
+  <strong>Made with ❤️ by Huminary Labs</strong>
+</div>
 - Profile sync: `app/api/user-preferences/route.ts` → `lib/rag/index-document.ts`
 - Retrieval and assembly: `lib/rag/retrieve.ts`, consumed by `app/api/chat/route.ts`
 
