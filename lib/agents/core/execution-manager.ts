@@ -5,10 +5,13 @@
 
 import { BaseMessage } from '@langchain/core/messages'
 import { AgentConfig, AgentExecution, ExecutionResult, ExecutionOptions } from '../types'
+import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/tool-selection-logger'
+import { resolveNotionKey } from '@/lib/notion/credentials'
 import { EventEmitter } from './event-emitter'
 import { AgentErrorHandler } from './error-handler'
 import { SystemMessage } from '@langchain/core/messages'
 import { AsyncLocalStorage } from 'async_hooks'
+import { withRequestContext } from '@/lib/server/request-context'
 
 // AsyncLocalStorage for execution context
 const executionContext = new AsyncLocalStorage<string>()
@@ -78,12 +81,17 @@ export class ExecutionManager {
       // Prepare initial state compatible with MessagesAnnotation
       const initialState = {
         messages: filteredMessages,
-        executionId: execution.id
+        executionId: execution.id,
+        userId: context.userId // Include userId for tool context propagation
       }
 
-      // Compile and execute graph
+      // Compile graph and execute within request context so tools can read userId
       const compiledGraph = graph.compile()
-      const result = await compiledGraph.invoke(initialState)
+      // Also set legacy global for any tools still reading from globalThis
+      ;(globalThis as any).__currentUserId = context.userId
+      const result = await withRequestContext({ userId: context.userId, requestId: execution.id }, async () => {
+        return compiledGraph.invoke(initialState)
+      })
 
       // Extract final response
       const finalMessages = result.messages || []
@@ -108,13 +116,15 @@ export class ExecutionManager {
       execution.metrics.tokensUsed = executionResult.tokensUsed!
       execution.metrics.totalTokens = executionResult.tokensUsed!
 
-      this.eventEmitter.emit('execution.completed', execution)
+  this.eventEmitter.emit('execution.completed', execution)
 
       // Don't clean up global execution ID immediately - keep it for delegation tracking
       // It will be cleaned up when the execution context is fully disposed
       // delete (globalThis as any).__currentExecutionId
 
-      return executionResult
+  // Clean up legacy global after execution completes
+  try { delete (globalThis as any).__currentUserId } catch {}
+  return executionResult
     } catch (error) {
       await this.errorHandler.handleExecutionError(execution, error as Error)
       
@@ -122,7 +132,9 @@ export class ExecutionManager {
       // It will be cleaned up when the execution context is fully disposed
       // delete (globalThis as any).__currentExecutionId
       
-      throw error
+  // On error, attempt to clean up legacy global
+  try { delete (globalThis as any).__currentUserId } catch {}
+  throw error
     }
   }
 
@@ -131,6 +143,28 @@ export class ExecutionManager {
 
     for (const toolCall of toolCalls) {
       try {
+        const execStart = Date.now()
+        let notionCredentialPresent: boolean | undefined
+        if (toolCall.name?.startsWith('notion_')) {
+          // Best-effort credential resolution (no throw)
+          try {
+            const userId = (globalThis as any).__currentUserId || agentConfig.userId
+            const key = await resolveNotionKey(userId)
+            notionCredentialPresent = !!key
+          } catch {
+            notionCredentialPresent = false
+          }
+        }
+
+        logToolExecutionStart({
+            event: 'tool_start',
+            agentId: agentConfig.id,
+            userId: (globalThis as any).__currentUserId || agentConfig.userId,
+            executionId: (globalThis as any).__currentExecutionId,
+            tool: toolCall.name,
+            argsShape: toolCall.args ? Object.keys(toolCall.args) : [],
+            notionCredentialPresent
+        })
         this.eventEmitter.emit('tool.executing', {
           toolName: toolCall.name,
           agentId: agentConfig.id,
@@ -153,6 +187,16 @@ export class ExecutionManager {
           agentId: agentConfig.id,
           result: result.output
         })
+        logToolExecutionEnd({
+          event: 'tool_end',
+          agentId: agentConfig.id,
+          userId: (globalThis as any).__currentUserId || agentConfig.userId,
+          executionId: (globalThis as any).__currentExecutionId,
+          tool: toolCall.name,
+          success: true,
+          durationMs: Date.now() - execStart,
+          notionCredentialPresent
+        })
       } catch (error) {
         const errorResult: ToolResult = {
           tool_call_id: toolCall.id,
@@ -167,6 +211,16 @@ export class ExecutionManager {
           toolName: toolCall.name,
           agentId: agentConfig.id,
           error: error
+        })
+        logToolExecutionEnd({
+          event: 'tool_end',
+          agentId: agentConfig.id,
+          userId: (globalThis as any).__currentUserId || agentConfig.userId,
+          executionId: (globalThis as any).__currentExecutionId,
+          tool: toolCall.name,
+          success: false,
+          durationMs: 0,
+          error: (error as Error).message
         })
       }
     }

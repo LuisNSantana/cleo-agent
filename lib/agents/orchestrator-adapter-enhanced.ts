@@ -6,6 +6,7 @@
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
 import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
+import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Import legacy orchestrator as backup for complex delegation logic
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
@@ -105,12 +106,12 @@ export function getAgentOrchestrator() {
     startAgentExecutionForUI(
       input: string, 
       agentId?: string, 
-      threadId?: string, 
-      userId?: string, 
+      _threadId?: string, 
+      _userId?: string, 
       prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
-      forceSupervised?: boolean
+      _forceSupervised?: boolean
     ) {
-      // Use the same execution logic with filtered messages
+      // Use the same execution logic; thread/user are read from request-context
       return createAndRunExecution(input, agentId, prior || [])
     },
     // Execution getters - combine legacy and core
@@ -269,11 +270,14 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   
   // Fallback: simple core execution (without delegation)
   const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+  const ctxUser = getCurrentUserId()
+  const effectiveUserId = ctxUser || NIL_UUID
   const exec: AgentExecution = {
     id: executionId,
     agentId: agentId || 'cleo-supervisor',
-    threadId: 'default',
-    userId: 'anonymous',
+  threadId: 'default',
+    userId: effectiveUserId,
     status: 'running',
     startTime: new Date(),
     messages: [],

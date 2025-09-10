@@ -10,6 +10,9 @@ import { ModelFactory } from './model-factory'
 import { EventEmitter } from './event-emitter'
 import { ExecutionManager } from './execution-manager'
 import { buildToolRuntime } from '@/lib/langchain/tooling'
+import { applyToolHeuristics } from './tool-heuristics'
+import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/tool-selection-logger'
+import { resolveNotionKey } from '@/lib/notion/credentials'
 
 export interface GraphBuilderConfig {
   modelFactory: ModelFactory
@@ -219,8 +222,15 @@ export class GraphBuilder {
           maxTokens: agentConfig.maxTokens
         })
 
-        // Build and bind tools (if any)
-        const toolRuntime = buildToolRuntime(agentConfig.tools)
+          // Build and bind tools (if any) with heuristic filtering
+          const selectedTools = await applyToolHeuristics({
+            agentId: agentConfig.id,
+            userId: state.userId,
+            messages: state.messages || [],
+            selectedTools: agentConfig.tools || [],
+            executionId: state.metadata?.executionId
+          })
+          const toolRuntime = buildToolRuntime(selectedTools)
         const model: any = (typeof (baseModel as any).bindTools === 'function')
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
@@ -346,7 +356,8 @@ export class GraphBuilder {
                   context: delegationData.context,
                   handoffMessage: delegationData.handoffMessage,
                   priority: delegationData.priority || 'normal',
-                  sourceExecutionId: currentExecutionId
+                  sourceExecutionId: currentExecutionId,
+                  userId: state.userId // Include userId for proper context propagation
                 })
                 
                 try {
@@ -530,8 +541,15 @@ export class GraphBuilder {
           maxTokens: agentConfig.maxTokens
         })
 
-        // Build and bind tools (if any)
-        const toolRuntime = buildToolRuntime(agentConfig.tools)
+        // Build and bind tools (if any) with heuristic filtering (legacy path)
+        const selectedToolsLegacy = await applyToolHeuristics({
+          agentId: agentConfig.id,
+          userId: state.userId,
+          messages: state.messages || [],
+          selectedTools: agentConfig.tools || [],
+          executionId: state.metadata?.executionId
+        })
+        const toolRuntime = buildToolRuntime(selectedToolsLegacy)
         const model: any = (typeof (baseModel as any).bindTools === 'function')
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
@@ -613,9 +631,37 @@ export class GraphBuilder {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args) } catch {}
               }
+              // Structured execution start log
+              let notionCredentialPresent: boolean | undefined
+              if (name && String(name).toLowerCase().includes('notion')) {
+                try {
+                  const key = await resolveNotionKey(state.userId)
+                  notionCredentialPresent = !!key
+                } catch { notionCredentialPresent = false }
+              }
+              logToolExecutionStart({
+                event: 'tool_start',
+                agentId: agentConfig.id,
+                userId: state.userId,
+                executionId: state.metadata?.executionId,
+                tool: String(name),
+                argsShape: args && typeof args === 'object' ? Object.keys(args) : [],
+                notionCredentialPresent
+              })
               console.log(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args).slice(0, 100)}...)`)
               const output = await toolRuntime.run(String(name), args)
               console.log(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
+              // Structured execution end log (success)
+              logToolExecutionEnd({
+                event: 'tool_end',
+                agentId: agentConfig.id,
+                userId: state.userId,
+                executionId: state.metadata?.executionId,
+                tool: String(name),
+                success: true,
+                durationMs: 0,
+                notionCredentialPresent
+              })
               // Delegation-aware handling: if tool output indicates a handoff, orchestrate delegation
               if (this.isDelegationToolResponse(output)) {
                 console.log('� [HANDOFF] Delegation detected in buildGraph:', output)
@@ -677,7 +723,8 @@ export class GraphBuilder {
                   context: delegationData.context,
                   handoffMessage: delegationData.handoffMessage,
                   priority: delegationData.priority || 'normal',
-                  sourceExecutionId: currentExecutionId
+                  sourceExecutionId: currentExecutionId,
+                  userId: state.userId // Include userId for proper context propagation
                 })
 
                 try {
@@ -720,6 +767,17 @@ export class GraphBuilder {
                 new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
               ]
               console.error(`❌ [Tool] ${name} failed:`, err)
+              // Structured execution end log (failure)
+              logToolExecutionEnd({
+                event: 'tool_end',
+                agentId: agentConfig.id,
+                userId: state.userId,
+                executionId: state.metadata?.executionId,
+                tool: String(name),
+                success: false,
+                durationMs: 0,
+                error: err instanceof Error ? err.message : String(err)
+              })
               this.eventEmitter.emit('tool.failed', { agentId: agentConfig.id, name, callId, error: err })
             }
           }

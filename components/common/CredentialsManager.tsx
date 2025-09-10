@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
-import { Trash2, Edit2, Plus, Eye, EyeOff, Key, Settings, CheckCircle, AlertCircle } from 'lucide-react';
+import { Trash2, Edit2, Plus, Eye, EyeOff, Key, Settings, CheckCircle, AlertCircle, HelpCircle, ExternalLink, Copy, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // =============================================================================
@@ -37,7 +37,13 @@ interface ShopifyCredential extends BaseCredential {
 interface SkyvernCredential extends BaseCredential {
   credential_name: string;
   base_url: string;
+  api_key: string;
   organization_id?: string;
+}
+
+interface NotionCredential extends BaseCredential {
+  label: string;
+  api_key: string;
 }
 
 interface BaseFormData {
@@ -57,9 +63,186 @@ interface SkyvernFormData extends BaseFormData {
   organization_id?: string;
 }
 
-type CredentialType = 'shopify' | 'skyvern';
-type Credential = ShopifyCredential | SkyvernCredential;
-type FormData = ShopifyFormData | SkyvernFormData;
+interface NotionFormData extends BaseFormData {
+  label: string;
+  api_key: string;
+}
+
+type CredentialType = 'shopify' | 'skyvern' | 'notion';
+type Credential = ShopifyCredential | SkyvernCredential | NotionCredential;
+type FormData = ShopifyFormData | SkyvernFormData | NotionFormData;
+
+// =============================================================================
+// NOTION HELP MODAL COMPONENT
+// =============================================================================
+
+interface NotionHelpModalProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const NotionHelpModal = ({ isOpen, onOpenChange }: NotionHelpModalProps) => {
+  const [copiedStep, setCopiedStep] = useState<number | null>(null);
+
+  const copyToClipboard = async (text: string, stepNumber: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedStep(stepNumber);
+      setTimeout(() => setCopiedStep(null), 2000);
+      toast({
+        title: "Copiado",
+        description: "Enlace copiado al portapapeles",
+      });
+    } catch (err) {
+      console.error('Error copying to clipboard:', err);
+    }
+  };
+
+  const steps = [
+    {
+      number: 1,
+      title: "Crear una Integración",
+      description: "Ve al dashboard de integraciones de Notion",
+      action: "Abrir en nueva pestaña",
+      url: "https://www.notion.com/my-integrations",
+      details: [
+        "Haz clic en '+ New integration'",
+        "Dale un nombre (ej: 'Cleo Agent')",
+        "Selecciona tu workspace",
+        "Haz clic en 'Submit'"
+      ]
+    },
+    {
+      number: 2,
+      title: "Obtener tu Token API",
+      description: "Copia tu Internal Integration Secret",
+      details: [
+        "En la página de configuración de tu integración",
+        "Busca la sección 'Configuration'",
+        "Copia el 'Internal Integration Secret'",
+        "Los nuevos tokens empiezan con 'ntn_'",
+        "Los tokens antiguos empiezan con 'secret_'"
+      ]
+    },
+    {
+      number: 3,
+      title: "Dar Permisos",
+      description: "Conecta la integración a tus páginas",
+      details: [
+        "Ve a la página de Notion que quieres usar",
+        "Haz clic en 'Share' (arriba a la derecha)",
+        "Clic en 'Add people, emails, groups, or integrations'",
+        "Busca y selecciona tu integración",
+        "Elige los permisos apropiados"
+      ]
+    }
+  ];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto bg-background border-border">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2 text-xl">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-black to-gray-700 flex items-center justify-center">
+              <span className="text-white text-sm font-bold">N</span>
+            </div>
+            <span>Cómo obtener tu API Key de Notion</span>
+          </DialogTitle>
+          <DialogDescription>
+            Sigue estos simples pasos para conectar tu workspace de Notion con Cleo Agent
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {steps.map((step, index) => (
+            <motion.div
+              key={step.number}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="relative"
+            >
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm">
+                  {step.number}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {step.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-3">
+                    {step.description}
+                  </p>
+                  
+                  {step.url && (
+                    <div className="mb-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="inline-flex items-center space-x-2"
+                        onClick={() => {
+                          window.open(step.url, '_blank');
+                        }}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>{step.action}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => copyToClipboard(step.url!, step.number)}
+                      >
+                        {copiedStep === step.number ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  <ul className="space-y-2">
+                    {step.details.map((detail, detailIndex) => (
+                      <li key={detailIndex} className="flex items-start space-x-2 text-sm text-muted-foreground">
+                        <ArrowRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary" />
+                        <span>{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              
+              {index < steps.length - 1 && (
+                <div className="absolute left-4 top-12 w-px h-6 bg-border"></div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                Formato de Token Actualizado
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Desde septiembre 2024, los nuevos tokens empiezan con <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs">ntn_</code> en lugar de <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs">secret_</code>. Ambos formatos funcionan perfectamente.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 // =============================================================================
 // SERVICE CONFIGURATIONS
@@ -93,8 +276,8 @@ const SERVICE_CONFIGS: Record<CredentialType, ServiceConfig> = {
     name: 'Shopify',
     description: 'E-commerce store management and analytics',
     icon: (
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-        S
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm">
+        <img src="/icons/shopify.png" alt="Shopify" className="w-6 h-6" />
       </div>
     ),
     color: 'text-green-600 dark:text-green-400',
@@ -128,6 +311,25 @@ const SERVICE_CONFIGS: Record<CredentialType, ServiceConfig> = {
       { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...', required: true, description: 'Your Skyvern API key' },
       { key: 'organization_id', label: 'Organization ID', type: 'text', placeholder: 'org_123...', required: false, description: 'Optional: For enterprise accounts' }
     ]
+  },
+  notion: {
+    type: 'notion',
+    name: 'Notion',
+    description: 'Workspace management and content organization',
+    icon: (
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm">
+        <img src="/icons/notion-icon.svg" alt="Notion" className="w-6 h-6" />
+      </div>
+    ),
+    color: 'text-slate-600 dark:text-slate-400',
+    bgColor: 'bg-slate-50/50 dark:bg-slate-950/20',
+    borderColor: 'border-slate-200/50 dark:border-slate-800/50',
+    apiEndpoint: '/api/notion/credentials',
+    testEndpoint: '/api/notion/test',
+    fields: [
+      { key: 'label', label: 'Label', type: 'text', placeholder: 'Primary Workspace', required: true, description: 'Friendly name for this API key' },
+      { key: 'api_key', label: 'Internal Integration Token', type: 'password', placeholder: 'ntn_... (or secret_...)', required: true, description: 'Your Notion internal integration token (new tokens start with ntn_, older tokens with secret_)' }
+    ]
   }
 };
 
@@ -150,6 +352,7 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [isNotionHelpOpen, setIsNotionHelpOpen] = useState(false);
 
   // Initialize form data based on service type
   const getInitialFormData = (): FormData => {
@@ -159,6 +362,8 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
         return { ...base, store_name: '', store_domain: '', access_token: '' } as ShopifyFormData;
       case 'skyvern':
         return { ...base, credential_name: '', base_url: 'https://api.skyvern.com', api_key: '', organization_id: '' } as SkyvernFormData;
+      case 'notion':
+        return { ...base, label: '', api_key: '' } as NotionFormData;
       default:
         return base as FormData;
     }
@@ -232,6 +437,14 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
           api_key: '', // Don't pre-populate sensitive data
           organization_id: skyvernCredential.organization_id || '',
         } as SkyvernFormData);
+        break;
+      case 'notion':
+        const notionCredential = credential as NotionCredential;
+        setFormData({
+          ...baseData,
+          label: notionCredential.label,
+          api_key: '', // Don't pre-populate sensitive data
+        } as NotionFormData);
         break;
     }
     
@@ -385,6 +598,8 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
         return (credential as ShopifyCredential).store_name;
       case 'skyvern':
         return (credential as SkyvernCredential).credential_name;
+      case 'notion':
+        return (credential as NotionCredential).label;
       default:
         return 'Unknown';
     }
@@ -396,6 +611,8 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
         return (credential as ShopifyCredential).store_domain;
       case 'skyvern':
         return (credential as SkyvernCredential).base_url;
+      case 'notion':
+        return 'Notion Workspace';
       default:
         return '';
     }
@@ -574,15 +791,30 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
               </div>
             </div>
             
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Add {config.name}</span>
-                  <span className="sm:hidden">Add</span>
+            <div className="flex items-center space-x-2">
+              {/* Help button specifically for Notion */}
+              {serviceType === 'notion' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                  onClick={() => setIsNotionHelpOpen(true)}
+                >
+                  <HelpCircle className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">¿Cómo obtener API Key?</span>
+                  <span className="sm:hidden">Ayuda</span>
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md bg-popover border-border">
+              )}
+              
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Add {config.name}</span>
+                    <span className="sm:hidden">Add</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-popover border-border">
                 <DialogHeader>
                   <DialogTitle className="text-popover-foreground">Add {config.name} Credentials</DialogTitle>
                   <DialogDescription className="text-muted-foreground">
@@ -615,6 +847,7 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         
@@ -690,6 +923,14 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Notion Help Modal */}
+      {serviceType === 'notion' && (
+        <NotionHelpModal 
+          isOpen={isNotionHelpOpen} 
+          onOpenChange={setIsNotionHelpOpen} 
+        />
+      )}
     </div>
   );
 }
@@ -704,4 +945,8 @@ export const ShopifyCredentialsManager = () => (
 
 export const SkyvernCredentialsManager = () => (
   <CredentialsManager serviceType="skyvern" />
+);
+
+export const NotionCredentialsManager = () => (
+  <CredentialsManager serviceType="notion" />
 );

@@ -1,12 +1,24 @@
- import { createGuestServerClient } from './supabase/server-guest'
+import { createGuestServerClient } from './supabase/server-guest'
 import type { Database } from '@/app/types/database.types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-async function getClient() {
-  // server-guest uses service role and no cookies; ideal for server actions/routes
-  const sb = await createGuestServerClient()
-  if (!sb) throw new Error('Supabase is disabled')
-  return sb as unknown as SupabaseClient<Database>
+// Internal helper with environment guards. Returns null when analytics cannot run.
+async function getClient(): Promise<SupabaseClient<Database> | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  // Prefer service role for server-side aggregated writes, fallback to anon for read-only if provided
+  const key = process.env.SUPABASE_SERVICE_ROLE || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) {
+    // Quiet (non-fatal) – analytics disabled gracefully
+    return null
+  }
+  try {
+    const sb = await createGuestServerClient()
+    if (!sb) return null
+    return sb as unknown as SupabaseClient<Database>
+  } catch (e) {
+    // Do not propagate – analytics must never break tool execution
+    return null
+  }
 }
 
 export async function trackFeatureUsage(
@@ -16,6 +28,7 @@ export async function trackFeatureUsage(
 ) {
   try {
     const sb = await getClient()
+    if (!sb) return // analytics disabled
     const usageDate = new Date().toISOString().slice(0, 10)
     const delta = opts?.delta ?? 1
     const time = opts?.timeSpentMinutes ?? 0
@@ -66,8 +79,8 @@ export async function trackFeatureUsage(
       .update({ usage_count: newCount, total_time_spent_minutes: newTime, success_rate: newSR, metadata: opts?.metadata ?? null })
       .eq('id', (existing as any).id)
     if (updErr) console.error('trackFeatureUsage update error', updErr)
-  } catch (e) {
-    console.error('trackFeatureUsage fatal', e)
+  } catch (_e) {
+    // Swallow errors silently to avoid noise
   }
 }
 
@@ -78,6 +91,7 @@ export async function trackToolUsage(
 ) {
   try {
     const sb = await getClient()
+    if (!sb) return // analytics disabled
     const usageDate = new Date().toISOString().slice(0, 10)
     const ok = opts?.ok ?? true
     const exec = Math.max(0, Math.floor(opts?.execMs ?? 0))
@@ -137,13 +151,14 @@ export async function trackToolUsage(
       })
       .eq('id', (existing as any).id)
     if (updErr) console.error('trackToolUsage update error', updErr)
-  } catch (e) {
-    console.error('trackToolUsage fatal', e)
+  } catch (_e) {
+    // Silent fail
   }
 }
 
 export async function getUserDailySummary(userId: string) {
   const sb = await getClient()
+  if (!sb) return []
   const { data, error } = await sb
     .from('user_daily_summary')
     .select('*')

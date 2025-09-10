@@ -10,6 +10,7 @@ import { AgentOrchestrator as CoreOrchestrator, ExecutionContext, ExecutionOptio
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
 import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
+import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Singleton core orchestrator (globalThis to survive route reloads)
 let coreInstance: CoreOrchestrator | null = null
@@ -46,6 +47,17 @@ export function getAgentOrchestrator() {
     },
     startAgentExecutionWithHistory(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>) {
       return createAndRunExecution(input, agentId, prior)
+    },
+    // Dual-mode execution for UI: accept threadId & userId to propagate request context
+    startAgentExecutionForUI(
+      input: string,
+      agentId?: string,
+      threadId?: string,
+      userId?: string,
+      prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+      _forceSupervised?: boolean
+    ) {
+      return createAndRunExecution(input, agentId, prior || [], threadId, userId)
     },
     // Execution getters for polling endpoints
     getExecution(executionId: string) {
@@ -168,16 +180,27 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
   })
 }
 
-function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
+function createAndRunExecution(
+  input: string,
+  agentId: string | undefined,
+  prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+  threadId?: string,
+  userId?: string
+): AgentExecution {
   const core = getCore()
   const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   
   // Create execution stub for immediate response
+  // Determine a safe userId for execution context
+  const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+  const ctxUser = getCurrentUserId()
+  const effectiveUserId = userId || ctxUser || NIL_UUID
+
   const exec: AgentExecution = {
     id: executionId,
     agentId: agentId || 'cleo-supervisor',
-    threadId: 'default',
-    userId: 'anonymous',
+    threadId: threadId || 'default',
+    userId: effectiveUserId,
     status: 'running',
     startTime: new Date(),
     messages: [],

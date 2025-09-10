@@ -48,6 +48,7 @@ export async function getEffectiveApiKey(
     google: getEnv("GOOGLE_GENERATIVE_AI_API_KEY"),
     anthropic: getEnv("ANTHROPIC_API_KEY"),
     xai: getEnv("XAI_API_KEY"),
+  groq: getEnv("GROQ_API_KEY"),
     openrouter: getEnv("OPENROUTER_API_KEY"),
     langchain: getEnv("GROQ_API_KEY") || getEnv("OPENAI_API_KEY"), // LangChain uses underlying provider keys
   }

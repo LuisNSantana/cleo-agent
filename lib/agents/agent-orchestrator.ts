@@ -6,6 +6,7 @@
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { AgentOrchestrator as CoreOrchestrator, ExecutionContext } from '@/lib/agents/core/orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
+import { getCurrentUserId } from '@/lib/server/request-context'
 import { getAllAgentsSync as getAllAgents, getAgentByIdSync as getAgentById } from '@/lib/agents/unified-config'
 
 // ----------------------------------------------------------------------------
@@ -104,15 +105,21 @@ function resolveModelInfo(agentConfig: AgentConfig) {
 // ----------------------------------------------------------------------------
 // Execution
 // ----------------------------------------------------------------------------
-function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
+function createAndRunExecution(
+	input: string,
+	agentId: string | undefined,
+	prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+	threadId?: string,
+	userId?: string
+): AgentExecution {
 	const core = getCore()
 	const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 
 	const exec: AgentExecution = {
 		id: executionId,
 		agentId: agentId || 'cleo-supervisor',
-		threadId: 'default',
-		userId: 'anonymous',
+			threadId: threadId || 'default',
+			userId: userId || getCurrentUserId() || '00000000-0000-0000-0000-000000000000',
 		status: 'running',
 		startTime: new Date(),
 		messages: [],
@@ -312,8 +319,8 @@ export function getAgentOrchestrator() {
 			prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
 			forceSupervised?: boolean
 		) {
-			// Use the same execution logic with filtered messages
-			return createAndRunExecution(input, agentId, prior || [])
+			// Use the same execution logic with filtered messages and propagate ids
+			return createAndRunExecution(input, agentId, prior || [], threadId, userId)
 		},
 
 		getExecution(executionId: string) {

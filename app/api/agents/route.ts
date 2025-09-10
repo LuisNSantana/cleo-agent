@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureDelegationToolForAgent } from '@/lib/tools'
 import { APU_AGENT, WEX_AGENT, PETER_AGENT } from '@/lib/agents/config'
+import { AgentRegistry } from '@/lib/agents/registry'
 
 export async function GET() {
   try {
@@ -22,19 +23,92 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-  // Get all active agents for this user (include defaults and custom)
-  const { data: agents, error } = await supabase
-      .from('agents' as any)
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .order('priority', { ascending: true })
+    console.log('Current user ID:', user.id)
 
-    if (error) {
-      console.error('Error fetching agents:', error)
-      return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 })
+  // Get all active agents for this user (include predefined and custom)
+  // Include legacy is_default column (some seeded agents still use it) and new predefined
+  // Fetch user-owned active agents
+  const { data: userAgents, error: userAgentsError } = await supabase
+    .from('agents' as any)
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  if (userAgentsError) {
+    console.error('Error fetching user agents:', userAgentsError)
+    return NextResponse.json({ error: 'Failed to fetch user agents' }, { status: 500 })
+  }
+
+  // Fetch predefined (and legacy is_default) active agents via new policy
+  const { data: predefinedAgents, error: predefinedError } = await supabase
+    .from('agents' as any)
+    .select('*')
+    .in('predefined', [true])
+    .eq('is_active', true)
+
+  if (predefinedError) {
+    console.warn('Could not fetch predefined agents:', predefinedError)
+  }
+
+  const agents = [ ...(predefinedAgents || []), ...(userAgents || []) ]
+
+  console.log('Agents combined (predefined + user):', agents.length)
+  console.log('Agents fetched (initial combined placeholder before sync):', agents?.length, 'agents')
+
+    console.log('Before AgentRegistry sync - agents count:', agents?.length)
+
+    // Re-enabled: ensure predefined agents are present / synchronized
+    let syncedAgents = agents || []
+    try {
+      const registry = AgentRegistry.getInstance()
+      await registry.syncDatabaseAgents(user.id)
+      // After sync, refetch only if count seems too low (< 3) to capture inserted defaults
+      if ((syncedAgents?.length || 0) < 3) {
+        const refetch = await supabase
+          .from('agents' as any)
+          .select('*')
+          .eq('is_active', true)
+          .or(`user_id.eq.${user.id},predefined.eq.true,is_default.eq.true`)
+          .order('is_default', { ascending: false })
+          .order('predefined', { ascending: false })
+          .order('priority', { ascending: true })
+        if (!refetch.error && Array.isArray(refetch.data)) {
+          syncedAgents = refetch.data as any
+          console.log('Refetched agents after sync:', syncedAgents.length)
+        } else if (refetch.error) {
+          console.warn('Refetch after sync failed:', refetch.error)
+        }
+      }
+    } catch (syncError) {
+      console.warn('AgentRegistry sync failed, will fallback to in-memory defaults:', syncError)
+      // Fallback: inject in-memory builtin configs if missing
+      const existingNames = new Set((syncedAgents || []).map((a: any) => (a.name || '').toLowerCase()))
+      const builtinCandidates = [APU_AGENT, WEX_AGENT, PETER_AGENT]
+      for (const cfg of builtinCandidates) {
+        if (!existingNames.has(cfg.name.toLowerCase())) {
+          (syncedAgents as any).push({
+            id: `runtime-${cfg.name.toLowerCase()}`,
+            name: cfg.name,
+            description: cfg.description,
+            role: cfg.role,
+            model: cfg.model,
+            temperature: cfg.temperature,
+            max_tokens: cfg.maxTokens,
+            color: cfg.color,
+            icon: cfg.icon,
+            tags: cfg.tags,
+            tools: cfg.tools,
+            predefined: true,
+            is_default: true,
+            priority: 50,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+        }
+      }
     }
+
+    console.log('After AgentRegistry sync - agents count:', syncedAgents?.length)
 
     // If any are sub-agents, fetch their parent names to help the client map to built-in IDs
     const subAgents = (agents || []).filter((a: any) => !!a.parent_agent_id)
@@ -43,7 +117,7 @@ export async function GET() {
     if (parentIds.length > 0) {
       const parentsRes: any = await supabase
         .from('agents' as any)
-        .select('id,name,is_default')
+        .select('id,name,predefined')
         .in('id', parentIds)
       const parentErr = parentsRes?.error
       const parents: any[] = parentsRes?.data || []
@@ -73,20 +147,20 @@ export async function GET() {
       console.warn('Could not construct child delegation tools map:', mapErr)
     }
 
-    // Build parent candidates list (eligible parents): include defaults and customs, only active and not sub-agents
+    // Build parent candidates list (eligible parents): include predefined and customs, only active and not sub-agents
     let parentCandidates: Array<{ id: string; name: string; isDefault: boolean }> = []
     try {
       const parentsAllRes: any = await supabase
         .from('agents' as any)
-        .select('id,name,is_default,is_active,is_sub_agent,user_id')
-        .or(`user_id.eq.${user.id},is_default.eq.true`)
+        .select('id,name,predefined,is_active,is_sub_agent,user_id')
+        .or(`user_id.eq.${user.id},predefined.eq.true`)
         .eq('is_active', true)
         .eq('is_sub_agent', false)
-        .order('is_default', { ascending: false })
+        .order('predefined', { ascending: false })
       const parentsAllErr = parentsAllRes?.error
       const parentsAll: any[] = parentsAllRes?.data || []
       if (!parentsAllErr && Array.isArray(parentsAll)) {
-        parentCandidates = parentsAll.map((p: any) => ({ id: p.id, name: p.name, isDefault: !!p.is_default }))
+        parentCandidates = parentsAll.map((p: any) => ({ id: p.id, name: p.name, isDefault: !!p.predefined }))
       } else if (parentsAllErr) {
         console.warn('Could not fetch parent candidates:', parentsAllErr)
       }
@@ -118,11 +192,12 @@ export async function GET() {
     }
 
     // Transform to match frontend format and include parent mapping hints
-  const transformedAgents = (Array.isArray(agents) ? (agents as any[]) : []).map((agent: any) => {
+  const transformedAgents = (Array.isArray(syncedAgents) ? (syncedAgents as any[]) : []).map((agent: any) => {
       // Merge base tools with dynamic delegation tools from children (if this is a parent)
       let baseTools: string[] = Array.isArray(agent.tools) ? agent.tools : []
       // Fallback: if default agent with no tools in DB, use builtin config tools
-      if ((!baseTools || baseTools.length === 0) && agent.is_default) {
+  const legacyPredefined = agent.is_default || agent.predefined
+  if ((!baseTools || baseTools.length === 0) && legacyPredefined) {
         const builtin = builtinConfigByName(agent.name)
         if (builtin?.tools?.length) baseTools = builtin.tools
       }
@@ -151,7 +226,7 @@ export async function GET() {
         tags: (() => {
           const t: string[] = Array.isArray(agent.tags) ? agent.tags : []
           if (t.length) return t
-          if (agent.is_default) {
+          if (agent.predefined) {
             const builtin = builtinConfigByName(agent.name)
             if (builtin?.tags?.length) return builtin.tags
           }
@@ -159,7 +234,7 @@ export async function GET() {
         })(),
         prompt: agent.system_prompt,
         tools: mergedTools,
-        isDefault: agent.is_default,
+  isDefault: !!(agent.predefined ?? agent.is_default),
         priority: agent.priority,
         updatedAt: agent.updated_at,
         // Sub-agent fields
@@ -376,6 +451,14 @@ export async function POST(request: NextRequest) {
       }
     } catch (delegationErr) {
       console.warn('Warning: Could not setup dynamic delegation or persist tool:', delegationErr)
+    }
+
+    // Sync with AgentRegistry after creating new agent
+    try {
+      const registry = AgentRegistry.getInstance()
+      await registry.syncDatabaseAgents(user.id)
+    } catch (syncError) {
+      console.warn('Could not sync with AgentRegistry after creating agent:', syncError)
     }
 
     return NextResponse.json({ agent: transformedAgent }, { status: 201 })

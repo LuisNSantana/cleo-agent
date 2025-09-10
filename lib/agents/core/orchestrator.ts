@@ -16,6 +16,7 @@ import { MetricsCollector } from './metrics-collector'
 import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgentsSync as getAllAgents } from '../unified-config'
+import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Helper function to emit browser events for UI updates
 function emitBrowserEvent(eventName: string, detail: any) {
@@ -797,9 +798,27 @@ export class AgentOrchestrator {
       })
       
       // Create execution context for delegated task
+      // Determine a safe, valid userId for delegated executions
+      const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+      const isValidUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+
+      const sourceUserId = delegationData?.sourceExecutionId
+        ? this.activeExecutions.get(delegationData.sourceExecutionId)?.userId
+        : undefined
+      const contextUserId = getCurrentUserId()
+      const preferredUserId = [delegationData.userId, sourceUserId, contextUserId].find(id => isValidUuid(id))
+
+      console.log('👤 [DELEGATION] User resolution:', {
+        providedUserId: delegationData.userId,
+        sourceUserId,
+        contextUserId,
+        chosenUserId: preferredUserId || sourceUserId || contextUserId || NIL_UUID
+      })
+
       const delegationContext: ExecutionContext = {
         threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: 'system_delegation',
+        // Ensure we never set an invalid UUID that would break DB filters/RLS
+        userId: preferredUserId || sourceUserId || contextUserId || NIL_UUID,
         agentId: delegationData.targetAgent,
         messageHistory: [
           new SystemMessage({

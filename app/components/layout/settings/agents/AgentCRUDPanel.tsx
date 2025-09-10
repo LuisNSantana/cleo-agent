@@ -307,6 +307,176 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     icon: '/icons/metrics.png'
   },
 
+  // Notion Workspace Tools
+  'get-notion-page': {
+    name: 'Get Notion Page',
+    description: 'Retrieve detailed information about a Notion page including properties and content',
+    category: 'Notion',
+    useCases: ['Content retrieval', 'Page analysis', 'Data extraction', 'Information gathering'],
+    icon: '/icons/notion.png'
+  },
+  'create-notion-page': {
+    name: 'Create Notion Page',
+    description: 'Create a new page in Notion with custom properties and content',
+    category: 'Notion',
+    useCases: ['Content creation', 'Documentation', 'Note taking', 'Project pages'],
+    icon: '/icons/notion.png'
+  },
+  'update-notion-page': {
+    name: 'Update Notion Page',
+    description: 'Update existing page properties and metadata',
+    category: 'Notion',
+    useCases: ['Content editing', 'Property updates', 'Page maintenance', 'Status changes'],
+    icon: '/icons/notion.png'
+  },
+  'archive-notion-page': {
+    name: 'Archive Notion Page',
+    description: 'Archive a page (move to trash)',
+    category: 'Notion',
+    useCases: ['Content management', 'Page cleanup', 'Archive organization', 'Workspace maintenance'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-page-property': {
+    name: 'Get Notion Page Property',
+    description: 'Get the value of a specific page property',
+    category: 'Notion',
+    useCases: ['Property retrieval', 'Data extraction', 'Status checking', 'Field analysis'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-database': {
+    name: 'Get Notion Database',
+    description: 'Retrieve database schema and metadata',
+    category: 'Notion',
+    useCases: ['Database analysis', 'Schema review', 'Structure understanding', 'Property mapping'],
+    icon: '/icons/notion.png'
+  },
+  'query-notion-database': {
+    name: 'Query Notion Database',
+    description: 'Query database entries with advanced filtering and sorting',
+    category: 'Notion',
+    useCases: ['Data retrieval', 'Database queries', 'Filtered searches', 'Report generation'],
+    icon: '/icons/notion.png'
+  },
+  'create-notion-database': {
+    name: 'Create Notion Database',
+    description: 'Create a new database with custom schema',
+    category: 'Notion',
+    useCases: ['Database creation', 'Data organization', 'Project tracking', 'CRM setup'],
+    icon: '/icons/notion.png'
+  },
+  'update-notion-database': {
+    name: 'Update Notion Database',
+    description: 'Update database properties and schema',
+    category: 'Notion',
+    useCases: ['Schema updates', 'Property management', 'Database maintenance', 'Structure changes'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-database-schema': {
+    name: 'Get Notion Database Schema',
+    description: 'Get the complete schema and property definitions',
+    category: 'Notion',
+    useCases: ['Schema analysis', 'Property review', 'Database understanding', 'Field mapping'],
+    icon: '/icons/notion.png'
+  },
+  'create-notion-database-entry': {
+    name: 'Create Notion Database Entry',
+    description: 'Add a new entry (page) to a database',
+    category: 'Notion',
+    useCases: ['Data entry', 'Record creation', 'Database population', 'Content addition'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-block-children': {
+    name: 'Get Notion Block Children',
+    description: 'Retrieve all child blocks from a page or block',
+    category: 'Notion',
+    useCases: ['Content analysis', 'Block retrieval', 'Page structure', 'Content extraction'],
+    icon: '/icons/notion.png'
+  },
+  'append-notion-blocks': {
+    name: 'Append Notion Blocks',
+    description: 'Add new content blocks to a page',
+    category: 'Notion',
+    useCases: ['Content addition', 'Page building', 'Block insertion', 'Content expansion'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-block': {
+    name: 'Get Notion Block',
+    description: 'Get details of a specific block',
+    category: 'Notion',
+    useCases: ['Block analysis', 'Content inspection', 'Block properties', 'Content review'],
+    icon: '/icons/notion.png'
+  },
+  'update-notion-block': {
+    name: 'Update Notion Block',
+    description: 'Update block content and properties',
+    category: 'Notion',
+    useCases: ['Content editing', 'Block updates', 'Text changes', 'Content maintenance'],
+    icon: '/icons/notion.png'
+  },
+  'delete-notion-block': {
+    name: 'Delete Notion Block',
+    description: 'Delete/archive a block',
+    category: 'Notion',
+    useCases: ['Content removal', 'Block cleanup', 'Content organization', 'Page maintenance'],
+    icon: '/icons/notion.png'
+  },
+  'create-notion-block': {
+    name: 'Create Notion Block',
+    description: 'Create and append blocks with simplified interface',
+    category: 'Notion',
+    useCases: ['Content creation', 'Block addition', 'Page building', 'Content structuring'],
+    icon: '/icons/notion.png'
+  },
+  'add-notion-text-content': {
+    name: 'Add Notion Text Content',
+    description: 'Quick way to add text content to pages',
+    category: 'Notion',
+    useCases: ['Text addition', 'Quick notes', 'Content writing', 'Simple editing'],
+    icon: '/icons/notion.png'
+  },
+  'search-notion-workspace': {
+    name: 'Search Notion Workspace',
+    description: 'Search across all pages and databases in workspace',
+    category: 'Notion',
+    useCases: ['Content search', 'Information finding', 'Workspace exploration', 'Data discovery'],
+    icon: '/icons/notion.png'
+  },
+  'search-notion-pages': {
+    name: 'Search Notion Pages',
+    description: 'Search specifically for pages',
+    category: 'Notion',
+    useCases: ['Page search', 'Document finding', 'Content discovery', 'Page exploration'],
+    icon: '/icons/notion.png'
+  },
+  'search-notion-databases': {
+    name: 'Search Notion Databases',
+    description: 'Search specifically for databases',
+    category: 'Notion',
+    useCases: ['Database search', 'Data source finding', 'Database discovery', 'Schema exploration'],
+    icon: '/icons/notion.png'
+  },
+  'list-notion-users': {
+    name: 'List Notion Users',
+    description: 'List all users in the workspace',
+    category: 'Notion',
+    useCases: ['User management', 'Team overview', 'Access control', 'Workspace administration'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-user': {
+    name: 'Get Notion User',
+    description: 'Get detailed information about a specific user',
+    category: 'Notion',
+    useCases: ['User details', 'Profile information', 'User analysis', 'Contact information'],
+    icon: '/icons/notion.png'
+  },
+  'get-notion-current-user': {
+    name: 'Get Notion Current User',
+    description: 'Get information about the current authenticated user',
+    category: 'Notion',
+    useCases: ['Profile check', 'Authentication status', 'User verification', 'Account information'],
+    icon: '/icons/notion.png'
+  },
+
   // Document & Content Tools
   'createDocument': {
     name: 'Create Document',
@@ -356,17 +526,17 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
   },
   'delegate_to_ami': {
     name: 'Delegate to Ami',
-    description: 'Assign creative tasks to Ami specialist',
+    description: 'Assign executive assistant and Notion workspace organization tasks to Ami specialist',
     category: 'Task Delegation',
-  useCases: ['Creative projects', 'Design work', 'Content creation', 'Artistic tasks'],
-  icon: '/img/agents/ami4.png'
+    useCases: ['Calendar management', 'Research tasks', 'Note-taking', 'Notion organization', 'Client management'],
+    icon: '/img/agents/ami4.png'
   },
   'delegate_to_peter': {
     name: 'Delegate to Peter',
-    description: 'Assign logical and mathematical tasks to Peter specialist',
+    description: 'Assign Google Workspace and document management tasks to Peter specialist',
     category: 'Task Delegation',
-  useCases: ['Problem solving', 'Mathematical calculations', 'Logic puzzles', 'Analytical tasks'],
-  icon: '/img/agents/peter4.png'
+    useCases: ['Google Docs creation', 'Spreadsheet management', 'Drive organization', 'Calendar coordination'],
+    icon: '/img/agents/peter4.png'
   },
   'delegate_to_emma': {
     name: 'Delegate to Emma',
@@ -381,6 +551,13 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     category: 'Task Delegation',
     useCases: ['Web research', 'Market analysis', 'News synthesis', 'Competitive intelligence'],
     icon: '/img/agents/apu4.png'
+  },
+  'delegate_to_wex': {
+    name: 'Delegate to Wex',
+    description: 'Delegate web automation tasks to Wex for browser-based operations and workflows',
+    category: 'Task Delegation',
+    useCases: ['Web scraping', 'Form filling', 'Browser automation', 'Workflow automation', 'Data extraction'],
+    icon: '/img/agents/wex4.png'
   },
   'complete_task': {
     name: 'Complete Task',
@@ -462,7 +639,10 @@ const TOOL_REGISTRY: Record<string, ToolInfo> = {
     category: 'Automation',
     useCases: ['Task management', 'History review', 'Bulk monitoring', 'Task overview'],
     icon: '/icons/web_scrapping.png'
-  }
+  },
+
+  // Notion Credential Tools
+  // (Notion credential helper tools intentionally excluded from selectable tools)
 }
 
 interface AgentCRUDPanelProps {
@@ -1691,7 +1871,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                   <h3 className="text-lg font-semibold text-white">Tools & Capabilities</h3>
                   {detailsAgent!.tools && detailsAgent!.tools.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {detailsAgent!.tools.map((toolName, index) => {
+                      {detailsAgent!.tools
+                        // Hide internal/credential helper tools defensively even if legacy data still contains them
+                        .filter(t => !['add_notion_credentials','test_notion_connection','list_notion_credentials'].includes(t))
+                        .map((toolName, index) => {
                         const toolInfo = TOOL_REGISTRY[toolName] || {
                           name: toolName,
                           description: 'Tool description not available',

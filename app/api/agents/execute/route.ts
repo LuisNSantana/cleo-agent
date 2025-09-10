@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { ExecuteAgentRequest } from '@/lib/agents/types'
 import { createClient } from '@/lib/supabase/server'
+import { withRequestContext } from '@/lib/server/request-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -141,49 +142,49 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Set global user context for tools (like chat route does)
-      if (authedUserId) {
-        ;(globalThis as any).__currentUserId = authedUserId;
-      }
+      // Execute within request context to ensure proper context propagation during delegation
+      const result = await withRequestContext({ 
+        userId: authedUserId || 'default-user',
+        requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      }, async () => {
+        // Start execution with enhanced dual-mode support
+        const execution = (orchestrator as any).startAgentExecutionForUI?.(
+          input, 
+          agentId, 
+          effectiveThreadId || undefined, 
+          authedUserId || undefined, 
+          priorMessages,
+          forceSupervised || false
+        ) || (orchestrator as any).startAgentExecutionWithHistory?.(input, agentId, priorMessages) || orchestrator.startAgentExecution(input, agentId)
+        
+        console.log('[API/execute] Started dual-mode execution:', {
+          id: execution.id,
+          mode: forceSupervised ? 'supervised' : (agentId && agentId !== 'cleo-supervisor' ? 'direct' : 'supervised'),
+          agentId: execution.agentId,
+          threadId: effectiveThreadId
+        })
 
-      // Start execution with enhanced dual-mode support
-      const execution = (orchestrator as any).startAgentExecutionForUI?.(
-        input, 
-        agentId, 
-        effectiveThreadId || undefined, 
-        authedUserId || undefined, 
-        priorMessages,
-        forceSupervised || false
-      ) || (orchestrator as any).startAgentExecutionWithHistory?.(input, agentId, priorMessages) || orchestrator.startAgentExecution(input, agentId)
-      
-      console.log('[API/execute] Started dual-mode execution:', {
-        id: execution.id,
-        mode: forceSupervised ? 'supervised' : (agentId && agentId !== 'cleo-supervisor' ? 'direct' : 'supervised'),
-        agentId: execution.agentId,
-        threadId: effectiveThreadId
+        return execution
       })
 
       return NextResponse.json({
         success: true,
         execution: {
-          id: execution.id,
-          agentId: execution.agentId,
-          status: execution.status,
-          startTime: execution.startTime,
-          messages: execution.messages,
-          metrics: execution.metrics,
-          error: execution.error,
-          steps: execution.steps || []
+          id: result.id,
+          agentId: result.agentId,
+          status: result.status,
+          startTime: result.startTime,
+          messages: result.messages,
+          metrics: result.metrics,
+          error: result.error,
+          steps: result.steps || []
         },
         thread: effectiveThreadId ? { id: effectiveThreadId } : null
       })
     } catch (error) {
       console.error('Agent execution error:', error)
 
-      // Clean up global context on error
-      if ((globalThis as any).__currentUserId) {
-        delete (globalThis as any).__currentUserId;
-      }      // Only recreate orchestrator for very specific graph errors, not general errors
+      // Only recreate orchestrator for very specific graph errors, not general errors
       if (error instanceof Error && (
         error.message.includes('already present') ||
         error.message.includes('Graph not initialized') ||
@@ -215,11 +216,6 @@ export async function POST(request: NextRequest) {
         } catch (retryError) {
           console.error('Retry execution failed:', retryError)
           
-          // Clean up global context on retry error
-          if ((globalThis as any).__currentUserId) {
-            delete (globalThis as any).__currentUserId;
-          }
-          
           return NextResponse.json(
             { error: 'Failed to execute agent after retry', details: retryError instanceof Error ? retryError.message : String(retryError) },
             { status: 500 }
@@ -228,12 +224,6 @@ export async function POST(request: NextRequest) {
       }
 
       // For other errors, just return the error without recreating
-      
-      // Clean up global context on general error
-      if ((globalThis as any).__currentUserId) {
-        delete (globalThis as any).__currentUserId;
-      }
-      
       return NextResponse.json(
         { 
           error: 'Failed to execute agent',
@@ -245,11 +235,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error executing agent:', error)
-    
-    // Clean up global context on outer error
-    if ((globalThis as any).__currentUserId) {
-      delete (globalThis as any).__currentUserId;
-    }
     
     return NextResponse.json(
       {

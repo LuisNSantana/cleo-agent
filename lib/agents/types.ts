@@ -30,6 +30,11 @@ export interface AgentConfig {
   stopConditions?: string[] // e.g. stop tokens or patterns
   toolSchemas?: Record<string, any> // Optional JSON schemas for tool inputs
   tags?: string[] // capabilities or categories
+  // Modular system fields
+  immutable?: boolean // Whether this agent can be modified (true for predefined)
+  predefined?: boolean // Whether this is a built-in agent (true for the 7 core agents)
+  dynamic?: boolean // Whether this agent is user-created or dynamically generated
+  userId?: string // For user-created agents
 }
 
 export type AgentRole =
