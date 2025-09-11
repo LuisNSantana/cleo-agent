@@ -39,25 +39,43 @@ WORKDIR /app
 # Re-enable pnpm in this stage
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
+# Define build arguments for environment variables
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG SUPABASE_SERVICE_ROLE_KEY
+ARG OPENAI_API_KEY
+ARG MISTRAL_API_KEY
+ARG ANTHROPIC_API_KEY
+ARG XAI_API_KEY
+ARG GROQ_API_KEY
+ARG OPENROUTER_API_KEY
+ARG CSRF_SECRET
+ARG ENCRYPTION_KEY
+
+# Set environment variables from build args
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+ENV OPENAI_API_KEY=$OPENAI_API_KEY
+ENV MISTRAL_API_KEY=$MISTRAL_API_KEY
+ENV ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+ENV XAI_API_KEY=$XAI_API_KEY
+ENV GROQ_API_KEY=$GROQ_API_KEY
+ENV OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+ENV CSRF_SECRET=$CSRF_SECRET
+ENV ENCRYPTION_KEY=$ENCRYPTION_KEY
+
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy all project files
 COPY . .
 
-# Copy environment variables for build
-COPY .env.local .env.production
-
 # Set Next.js telemetry to disabled
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Load environment variables and build the application
-RUN set -a && \
-    if [ -f .env.local ]; then \
-      . ./.env.local; \
-    fi && \
-    set +a && \
-    pnpm build
+# Build the application using pnpm
+RUN pnpm build
 
 # Verify standalone build was created
 RUN ls -la .next/ && \
