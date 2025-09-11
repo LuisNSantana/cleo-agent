@@ -20,7 +20,8 @@ import {
   BrainIcon,
   RobotIcon,
   CopyIcon,
-  XIcon
+  XIcon,
+  ArrowClockwise
 } from '@phosphor-icons/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AgentConfig, AgentRole } from '@/lib/agents/types'
@@ -1191,6 +1192,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   React.useEffect(() => setMounted(true), [])
   // Pull server-provided parent candidates (eligible parents) from client store when available
   const parentCandidates = useClientAgentStore((s) => s.parentCandidates)
+  const { syncAgents } = useClientAgentStore()
   // Simple UUID v4-ish check (accepts generic UUID formats)
   const isUUID = (v: string | undefined | null): boolean => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
   const { models } = useModel()
@@ -1210,6 +1212,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
   const [viewFilter, setViewFilter] = React.useState<'all'|'mine'|'defaults'|'subagents'>('all')
   const [search, setSearch] = React.useState('')
   const [toolFilter, setToolFilter] = React.useState('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   // Responsive detection to avoid rendering both mobile and desktop prompt editors simultaneously
   const [isDesktop, setIsDesktop] = React.useState(false)
   React.useEffect(() => {
@@ -1291,6 +1294,19 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
 
   const removeTag = (t: string) => {
     setFormData((prev) => ({ ...prev, tags: (prev.tags || []).filter((x) => x !== t) }))
+  }
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await syncAgents()
+      // TODO: Add refresh functions for complexity-scorer and intelligent-analyzer when available
+      console.log('🔄 Agents synchronized successfully')
+    } catch (error) {
+      console.error('❌ Error refreshing agents:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const handleTagKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
@@ -1494,14 +1510,27 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
           <p className="text-slate-400 mt-1">Manage and configure your AI agents</p>
         </div>
         
-        <Button
-          onClick={() => { resetForm(); setEditingAgent(null); setIsCreateDialogOpen(true) }}
-          variant="outline"
-          className="border-slate-600 text-slate-300 hover:text-white hover:border-violet-500 hover:bg-violet-500/10 transition-all duration-200"
-        >
-          <PlusIcon className="w-4 h-4 mr-2" />
-          Create Agent
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="border-slate-600 text-slate-300 hover:text-white hover:border-blue-500 hover:bg-blue-500/10 transition-all duration-200"
+          >
+            <ArrowClockwise className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Syncing...' : 'Refresh'}
+          </Button>
+          
+          <Button
+            onClick={() => { resetForm(); setEditingAgent(null); setIsCreateDialogOpen(true) }}
+            variant="outline"
+            className="border-slate-600 text-slate-300 hover:text-white hover:border-violet-500 hover:bg-violet-500/10 transition-all duration-200"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Create Agent
+          </Button>
+        </div>
       </div>
 
       {/* Filters & Grouped Agents: Default, My Agents, Sub-agents */}

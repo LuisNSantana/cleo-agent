@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,12 +17,26 @@ import {
   PlusIcon,
   SparkleIcon,
   UsersIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  ArrowClockwiseIcon
 } from '@phosphor-icons/react'
 import Link from 'next/link'
 
 export function AgentsSettings() {
-  const { agents, metrics } = useClientAgentStore()
+  const { agents, metrics, syncAgents } = useClientAgentStore()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefreshAgents = async () => {
+    setIsRefreshing(true)
+    try {
+      await syncAgents()
+      console.log('✅ Agents synchronized successfully')
+    } catch (error) {
+      console.error('❌ Failed to sync agents:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const moduleCards = [
     {
@@ -220,7 +234,7 @@ export function AgentsSettings() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Link href="/agents/manage">
                   <Button variant="outline" className="w-full justify-start gap-3 h-12 border-slate-600 hover:border-purple-500/50 hover:bg-purple-500/10">
                     <PlusIcon className="w-5 h-5" />
@@ -241,6 +255,16 @@ export function AgentsSettings() {
                     Start Chat
                   </Button>
                 </Link>
+
+                <Button 
+                  variant="outline" 
+                  onClick={handleRefreshAgents}
+                  disabled={isRefreshing}
+                  className="w-full justify-start gap-3 h-12 border-slate-600 hover:border-cyan-500/50 hover:bg-cyan-500/10 disabled:opacity-50"
+                >
+                  <ArrowClockwiseIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Syncing...' : 'Sync Agents'}
+                </Button>
               </div>
             </CardContent>
           </Card>

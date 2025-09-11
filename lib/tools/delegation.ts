@@ -38,7 +38,11 @@ function getAgentDisplayName(agentId: string): string {
     'peter-workspace': 'Peter',
     'emma-ecommerce': 'Emma',
     'apu-research': 'Apu',
-    'wex-automation': 'Wex'
+    'wex-automation': 'Wex',
+    // Sub-agents
+    'apu-markets': 'Apu Markets',
+    'astra-email': 'Astra',
+    'notion-agent': 'Notion Agent'
   }
   return agentNames[agentId] || agentId
 }
@@ -228,11 +232,38 @@ export const delegateToApuTool = tool({
   }
 });
 
+export const delegateToApuMarketsTool = tool({
+  description: 'Delegate financial market analysis, stock research, and real-time market data tasks to Apu Markets sub-agent specialist. Use for stock quotes, market trends, financial news, investment analysis, portfolio tracking, and market intelligence.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'apu-markets', task, context, priority, requirements })
+  }
+});
+
+export const delegateToAstraTool = tool({
+  description: 'Delegate email management, composition, and communication tasks to Astra email specialist. Use for sending emails, drafting messages, managing inbox, email automation, and correspondence handling.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'astra-email', task, context, priority, requirements })
+  }
+});
+
+export const delegateToNotionTool = tool({
+  description: 'Delegate Notion workspace management, page creation, database operations, and knowledge organization tasks to Notion specialist. Use for creating pages, managing databases, organizing content, and workspace administration.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'notion-agent', task, context, priority, requirements })
+  }
+});
+
 // Export all delegation tools
 export const delegationTools = {
   delegate_to_toby: delegateToTobyTool,
   delegate_to_ami: delegateToAmiTool,
   delegate_to_peter: delegateToPeterTool,
   delegate_to_emma: delegateToEmmaTool,
-  delegate_to_apu: delegateToApuTool
+  delegate_to_apu: delegateToApuTool,
+  delegate_to_apu_markets: delegateToApuMarketsTool,
+  delegate_to_astra: delegateToAstraTool,
+  delegate_to_notion_agent: delegateToNotionTool
 };

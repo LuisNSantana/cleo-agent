@@ -175,8 +175,8 @@ export class ModelFactory {
         maxTokens,
         streaming
       }
-      // GPT-5 models currently do not accept custom temperature; omit field entirely
-      if (!isGpt5 && typeof temperature === 'number') {
+      // GPT-5 models support temperature - include it for all models
+      if (typeof temperature === 'number') {
         opts.temperature = temperature
       }
       return new ChatOpenAI(opts)

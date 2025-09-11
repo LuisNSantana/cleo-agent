@@ -268,3 +268,24 @@ export function makeDelegationDecision(userMessage: string): {
     complexity
   };
 }
+
+/**
+ * Refresh agent patterns based on current available agents
+ * Call this after adding/removing agents to update delegation suggestions
+ */
+export async function refreshComplexityScorerPatterns(): Promise<void> {
+  try {
+    // Import registry dynamically to avoid circular dependencies
+    const { agentRegistry } = await import('./registry')
+    
+    // Get current user ID (you might need to adjust this based on your auth system)
+    const userId = 'current-user' // TODO: Get from auth context
+    
+    // Sync agents from database
+    await agentRegistry.syncDatabaseAgents(userId)
+    
+    console.log('✅ Complexity scorer patterns refreshed')
+  } catch (error) {
+    console.error('❌ Failed to refresh complexity scorer patterns:', error)
+  }
+}

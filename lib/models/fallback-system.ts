@@ -18,6 +18,7 @@ const modelFallbacks: Record<string, string> = {
   
   // SMARTER TIER - GPT-5 Mini as primary, Claude 3.5 Sonnet as fallback
   "gpt-5-mini": "claude-3-5-sonnet-20241022",
+  "gpt-5-mini-2025-08-07": "claude-3-5-sonnet-20241022", // Fixed: correct model name
   
   // Additional fallbacks for common models
   "gpt-4o": "claude-3-5-sonnet-20241022",

@@ -103,7 +103,7 @@ const smarterModels: ModelConfig[] = [
     outputCost: 2.0,
     priceUnit: "per 1M tokens",
     tags: ["smart", "reasoning", "vision", "tools", "advanced", "gpt5"],
-    contextWindow: 400000,
+    contextWindow: 400000, // 400k context window
     vision: true,
     tools: true,
     audio: false,
@@ -116,7 +116,7 @@ const smarterModels: ModelConfig[] = [
     defaults: {
       temperature: 0.7,
       topP: 0.9,
-      maxTokens: 4096,
+      maxTokens: 32768, // Optimized: increased from 4096 to 32k (well within 128k max output)
     },
     apiSdk: (apiKey?: string) => openproviders("gpt-5-mini-2025-08-07", undefined, apiKey),
   }

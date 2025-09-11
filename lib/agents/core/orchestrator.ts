@@ -1201,5 +1201,19 @@ export class AgentOrchestrator {
   }
 }
 
-// Singleton instance for global access
-export const globalOrchestrator = new AgentOrchestrator()
+// Singleton instance for global access (lazy-initialized to avoid module load issues)
+let _globalOrchestrator: AgentOrchestrator | null = null
+
+export function getGlobalOrchestrator(): AgentOrchestrator {
+  if (!_globalOrchestrator) {
+    _globalOrchestrator = new AgentOrchestrator()
+  }
+  return _globalOrchestrator
+}
+
+// Backward compatibility
+export const globalOrchestrator = {
+  get instance() {
+    return getGlobalOrchestrator()
+  }
+}

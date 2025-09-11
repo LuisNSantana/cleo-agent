@@ -233,9 +233,9 @@ export const TOBY_AGENT: AgentConfig = {
   name: 'Toby',
   description: 'Advanced technical research specialist with expertise in data analysis, metrics interpretation, and comprehensive information synthesis',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-mini-2025-08-07', // Upgraded: better reasoning for complex technical analysis
   temperature: 0.2,
-  maxTokens: 12288,
+  maxTokens: 16384, // Optimized: increased for detailed technical analysis
   tools: ['webSearch', 'calculator', 'getCurrentDateTime', 'cryptoPrices', 'complete_task'],
   tags: ['technical', 'research', 'data', 'analysis', 'information', 'metrics', 'documentation', 'investigation'],
   prompt: `You are Toby, the technical research and analysis specialist.
@@ -553,9 +553,9 @@ export const EMMA_AGENT: AgentConfig = {
   name: 'Emma',
   description: 'E-commerce Revenue Optimizer specializing in Shopify analytics, customer insights, inventory management, and automated store optimizations',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-mini-2025-08-07', // Upgraded: better analytical reasoning for business insights
   temperature: 0.4,
-  maxTokens: 12288,
+  maxTokens: 16384, // Optimized: increased for comprehensive e-commerce analysis
   tools: ['shopifyGetProducts', 'shopifyGetOrders', 'shopifyGetAnalytics', 'shopifyGetCustomers', 'shopifySearchProducts', 'shopifyUpdateProductPrice', 'complete_task'],
   tags: ['ecommerce', 'shopify', 'sales', 'inventory', 'store', 'analytics', 'business', 'customer'],
   prompt: `You are Emma, the e-commerce & Shopify specialist.
@@ -618,9 +618,9 @@ export const APU_AGENT: AgentConfig = {
   name: 'Apu',
   description: 'Specialist in advanced web intelligence using SerpAPI (Google, News, Scholar, Maps) with structured summarization.',
   role: 'specialist',
-  model: 'gpt-5-mini',
+  model: 'gpt-5-mini-2025-08-07', // Fixed: correct GPT-5 mini model name
   temperature: 0.3,
-  maxTokens: 12288,
+  maxTokens: 32768, // Optimized: increased from 4096, well within 128k limit
   tools: [
     'serpGeneralSearch',
     'serpNewsSearch',

@@ -3,7 +3,7 @@
  * Export all modular components for the Agent System
  */
 
-export { AgentOrchestrator, globalOrchestrator } from './orchestrator'
+export { AgentOrchestrator, globalOrchestrator, getGlobalOrchestrator } from './orchestrator'
 export { GraphBuilder } from './graph-builder'
 export { ExecutionManager } from './execution-manager'
 export { ModelFactory } from './model-factory'
