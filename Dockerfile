@@ -51,8 +51,13 @@ COPY .env.local .env.production
 # Set Next.js telemetry to disabled
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build the application using pnpm
-RUN pnpm build
+# Load environment variables and build the application
+RUN set -a && \
+    if [ -f .env.local ]; then \
+      . ./.env.local; \
+    fi && \
+    set +a && \
+    pnpm build
 
 # Verify standalone build was created
 RUN ls -la .next/ && \

@@ -1,5 +1,13 @@
 import type { Metadata } from 'next'
-import { SerpapiPage } from './serpapi-page'
+
+export function SerpapiPage() {
+  return (
+    <div>
+      <h1>SerpAPI Credentials</h1>
+      <p>Configure your SerpAPI credentials here.</p>
+    </div>
+  )
+}
 
 export const metadata: Metadata = { title: 'SerpAPI Credentials' }
 
