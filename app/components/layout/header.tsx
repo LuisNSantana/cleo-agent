@@ -15,6 +15,7 @@ import Link from "next/link"
 import { DialogPublish } from "./dialog-publish"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { ThemeToggle } from "./theme-toggle"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
@@ -70,6 +71,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
               {!isMultiModelEnabled && <DialogPublish />}
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
+              <NotificationBell />
               <ThemeToggle />
               <UserMenu />
             </div>

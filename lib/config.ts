@@ -14,31 +14,39 @@ export const REMAINING_QUERY_ALERT_THRESHOLD = 2
 export const DAILY_FILE_UPLOAD_LIMIT = 5
 export const DAILY_LIMIT_PRO_MODELS = 500
 
-// Modelos disponibles sin autenticación (solo Llama)
+// Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
-  // Guest mode: allow Fast + Balanced + Local
+  // Guest mode: Fast tier with vision support
+  "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (primary)
+  "grok-3-mini-fallback", // Fast - Grok-3 Mini (fallback, text-only)
+  "gpt-4o-mini", // Emergency fallback
   "langchain:fast",
-  "langchain:balanced-local",
 ]
 
-// Modelos gratuitos para usuarios autenticados (Llama + Grok + GPT-OSS + LangChain)
+// Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
-  // Free tier: allow Balanced + Local and Fast
-  "langchain:balanced-local",
+  // Free tier: Fast + Balanced with fallbacks
+  "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (vision support)
+  "gpt-oss-120b", // Balanced - GPT-OSS 120B via Groq
+  "grok-3-mini-fallback", // Fast fallback
+  "mistral-large-latest-fallback", // Balanced fallback
+  "gpt-4o-mini", // Emergency fallback  
   "langchain:fast",
-  // GPT-OSS models via Groq
-  "gpt-oss-120b",
 ]
 
-// Default authenticated model: use the local Cleo Llama model
-export const MODEL_DEFAULT = "langchain:fast"
+// Default authenticated model: use Fast tier (best for most users)
+export const MODEL_DEFAULT = "claude-3-5-haiku-20241022"
 
-// Modelo predeterminado para invitados (guest)
-export const MODEL_DEFAULT_GUEST = "langchain:fast"
+// Modelo predeterminado para invitados: Fast tier with vision
+export const MODEL_DEFAULT_GUEST = "claude-3-5-haiku-20241022"
 
-// Globally disabled model IDs (hidden from selectors and not selectable)
+// Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [
-  "langchain:balanced-local" // Temporarily hidden - keeping only fast and balanced
+  // Hide all old model variants - keeping only optimized Fast/Balanced/Smarter
+  "langchain:balanced-local",
+  "gpt-oss-120b",
+  "gpt-oss-20b", 
+  "llama-3.3-70b-versatile",
 ]
 
 export const APP_NAME = "Cleo"

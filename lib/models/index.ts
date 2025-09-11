@@ -1,42 +1,40 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
-import { grokModels } from "./data/grok"
+import { optimizedModels } from "./data/optimized-tiers"
 import { langchainModels } from "./data/langchain"
 import { ModelConfig } from "./types"
-import { openaiModels } from "./data/openai.clean"
-import { openrouterModels } from "./data/openrouter"
-import { gptOssModels } from "./data/gpt-oss"
-import { groqModels } from "./data/groq"
 
 /**
- * Cleo Agent Models
+ * Cleo Agent Models - Optimized 3-Tier System
  * 
- * This application offers two models:
- * - Faster: xAI Grok-3 Mini, optimized for speed
- * - Smarter: OpenAI GPT-5 mini, optimized for reasoning
+ * Based on 2025 cost-effectiveness analysis and performance benchmarks:
  * 
- * Users can choose between these models to compare responses and
- * select their preferred AI for document analysis, calendar management,
- * live search, and other agent tasks.
+ * PRIMARY MODELS (User-facing options):
+ * - Fast: Claude 3.5 Haiku (vision + speed + cost-effective)
+ * - Balanced: GPT-OSS 120B via Groq (best price/performance)  
+ * - Smarter: OpenAI GPT-5 Mini (advanced reasoning)
+ * 
+ * Note: Fallback models are handled internally by ModelFactory
+ * and are not shown in the UI to keep the selection simple.
  */
 const STATIC_MODELS: ModelConfig[] = [
-  ...grokModels, // Faster (Grok-3 Mini)
-  ...openaiModels, // Smarter (GPT-5 mini)
-  ...groqModels, // High-speed models via Groq (GPT-OSS, Llama)
-  ...gptOssModels, // GPT-OSS models via Groq (legacy compatibility)
-  ...langchainModels, // Multi-Model Orchestration
-  // Add a single OpenRouter option for testing: Llama 4 Scout
-  ...openrouterModels.filter((m) => m.id === "openrouter:meta-llama/llama-4-scout"),
+  ...optimizedModels, // Only primary models (3 total) for clean UI
+  ...langchainModels, // Multi-Model Orchestration for advanced workflows
 ]
 
 // Debug: Log available models
-console.log('🔍 Available models:', STATIC_MODELS.map(m => ({ id: m.id, name: m.name, provider: m.provider })))
+console.log('🔍 Optimized 3-tier models (primary only):', STATIC_MODELS.map(m => ({ id: m.id, name: m.name, provider: m.provider })))
+
 console.log('🔍 FREE_MODELS_IDS:', FREE_MODELS_IDS)
 
 /**
  * Get all available models for Cleo Agent
  * 
- * Returns Grok, Llama, and GPT-OSS models, allowing users to choose
- * their preferred AI model for the Cleo agent experience.
+ * Returns only the 3 primary tier models for clean UI:
+ * - Fast: Claude 3.5 Haiku
+ * - Balanced: GPT-OSS 120B  
+ * - Smarter: GPT-5 Mini
+ * 
+ * Note: Fallback logic is handled internally by ModelFactory
  */
 export async function getAllModels(): Promise<ModelConfig[]> {
   return STATIC_MODELS

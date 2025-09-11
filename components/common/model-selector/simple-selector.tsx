@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { MODEL_DEFAULT } from "@/lib/config"
-import { grokModels } from "@/lib/models/data/grok"
+import { allModelsWithFallbacks } from "@/lib/models/data/optimized-tiers"
 import { ModelConfig } from "@/lib/models/types"
 import { cn } from "@/lib/utils"
 import { BrainIcon, CheckCircleIcon } from "@phosphor-icons/react"
@@ -20,9 +20,9 @@ export function SimpleModelSelector({
   className,
   disabled = false,
 }: SimpleModelSelectorProps) {
-  // Find the current model
-  const currentModel = grokModels.find((model: ModelConfig) => model.id === selectedModelId) || 
-                      grokModels.find((model: ModelConfig) => model.id === MODEL_DEFAULT)
+  // Find the current model from optimized tiers with fallbacks
+  const currentModel = allModelsWithFallbacks.find((model: ModelConfig) => model.id === selectedModelId) || 
+                      allModelsWithFallbacks.find((model: ModelConfig) => model.id === MODEL_DEFAULT)
 
   if (!currentModel) {
     return (

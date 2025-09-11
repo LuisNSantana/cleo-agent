@@ -15,7 +15,7 @@ import { MemoryManager } from './memory-manager'
 import { MetricsCollector } from './metrics-collector'
 import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
-import { getAllAgentsSync as getAllAgents } from '../unified-config'
+import { getAllAgents, getAgentById } from '../unified-config'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Helper function to emit browser events for UI updates
@@ -734,8 +734,16 @@ export class AgentOrchestrator {
       
       // If not a sub-agent, look in main agents
       if (!targetAgentConfig) {
-        const allAgents = getAllAgents()
+        const allAgents = await getAllAgents()
         targetAgentConfig = allAgents.find(agent => agent.id === delegationData.targetAgent)
+        
+        // Handle legacy agent ID mappings for backward compatibility
+        if (!targetAgentConfig && delegationData.targetAgent === 'ami-assistant') {
+          console.log('🔄 [DELEGATION] Mapping legacy agent ID ami-assistant to ami-creative')
+          targetAgentConfig = allAgents.find(agent => agent.id === 'ami-creative')
+          delegationData.targetAgent = 'ami-creative' // Update the reference
+        }
+        
         isSubAgent = false
       } else {
         isSubAgent = true

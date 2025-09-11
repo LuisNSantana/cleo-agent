@@ -34,7 +34,7 @@ function emitPipelineEvent(event: any) {
 function getAgentDisplayName(agentId: string): string {
   const agentNames: Record<string, string> = {
     'toby-technical': 'Toby',
-    'ami-assistant': 'Ami', 
+    'ami-creative': 'Ami', 
     'peter-workspace': 'Peter',
     'emma-ecommerce': 'Emma',
     'apu-research': 'Apu',

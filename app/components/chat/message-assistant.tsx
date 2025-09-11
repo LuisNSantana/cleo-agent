@@ -17,6 +17,7 @@ import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
 import { OpenDocumentToolDisplay } from '@/components/chat/open-document-tool-display'
 import { useMemo } from 'react'
 import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
+import { OptimizationInsights, extractPipelineOptimizations } from '@/app/components/chat/optimization-insights'
 import { Loader } from '@/components/prompt-kit/loader'
 
 type MessageAssistantProps = {
@@ -87,6 +88,12 @@ export function MessageAssistant({
       return []
     }
   }, [parts])
+
+  // Extract optimization insights from pipeline data
+  const optimizationData = useMemo(() => {
+    if (pipelineSteps.length === 0) return null
+    return extractPipelineOptimizations(pipelineSteps, toolInvocationParts || [])
+  }, [pipelineSteps, toolInvocationParts])
 
   // Extract openDocument result so we can render the document card inline in the assistant message
   const openDocumentResult = (() => {

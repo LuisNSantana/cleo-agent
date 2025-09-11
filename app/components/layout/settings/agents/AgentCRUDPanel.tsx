@@ -2039,11 +2039,39 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                         // Hide internal/credential helper tools defensively even if legacy data still contains them
                         .filter(t => !['add_notion_credentials','test_notion_connection','list_notion_credentials'].includes(t))
                         .map((toolName, index) => {
-                        const toolInfo = TOOL_REGISTRY[toolName] || {
+                        // Friendly rendering for delegation tools that are created dynamically per sub-agent
+                        const isDelegation = toolName.startsWith('delegate_to_')
+                        const delegationInfo = (() => {
+                          if (!isDelegation) return null
+                          // delegate_to_<sanitizedAgentId> where sanitized replaces non-alphanumeric with _
+                          const suffix = toolName.replace(/^delegate_to_/, '')
+                          const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '_')
+                          // Prefer children of the current agent as targets
+                          const children = agents.filter(a => (a as any).parentAgentId === detailsAgent!.id)
+                          const byChild = children.find(c => sanitize(c.id) === suffix)
+                          const target = byChild || agents.find(a => sanitize(a.id) === suffix)
+                          if (target) {
+                            return {
+                              name: `Delegate to ${target.name}`,
+                              description: `Delegate the current task to sub-agent ${target.name}. ${target.description || ''}`.trim(),
+                              category: 'Delegation',
+                              useCases: Array.isArray(target.tags) && target.tags.length ? target.tags.slice(0, 5) : ['handoff', 'specialist', 'routing']
+                            } as ToolInfo
+                          }
+                          // Generic fallback for delegation tools when target is not resolvable
+                          return {
+                            name: 'Delegate to agent',
+                            description: 'Delegates the task to another agent or sub-agent better suited for the request.',
+                            category: 'Delegation',
+                            useCases: ['handoff', 'specialist', 'routing']
+                          } as ToolInfo
+                        })()
+
+                        const toolInfo = delegationInfo || TOOL_REGISTRY[toolName] || {
                           name: toolName,
                           description: 'Tool description not available',
-                          category: 'Unknown',
-                          useCases: []
+                          category: isDelegation ? 'Delegation' : 'Unknown',
+                          useCases: isDelegation ? ['handoff', 'specialist', 'routing'] : []
                         }
                         return (
                           <div key={index} className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30 hover:border-violet-500/30 transition-colors">

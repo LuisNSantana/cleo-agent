@@ -350,8 +350,28 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				const exec = orchestrator.startAgentExecutionForUI?.(input, agentId, undefined, userId, [], true)
 					|| orchestrator.startAgentExecution?.(input, agentId)
 				const execId: string | undefined = exec?.id
+				
+				// Check if execution failed to start (agent not found)
+				if (!exec || !execId) {
+					console.error(`❌ [DELEGATION] Failed to start execution for agent: ${agentId}`)
+					return {
+						status: 'failed',
+						targetAgent: agentId,
+						delegatedTask: task,
+						context: context || '',
+						priority: priority || 'normal',
+						requirements: requirements || '',
+						handoffMessage: `Failed to delegate to ${agentName}: Agent not found or unavailable`,
+						nextAction: 'handle_error',
+						agentId,
+						result: `Delegation failed: Agent ${agentId} not found or unavailable`,
+						executionId: execId,
+						error: `Agent ${agentId} not found or unavailable`
+					}
+				}
+				
 				const startedAt = Date.now()
-				const TIMEOUT_MS = 120_000
+				const TIMEOUT_MS = 60_000 // Reduced timeout to 60 seconds
 				const POLL_MS = 600
 
 				let finalResult: string | null = null
@@ -377,18 +397,24 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 					finalResult = 'Delegation timed out. Partial results may be available in the agent center.'
 				}
 
+				// Determine status based on the result
+				const delegationStatus = finalResult.startsWith('Delegation failed:') || finalResult.startsWith('Delegation timed out') 
+					? 'failed' 
+					: 'delegated'
+
 				return {
-					status: 'delegated',
+					status: delegationStatus,
 					targetAgent: agentId,
 					delegatedTask: task,
 					context: context || '',
 					priority: priority || 'normal',
 					requirements: requirements || '',
 					handoffMessage: `Task delegated to ${agentName}: ${task}${context ? ` - Context: ${context}` : ''}`,
-					nextAction: 'handoff_to_agent',
+					nextAction: delegationStatus === 'failed' ? 'handle_error' : 'handoff_to_agent',
 					agentId,
 					result: finalResult,
 					executionId: execId,
+					error: delegationStatus === 'failed' ? finalResult : undefined
 				}
 			}
 		})

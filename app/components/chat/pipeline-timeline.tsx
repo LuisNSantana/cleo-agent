@@ -27,15 +27,15 @@ function formatTime(ts: string | Date) {
 
 function actionLabel(action: PipelineStep['action']) {
   switch (action) {
-    case 'routing': return 'Routing'
-    case 'analyzing': return 'Analyzing'
-    case 'thinking': return 'Processing'
-    case 'delegating': return 'Delegating'
-    case 'delegation': return 'Agent Task'
-    case 'responding': return 'Responding'
-    case 'completing': return 'Finalizing'
-    case 'reviewing': return 'Supervising'
-    case 'executing': return 'Executing tool'
+    case 'routing': return '🎯 Smart Routing'
+    case 'analyzing': return '🔍 Analyzing Query'
+    case 'thinking': return '🧠 Processing'
+    case 'delegating': return '📋 Delegating'
+    case 'delegation': return '⚡ Specialized Task'
+    case 'responding': return '💬 Responding'
+    case 'completing': return '✅ Finalizing'
+    case 'reviewing': return '👁️ Supervising'
+    case 'executing': return '🔧 Using Tool'
     default: return String(action).charAt(0).toUpperCase() + String(action).slice(1)
   }
 }
@@ -107,8 +107,8 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
       <div className="bg-gradient-to-b from-background/60 to-transparent pointer-events-none absolute inset-0" />
       <div className="relative p-3 sm:p-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-muted-foreground/80 text-xs uppercase tracking-wide">
-            Pipeline ({uniqueSteps.length} step{uniqueSteps.length !== 1 ? 's' : ''})
+          <div className="text-muted-foreground/80 text-xs uppercase tracking-wide font-medium">
+            🚀 Optimized Pipeline ({uniqueSteps.length} step{uniqueSteps.length !== 1 ? 's' : ''})
           </div>
           {uniqueSteps.length > 3 && (
             <button

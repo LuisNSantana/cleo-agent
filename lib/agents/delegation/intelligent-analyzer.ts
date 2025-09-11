@@ -2,7 +2,7 @@
  * Intelligent Delegation Analyzer v2
  *
  * Improvements:
- * - Fuzzy matching (Levenshtein) for typos and variants (e.g., "tiendda", "analiticas")
+ * - Fuzzy matching (Levenshtein) for typos and variants
  * - Calibrated scoring weights and confidence thresholds
  * - Expanded bilingual keywords and contextual phrases
  * - Clearer clarification logic when intent is ambiguous
@@ -30,55 +30,70 @@ interface KeywordPatterns {
 
 // Enhanced keyword patterns for each specialist
 const AGENT_PATTERNS: KeywordPatterns = {
-  'toby-technical': {
+  'apu-research': {
     primary: [
+      // Technical and development (consolidated from toby-technical)
       'code', 'debug', 'api', 'database', 'sql', 'script', 'programming', 'development', 'technical', 'bug', 'fix', 'backend', 'frontend',
-      // stack-specific
+      // Stack-specific
       'typescript', 'react', 'next.js', 'nextjs', 'tailwind', 'node', 'npm', 'pnpm', 'docker', 'kubernetes', 'k8s', 'redis', 'websocket', 'sse',
-      'supabase', 'postgres', 'rls', 'trigger', 'migration', 'endpoint', 'api route'
-    ],
-    secondary: ['performance', 'optimization', 'security', 'deployment', 'server', 'framework', 'library', 'algorithm', 'cache', 'latency', 'timeout'],
-    contextual: ['how to build', 'how to implement', 'error', 'not working', 'crash', 'slow', 'integrate', 'setup', 'type error', 'compile error', 'failed build'],
-    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas']
-  },
-  'ami-assistant': {
-    primary: [
-      // Gestión administrativa y organización
-      'calendar', 'calendario', 'meeting', 'reunión', 'appointment', 'cita', 'agenda', 'schedule',
-      'notion', 'organize', 'organizar', 'manage', 'gestión', 'gestion', 'coordinate', 'coordinar', 'plan', 'planificar',
-      
-  // Investigación práctica y búsquedas del día a día (incluye vuelos y restaurantes)
-  'restaurant', 'restaurante', 'cocina', 'cuisine', 'menu', 'menú', 'hours', 'horarios', 'near me', 'cerca', 'hotel', 'booking', 'reserva', 'reservación', 'reservacion', 'flight', 'flights', 'vuelo', 'vuelos', 'travel', 'viaje',
-      'find', 'encontrar', 'search', 'buscar', 'recommend', 'recomendar', 'where', 'dónde', 'donde',
-      
-      // Servicios y lifestyle 
-      'movie', 'cine', 'event', 'evento', 'activity', 'actividad', 'place', 'lugar', 'near me', 'cerca', 'horarios', 'hours', 'menu', 'menú', 'menu', 'cuisine', 'comida',
-      
-  // Investigación de contactos y empresas / LinkedIn / Email
-  'contact', 'contacto', 'client', 'cliente', 'lead', 'prospect', 'prospecto', 'person', 'persona', 'company', 'empresa',
-  'linkedin', 'perfil', 'profile', 'research', 'investigar', 'information', 'información', 'informacion', 'email', 'correo', 'inbox', 'bandeja', 'responder', 'reply', 'titulo', 'title', 'position'
+      'supabase', 'postgres', 'rls', 'trigger', 'migration', 'endpoint', 'api route',
+      // Research and intelligence (original apu)
+      'research', 'investigación', 'investigar', 'analyze', 'analizar', 'investigate', 'trends', 'tendencias', 'data', 'datos', 'market', 'mercado', 
+      'news', 'intelligence', 'study', 'estudio', 'benchmark', 'competitor', 'competidores', 'stock', 'stocks'
     ],
     secondary: [
-  'productivity', 'productividad', 'workflow', 'template', 'plantilla', 'deadline', 'agenda',
-  'tripadvisor', 'yelp', 'opentable', 'booking.com', 'kayak', 'skyscanner', 'google flights', 'google.com/travel/flights', 'google maps', 'maps', 'directions', 'direcciones', 'address',
-      'price', 'precio', 'review', 'opinión', 'opinion', 'rating', 'calificación', 'calificacion', 'compare', 'comparar',
-  'business', 'negocio', 'insight', 'networking', 'recommendations', 'recomendaciones', 'mejores', 'top rated', 'cheap', 'barato',
-  'latest news', 'breaking', 'tendencias', 'noticias', 'news', 'hoy'
+      // Technical
+      'performance', 'optimization', 'security', 'deployment', 'server', 'framework', 'library', 'algorithm', 'cache', 'latency', 'timeout',
+      // Research
+      'competitive', 'competencia', 'industry', 'industria', 'insights', 'report', 'reporte', 'statistics', 'estadísticas', 'forecast', 
+      'pronóstico', 'comparison', 'comparación', 'whitepaper', 'paper', 'journal', 'citation', 'source', 'dataset', 'press release', 
+      'market size', 'tam', 'sam', 'som'
     ],
     contextual: [
-  'help me organize', 'ayúdame a organizar', 'ayudame a organizar', 'find a restaurant', 'buscar un restaurante', 'buscar restaurantes', 'recommend restaurants', 'recomienda restaurantes',
-  'book a hotel', 'reservar hotel', 'book a table', 'reservar mesa', 'make a reservation', 'hacer una reserva',
-  'plan a trip', 'planificar viaje', 'find flights', 'buscar vuelos', 'cheap flights', 'vuelos baratos', 'google flights', 'skyscanner',
-  'where can i', 'dónde puedo', 'donde puedo', 'recommend me', 'recomiéndame', 'recomendame',
-      'best places', 'mejores lugares', 'nearby', 'cerca de mí', 'cerca de mi',
-  'research company', 'investigar empresa', 'find contact', 'encontrar contacto', 'find linkedin', 'buscar linkedin', 'lookup linkedin', 'perfil linkedin',
-  'read my email', 'lee mi correo', 'check inbox', 'revisa bandeja', 'draft reply', 'borrador de respuesta', 'reply email', 'responde correo',
-  'manage my calendar', 'gestionar mi calendario', 'organize my notion', 'search online',
-  'news today', 'noticias de hoy', 'what happened', 'qué pasó'
+      // Technical
+      'how to build', 'how to implement', 'error', 'not working', 'crash', 'slow', 'integrate', 'setup', 'type error', 'compile error', 'failed build',
+      // Research
+      'what are the trends', 'analyze the market', 'analizar el mercado', 'research shows', 'latest data', 'industry analysis', 
+      'análisis de la industria', 'compare competitors', 'analizar competidores', 'find sources', 'encontrar fuentes'
+    ],
+    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets']
+  },
+  'ami-creative': {
+    primary: [
+      // Gestión administrativa y organización
+      'task', 'tarea', 'project', 'proyecto', 'manage', 'gestión', 'gestionar', 'organize', 'organizar', 'schedule', 'scheduling', 'plan', 'planning','calendar', 'calendario', 'meeting', 'reunión', 'appointment', 'cita', 'agenda', 'schedule',
+      'notion', 'organize', 'organizar', 'manage', 'gestión', 'gestion', 'coordinate', 'coordinar', 'plan', 'planificar',
+      // Investigación práctica y búsquedas del día a día (incluye vuelos y restaurantes)
+      'restaurant', 'restaurante', 'cocina', 'cuisine', 'menu', 'menú', 'hours', 'horarios', 'near me', 'cerca', 
+      'hotel', 'booking', 'reserva', 'reservación', 'reservacion', 'flight', 'flights', 'vuelo', 'vuelos', 'travel', 'viaje','find', 'encontrar', 'search', 'buscar', 'recommend', 'recomendar', 'where', 'dónde', 'donde',
+      // Servicios y lifestyle 
+      'movie', 'cine', 'event', 'evento', 'activity', 'actividad', 'place', 'lugar', 'comida',
+      // Investigación de contactos y empresas / LinkedIn / Email
+      'contact', 'contacto', 'client', 'cliente', 'lead', 'prospect', 'prospecto', 'person', 'persona', 'company', 'empresa',
+      'linkedin', 'perfil', 'profile', 'research', 'investigar', 'information', 'información', 'informacion', 
+      'email', 'correo', 'inbox', 'bandeja', 'responder', 'reply', 'titulo', 'title', 'position'
+  ],
+    secondary: [
+      'productivity', 'productividad', 'workflow', 'template', 'plantilla', 'deadline', 'agenda',
+      'tripadvisor', 'yelp', 'opentable', 'booking.com', 'kayak', 'skyscanner', 'google flights', 'google.com/travel/flights', 
+      'google maps', 'maps', 'directions', 'direcciones', 'address','price', 'precio', 'review', 'opinión', 'opinion', 'rating', 'calificación', 'calificacion', 'compare', 'comparar',
+      'business', 'negocio', 'insight', 'networking', 'recommendations', 'recomendaciones', 'mejores', 'top rated', 'cheap', 'barato',
+      'latest news', 'breaking', 'tendencias', 'noticias', 'news', 'hoy'
+    ],
+    contextual: [
+      'help me organize', 'ayúdame a organizar', 'ayudame a organizar', 'find a restaurant', 'buscar un restaurante', 'buscar restaurantes', 
+      'recommend restaurants', 'recomienda restaurantes', 'book a hotel', 'reservar hotel', 'book a table', 'reservar mesa', 
+      'make a reservation', 'hacer una reserva', 'plan a trip', 'planificar viaje', 'find flights', 'buscar vuelos', 
+      'cheap flights', 'vuelos baratos', 'google flights', 'skyscanner', 'where can i', 'dónde puedo', 'donde puedo', 
+      'recommend me', 'recomiéndame', 'recomendame', 'best places', 'mejores lugares', 'nearby', 'cerca de mí', 'cerca de mi',
+      'research company', 'investigar empresa', 'find contact', 'encontrar contacto', 'find linkedin', 'buscar linkedin', 
+      'lookup linkedin', 'perfil linkedin', 'read my email', 'lee mi correo', 'check inbox', 'revisa bandeja', 
+      'draft reply', 'borrador de respuesta', 'reply email', 'responde correo', 'manage my calendar', 'gestionar mi calendario', 
+      'organize my notion', 'search online', 'news today', 'noticias de hoy', 'what happened', 'qué pasó'
     ],
     exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda']
   },
-  'peter-workspace': {
+  'peter-google': {
     primary: ['google', 'docs', 'sheets', 'drive', 'calendar', 'workspace', 'document', 'spreadsheet', 'gmail', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
     secondary: ['template', 'productivity', 'automation', 'workflow', 'organize', 'collaborate', 'permissions', 'share', 'invite', 'calendar invite', 'compartir', 'permisos'],
     contextual: ['create a doc', 'share file', 'schedule meeting', 'track progress', 'organize data', 'create a sheet', 'build a form', 'send email via apps script'],
@@ -108,21 +123,37 @@ const AGENT_PATTERNS: KeywordPatterns = {
     ],
     exclusions: []
   },
-  'apu-research': {
-    primary: ['research', 'investigación', 'investigar', 'analyze', 'analizar', 'investigate', 'trends', 'tendencias', 'data', 'datos', 'market', 'mercado', 'news', 'intelligence', 'study', 'estudio', 'benchmark', 'competitor', 'competidores','stock','stocks'],
-    secondary: ['competitive', 'competencia', 'industry', 'industria', 'insights', 'report', 'reporte', 'statistics', 'estadísticas', 'forecast', 'pronóstico', 'comparison', 'comparación', 'whitepaper', 'paper', 'journal', 'citation', 'source', 'dataset', 'press release', 'market size', 'tam', 'sam', 'som'],
-    contextual: ['what are the trends', 'analyze the market', 'analizar el mercado', 'research shows', 'latest data', 'industry analysis', 'análisis de la industria', 'compare competitors', 'analizar competidores', 'find sources', 'encontrar fuentes'],
-    exclusions: []
+  // Sub-agents
+  'astra-email': {
+    primary: ['email', 'gmail', 'correo', 'send', 'enviar', 'draft', 'borrador', 'reply', 'responder', 'compose', 'message', 'mensaje'],
+    secondary: ['inbox', 'bandeja', 'communication', 'comunicación', 'correspondence', 'correspondencia', 'mail', 'letter', 'carta'],
+    contextual: ['send email', 'enviar correo', 'check inbox', 'revisar bandeja', 'draft reply', 'write message', 'compose email'],
+    exclusions: ['calendar', 'meeting', 'schedule']
+  },
+  'notion-agent': {
+    primary: ['notion', 'workspace', 'page', 'database', 'notes', 'notas', 'organize', 'organizar', 'knowledge', 'conocimiento'],
+    secondary: ['template', 'plantilla', 'wiki', 'documentation', 'documentación', 'structure', 'estructura'],
+    contextual: ['create notion page', 'organize workspace', 'notion database', 'knowledge base', 'take notes'],
+    exclusions: ['email', 'calendar', 'google']
+  },
+  'apu-markets': {
+    primary: ['stock', 'stocks', 'market', 'markets', 'finance', 'financial', 'investment', 'trading', 'precio', 'price'],
+    secondary: ['portfolio', 'ticker', 'analysis', 'forecast', 'bull', 'bear', 'dividend', 'earnings', 'quarterly'],
+    contextual: ['stock price', 'market analysis', 'financial data', 'investment research', 'market trends'],
+    exclusions: ['shopify', 'ecommerce', 'calendar']
   }
 }
 
 // Agent display names and tool mappings
 const AGENT_METADATA = {
-  'toby-technical': { name: 'Toby', toolName: 'delegate_to_toby' },
-  'ami-assistant': { name: 'Ami', toolName: 'delegate_to_ami' },
-  'peter-workspace': { name: 'Peter', toolName: 'delegate_to_peter' },
+  'apu-research': { name: 'Apu', toolName: 'delegate_to_apu' },
+  'ami-creative': { name: 'Ami', toolName: 'delegate_to_ami' },
+  'peter-google': { name: 'Peter', toolName: 'delegate_to_peter' },
   'emma-ecommerce': { name: 'Emma', toolName: 'delegate_to_emma' },
-  'apu-research': { name: 'Apu', toolName: 'delegate_to_apu' }
+  // Sub-agents
+  'astra-email': { name: 'Astra', toolName: 'delegate_to_astra' },
+  'notion-agent': { name: 'Notion Agent', toolName: 'delegate_to_notion_agent' },
+  'apu-markets': { name: 'Apu Markets', toolName: 'delegate_to_apu_markets' }
 }
 
 // Scoring configuration
@@ -294,13 +325,15 @@ function generateClarificationQuestion(primaryAgent: string, secondaryAgent?: st
   const secondary = AGENT_METADATA[secondaryAgent as keyof typeof AGENT_METADATA]
   
   const clarifications = {
-    'toby-technical_ami-assistant': "Are you looking for technical implementation or day-to-day assistance like scheduling or reservations?",
-    'peter-workspace_emma-ecommerce': "Is this for general productivity (Docs/Sheets/Drive) or specifically for your store management and analytics?",
-    'ami-assistant_apu-research': "Do you need practical help (finding places, contacts) or deeper research and analysis?",
-    'toby-technical_apu-research': "Are you looking for technical implementation or data analysis and market insights?",
-    'ami-assistant_emma-ecommerce': "Is this about general lifestyle/organization or about your Shopify store?",
-    'toby-technical_emma-ecommerce': "Is this a store analytics/business question or a technical implementation issue?",
-    'peter-workspace_ami-assistant': "Do you want Workspace help (Docs/Sheets/Calendar) or broader assistance like reservations and local recommendations?",
+    'apu-research_ami-creative': "Are you looking for technical/research implementation or practical assistance like scheduling and coordination?",
+    'peter-google_emma-ecommerce': "Is this for general productivity (Docs/Sheets/Drive) or specifically for your store management and analytics?",
+    'ami-creative_apu-research': "Do you need practical help (finding places, contacts, scheduling) or deeper research and analysis?",
+    'apu-research_emma-ecommerce': "Are you looking for technical/research analysis or store-specific analytics and business questions?",
+    'ami-creative_emma-ecommerce': "Is this about general lifestyle/organization or about your Shopify store?",
+    'peter-google_ami-creative': "Do you want Workspace help (Docs/Sheets/Calendar) or broader assistance like reservations and local recommendations?",
+    'astra-email_ami-creative': "Is this specifically about email management or broader administrative tasks?",
+    'notion-agent_ami-creative': "Is this about Notion workspace organization or general administrative coordination?",
+    'apu-markets_apu-research': "Are you looking for financial market analysis or broader research and intelligence?",
   }
   
   const key = `${primaryAgent}_${secondaryAgent}` as keyof typeof clarifications

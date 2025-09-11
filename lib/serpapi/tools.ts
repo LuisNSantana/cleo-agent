@@ -246,6 +246,72 @@ export const serpRawTool = tool({
 	}
 })
 
+// MARKETS (initial wrappers) -------------------------------------------------
+// Note: Finance engines in SerpAPI vary by plan; we use stable engines (google, google_news)
+// and normalize a compact shape with graceful fallbacks.
+
+export const stockQuoteTool = tool({
+	description: 'Get a quick stock quote context via Google results (beta). Returns top organic link and any detected finance snippet.',
+	inputSchema: z.object({
+		symbol: z.string().min(1).describe('Ticker symbol, e.g., AAPL, MSFT, TSLA'),
+		hl: z.string().optional(),
+		gl: z.string().optional()
+	}),
+	execute: async ({ symbol, hl, gl }) => {
+		const userId = getCurrentUserId()
+		const key = await resolveSerpapiKey(userId)
+		if (!key) return { error: 'No SerpAPI key configured.' }
+		checkLimit(userId || 'anon')
+		try {
+			const q = `${symbol} stock price`
+			const json = await serpFetch({ engine: 'google', q, hl, gl, num: 5 }, key)
+			const organic = normalizeOrganic(json.organic_results)
+			// Best-effort extraction from knowledge_graph/answer_box if present
+			const kg = (json as any).knowledge_graph || {}
+			const answer = (json as any).answer_box || {}
+			const finance = {
+				name: kg.title || kg.name || symbol,
+				price: answer.price || kg.price || null,
+				currency: answer.currency || kg.currency || null,
+				price_change: answer.price_change || kg.price_change || null,
+				price_change_percent: answer.price_change_percent || kg.price_change_percentage || null,
+				as_of: answer.datetime || kg.date || json.search_metadata?.created_at || null
+			}
+			const sources = organic.slice(0, 3).map(r => ({ title: r.title, link: r.link }))
+			return { symbol, query: q, finance, sources, engine: 'google' }
+		} catch (e) { return { error: e instanceof Error ? e.message : 'Unknown error' } }
+	}
+})
+
+export const marketNewsTool = tool({
+	description: 'Get latest market news for a ticker via Google News (beta).',
+	inputSchema: z.object({
+		symbol: z.string().min(1).describe('Ticker symbol, e.g., AAPL'),
+		tbs: z.string().optional().describe('Time window, e.g., qdr:d (day), qdr:w (week)'),
+		hl: z.string().optional(),
+		gl: z.string().optional(),
+		num: z.number().min(1).max(10).default(6)
+	}),
+	execute: async ({ symbol, tbs, hl, gl, num }) => {
+		const userId = getCurrentUserId()
+		const key = await resolveSerpapiKey(userId)
+		if (!key) return { error: 'No SerpAPI key configured.' }
+		checkLimit(userId || 'anon')
+		try {
+			const q = `${symbol} stock`
+			const json = await serpFetch({ engine: 'google_news', q, hl, gl, num, tbs }, key)
+			const articles = (json.articles || []).slice(0, num).map((a: any) => ({
+				title: a.title,
+				link: a.link,
+				source: a.source,
+				date: a.date,
+				snippet: a.snippet
+			}))
+			return { symbol, query: q, articles, engine: 'google_news' }
+		} catch (e) { return { error: e instanceof Error ? e.message : 'Unknown error' } }
+	}
+})
+
 // COLLECTION EXPORT ---------------------------------------------------------
 export const serpapiTools = {
 	serpGeneralSearch: serpGeneralSearchTool,
@@ -253,7 +319,10 @@ export const serpapiTools = {
 	serpScholarSearch: serpScholarSearchTool,
 	serpAutocomplete: serpAutocompleteTool,
 	serpLocationSearch: serpLocationSearchTool,
-	serpRaw: serpRawTool
+	serpRaw: serpRawTool,
+	// Markets
+	stockQuote: stockQuoteTool,
+	marketNews: marketNewsTool
 }
 
 export type SerpapiToolNames = keyof typeof serpapiTools

@@ -8,6 +8,10 @@ import { UIMessage as MessageType } from "ai"
 import { useRef, useMemo, Fragment } from "react"
 import { Message } from "./message"
 import { PipelineTimeline, type PipelineStep } from './pipeline-timeline'
+import { OptimizationInsights, extractPipelineOptimizations } from './optimization-insights'
+import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus } from './real-time-optimization'
+import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
+import { PerformanceMetrics } from './performance-metrics'
 
 type ConversationProps = {
   messages: MessageType[]
@@ -26,66 +30,83 @@ export function Conversation({
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
 
-  // Extract pipeline steps from all messages for active delegation display
-  const activePipelineSteps = useMemo(() => {
-    try {
+  // Extract pipeline steps PER MESSAGE instead of globally
+  const messagePipelineSteps = useMemo(() => {
+    const messageSteps: Map<string, PipelineStep[]> = new Map()
+    
+    console.log(`📊 [FRONTEND DEBUG] Processing ${messages.length} messages for per-message pipeline steps`)
+    
+    messages.forEach((msg, msgIndex) => {
+      if (!msg.parts || !Array.isArray(msg.parts)) return
+      
       const steps: PipelineStep[] = []
+      console.log(`📝 [FRONTEND DEBUG] Message ${msgIndex} (${msg.role}) has ${msg.parts.length} parts`)
       
-      console.log(`📊 [FRONTEND DEBUG] Processing ${messages.length} messages for pipeline steps`)
-      
-      messages.forEach((msg, msgIndex) => {
-        if (!msg.parts || !Array.isArray(msg.parts)) return
-        
-        console.log(`📝 [FRONTEND DEBUG] Message ${msgIndex} (${msg.role}) has ${msg.parts.length} parts`)
-        
-        msg.parts.forEach((part, partIndex) => {
-          // Use any casting to handle custom execution-step type
-          const anyPart = part as any
-          if (anyPart && anyPart.type === 'execution-step' && anyPart.step) {
-            const step = anyPart.step as PipelineStep
-            console.log(`🎯 [FRONTEND DEBUG] Found execution step in msg ${msgIndex}, part ${partIndex}:`, {
-              id: step.id,
-              agent: step.agent,
-              action: step.action,
-              content: step.content?.slice(0, 50),
-              metadata: step.metadata
-            })
-            steps.push(step)
-          }
-        })
+      msg.parts.forEach((part, partIndex) => {
+        // Use any casting to handle custom execution-step type
+        const anyPart = part as any
+        if (anyPart && anyPart.type === 'execution-step' && anyPart.step) {
+          const step = anyPart.step as PipelineStep
+          console.log(`🎯 [FRONTEND DEBUG] Found execution step in msg ${msgIndex}, part ${partIndex}:`, {
+            id: step.id,
+            agent: step.agent,
+            action: step.action,
+            content: step.content?.slice(0, 50),
+            metadata: step.metadata
+          })
+          steps.push(step)
+        }
       })
 
-      // Sort by timestamp
-      steps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      
-      // Simple deduplication by step ID to avoid exact duplicates
-      const uniqueSteps = steps.filter((step, index, arr) => {
-        // If step has an ID, deduplicate by ID
+      // Sort by timestamp and deduplicate
+      const sortedSteps = steps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const uniqueSteps = sortedSteps.filter((step, index, arr) => {
         if (step.id) {
           return arr.findIndex(s => s.id === step.id) === index
         }
-        // Otherwise, deduplicate by content+timestamp combination
         const key = `${step.agent}-${step.action}-${step.content?.slice(0, 50)}-${step.timestamp}`
         return arr.findIndex(s => 
           `${s.agent}-${s.action}-${s.content?.slice(0, 50)}-${s.timestamp}` === key
         ) === index
       })
       
-      console.log(`📊 [FRONTEND DEBUG] Pipeline processing complete:`, {
-        totalSteps: steps.length,
-        uniqueSteps: uniqueSteps.length,
-        stepsByAgent: uniqueSteps.reduce((acc, step) => {
-          acc[step.agent] = (acc[step.agent] || 0) + 1
-          return acc
-        }, {} as Record<string, number>)
-      })
-      
-      return uniqueSteps
-    } catch (error) {
-      console.error('❌ [FRONTEND DEBUG] Error extracting pipeline steps:', error)
-      return []
+      if (uniqueSteps.length > 0) {
+        messageSteps.set(msg.id, uniqueSteps)
+        console.log(`📊 [FRONTEND DEBUG] Message ${msg.id} has ${uniqueSteps.length} pipeline steps`)
+      }
+    })
+    
+    return messageSteps
+  }, [messages])
+
+  // Get all steps for global optimization status (backwards compatibility)
+  const allActivePipelineSteps = useMemo(() => {
+    const allSteps: PipelineStep[] = []
+    messagePipelineSteps.forEach(steps => allSteps.push(...steps))
+    return allSteps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }, [messagePipelineSteps])
+
+  // Get steps for current message (latest) for real-time optimization
+  const currentMessageSteps = useMemo(() => {
+    if (messages.length === 0) return []
+    const latestMessage = messages[messages.length - 1]
+    
+    // If we're in submitted/streaming state, get steps from the latest message
+    if (status === "submitted" || status === "streaming") {
+      return messagePipelineSteps.get(latestMessage.id) || []
     }
-  }, [messages])  // AI SDK v5: extract concatenated text from UIMessage.parts for display
+    
+    return []
+  }, [messages, messagePipelineSteps, status])
+
+  // Use optimization status hook for real-time feedback - only for current message
+  const { status: optimizationStatus, metrics, isActive } = useOptimizationStatus(
+    currentMessageSteps,
+    status === "streaming",
+    status === "submitted"
+  )
+
+  // AI SDK v5: extract concatenated text from UIMessage.parts for display
   const extractTextFromMessage = (msg?: MessageType): string => {
     if (!msg) return ""
     const anyMsg = msg as any
@@ -138,20 +159,33 @@ export function Conversation({
 
             // Check if this is the LAST assistant message - show pipeline BEFORE it
             const isLastAssistantMessage = message.role === "assistant" && isLast
-            const shouldShowPipelineBeforeThisMessage = isLastAssistantMessage && activePipelineSteps.length > 0
+            const currentMessageSteps = messagePipelineSteps.get(message.id) || []
+            const shouldShowPipelineBeforeThisMessage = isLastAssistantMessage && currentMessageSteps.length > 0
+
+            // Extract optimization data for insights (use current message steps)
+            const optimizationData = shouldShowPipelineBeforeThisMessage 
+              ? extractPipelineOptimizations(currentMessageSteps, [])
+              : null
 
             return (
               <Fragment key={message.id}>
                 {/* Show pipeline BEFORE the final assistant response (only if we have steps) */}
                 {shouldShowPipelineBeforeThisMessage && (
-                  <div className="group flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-                    <div className="w-full">
-                      <div className="flex items-center gap-2 text-xs text-green-400 mb-3">
+                  <div className="group flex w-full max-w-4xl flex-col items-start gap-3 px-6 pb-3">
+                    <div className="w-full space-y-3">
+                      <div className="flex items-center gap-2 text-xs text-green-400">
                         <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                         <span className="font-medium">Pipeline completed</span>
-                        <span className="text-green-300/70">• {activePipelineSteps.length} steps executed</span>
+                        <span className="text-green-300/70">• {currentMessageSteps.length} steps executed</span>
                       </div>
-                      <PipelineTimeline steps={activePipelineSteps} />
+                      <PipelineTimeline steps={currentMessageSteps} />
+                      {optimizationData && (
+                        <OptimizationInsights pipeline={optimizationData} />
+                      )}
+                      {/* Show final performance metrics */}
+                      {metrics && (
+                        <PerformanceMetrics metrics={metrics} />
+                      )}
                     </div>
                   </div>
                 )}
@@ -179,15 +213,25 @@ export function Conversation({
           {/* Pipeline LIVE: Show when streaming OR waiting for response (no assistant message yet OR streaming) */}
           {(status === "submitted" || (status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "user")) && (
             <div className="group min-h-scroll-anchor flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-              <div className="w-full">
-                {activePipelineSteps.length > 0 ? (
+              <div className="w-full space-y-3">
+                {currentMessageSteps.length > 0 ? (
                   <>
                     <div className="flex items-center gap-2 text-xs text-blue-400 mb-3">
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                       <span className="font-medium">Executing pipeline</span>
-                      <span className="text-blue-300/70">• {activePipelineSteps.length} steps in progress</span>
+                      <span className="text-blue-300/70">• {currentMessageSteps.length} steps in progress</span>
                     </div>
-                    <PipelineTimeline steps={activePipelineSteps} />
+                    <PipelineTimeline steps={currentMessageSteps} />
+                    
+                    {/* Real-time optimization feedback during execution */}
+                    {optimizationStatus && (
+                      <RealTimeOptimization status={optimizationStatus} />
+                    )}
+                    
+                    {/* Show performance metrics during execution */}
+                    {metrics && isActive && (
+                      <PerformanceMetrics metrics={metrics} />
+                    )}
                   </>
                 ) : (
                   <>
@@ -196,6 +240,15 @@ export function Conversation({
                       <span className="font-medium">Initializing pipeline</span>
                       <span className="text-blue-300/70">• Preparing delegation</span>
                     </div>
+                    
+                    {/* Show analyzing state when no pipeline steps yet - using initial optimization status */}
+                    <RealTimeOptimization status={{
+                      stage: 'analyzing',
+                      route: 'direct',
+                      optimizations: ['Query complexity analysis', 'Initializing optimization pipeline'],
+                      timeElapsed: 0
+                    }} />
+                    
                     <Loader />
                   </>
                 )}
@@ -204,15 +257,20 @@ export function Conversation({
           )}
 
           {/* Pipeline LIVE during streaming: Show when assistant message is streaming */}
-          {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && activePipelineSteps.length > 0 && (
+          {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length > 0 && (
             <div className="group flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-              <div className="w-full">
+              <div className="w-full space-y-3">
                 <div className="flex items-center gap-2 text-xs text-amber-400 mb-3">
                   <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
                   <span className="font-medium">Pipeline active</span>
-                  <span className="text-amber-300/70">• {activePipelineSteps.length} steps updating</span>
+                  <span className="text-amber-300/70">• {currentMessageSteps.length} steps updating</span>
                 </div>
-                <PipelineTimeline steps={activePipelineSteps} />
+                <PipelineTimeline steps={currentMessageSteps} />
+                
+                {/* Real-time optimization during streaming */}
+                {optimizationStatus && (
+                  <RealTimeOptimization status={optimizationStatus} />
+                )}
               </div>
             </div>
           )}

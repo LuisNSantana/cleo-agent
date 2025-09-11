@@ -173,6 +173,14 @@ function createTaskPrompt(task: AgentTask): string {
 
 Description: ${task.description}
 
+CRITICAL TASK EXECUTION RULES:
+- This is a SCHEDULED TASK, not a conversation
+- NEVER ask for clarification or additional information
+- Use ALL provided information in task description and task_config
+- Execute immediately with available data and reasonable defaults
+- Provide comprehensive results
+- ALWAYS call complete_task when finished
+
 Task Configuration:
 ${JSON.stringify(task.task_config, null, 2)}
 
@@ -194,7 +202,7 @@ As Apu (Research & Intelligence Specialist), conduct thorough research using you
 - Use serpLocationSearch if geographical context is needed
 - Use serpAutocomplete to expand search terms
 
-Provide a comprehensive research report with:
+Execute immediately with provided query/topic. Provide a comprehensive research report with:
 1. Executive Summary (2-3 sentences)
 2. Key Findings (structured bullet points)
 3. Sources and Evidence (cite all sources used)
@@ -210,7 +218,7 @@ As Wex (Web Automation Specialist), execute the automation task using your Skyve
 - Use get_skyvern_task to monitor task progress
 - Use take_skyvern_screenshot for debugging if needed
 
-Provide detailed results including:
+Execute immediately with provided URL/instructions. Provide detailed results including:
 1. Task execution summary
 2. Steps completed successfully
 3. Any issues encountered and resolutions
@@ -225,7 +233,7 @@ As Emma (E-commerce Specialist), handle the e-commerce related task:
 - Use your available tools for product research, price monitoring, or marketplace analysis
 - Provide actionable insights for e-commerce optimization
 
-Deliver results with:
+Execute immediately with provided parameters. Deliver results with:
 1. Analysis summary
 2. Key metrics and data points
 3. Recommendations for optimization
@@ -233,10 +241,39 @@ Deliver results with:
 
 When analysis is complete, call complete_task with your findings.`;
 
+    case 'peter-google':
+      return `${basePrompt}
+
+As Peter (Google Workspace Specialist), create actual Google documents/files:
+- Use createGoogleDoc/createGoogleSheet to create REAL files with shareable links
+- Never provide just text content - create actual downloadable files
+
+Execute immediately with provided content. Deliver:
+1. Created document with direct Google Workspace link
+2. Brief explanation of document structure
+3. Access instructions
+
+When document is created, call complete_task with document link.`;
+
+    case 'ami-assistant':
+      return `${basePrompt}
+
+As Ami (Executive Assistant), handle administrative and productivity tasks:
+- Use calendar tools for scheduling (create events with smart defaults)
+- Delegate specialized work to appropriate sub-agents
+- Execute immediately with available information
+
+Execute immediately with provided parameters. Provide:
+1. Task completion summary
+2. Any calendar events created or actions taken
+3. Next steps and follow-up recommendations
+
+When task is complete, call complete_task with results.`;
+
     default:
       return `${basePrompt}
 
-Complete this task using your available tools and expertise. When finished, call complete_task with your results.`;
+Execute this task immediately using your available tools and expertise. When finished, call complete_task with your results.`;
   }
 }
 

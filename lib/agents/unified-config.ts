@@ -1,87 +1,41 @@
 /**
  * Unified Agent Management
- * Primary interface for all agent operations - DB-first with static fallback for legacy compatibility
+ * Environment-aware interface that routes to client or server implementations
  */
 
-import { getAgentByIdForUser, getAllAgentsForUser, ensureDefaultAgentsForUser } from './unified-service'
 import { getAllAgents as getStaticAgents, getAgentById as getStaticAgentById } from './config'
 import type { AgentConfig } from './types'
-import type { UnifiedAgent } from './unified-types'
+
+// Check if we're in a server environment
+const isServer = typeof window === 'undefined'
 
 /**
- * Transform UnifiedAgent to AgentConfig for backward compatibility
- */
-function transformToAgentConfig(unifiedAgent: UnifiedAgent): AgentConfig {
-  return {
-    id: unifiedAgent.id,
-    name: unifiedAgent.name,
-    description: unifiedAgent.description || '',
-    role: unifiedAgent.role as any,
-    model: unifiedAgent.model,
-    temperature: unifiedAgent.temperature || 0.7,
-    maxTokens: unifiedAgent.maxTokens || 4000,
-    tools: unifiedAgent.tools || [],
-    prompt: unifiedAgent.systemPrompt,
-    color: unifiedAgent.color || '#FF6B6B',
-    icon: unifiedAgent.icon || '🤖'
-  }
-}
-
-/**
- * Get agent by ID - Database-first approach with automatic default agent creation
+ * Get agent by ID - Environment-aware routing
  */
 export async function getAgentById(id: string, userId?: string): Promise<AgentConfig | undefined> {
-  try {
-    if (!userId) {
-      console.warn('🔍 No userId provided for getAgentById, using default user')
-      userId = 'default-user'
-    }
-
-    console.log('🔍 Looking for agent:', id, 'for user:', userId)
-    
-    // Ensure default agents exist for this user
-    await ensureDefaultAgentsForUser(userId)
-    
-    // Get agent from database
-    const unifiedAgent = await getAgentByIdForUser(id, userId)
-    
-    if (unifiedAgent) {
-      console.log('🔍 Found agent in database:', unifiedAgent.name)
-      return transformToAgentConfig(unifiedAgent)
-    }
-
-    console.warn(`🔍 Agent not found in database: ${id}`)
-    return undefined
-  } catch (error) {
-    console.error('🔍 Error getting agent by ID:', error)
-    return undefined
+  if (isServer) {
+    // Dynamic import for server-side operations
+    const { getAgentById: getAgentByIdServer } = await import('./unified-config-server')
+    return getAgentByIdServer(id, userId)
+  } else {
+    // Client-side: use static agents only for now
+    console.warn('🔍 Client-side getAgentById - using static agents only')
+    return getStaticAgentById(id)
   }
 }
 
 /**
- * Get all agents for a user - Database-first with automatic default agent creation
+ * Get all agents for a user - Environment-aware routing
  */
 export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
-  try {
-    if (!userId) {
-      console.warn('🔍 No userId provided for getAllAgents, using default user')
-      userId = 'default-user'
-    }
-
-    console.log('🔍 Getting all agents for user:', userId)
-    
-    // Ensure default agents exist for this user
-    await ensureDefaultAgentsForUser(userId)
-    
-    // Get all agents from database
-    const unifiedAgents = await getAllAgentsForUser(userId)
-    
-    console.log(`🔍 Found ${unifiedAgents.length} agents for user ${userId}`)
-    
-    return unifiedAgents.map(transformToAgentConfig)
-  } catch (error) {
-    console.error('🔍 Error getting all agents:', error)
-    return []
+  if (isServer) {
+    // Dynamic import for server-side operations
+    const { getAllAgents: getAllAgentsServer } = await import('./unified-config-server')
+    return getAllAgentsServer(userId)
+  } else {
+    // Client-side: use static agents only for now
+    console.warn('🔍 Client-side getAllAgents - using static agents only')
+    return getStaticAgents()
   }
 }
 

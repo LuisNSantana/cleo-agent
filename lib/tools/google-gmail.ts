@@ -114,6 +114,18 @@ function getHeader(headers: Array<{ name: string; value: string }>, key: string)
   return h?.value ?? ''
 }
 
+// RFC 2047 MIME header encoding for non-ASCII characters
+function encodeRFC2047(text: string): string {
+  // Check if text contains non-ASCII characters
+  if (/^[\x00-\x7F]*$/.test(text)) {
+    return text // Already ASCII, no encoding needed
+  }
+  
+  // Encode as =?UTF-8?B?base64-encoded-text?=
+  const base64Text = Buffer.from(text, 'utf-8').toString('base64')
+  return `=?UTF-8?B?${base64Text}?=`
+}
+
 // 📥 List messages
 export const listGmailMessagesTool = tool({
   description: '📥 List Gmail messages. Supports Gmail search query, label filters, and max results. Returns lightweight metadata (From, Subject, Date, Snippet).',
@@ -266,7 +278,7 @@ export const sendGmailMessageTool = tool({
       if (replyTo) headers.push(`Reply-To: ${replyTo}`)
       if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`)
       if (references) headers.push(`References: ${references}`)
-      headers.push(`Subject: ${subject}`)
+      headers.push(`Subject: ${encodeRFC2047(subject)}`)
       headers.push('MIME-Version: 1.0')
 
       let mime = ''
