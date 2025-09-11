@@ -6,8 +6,6 @@ import { createClient } from '@/lib/supabase/server';
 import { 
   addShopifyCredentials, 
   getUserShopifyCredentials, 
-  updateShopifyCredentials, 
-  deleteShopifyCredentials,
   getActiveShopifyCredentials
 } from '@/lib/shopify/credentials';
 import { z } from 'zod';
@@ -20,13 +18,6 @@ const CreateCredentialSchema = z.object({
   store_name: z.string().min(1, 'Store name is required'),
   access_token: z.string().min(1, 'Access token is required'),
   is_active: z.boolean().default(true),
-});
-
-const UpdateCredentialSchema = z.object({
-  store_name: z.string().optional(),
-  store_domain: z.string().optional(),
-  access_token: z.string().optional(),
-  is_active: z.boolean().optional(),
 });
 
 /**
@@ -92,65 +83,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.error('Error adding Shopify credentials:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-/**
- * PUT /api/shopify/credentials/[id]
- * Update Shopify credentials
- */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validatedData = UpdateCredentialSchema.parse(body);
-    
-    const result = await updateShopifyCredentials(userId, params.id, validatedData);
-    
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    return NextResponse.json({ credential: result.data });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ 
-        error: 'Validation error', 
-        details: error.errors 
-      }, { status: 400 });
-    }
-    
-    console.error('Error updating Shopify credentials:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-/**
- * DELETE /api/shopify/credentials/[id]
- * Delete Shopify credentials
- */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const result = await deleteShopifyCredentials(userId, params.id);
-    
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    return NextResponse.json({ message: 'Credentials deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting Shopify credentials:', error);
+    console.error('Error creating Shopify credentials:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
