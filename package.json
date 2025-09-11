@@ -10,6 +10,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "gen:key": "node ./scripts/generate-encryption-key.js",
+    "docker:build": "./scripts/docker-build.sh",
     "docker:up": "docker-compose up --build",
     "docker:down": "docker-compose down --volumes --remove-orphans",
     "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d --build && docker-compose logs -f cleo",

@@ -6,8 +6,9 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 
 const isProd = process.env.NODE_ENV === "production"
 
-const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseHost = supabaseUrl && supabaseUrl !== 'your_supabase_project_url' && supabaseUrl.startsWith('http')
+  ? new URL(supabaseUrl).host
   : undefined
 
 const nextConfig: NextConfig = withBundleAnalyzer({
