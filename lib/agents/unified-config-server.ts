@@ -5,6 +5,7 @@
 
 import { getAgentByIdForUser, getAllAgentsForUser, ensureDefaultAgentsForUser } from './unified-service'
 import { getAllAgents as getStaticAgents, getAgentById as getStaticAgentById } from './config'
+import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 import type { UnifiedAgent } from './unified-types'
 
@@ -51,6 +52,16 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
     }
 
     console.warn(`🔍 Agent not found in database: ${id}`)
+    
+    // Fallback: Check predefined agents (includes sub-agents)
+    console.log('🔍 Checking predefined agents for:', id)
+    const predefinedAgent = getPredefinedAgentById(id)
+    if (predefinedAgent) {
+      console.log('🔍 Found predefined agent:', predefinedAgent.name)
+      return predefinedAgent
+    }
+
+    console.warn(`🔍 Agent not found in predefined agents either: ${id}`)
     return undefined
   } catch (error) {
     console.error('🔍 Error getting agent by ID:', error)

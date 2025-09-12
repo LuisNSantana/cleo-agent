@@ -6,7 +6,7 @@
 import { AgentConfig } from '../types'
 
 export const AMI_AGENT: AgentConfig = {
-  id: 'ami-assistant',
+  id: 'ami-creative',
   name: 'Ami',
   description: 'Executive assistant specialist focused on productivity, scheduling, email management, and administrative coordination',
   role: 'specialist',

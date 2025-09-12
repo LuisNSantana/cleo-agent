@@ -13,6 +13,7 @@ import { getAgentById, getAgentByName } from '@/lib/agents/unified-config';
 import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
 import { createClient } from '@/lib/supabase/server';
+import { withRequestContext } from '@/lib/server/request-context';
 
 export interface TaskExecutionResult {
   success: boolean;
@@ -94,7 +95,11 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     console.log(`🚀 Starting agent execution...`);
     
-    const result = await compiledGraph.invoke(initialState);
+    // Execute within user context so tools can access credentials
+    const result = await withRequestContext(
+      { userId: task.user_id, requestId: `task-${task.task_id}` },
+      () => compiledGraph.invoke(initialState)
+    );
 
     execution_metadata.end_time = new Date().toISOString();
     execution_metadata.duration_ms = Date.now() - startTime;
@@ -102,6 +107,66 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     // Extract result content from the graph response
     const lastMessage = result.messages[result.messages.length - 1];
     const resultContent = lastMessage?.content || 'Task completed';
+
+    // Check for tool failures in the message history
+    let hasToolFailures = false;
+    let failureReasons: string[] = [];
+    
+    for (const message of result.messages) {
+      // Check for tool messages with failures
+      if (message.content && typeof message.content === 'string') {
+        if (message.content.includes('"success":false') || 
+            message.content.includes('Auth required') ||
+            message.content.includes('error') ||
+            message.content.includes('failed')) {
+          hasToolFailures = true;
+          if (message.content.includes('Auth required')) {
+            failureReasons.push('Authentication required');
+          }
+        }
+      }
+      // Check for tool call results
+      if (message.tool_calls && Array.isArray(message.tool_calls)) {
+        for (const toolCall of message.tool_calls) {
+          if (toolCall.result && typeof toolCall.result === 'object') {
+            if (toolCall.result.success === false) {
+              hasToolFailures = true;
+              failureReasons.push(toolCall.result.message || 'Tool execution failed');
+            }
+          }
+        }
+      }
+    }
+
+    if (hasToolFailures) {
+      console.log(`❌ Task failed due to tool failures: ${failureReasons.join(', ')}`);
+      
+      // Create failure notification
+      await createTaskNotification({
+        task_id: task.task_id,
+        agent_id: task.agent_id,
+        agent_name: task.agent_name,
+        agent_avatar: task.agent_avatar,
+        notification_type: 'task_failed',
+        title: `❌ Task Failed: ${task.title}`,
+        message: `${task.agent_name} could not complete task "${task.title}". Reason: ${failureReasons.join(', ')}`,
+        task_result: {
+          error: failureReasons.join(', '),
+          execution_time: execution_metadata.duration_ms,
+          failed_at: execution_metadata.end_time
+        },
+        priority: 'high'
+      }).catch(err => console.error('Failed to create failure notification:', err));
+
+      return {
+        success: false,
+        error: failureReasons.join(', '),
+        result: resultContent,
+        tool_calls: [],
+        agent_messages: result.messages,
+        execution_metadata
+      };
+    }
 
     console.log(`✅ Task completed successfully in ${execution_metadata.duration_ms}ms`);
 
@@ -255,7 +320,7 @@ Execute immediately with provided content. Deliver:
 
 When document is created, call complete_task with document link.`;
 
-    case 'ami-assistant':
+    case 'ami-creative':
       return `${basePrompt}
 
 As Ami (Executive Assistant), handle administrative and productivity tasks:

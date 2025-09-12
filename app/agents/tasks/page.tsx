@@ -298,6 +298,27 @@ export default function AgentsTasksPage() {
     }
   }
 
+  const handleRetryTask = async (taskId: string) => {
+    try {
+      const res = await fetch('/api/agent-tasks/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId })
+      })
+      const data = await res.json()
+      if (data.success) {
+        // Refresh tasks to show updated status
+        await fetchTasks()
+      } else {
+        console.error('Failed to retry task:', data.error)
+        alert('Failed to retry task: ' + (data.error || 'Unknown error'))
+      }
+    } catch (e) {
+      console.error('Error retrying task:', e)
+      alert('Error retrying task')
+    }
+  }
+
   const submitCreate = async () => {
     if (!formAgentId || !formTitle || !formDescription) return
     setCreating(true)
@@ -588,14 +609,27 @@ export default function AgentsTasksPage() {
                                 {task.status}
                               </Badge>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTask(task.task_id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {(task.status === 'failed' || task.status === 'cancelled') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRetryTask(task.task_id)}
+                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                  title="Retry task"
+                                >
+                                  <ArrowClockwiseIcon className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteTask(task.task_id)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">

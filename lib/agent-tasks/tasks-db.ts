@@ -160,7 +160,7 @@ export async function createAgentTask(
     const builtinIdByName: Record<string, string> = {
       'cleo': 'cleo-supervisor',
       'emma': 'emma-ecommerce',
-      'ami': 'ami-creative',
+      'ami': 'ami-creative',  // Keep consistent with existing tasks in DB
       'peter': 'peter-google',
       'toby': 'toby-technical',
       'apu': 'apu-research',

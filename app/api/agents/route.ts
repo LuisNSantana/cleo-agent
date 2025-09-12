@@ -76,9 +76,17 @@ export async function GET() {
       })
     }
 
-    // 2. Add user-created agents from database
+    // 2. Add user-created agents from database (exclude those with same names as predefined)
+    const predefinedNames = new Set(ALL_PREDEFINED_AGENTS.map(cfg => cfg.name.toLowerCase()))
+    
     if (userAgents && userAgents.length > 0) {
       for (const agent of userAgents) {
+        // Skip user agents that have the same name as predefined agents
+        if (predefinedNames.has((agent as any).name?.toLowerCase())) {
+          console.log(`Skipping duplicate user agent: ${(agent as any).name}`)
+          continue
+        }
+        
         enrichedAgents.push({
           ...(agent as any),
           predefined: false,
