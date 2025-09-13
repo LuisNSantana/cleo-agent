@@ -455,17 +455,11 @@ export class OpenAIAgent extends BaseAgent {
       const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
       // Validar nombres de función para Gemini
       const isGemini = modelId.startsWith('gemini') || modelId.startsWith('google/gemini')
-      let toolsValid = true
       let runtime = null
       if (Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools) {
-        runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
-        if (isGemini && runtime && runtime.lcTools) {
-          // Gemini: los nombres deben empezar con letra o _, y solo contener a-z, A-Z, 0-9, _, ., :, -
-          const validName = /^[a-zA-Z_][a-zA-Z0-9_.:-]{0,63}$/
-          toolsValid = runtime.lcTools.every((tool: any) => validName.test(tool.name))
-        }
+        runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
       }
-      const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools && toolsValid
+      const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools && runtime && runtime.lcTools.length > 0
       if (toolsEnabled && runtime) {
         const modelWithTools = this.model.bindTools(runtime.lcTools)
         console.log('🛠️ OpenAIAgent tools bound:', runtime.names)
