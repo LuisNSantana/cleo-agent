@@ -69,10 +69,10 @@ export const metadata: Metadata = {
   url: appUrl,
     images: [
       {
-    url: "/img/agents/logocleo4.png",
-    width: 512,
-    height: 512,
-    alt: "Cleo – AI Assistant",
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Cleo - Agent of Agents",
       },
     ],
   },
@@ -82,7 +82,7 @@ export const metadata: Metadata = {
     title: "Cleo - Agent of Agents",
     description:
       "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
-  images: ["/img/agents/logocleo4.png"],
+    images: ["/opengraph-image"],
   },
   appLinks: {
     web: {
