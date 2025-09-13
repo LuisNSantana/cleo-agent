@@ -25,8 +25,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(appUrl),
   title: {
     default: "Cleo - Agent of Agents",
     template: "%s · Cleo",
@@ -62,7 +66,7 @@ export const metadata: Metadata = {
     title: "Cleo - Agent of Agents",
     description:
       "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
-    url: "/",
+  url: appUrl,
     images: [
       {
     url: "/img/agents/logocleo4.png",
