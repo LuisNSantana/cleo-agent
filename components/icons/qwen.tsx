@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { SVGProps } from "react"
 
-// Official Qwen AI logo SVG (stylized Q with swirl)
+// Aproximación del logo de Qwen AI (estilizado como una Q con swoosh)
 const QwenIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     width={32}
@@ -11,10 +11,11 @@ const QwenIcon = (props: SVGProps<SVGSVGElement>) => (
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <rect width="48" height="48" rx="10" fill="#1A73E8" />
     <g>
-      <circle cx="24" cy="24" r="12" fill="#fff" />
-      <path d="M24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12 12 5.373 12 12c0 2.485-.757 4.793-2.05 6.7l3.35 3.35c.39.39.39 1.02 0 1.41-.39.39-1.02.39-1.41 0l-3.35-3.35A11.95 11.95 0 0 1 24 36z" fill="#1A73E8"/>
+      <path
+        d="M28 12c4.418 0 8 3.582 8 8 0 1.657-.504 3.2-1.367 4.467-.867.867-2.133 2.533-3.633 4.033-2.5 2.5-5 4-8 4-6.627 0-12-5.373-12-12s5.373-12 12-12c1.657 0 3.2.504 4.467 1.367l-4.467 4.467c-.867-.867-2.133-2.533-3.633-4.033-2.5-2.5-5-4-8-4"
+        fill="#1A73E8"
+      />
     </g>
   </svg>
 )
