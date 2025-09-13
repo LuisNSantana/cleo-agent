@@ -46,26 +46,16 @@ export async function GET(request: Request) {
     )
   }
 
-  try {
-    // Try to insert user only if not exists
-    const { error: insertError } = await supabaseAdmin.from("users").insert({
-      id: user.id,
-      email: user.email,
-      created_at: new Date().toISOString(),
-      message_count: 0,
-      premium: false,
-      // Solo modelos válidos y habilitados para guest
-      favorite_models: [
-        "openrouter:openai/gpt-4.1-mini"
-      ],
-    })
+  // Debug logging
+  console.log('🔍 [AUTH DEBUG] User data:', {
+    id: user.id,
+    email: user.email,
+    idType: typeof user.id,
+    idLength: user.id?.length
+  })
 
-    if (insertError && insertError.code !== "23505") {
-      console.error("Error inserting user:", insertError)
-    }
-  } catch (err) {
-    console.error("Unexpected user insert error:", err)
-  }
+  // NO manual insert - let the trigger handle it automatically
+  // The trigger 'on_auth_user_created_safe' already inserts into public.users
 
   // Ensure existing users also have MODEL_DEFAULT in their favorites (prepend if missing)
   try {
