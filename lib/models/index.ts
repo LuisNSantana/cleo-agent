@@ -21,10 +21,7 @@ const STATIC_MODELS: ModelConfig[] = [
   ...langchainModels, // Multi-Model Orchestration for advanced workflows
 ]
 
-// Debug: Log available models
-console.log('🔍 Optimized 3-tier models (primary only):', STATIC_MODELS.map(m => ({ id: m.id, name: m.name, provider: m.provider })))
-
-console.log('🔍 FREE_MODELS_IDS:', FREE_MODELS_IDS)
+// Debug logs removed for production safety
 
 /**
  * Get all available models for Cleo Agent
@@ -46,7 +43,6 @@ export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
   const freeModels = models
     .filter((model) => {
       const isInFreeList = FREE_MODELS_IDS.includes(model.id)
-      console.log(`🔍 Model ${model.id}: inFreeList=${isInFreeList}`)
       return isInFreeList
     })
     .map((model) => ({

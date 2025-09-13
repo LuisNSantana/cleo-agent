@@ -35,16 +35,11 @@ export function encryptKey(plaintext: string): {
 }
 
 export function decryptKey(encryptedData: string, ivHex: string): string {
-  console.log('🔓 Debug - decrypting token:', {
-    encrypted_data_length: encryptedData?.length || 0,
-    iv_hex_length: ivHex?.length || 0,
-    encrypted_preview: encryptedData?.substring(0, 50) + '...',
-    iv_preview: ivHex?.substring(0, 20) + '...'
-  })
+  // Removed verbose debug logging to avoid leaking sensitive details
 
   const rawParts = (encryptedData || '').split(":")
   const parts = rawParts.filter(p => p !== undefined && p !== null && p !== '')
-  console.log('🔓 Debug - decrypt parts:', { raw_parts: rawParts.length, parts_after_filter: parts.length })
+  // Intentionally silent
   let encrypted = ''
   let authTagHex = ''
   let actualIvHex = ''

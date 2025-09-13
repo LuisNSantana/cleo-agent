@@ -1,9 +1,9 @@
 import { toast } from "@/components/ui/toast"
 import { fetchClient } from "@/lib/fetch"
 import { useModel } from "@/lib/model-store/provider"
-import { useUser } from "@/lib/user-store/provider"
 import { debounce } from "@/lib/utils"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useUser } from "@/lib/user-store/provider"
 import { useCallback, useRef } from "react"
 
 type FavoriteModelsResponse = {
@@ -14,7 +14,7 @@ export function useFavoriteModels() {
   const queryClient = useQueryClient()
   const { favoriteModels: initialFavoriteModels, refreshFavoriteModelsSilent } =
     useModel()
-  const { refreshUser } = useUser()
+  const { refreshUser, user } = useUser()
 
   // Ensure we always have an array
   const safeInitialData = Array.isArray(initialFavoriteModels)
@@ -28,7 +28,9 @@ export function useFavoriteModels() {
     error,
   } = useQuery<string[]>({
     queryKey: ["favorite-models"],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
+      if (!user?.id) return safeInitialData
       const response = await fetchClient(
         "/api/user-preferences/favorite-models"
       )
@@ -48,6 +50,9 @@ export function useFavoriteModels() {
   // Mutation to update favorite models
   const updateFavoriteModelsMutation = useMutation({
     mutationFn: async (favoriteModels: string[]) => {
+      if (!user?.id) {
+        throw new Error("Not authenticated")
+      }
       const response = await fetchClient(
         "/api/user-preferences/favorite-models",
         {

@@ -260,7 +260,11 @@ export function useChatCore({
         basePrompt = getCleoPrompt(currentModelName, promptVariant)
       }
 
-      console.log(`🎯 Frontend using prompt variant: ${promptVariant} for model: ${currentModelName}`)
+      // Intentionally silenced in production to avoid leaking internal details
+      if (process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line no-console
+  console.debug(`🎯 Frontend using prompt variant: ${promptVariant} for model: ${currentModelName}`)
+      }
 
       // If the user has a custom system prompt, append it as an addendum instead of replacing
       if (user?.system_prompt && user.system_prompt.trim().length > 0) {

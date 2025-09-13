@@ -151,7 +151,19 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
 
   // Initial data fetch
   useEffect(() => {
-    refreshAll()
+    // Avoid unauthenticated 401 spam by attempting models first, then conditional others
+    ;(async () => {
+      setIsLoading(true)
+      try {
+        await fetchModels()
+        // Try to fetch user key status; if 401, ignore quietly
+        try { await fetchUserKeyStatus() } catch {}
+        // Try to fetch favorites; if 401, ignore quietly
+        try { await fetchFavoriteModels() } catch {}
+      } finally {
+        setIsLoading(false)
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once on mount
 
