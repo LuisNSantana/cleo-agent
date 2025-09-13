@@ -22,6 +22,8 @@ import { setPipelineEventController, clearPipelineEventController } from '@/lib/
 import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
 import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
 import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
+import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
+import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
@@ -209,6 +211,17 @@ export async function POST(req: Request) {
       Boolean(modelConfig.vision)
     )
 
+    // Safety: Remove any system-role messages from user payload since we pass `system` separately.
+    // Some providers (AI SDK v5) require the system message to be first; duplicating it in messages triggers errors.
+    if (Array.isArray(convertedMessages)) {
+      const before = convertedMessages.length
+      convertedMessages = convertedMessages.filter((m: any) => m?.role !== 'system') as any
+      const after = convertedMessages.length
+      if (before !== after) {
+        console.log(`[ChatAPI] Removed ${before - after} system messages from payload to satisfy provider constraints`)
+      }
+    }
+
     // Log conversion summary and count images
     const convertedMultimodal = convertedMessages.filter((msg) =>
       Array.isArray(msg.content)
@@ -342,6 +355,16 @@ export async function POST(req: Request) {
         activeTools = Object.keys(toolsForRun)
       } catch {}
     }
+
+    // Provider-specific tool name normalization
+    try {
+      const provider = getProviderForModel(originalModel as any)
+      if (provider === 'google' || originalModel.includes('gemini')) {
+        toolsForRun = sanitizeGeminiTools(toolsForRun as any) as any
+        activeTools = Object.keys(toolsForRun)
+        console.log('[ChatAPI] Gemini tool names sanitized for function_declarations')
+      }
+    } catch {}
 
     // Optional delegation-only toolset for general chat
     // When CHAT_DELEGATION_ONLY=true, expose only delegate_to_* tools (+ minimal helpers)
@@ -853,6 +876,9 @@ export async function POST(req: Request) {
       if (typeof topP === 'number') (additionalParams as any).topP = topP
       if (typeof maxTokens === 'number') (additionalParams as any).maxTokens = maxTokens
     }
+
+  // Clamp max output tokens to provider-safe limits using the original model id (includes provider prefixes)
+  additionalParams.maxTokens = clampMaxOutputTokens(originalModel, additionalParams.maxTokens)
     
     // Check if user is asking to open/view a document - reduce reasoning to avoid content in reasoning
     const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''

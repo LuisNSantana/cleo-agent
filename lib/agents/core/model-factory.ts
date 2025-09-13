@@ -14,6 +14,7 @@ import logger from '@/lib/utils/logger'
 // AI SDK imports for additional providers
 import { createMistral } from '@ai-sdk/mistral'
 import { createXai } from '@ai-sdk/xai'
+import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
 
 export interface ModelConfig {
   temperature?: number
@@ -41,17 +42,26 @@ class AISdkChatModel extends BaseChatModel {
   }
 
   async _generate(messages: any[], options?: any): Promise<any> {
-    // Convert LangChain messages to AI SDK format
-    const convertedMessages = messages.map((msg) => ({
+    // Convert LangChain messages to AI SDK format and ensure system-first ordering
+    const convertedMessagesRaw = messages.map((msg) => ({
       role: msg._getType() === 'human' ? 'user' : msg._getType() === 'ai' ? 'assistant' : 'system',
       content: msg.content
     }))
 
+    // Remove duplicate or mid-stream system messages; keep only the first system at the beginning if present
+    const systemMsgs = convertedMessagesRaw.filter(m => m.role === 'system')
+    let convertedMessages = convertedMessagesRaw.filter(m => m.role !== 'system')
+    if (systemMsgs.length > 0) {
+      // Keep only the first system message
+      convertedMessages = [systemMsgs[0], ...convertedMessages]
+    }
+
     try {
+      const safeMax = clampMaxOutputTokens(this.modelName, options?.maxTokens ?? this.maxTokens)
       const result = await this.model.generateText({
         messages: convertedMessages,
         temperature: this.temperature,
-        maxTokens: this.maxTokens,
+        maxTokens: safeMax,
         ...options
       })
 
@@ -126,6 +136,9 @@ export class ModelFactory {
     // Handle fallback model IDs (remove -fallback suffix for API calls)
     const cleanModelName = modelName.replace('-fallback', '')
 
+    // Apply provider-safe clamp for output tokens
+    const safeMax = clampMaxOutputTokens(cleanModelName, maxTokens)
+
     // Groq models (including GPT-OSS and Llama)
     if (cleanModelName.includes('gpt-oss') || 
         cleanModelName.includes('groq/') || 
@@ -141,7 +154,7 @@ export class ModelFactory {
       return new ChatGroq({
         model: resolvedModelName,
         temperature,
-        maxTokens,
+        maxTokens: safeMax,
         streaming,
         apiKey: process.env.GROQ_API_KEY
       })
@@ -154,7 +167,7 @@ export class ModelFactory {
       })
       
       const model = mistral(cleanModelName.replace('mistral/', ''))
-      return new AISdkChatModel(model, cleanModelName, temperature, maxTokens)
+  return new AISdkChatModel(model, cleanModelName, temperature, safeMax)
     }
 
     // xAI models (Grok) - including grok-3-mini-fallback -> grok-3-mini
@@ -164,7 +177,7 @@ export class ModelFactory {
       })
       
       const model = xai(cleanModelName.replace('xai/', ''))
-      return new AISdkChatModel(model, cleanModelName, temperature, maxTokens)
+  return new AISdkChatModel(model, cleanModelName, temperature, safeMax)
     }
 
     // OpenAI models (including GPT-5)
@@ -173,7 +186,7 @@ export class ModelFactory {
       const isGpt5 = resolved.startsWith('gpt-5')
       const opts: any = {
         modelName: resolved,
-        maxTokens,
+        maxTokens: safeMax,
         streaming
       }
       // GPT-5 models support temperature - include it for all models
@@ -186,10 +199,6 @@ export class ModelFactory {
     // Anthropic models (Claude) - including claude-3-5-haiku-latest and claude-3-5-sonnet-latest
     if (cleanModelName.startsWith('claude-') || cleanModelName.includes('anthropic')) {
       // Clamp to recommended Anthropic limits when known
-      let safeMax = maxTokens
-      if (cleanModelName.includes('claude-3-5-haiku')) {
-        safeMax = Math.min(maxTokens, 8192)
-      }
       return new ChatAnthropic({
         modelName: cleanModelName.replace('anthropic/', ''),
         temperature,
@@ -204,7 +213,7 @@ export class ModelFactory {
       return new ChatOllama({
         model: cleanModelName.replace('ollama/', '').replace('local/', ''),
         temperature,
-        numPredict: maxTokens
+        numPredict: safeMax
       })
     }
 
@@ -213,7 +222,7 @@ export class ModelFactory {
     return new ChatOpenAI({
       modelName: 'gpt-4o-mini',
       temperature,
-      maxTokens,
+      maxTokens: safeMax,
       streaming
     })
   }
