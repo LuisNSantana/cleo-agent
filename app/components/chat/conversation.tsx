@@ -196,9 +196,9 @@ export function Conversation({
                   // Extract attachments from experimental_attachments
                   attachments={attachments}
                   isLast={isLast}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  onReload={onReload}
+                  onDeleteAction={onDelete}
+                  onEditAction={onEdit}
+                  onReloadAction={onReload}
                   hasScrollAnchor={hasScrollAnchor}
                   parts={message.parts}
                   status={status}
