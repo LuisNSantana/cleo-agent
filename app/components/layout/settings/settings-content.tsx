@@ -29,6 +29,7 @@ import { FilesSection } from "./files/files-section"
 // import { OllamaSection } from "./connections/ollama-section" // Disabled for now
 import { AccountManagement } from "./general/account-management"
 import { UserProfile } from "./general/user-profile"
+import { NotificationsSettings } from "./general/notifications-settings"
 import { SimpleModelsInfo } from "./models/simple-models-info"
 import { CleoPersonalitySettings } from "./models/cleo-personality-settings"
 
@@ -131,6 +132,7 @@ export function SettingsContent({
             {/* Mobile tabs content */}
             <TabsContent value="general" className="space-y-6 px-6 overflow-y-auto">
               <UserProfile />
+              <NotificationsSettings />
               {isSupabaseEnabled && (
                 <>
                   <AccountManagement />
@@ -270,6 +272,7 @@ export function SettingsContent({
               <div className="mx-auto max-w-4xl min-w-0">
               <TabsContent value="general" className="mt-0 space-y-6">
                 <UserProfile />
+                <NotificationsSettings />
                 {isSupabaseEnabled && (
                   <>
                     <AccountManagement />

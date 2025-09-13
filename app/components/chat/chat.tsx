@@ -224,6 +224,7 @@ export function Chat() {
               },
             }}
           >
+            {/* Desktop hero */}
             <div className="hidden md:block">
               <CleoMascot />
             </div>
@@ -233,6 +234,19 @@ export function Chat() {
             >
               Let cleo be with you.
             </h1>
+
+            {/* Mobile hero (replicates desktop message + mini video) */}
+            <div className="md:hidden flex flex-col items-center justify-center px-4 pt-6 pb-24">
+              <div className="scale-75">
+                <CleoMascot />
+              </div>
+              <h2
+                className="mt-2 text-2xl font-semibold tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-indigo-700 dark:from-white dark:to-indigo-300 text-center"
+                aria-label="Let cleo be with you."
+              >
+                Let cleo be with you.
+              </h2>
+            </div>
           </motion.div>
         ) : (
           <Conversation key="conversation" {...conversationProps} />

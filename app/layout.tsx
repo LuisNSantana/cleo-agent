@@ -26,9 +26,73 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Cleo - AI Assistant by Huminary Labs",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  title: {
+    default: "Cleo – AI Assistant by Huminary Labs",
+    template: "%s · Cleo",
+  },
   description:
-    "Cleo is an emotionally intelligent AI assistant created by Huminary Labs. Experience the power of advanced language models like Grok-4 and Llama in a warm, empathetic interface designed to make your daily life easier and more fulfilling.",
+    "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs. Diseñado para ayudarte con empatía, contexto y herramientas avanzadas.",
+  applicationName: "Cleo",
+  generator: "Next.js",
+  keywords: [
+    "Cleo",
+    "AI Assistant",
+    "Huminary Labs",
+    "IA Emocional",
+    "Productividad",
+  ],
+  authors: [{ name: "Huminary Labs" }],
+  themeColor: "#0b1020",
+  colorScheme: "dark",
+  category: "productivity",
+  icons: {
+    icon: [
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    apple: "/apple-touch-icon.png",
+    other: [
+      { rel: "mask-icon", url: "/android-chrome-512x512.png", color: "#0b1020" },
+    ],
+  },
+  manifest: "/site.webmanifest",
+  openGraph: {
+    type: "website",
+    siteName: "Cleo",
+    title: "Cleo – AI Assistant",
+    description:
+      "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs.",
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Cleo – AI Assistant",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    creator: "@HuminaryLabs",
+    title: "Cleo – AI Assistant",
+    description:
+      "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs.",
+    images: [
+      {
+        url: "/opengraph-image.jpg",
+        alt: "Cleo – AI Assistant",
+      },
+    ],
+  },
+  appLinks: {
+    web: {
+      url: "/",
+      should_fallback: true,
+    },
+  },
 }
 
 export default async function RootLayout({
@@ -49,6 +113,13 @@ export default async function RootLayout({
           {...(isDev ? { "data-debug": "zola.chat" } : {})}
         />
       ) : null}
+      <head>
+        <meta name="theme-color" content="#0b1020" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

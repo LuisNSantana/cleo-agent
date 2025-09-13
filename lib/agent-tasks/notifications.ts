@@ -139,6 +139,19 @@ export async function createTaskNotification(
       await sendNotificationToChat(typedNotification, notificationData.target_chat_id);
     }
 
+    // Enviar Web Push al usuario con un resumen breve
+    try {
+      const { sendPushToUser } = await import('@/lib/push/web-push')
+      const payload = {
+        title: typedNotification.notification_type === 'task_failed' ? `❌ ${typedNotification.title}` : `✅ ${typedNotification.title}`,
+        body: typedNotification.message,
+        data: { url: '/agents/notifications', taskId: typedNotification.task_id, notificationId: typedNotification.id }
+      }
+      await sendPushToUser(userId, payload)
+    } catch (e) {
+      // non-blocking
+    }
+
     return { success: true, notification: typedNotification };
   } catch (error) {
     console.error('❌ Error in createTaskNotification:', error);
