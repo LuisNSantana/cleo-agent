@@ -2,6 +2,39 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { ModelConfig } from "../types"
 
 export const openrouterModels: ModelConfig[] = [
+  // New: Z.AI GLM 4.5 (tools: likely true)
+  {
+    id: "openrouter:z-ai/glm-4.5",
+    name: "GLM 4.5",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GLM",
+    baseProviderId: "z-ai",
+    description:
+      "Z.AI GLM-4.5: flagship MoE model, strong reasoning & coding, agent-centric design.",
+    tags: ["glm", "reasoning", "tool-calling", "openrouter"],
+    contextWindow: 131072,
+    inputCost: 0.14,
+    outputCost: 0.86,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/z-ai/glm-4.5",
+    apiDocs: "https://openrouter.ai/z-ai/glm-4.5",
+    modelPage: "https://openrouter.ai/z-ai/glm-4.5",
+    releasedAt: "2025-08-20",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+      }).chat("z-ai/glm-4.5"),
+  },
   // New: Nemotron Nano 9B V2 (tools: true)
   {
     id: "openrouter:nvidia/nemotron-nano-9b-v2:free",

@@ -57,6 +57,7 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:deepseek/deepseek-chat-v3.1:free",
     "openrouter:openrouter/sonoma-dusk-alpha",
     "openrouter:openai/gpt-4.1-mini",
+    "openrouter:z-ai/glm-4.5",
   ]),
   // Google Gemini: Native Gemini 2.5 Flash Lite
   ...pickById(geminiModels, [

@@ -22,6 +22,7 @@ export function clampMaxOutputTokens(modelId: string, requested?: number): numbe
   else if (id.includes('deepseek')) cap = 8192 // Official max 32k; many providers allow >=8k safely
   else if (id.includes('llama') || id.includes('meta/')) cap = 8192
   else if (id.includes('groq/') || id.includes('gpt-oss')) cap = 16384
+  else if (id.includes('glm') || id.includes('z-ai/')) cap = 8192
 
   const req = typeof requested === 'number' && requested > 0 ? requested : cap
   return Math.min(req, cap)
