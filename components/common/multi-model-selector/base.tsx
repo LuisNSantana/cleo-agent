@@ -38,13 +38,13 @@ import {
   StarIcon,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
 import { SubMenu } from "../model-selector/sub-menu"
 
 type MultiModelSelectorProps = {
   selectedModelIds: string[]
-  setSelectedModelIds: (modelIds: string[]) => void
+  setSelectedModelIdsAction: (modelIds: string[]) => void
   className?: string
   isUserAuthenticated?: boolean
   maxModels?: number
@@ -52,7 +52,7 @@ type MultiModelSelectorProps = {
 
 export function MultiModelSelector({
   selectedModelIds,
-  setSelectedModelIds,
+  setSelectedModelIdsAction,
   className,
   isUserAuthenticated = true,
   maxModels = 5,
@@ -95,13 +95,13 @@ export function MultiModelSelector({
       return
     }
 
-    const isSelected = selectedModelIds.includes(modelId)
+  const isSelected = selectedModelIds.includes(modelId)
 
     if (isSelected) {
-      setSelectedModelIds(selectedModelIds.filter((id) => id !== modelId))
+      setSelectedModelIdsAction(selectedModelIds.filter((id) => id !== modelId))
     } else {
       if (selectedModelIds.length < maxModels) {
-        setSelectedModelIds([...selectedModelIds, modelId])
+        setSelectedModelIdsAction([...selectedModelIds, modelId])
       }
     }
   }
@@ -159,6 +159,20 @@ export function MultiModelSelector({
     searchQuery,
     isModelHidden
   )
+
+  // Ensure unique entries to avoid duplicate keys (parity with ModelSelector)
+  const dedupedModels = useMemo(() => {
+    const seen = new Set<string>()
+    const result: ModelConfig[] = []
+    for (const m of filteredModels) {
+      const k = `${m.icon || "unknown"}::${m.id}`
+      if (!seen.has(k)) {
+        seen.add(k)
+        result.push(m)
+      }
+    }
+    return result
+  }, [filteredModels])
 
   if (isLoadingModels) {
     return null
@@ -370,8 +384,8 @@ export function MultiModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : filteredModels.length > 0 ? (
-                filteredModels.map((model) => renderModelItem(model))
+              ) : dedupedModels.length > 0 ? (
+                dedupedModels.map((model) => renderModelItem(model))
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                   <p className="text-muted-foreground mb-2 text-sm">
@@ -450,8 +464,8 @@ export function MultiModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : filteredModels.length > 0 ? (
-                filteredModels.map((model) => {
+              ) : dedupedModels.length > 0 ? (
+                dedupedModels.map((model) => {
                   const isLocked = !model.accessible
                   const isSelected = selectedModelIds.includes(model.id)
                   const provider = PROVIDERS.find(

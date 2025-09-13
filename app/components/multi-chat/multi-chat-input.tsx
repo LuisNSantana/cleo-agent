@@ -13,28 +13,28 @@ import React, { useCallback } from "react"
 
 type MultiChatInputProps = {
   value: string
-  onValueChange: (value: string) => void
-  onSend: () => void
+  onValueChangeAction: (value: string) => void
+  onSendAction: () => void
   isSubmitting?: boolean
   files: File[]
-  onFileUpload: (files: File[]) => void
-  onFileRemove: (file: File) => void
+  onFileUploadAction: (files: File[]) => void
+  onFileRemoveAction: (file: File) => void
   selectedModelIds: string[]
-  onSelectedModelIdsChange: (modelIds: string[]) => void
+  onSelectedModelIdsChangeAction: (modelIds: string[]) => void
   isUserAuthenticated: boolean
-  stop: () => void
+  stopAction: () => void
   status?: "submitted" | "streaming" | "ready" | "error"
   anyLoading?: boolean
 }
 
 export function MultiChatInput({
   value,
-  onValueChange,
-  onSend,
+  onValueChangeAction,
+  onSendAction,
   isSubmitting,
   selectedModelIds,
-  onSelectedModelIdsChange,
-  stop,
+  onSelectedModelIdsChangeAction,
+  stopAction,
   status,
   anyLoading,
 }: MultiChatInputProps) {
@@ -46,12 +46,12 @@ export function MultiChatInput({
     }
 
     if (status === "streaming") {
-      stop()
+      stopAction()
       return
     }
 
-    onSend()
-  }, [isSubmitting, anyLoading, onSend, status, stop])
+    onSendAction()
+  }, [isSubmitting, anyLoading, onSendAction, status, stopAction])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -71,10 +71,10 @@ export function MultiChatInput({
         }
 
         e.preventDefault()
-        onSend()
+        onSendAction()
       }
     },
-    [isSubmitting, anyLoading, onSend, status, value]
+    [isSubmitting, anyLoading, onSendAction, status, value]
   )
 
   return (
@@ -84,7 +84,7 @@ export function MultiChatInput({
           className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
           maxHeight={200}
           value={value}
-          onValueChange={onValueChange}
+          onValueChange={onValueChangeAction}
         >
           <PromptInputTextarea
             placeholder="Ask all selected models..."
@@ -95,7 +95,7 @@ export function MultiChatInput({
             <div className="flex gap-2">
               <MultiModelSelector
                 selectedModelIds={selectedModelIds}
-                setSelectedModelIds={onSelectedModelIdsChange}
+                setSelectedModelIdsAction={onSelectedModelIdsChangeAction}
               />
             </div>
             <PromptInputAction

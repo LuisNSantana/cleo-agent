@@ -24,21 +24,22 @@ export function filterAndSortModels(
     availableModels.some(model => model.id === fav)
   ) || []
 
-  // Separate favorites and others
-  const favoriteList: ModelConfig[] = []
-  const others: ModelConfig[] = []
-  for (const m of availableModels) {
-    if (validFavorites.includes(m.id)) favoriteList.push(m)
-    else others.push(m)
-  }
+  // Build favorites list preserving the order provided by user preferences
+  const byId: Record<string, ModelConfig> = Object.fromEntries(
+    availableModels.map((m) => [m.id, m])
+  )
+  const favoriteList: ModelConfig[] = validFavorites
+    .map((fid) => byId[fid])
+    .filter(Boolean)
 
-  // Sort others: free models first, then by name
-  others.sort((a, b) => {
-    const aIsFree = FREE_MODELS_IDS.includes(a.id)
-    const bIsFree = FREE_MODELS_IDS.includes(b.id)
-    if (aIsFree !== bIsFree) return aIsFree ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
+  // Collect non-favorites
+  const favoriteSet = new Set(validFavorites)
+  const others: ModelConfig[] = availableModels.filter(
+    (m) => !favoriteSet.has(m.id)
+  )
+
+  // Sort others strictly A→Z by display name
+  others.sort((a, b) => a.name.localeCompare(b.name))
 
   const merged = [...favoriteList, ...others]
 
