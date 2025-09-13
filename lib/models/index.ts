@@ -50,10 +50,13 @@ const extraProviderModels: ModelConfig[] = [
     "llama-3-3-70b-groq",
     "llama-3-1-8b-groq",
   ]),
-  // OpenRouter: Selected cost-effective models
+  // OpenRouter: Tool-calling enabled models only
   ...pickById(openrouterModels, [
-    "openrouter:deepseek/deepseek-r1:free",
-    "openrouter:qwen/qwen2.5-32b-instruct",
+    "openrouter:nvidia/nemotron-nano-9b-v2:free",
+    "openrouter:qwen/qwen3-next-80b-a3b-thinking",
+    "openrouter:deepseek/deepseek-chat-v3.1:free",
+    "openrouter:openrouter/sonoma-dusk-alpha",
+    "openrouter:openai/gpt-4.1-mini",
   ]),
   // Google Gemini: Native Gemini 2.5 Flash
   ...pickById(geminiModels, [

@@ -274,7 +274,10 @@ export class GroqAgent extends BaseAgent {
       let lastToolResult: string | null = null
       let lastToolName: string | null = null
       const toolInvocations: Array<{ toolCallId: string; toolName: string; args?: any; result?: any }> = []
-      const toolsEnabled = Boolean((input.metadata as any)?.enableTools)
+      // Desactivar tools para modelos OpenRouter DeepSeek y Qwen2.5
+      const modelId = this.config.id
+      const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
+      const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools
       if (toolsEnabled) {
         const runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
         const modelWithTools = (this.model as any).bindTools
@@ -447,9 +450,23 @@ export class OpenAIAgent extends BaseAgent {
   let lastToolResult: string | null = null
   let lastToolName: string | null = null
   const toolInvocations: Array<{ toolCallId: string; toolName: string; args?: any; result?: any }> = []
-      const toolsEnabled = Boolean((input.metadata as any)?.enableTools)
-      if (toolsEnabled) {
-        const runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
+      // Desactivar tools para modelos OpenRouter DeepSeek y Qwen2.5
+      const modelId = this.config.id
+      const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
+      // Validar nombres de función para Gemini
+      const isGemini = modelId.startsWith('gemini') || modelId.startsWith('google/gemini')
+      let toolsValid = true
+      let runtime = null
+      if (Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools) {
+        runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
+        if (isGemini && runtime && runtime.lcTools) {
+          // Gemini: los nombres deben empezar con letra o _, y solo contener a-z, A-Z, 0-9, _, ., :, -
+          const validName = /^[a-zA-Z_][a-zA-Z0-9_.:-]{0,63}$/
+          toolsValid = runtime.lcTools.every((tool: any) => validName.test(tool.name))
+        }
+      }
+      const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools && toolsValid
+      if (toolsEnabled && runtime) {
         const modelWithTools = this.model.bindTools(runtime.lcTools)
         console.log('🛠️ OpenAIAgent tools bound:', runtime.names)
         let ai = await modelWithTools.invoke(messages)
@@ -459,11 +476,11 @@ export class OpenAIAgent extends BaseAgent {
           messages.push(ai)
           for (const call of (ai as any).tool_calls) {
             try {
-      const toolResult = await runtime.run(call.name, call.args)
-      lastToolResult = toolResult
-      lastToolName = call.name
+              const toolResult = await runtime.run(call.name, call.args)
+              lastToolResult = toolResult
+              lastToolName = call.name
               messages.push(new ToolMessage({ content: toolResult, tool_call_id: call.id }))
-        toolInvocations.push({ toolCallId: call.id, toolName: call.name, args: call.args, result: safeJsonParse(toolResult) ?? toolResult })
+              toolInvocations.push({ toolCallId: call.id, toolName: call.name, args: call.args, result: safeJsonParse(toolResult) ?? toolResult })
             } catch (err: any) {
               messages.push(new ToolMessage({ content: `Tool ${call.name} failed: ${err?.message || String(err)}`, tool_call_id: call.id }))
             }
