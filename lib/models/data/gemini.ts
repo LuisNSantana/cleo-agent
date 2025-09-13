@@ -3,6 +3,33 @@ import { ModelConfig } from "../types"
 
 const geminiModels: ModelConfig[] = [
   {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "Google",
+    providerId: "google",
+    modelFamily: "Gemini",
+    baseProviderId: "google",
+    description: "Next-gen fast Gemini Flash with strong multimodal support (vision, audio).",
+    tags: ["fast", "multimodal", "vision"],
+    contextWindow: 1000000,
+    inputCost: 0.075,
+    outputCost: 0.3,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: true,
+    reasoning: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "Medium",
+    website: "https://gemini.google.com",
+    apiDocs: "https://ai.google.dev/api/docs",
+    modelPage: "https://deepmind.google/technologies/gemini",
+    icon: "gemini",
+    apiSdk: (apiKey?: string) =>
+      openproviders("gemini-2.5-flash", undefined, apiKey),
+  },
+  {
     id: "gemini-1.5-flash-002",
     name: "Gemini 1.5 Flash 002",
     provider: "Google",

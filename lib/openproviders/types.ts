@@ -70,6 +70,7 @@ export type PerplexityModel =
   | "sonar-reasoning"
 
 export type GeminiModel =
+  | "gemini-2.5-flash"
   | "gemini-2.0-flash-001"
   | "gemini-1.5-flash"
   | "gemini-1.5-flash-latest"
@@ -133,7 +134,7 @@ export type OpenRouterModel =
   | "openrouter:openai/gpt-4.1"
   | "openrouter:openai/o4-mini"
   | "openrouter:x-ai/grok-3-mini-beta"
-  | "openrouter:google/gemini-2.5-flash-preview-05-20"
+  | "openrouter:qwen/qwen2.5-32b-instruct"
 
 // Static Ollama models for type safety
 export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"

@@ -1,7 +1,11 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { optimizedModels } from "./data/optimized-tiers"
 import { langchainModels } from "./data/langchain"
+import { mistralModels } from "./data/mistral"
+import { llamaModels } from "./data/llama"
 import { ModelConfig } from "./types"
+import { openrouterModels } from "./data/openrouter"
+import { geminiModels } from "./data/gemini"
 
 /**
  * Cleo Agent Models - Optimized 3-Tier System
@@ -16,10 +20,52 @@ import { ModelConfig } from "./types"
  * Note: Fallback models are handled internally by ModelFactory
  * and are not shown in the UI to keep the selection simple.
  */
-const STATIC_MODELS: ModelConfig[] = [
-  ...optimizedModels, // Only primary models (3 total) for clean UI
-  ...langchainModels, // Multi-Model Orchestration for advanced workflows
+function pickById(list: ModelConfig[], ids: string[]): ModelConfig[] {
+  const set = new Set(ids)
+  return list.filter(m => set.has(m.id))
+}
+
+function dedupeById(list: ModelConfig[]): ModelConfig[] {
+  const seen = new Set<string>()
+  const out: ModelConfig[] = []
+  for (const m of list) {
+    if (!seen.has(m.id)) {
+      seen.add(m.id)
+      out.push(m)
+    }
+  }
+  return out
+}
+
+// Keep 3-tier primaries + LangChain orchestrators, and add key Mistral/Meta models
+const extraProviderModels: ModelConfig[] = [
+  // Mistral (flagship + small)
+  ...pickById(mistralModels, [
+    "mistral-large-latest",
+    "mistral-small-latest",
+  ]),
+  // Meta (Llama) main variants
+  ...pickById(llamaModels, [
+    "llama-4-maverick",
+    "llama-3-3-70b-groq",
+    "llama-3-1-8b-groq",
+  ]),
+  // OpenRouter: Selected cost-effective models
+  ...pickById(openrouterModels, [
+    "openrouter:deepseek/deepseek-r1:free",
+    "openrouter:qwen/qwen2.5-32b-instruct",
+  ]),
+  // Google Gemini: Native Gemini 2.5 Flash
+  ...pickById(geminiModels, [
+    "gemini-2.5-flash",
+  ]),
 ]
+
+const STATIC_MODELS: ModelConfig[] = dedupeById([
+  ...optimizedModels, // 3-tier primaries (Fast/Balanced/Smarter)
+  ...langchainModels, // Orchestration routes
+  ...extraProviderModels, // Key models from Mistral/Meta
+])
 
 // Debug logs removed for production safety
 

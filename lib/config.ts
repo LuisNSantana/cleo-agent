@@ -18,6 +18,7 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: Fast tier with vision support
   "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (primary)
+  "gpt-oss-120b", // Balanced - GPT-OSS 120B as default for guests (text-only)
   "grok-3-mini-fallback", // Fast - Grok-3 Mini (fallback, text-only)
   "gpt-4o-mini", // Emergency fallback
   "langchain:fast",
@@ -32,21 +33,33 @@ export const FREE_MODELS_IDS = [
   "mistral-large-latest-fallback", // Balanced fallback
   "gpt-4o-mini", // Emergency fallback  
   "langchain:fast",
+  // OpenRouter selected cost-effective models (for authenticated users)
+  "openrouter:deepseek/deepseek-r1:free",
+  "openrouter:qwen/qwen2.5-32b-instruct",
+  // Added core provider models for authenticated users
+  "mistral-large-latest",
+  "mistral-small-latest",
+  "llama-4-maverick",
+  "llama-3-3-70b-groq",
+  "llama-3-1-8b-groq",
 ]
 
 // Default authenticated model: use Fast tier (best for most users)
 export const MODEL_DEFAULT = "claude-3-5-haiku-20241022"
 
-// Modelo predeterminado para invitados: Fast tier with vision
-export const MODEL_DEFAULT_GUEST = "claude-3-5-haiku-20241022"
+// Modelo predeterminado para invitados: Balanced text model for cost-effectiveness
+export const MODEL_DEFAULT_GUEST = "gpt-oss-120b"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [
   // Hide all old model variants - keeping only optimized Fast/Balanced/Smarter
   "langchain:balanced-local",
-  "gpt-oss-120b",
   "gpt-oss-20b", 
   "llama-3.3-70b-versatile",
+  // Hide outdated Google Flash 2.0 variants in favor of 2.5 Flash
+  "openrouter:google/gemini-2.0-flash-001",
+  // Keep Lite if desired; we disable as outdated per request
+  "openrouter:google/gemini-2.0-flash-lite-001",
 ]
 
 export const APP_NAME = "Cleo"
