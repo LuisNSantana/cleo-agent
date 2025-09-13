@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +76,7 @@ type TaskNotification = {
 }
 
 export default function AgentsTasksPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState('tasks')
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [notifications, setNotifications] = useState<TaskNotification[]>([])
@@ -271,6 +273,26 @@ export default function AgentsTasksPage() {
     }, 30000)
     return () => clearInterval(interval)
   }, [tasks, activeTab])
+
+  // Deep link handling: ?tab=inbox&open=<notificationId>
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    const openId = searchParams.get('open')
+    if (tab === 'inbox') setActiveTab('inbox')
+
+    if (tab === 'inbox' && openId) {
+      // Ensure notifications are loaded then open
+      const ensure = async () => {
+        await fetchNotifications()
+        const target = notifications.find(n => n.id === openId)
+        if (target) {
+          openDetails(target)
+        }
+      }
+      ensure()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase().trim()

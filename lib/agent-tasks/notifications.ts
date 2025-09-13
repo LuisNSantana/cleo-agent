@@ -142,10 +142,11 @@ export async function createTaskNotification(
     // Enviar Web Push al usuario con un resumen breve
     try {
       const { sendPushToUser } = await import('@/lib/push/web-push')
+      const deeplinkUrl = `/agents/tasks?tab=inbox&open=${encodeURIComponent(typedNotification.id)}`
       const payload = {
         title: typedNotification.notification_type === 'task_failed' ? `❌ ${typedNotification.title}` : `✅ ${typedNotification.title}`,
         body: typedNotification.message,
-        data: { url: '/agents/notifications', taskId: typedNotification.task_id, notificationId: typedNotification.id }
+        data: { url: deeplinkUrl, taskId: typedNotification.task_id, notificationId: typedNotification.id }
       }
       await sendPushToUser(userId, payload)
     } catch (e) {
