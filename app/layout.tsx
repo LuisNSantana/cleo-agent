@@ -27,6 +27,7 @@ const geistMono = Geist_Mono({
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined) ||
   (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
 
 export const metadata: Metadata = {
@@ -67,7 +68,8 @@ export const metadata: Metadata = {
   url: appUrl,
     images: [
       {
-        url: "/opengraph-image",
+        // Add version param to bust social cache when image/design changes
+        url: "/opengraph-image?v=2",
         width: 1200,
         height: 630,
         alt: "Cleo - Agent of Agents",
@@ -80,7 +82,8 @@ export const metadata: Metadata = {
     title: "Cleo - Agent of Agents",
     description:
       "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
-    images: ["/opengraph-image"],
+    // Keep in sync with openGraph.images and include cache-busting param
+    images: ["/opengraph-image?v=2"],
   },
   appLinks: {
     web: {

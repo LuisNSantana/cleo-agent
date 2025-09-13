@@ -7,6 +7,11 @@ export const size = {
 export const contentType = "image/png"
 
 export default async function Image() {
+  // Derive absolute base for assets to avoid localhost fallback in production
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
+
   return new ImageResponse(
     (
       <div
@@ -33,7 +38,7 @@ export default async function Image() {
           {/* Logo */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={new URL("/img/agents/logocleo4.png", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").toString()}
+            src={new URL("/img/agents/logocleo4.png", appUrl).toString()}
             width={200}
             height={200}
             alt="Cleo logo"
