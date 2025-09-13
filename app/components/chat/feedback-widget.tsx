@@ -75,7 +75,7 @@ export function FeedbackWidget({ authUserId }: FeedbackWidgetProps) {
             transformOrigin: "bottom right",
           }}
         >
-          <FeedbackForm authUserId={authUserId} onClose={closeMenu} />
+          <FeedbackForm authUserId={authUserId} onCloseAction={closeMenu} />
         </MorphingPopoverContent>
       </MorphingPopover>
     </div>

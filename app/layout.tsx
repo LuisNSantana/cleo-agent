@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { SidebarProvider } from "@/components/ui/sidebar"
@@ -28,23 +28,21 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: {
-    default: "Cleo – AI Assistant by Huminary Labs",
+    default: "Cleo - Agent of Agents",
     template: "%s · Cleo",
   },
   description:
-    "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs. Diseñado para ayudarte con empatía, contexto y herramientas avanzadas.",
+    "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
   applicationName: "Cleo",
   generator: "Next.js",
   keywords: [
     "Cleo",
     "AI Assistant",
     "Huminary Labs",
-    "IA Emocional",
-    "Productividad",
+    "Agent of Agents",
+    "Productivity",
   ],
   authors: [{ name: "Huminary Labs" }],
-  themeColor: "#0b1020",
-  colorScheme: "dark",
   category: "productivity",
   icons: {
     icon: [
@@ -61,31 +59,26 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Cleo",
-    title: "Cleo – AI Assistant",
+    title: "Cleo - Agent of Agents",
     description:
-      "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs.",
+      "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
     url: "/",
     images: [
       {
-        url: "/opengraph-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Cleo – AI Assistant",
+    url: "/img/agents/logocleo4.png",
+    width: 512,
+    height: 512,
+    alt: "Cleo – AI Assistant",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     creator: "@HuminaryLabs",
-    title: "Cleo – AI Assistant",
+    title: "Cleo - Agent of Agents",
     description:
-      "Cleo es un asistente de IA emocionalmente inteligente creado por Huminary Labs.",
-    images: [
-      {
-        url: "/opengraph-image.jpg",
-        alt: "Cleo – AI Assistant",
-      },
-    ],
+      "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
+  images: ["/img/agents/logocleo4.png"],
   },
   appLinks: {
     web: {
@@ -93,6 +86,13 @@ export const metadata: Metadata = {
       should_fallback: true,
     },
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1020" },
+  ],
 }
 
 export default async function RootLayout({
@@ -105,7 +105,7 @@ export default async function RootLayout({
   const userProfile = await getUserProfile()
 
   return (
-    <html lang="en" suppressHydrationWarning className="dark">
+    <html lang="en" suppressHydrationWarning>
       {isOfficialDeployment ? (
         <Script
           defer
@@ -113,8 +113,7 @@ export default async function RootLayout({
           {...(isDev ? { "data-debug": "zola.chat" } : {})}
         />
       ) : null}
-      <head>
-        <meta name="theme-color" content="#0b1020" />
+  <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="manifest" href="/site.webmanifest" />
@@ -139,7 +138,7 @@ export default async function RootLayout({
                     >
                       <ThemeProvider
                         attribute="class"
-                        defaultTheme="dark"
+                        defaultTheme="system"
                         enableSystem
                         disableTransitionOnChange
                       >

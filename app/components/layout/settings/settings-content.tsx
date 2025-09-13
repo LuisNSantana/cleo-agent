@@ -37,7 +37,7 @@ type SettingsContentProps = {
   isDrawer?: boolean
 }
 
-type TabType = "general" | "appearance" | "models" | "connections" | "files" | "agents"
+type TabType = "general" | "appearance" | "models" | "connections" | "files" | "agents" | "docs"
 
 export function SettingsContent({
   isDrawer = false,
@@ -126,6 +126,13 @@ export function SettingsContent({
                   <UsersIcon className="size-4" />
                   <span>Agentes</span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="docs"
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <FileTextIcon className="size-4" />
+                  <span>Docs</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -188,6 +195,34 @@ export function SettingsContent({
                     <UsersIcon className="size-4" />
                     Ir al Sistema de Agentes
                   </Button>
+                </Link>
+              </div>
+            </TabsContent>
+            <TabsContent value="docs" className="space-y-6 px-6 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Link href="/docs#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Inicio</h4>
+                  <p className="text-muted-foreground text-sm">Conceptos clave y tour rápido</p>
+                </Link>
+                <Link href="/docs#agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Control de Agentes</h4>
+                  <p className="text-muted-foreground text-sm">Cómo funcionan y cómo gestionarlos</p>
+                </Link>
+                <Link href="/docs#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Crear Tareas</h4>
+                  <p className="text-muted-foreground text-sm">Flujos de trabajo y seguimiento</p>
+                </Link>
+                <Link href="/docs#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Crear Agentes</h4>
+                  <p className="text-muted-foreground text-sm">Perfiles, capacidades y herramientas</p>
+                </Link>
+                <Link href="/docs#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">PWA & Notificaciones</h4>
+                  <p className="text-muted-foreground text-sm">Instalación y push en tiempo real</p>
+                </Link>
+                <Link href="/docs#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Dashboard</h4>
+                  <p className="text-muted-foreground text-sm">Métricas, rendimiento y actividad</p>
                 </Link>
               </div>
             </TabsContent>
@@ -264,6 +299,15 @@ export function SettingsContent({
                     <span>Agentes</span>
                   </div>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="docs"
+                  className="w-full justify-start rounded-md px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileTextIcon className="size-4" />
+                    <span>Docs</span>
+                  </div>
+                </TabsTrigger>
               </div>
             </TabsList>
 
@@ -326,6 +370,34 @@ export function SettingsContent({
                       <UsersIcon className="size-4" />
                       Ir al Sistema de Agentes
                     </Button>
+                  </Link>
+                </div>
+              </TabsContent>
+              <TabsContent value="docs" className="mt-0 space-y-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Link href="/docs#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Inicio</h4>
+                    <p className="text-muted-foreground text-sm">Conceptos clave y tour rápido</p>
+                  </Link>
+                  <Link href="/docs#agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Control de Agentes</h4>
+                    <p className="text-muted-foreground text-sm">Cómo funcionan y cómo gestionarlos</p>
+                  </Link>
+                  <Link href="/docs#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Crear Tareas</h4>
+                    <p className="text-muted-foreground text-sm">Flujos de trabajo y seguimiento</p>
+                  </Link>
+                  <Link href="/docs#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Crear Agentes</h4>
+                    <p className="text-muted-foreground text-sm">Perfiles, capacidades y herramientas</p>
+                  </Link>
+                  <Link href="/docs#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">PWA & Notificaciones</h4>
+                    <p className="text-muted-foreground text-sm">Instalación y push en tiempo real</p>
+                  </Link>
+                  <Link href="/docs#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Dashboard</h4>
+                    <p className="text-muted-foreground text-sm">Métricas, rendimiento y actividad</p>
                   </Link>
                 </div>
               </TabsContent>

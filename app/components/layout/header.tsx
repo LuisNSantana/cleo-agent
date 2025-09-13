@@ -46,6 +46,12 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           {!isLoggedIn ? (
             <div className="pointer-events-auto flex flex-1 items-center justify-end gap-4">
               <ThemeToggle />
+              <Link
+                href="/docs"
+                className="font-base text-muted-foreground hover:text-foreground text-base transition-colors"
+              >
+                Docs
+              </Link>
               <AppInfoTrigger
                 trigger={
                   <Button

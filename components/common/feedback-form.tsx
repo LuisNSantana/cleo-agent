@@ -15,10 +15,10 @@ const TRANSITION_CONTENT: Transition = {
 
 type FeedbackFormProps = {
   authUserId?: string
-  onClose: () => void
+  onCloseAction: () => void
 }
 
-export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
+export function FeedbackForm({ authUserId, onCloseAction }: FeedbackFormProps) {
   const [status, setStatus] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle")
@@ -31,7 +31,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
   const handleClose = () => {
     setFeedback("")
     setStatus("idle")
-    onClose()
+  onCloseAction()
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -58,7 +58,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
         return
       }
 
-      const { error } = await supabase.from("feedback").insert({
+  const { error } = await supabase.from("feedback").insert({
         message: feedback,
         user_id: authUserId,
       })
@@ -72,7 +72,18 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
         return
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1200))
+      // Fire-and-forget email to team inbox
+      try {
+        await fetch("/api/feedback/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: feedback, userId: authUserId }),
+        })
+      } catch (_) {
+        // ignore failures silently
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
       setStatus("success")
 
