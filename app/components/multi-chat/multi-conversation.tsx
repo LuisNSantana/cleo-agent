@@ -76,9 +76,9 @@ function ResponseCard({ response, group }: ResponseCardProps) {
                 : undefined)
             }
             attachments={undefined}
-            onDelete={() => group.onDelete(response.model, response.message.id)}
-            onEdit={(id, newText) => group.onEdit(response.model, id, newText)}
-            onReload={() => group.onReload(response.model)}
+            onDeleteAction={() => group.onDelete(response.model, response.message.id)}
+            onEditAction={(id, newText) => group.onEdit(response.model, id, newText)}
+            onReloadAction={() => group.onReload(response.model)}
             status={response.isLoading ? "streaming" : "ready"}
             isLast={false}
             hasScrollAnchor={false}
@@ -147,9 +147,9 @@ export function MultiModelConversation({
                         variant="user"
                         parts={group.userMessage.parts}
                         attachments={undefined}
-                        onDelete={() => {}}
-                        onEdit={() => {}}
-                        onReload={() => {}}
+                        onDeleteAction={() => {}}
+                        onEditAction={() => {}}
+                        onReloadAction={() => {}}
                         status="ready"
                       >
                         {(() => {
