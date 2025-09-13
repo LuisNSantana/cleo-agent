@@ -39,8 +39,21 @@ export async function GET(request: Request) {
     )
   }
 
+  console.log('🔍 [AUTH DEBUG] Exchange code result:', {
+    hasData: !!data,
+    hasUser: !!data?.user,
+    userId: data?.user?.id,
+    userEmail: data?.user?.email
+  })
+
   const user = data?.user
   if (!user || !user.id || !user.email) {
+    console.error('🚨 [AUTH DEBUG] Missing user data:', {
+      hasUser: !!user,
+      hasId: !!user?.id,
+      hasEmail: !!user?.email,
+      userData: user
+    })
     return NextResponse.redirect(
       `${origin}/auth/error?message=${encodeURIComponent("Missing user info")}`
     )
@@ -56,6 +69,26 @@ export async function GET(request: Request) {
 
   // NO manual insert - let the trigger handle it automatically
   // The trigger 'on_auth_user_created_safe' already inserts into public.users
+
+  // Wait a moment for trigger to complete
+  await new Promise(resolve => setTimeout(resolve, 1000))
+
+  // Verify user was created in public.users
+  try {
+    const { data: userData, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("id, email, favorite_models")
+      .eq("id", user.id)
+      .single()
+
+    console.log('🔍 [AUTH DEBUG] User verification:', {
+      found: !!userData,
+      userData,
+      fetchError
+    })
+  } catch (err) {
+    console.error("User verification error:", err)
+  }
 
   // Ensure existing users also have MODEL_DEFAULT in their favorites (prepend if missing)
   try {

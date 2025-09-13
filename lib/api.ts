@@ -121,6 +121,7 @@ export async function signInWithGoogle(supabase: SupabaseClient) {
       provider: "google",
       options: {
         redirectTo: `${baseUrl}/auth/callback`,
+        scopes: "openid email profile",
         queryParams: {
           access_type: "offline",
           prompt: "consent",
