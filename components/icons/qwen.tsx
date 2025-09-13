@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { SVGProps } from "react"
 
-// Aproximación del logo de Qwen AI (estilizado como una Q con swoosh)
+// Qwen icon using the official SVG from public/icons/qwen-color.svg
 const QwenIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     width={32}

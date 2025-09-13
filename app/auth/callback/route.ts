@@ -54,7 +54,10 @@ export async function GET(request: Request) {
       created_at: new Date().toISOString(),
       message_count: 0,
       premium: false,
-  favorite_models: [MODEL_DEFAULT, "grok-3-mini", "langchain:balanced-local"],
+      // Solo modelos válidos y habilitados para guest
+      favorite_models: [
+        "openrouter:openai/gpt-4.1-mini"
+      ],
     })
 
     if (insertError && insertError.code !== "23505") {
