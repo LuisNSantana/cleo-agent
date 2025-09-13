@@ -17,9 +17,9 @@ export function clampMaxOutputTokens(modelId: string, requested?: number): numbe
   else if (id.startsWith('gpt-4o') || id.startsWith('gpt-4.1') || id.includes('openai/')) cap = 16384 // API commonly enforces 4k output
   else if (id.startsWith('grok-3')) cap = 16384 // Observed ~16k output capability
   else if (id.includes('gemini')) cap = 16384 // Gemini 2.5 Flash-Lite supports very high output; 16k is safe across providers
-  else if (id.includes('mistral')) cap = 4096
-  else if (id.includes('qwen')) cap = 4096
-  else if (id.includes('deepseek')) cap = 8192 // Official max 32k; many providers allow >=8k safely
+  else if (id.includes('mistral')) cap = 8192
+  else if (id.includes('qwen')) cap = 8192
+  else if (id.includes('deepseek')) cap = 16384 // Official max 32k; many providers allow >=8k safely
   else if (id.includes('llama') || id.includes('meta/')) cap = 8192
   else if (id.includes('groq/') || id.includes('gpt-oss')) cap = 16384
   else if (id.includes('glm') || id.includes('z-ai/')) cap = 8192
