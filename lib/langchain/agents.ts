@@ -6,8 +6,7 @@
  * - OpenAIAgent: High-quality multimodal analysis
  */
 
-import { ChatGroq } from '@langchain/groq'
-import { ChatOpenAI } from '@langchain/openai'
+import { openproviders } from '@/lib/openproviders'
 import { HumanMessage, SystemMessage, ToolMessage, AIMessage } from '@langchain/core/messages'
 import { TaskInput, TaskOutput, ModelConfig } from './types'
 import { getCleoPrompt, sanitizeModelName } from '@/lib/prompts'
@@ -215,15 +214,9 @@ Price for "${title}" was updated successfully to ${price}.`
 
 export class GroqAgent extends BaseAgent {
   initializeModel(): void {
-    console.log('🤖 Initializing GroqAgent with model:', this.config.name)
-    
-    this.model = new ChatGroq({
-      apiKey: process.env.GROQ_API_KEY,
-      model: 'llama-3.3-70b-versatile', // Use a valid Groq model
-      temperature: 0.7,
-      maxTokens: 4096,
-    })
-    
+    console.log('🤖 Initializing GroqAgent with model:', this.config.id)
+    // Use openproviders for Groq and all supported providers
+    this.model = openproviders(this.config.id)
     console.log('✅ GroqAgent initialized successfully')
   }
 
@@ -387,21 +380,9 @@ export class GroqAgent extends BaseAgent {
 
 export class OpenAIAgent extends BaseAgent {
   initializeModel(): void {
-    const openaiModel = this.config.id.startsWith('openai:')
-      ? this.config.id.split(':')[1]
-      : 'gpt-4o-mini'
-    console.log('🤖 Initializing OpenAIAgent with model:', openaiModel)
-    const isGpt5 = openaiModel.startsWith('gpt-5')
-    const opts: any = {
-      model: openaiModel,
-      maxTokens: 4096,
-      openAIApiKey: process.env.OPENAI_API_KEY,
-    }
-    // GPT-5 models don't accept custom temperature; omit to use provider default
-    if (!isGpt5) {
-      opts.temperature = 0.1
-    }
-    this.model = new ChatOpenAI(opts)
+    console.log('🤖 Initializing OpenAIAgent with model:', this.config.id)
+    // Use openproviders for OpenAI and all supported providers
+    this.model = openproviders(this.config.id)
     console.log('✅ OpenAIAgent initialized successfully')
   }
 
@@ -580,19 +561,9 @@ export class OpenAIAgent extends BaseAgent {
 // Local Ollama-backed agent using OpenAI-compatible endpoint
 export class OllamaAgent extends BaseAgent {
   initializeModel(): void {
-    const modelName = this.config.id.startsWith('ollama:')
-      ? this.config.id.slice('ollama:'.length) // keep full model name including tag
-      : this.config.id
-    const baseURL = (process.env.OLLAMA_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:11434') + '/v1'
-    console.log('🤖 Initializing OllamaAgent:', { modelName, baseURL, env: process.env.OLLAMA_BASE_URL })
-    this.model = new ChatOpenAI({
-      configuration: { baseURL },
-      apiKey: 'ollama',
-      model: modelName,
-      temperature: 0.3,
-      maxTokens: 2048,
-      timeout: 30000, // 30 second timeout
-    })
+    console.log('🤖 Initializing OllamaAgent with model:', this.config.id)
+    // Use openproviders for Ollama and all supported providers
+    this.model = openproviders(this.config.id)
     console.log('✅ OllamaAgent model configured successfully')
   }
 
@@ -718,23 +689,23 @@ export class AgentFactory {
       capabilities: config.capabilities
     })
 
-    switch (config.provider) {
-      case 'groq':
-        console.log('🚀 AgentFactory: Creating GroqAgent')
-        return new GroqAgent(config)
-      
-      case 'openai':
-        console.log('🤖 AgentFactory: Creating OpenAIAgent')
-        return new OpenAIAgent(config)
-      
-      case 'ollama':
-        console.log('🧱 AgentFactory: Creating OllamaAgent')
-        return new OllamaAgent(config)
-
-      default:
-        console.error('❌ AgentFactory: Unsupported model provider:', config.provider)
-        throw new Error(`Unsupported model provider: ${config.provider}`)
+    // Use GroqAgent for Groq, OpenRouter, and any model with functionCalling
+    if (['groq', 'openrouter'].includes(config.provider)) {
+      console.log('🚀 AgentFactory: Creating GroqAgent (Groq/OpenRouter)')
+      return new GroqAgent(config)
     }
+    // Use OpenAIAgent for OpenAI and Google Gemini
+    if (['openai', 'google'].includes(config.provider)) {
+      console.log('🤖 AgentFactory: Creating OpenAIAgent (OpenAI/Google)')
+      return new OpenAIAgent(config)
+    }
+    // Use OllamaAgent for Ollama
+    if (config.provider === 'ollama') {
+      console.log('🧱 AgentFactory: Creating OllamaAgent')
+      return new OllamaAgent(config)
+    }
+    console.error('❌ AgentFactory: Unsupported model provider:', config.provider)
+    throw new Error(`Unsupported model provider: ${config.provider}`)
   }
 
   private static getModelConfig(modelId: string): ModelConfig {
