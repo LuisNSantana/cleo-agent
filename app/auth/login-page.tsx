@@ -83,14 +83,13 @@ export default function LoginPage() {
       </main>
 
       <footer className="text-muted-foreground py-6 text-center text-sm">
-        {/* @todo */}
         <p>
           By continuing, you agree to our{" "}
-          <Link href="/" className="text-foreground hover:underline">
+          <Link href="/terms" className="text-foreground hover:underline">
             Terms of Service
           </Link>{" "}
           and{" "}
-          <Link href="/" className="text-foreground hover:underline">
+          <Link href="/privacy" className="text-foreground hover:underline">
             Privacy Policy
           </Link>
         </p>
