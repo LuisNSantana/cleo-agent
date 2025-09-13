@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-export function SerpapiPage() {
+function SerpapiPage() {
   return (
     <div>
       <h1>SerpAPI Credentials</h1>
