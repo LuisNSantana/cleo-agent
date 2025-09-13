@@ -30,12 +30,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function DocsPage({
+export default async function DocsPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined }
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const raw = Array.isArray(searchParams?.lang) ? searchParams?.lang[0] : searchParams?.lang
+  const resolved = (await searchParams) ?? {}
+  const raw = Array.isArray(resolved.lang) ? resolved.lang[0] : resolved.lang
   const initialLang = raw === "es" || raw === "pt" || raw === "en" ? raw : "en"
   return <DocsPageClient initialLang={initialLang} />
 }
