@@ -58,9 +58,9 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:openrouter/sonoma-dusk-alpha",
     "openrouter:openai/gpt-4.1-mini",
   ]),
-  // Google Gemini: Native Gemini 2.5 Flash
+  // Google Gemini: Native Gemini 2.5 Flash Lite
   ...pickById(geminiModels, [
-    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
   ]),
 ]
 

@@ -10,6 +10,9 @@ import {
   FileIcon,
   MagnifyingGlassIcon as SearchIcon
 } from "@phosphor-icons/react"
+
+import NvidiaIcon from "./nvidia"
+import QwenIcon from "./qwen"
 import Image from "next/image"
 
 // Map tool names to their corresponding icons
@@ -48,6 +51,9 @@ export const toolIconMap = {
   hashtagResearch: XTwitterIcon,
   twitterTrendsAnalysis: XTwitterIcon,
   twitterAnalytics: XTwitterIcon,
+  // Custom model provider icons
+  nvidia: NvidiaIcon,
+  qwen: QwenIcon,
 } as const
 
 export type ToolName = keyof typeof toolIconMap
