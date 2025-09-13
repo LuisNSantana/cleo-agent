@@ -40,31 +40,23 @@ export function ButtonFileUpload({
 
   if (!isFileUploadAvailable) {
     return (
-      <Popover>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="Add files"
-              >
-                <Paperclip className="size-4" />
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Add files</TooltipContent>
-        </Tooltip>
-        <PopoverContent className="p-2">
-          <div className="text-secondary-foreground text-sm">
-            This model does not support file uploads.
-            <br />
-            Please select another model.
-          </div>
-        </PopoverContent>
-      </Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent opacity-50"
+            type="button"
+            aria-label="Add files (disabled: no vision support)"
+            disabled
+          >
+            <Paperclip className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          This model does not support file uploads
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
