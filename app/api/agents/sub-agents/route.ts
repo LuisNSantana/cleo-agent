@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     if (parentAgentId) {
       // List sub-agents for specific parent
-      const subAgents = await SubAgentService.getSubAgents(parentAgentId)
+      const subAgents = await SubAgentService.getSubAgents(parentAgentId, userId)
       
       return NextResponse.json({
         success: true,

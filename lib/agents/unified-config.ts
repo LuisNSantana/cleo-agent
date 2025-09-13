@@ -3,7 +3,7 @@
  * Environment-aware interface that routes to client or server implementations
  */
 
-import { getAllAgents as getStaticAgents, getAgentById as getStaticAgentById } from './config'
+import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 
 // Check if we're in a server environment
@@ -18,9 +18,9 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
     const { getAgentById: getAgentByIdServer } = await import('./unified-config-server')
     return getAgentByIdServer(id, userId)
   } else {
-    // Client-side: use static agents only for now
-    console.warn('🔍 Client-side getAgentById - using static agents only')
-    return getStaticAgentById(id)
+    // Client-side: use predefined agents only
+    console.warn('🔍 Client-side getAgentById - using predefined agents only')
+    return getPredefinedAgentById(id)
   }
 }
 
@@ -33,9 +33,9 @@ export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
     const { getAllAgents: getAllAgentsServer } = await import('./unified-config-server')
     return getAllAgentsServer(userId)
   } else {
-    // Client-side: use static agents only for now
-    console.warn('🔍 Client-side getAllAgents - using static agents only')
-    return getStaticAgents()
+    // Client-side: use predefined agents only
+    console.warn('🔍 Client-side getAllAgents - using predefined agents only')
+    return [...ALL_PREDEFINED_AGENTS]
   }
 }
 
@@ -60,7 +60,7 @@ export async function getAgentByName(name: string, userId?: string): Promise<Age
  */
 export function getAllAgentsSync(): AgentConfig[] {
   console.warn('⚠️  Using legacy sync access - migrate orchestrator to async when possible')
-  return getStaticAgents()
+  return [...ALL_PREDEFINED_AGENTS]
 }
 
 /**
@@ -68,5 +68,5 @@ export function getAllAgentsSync(): AgentConfig[] {
  */
 export function getAgentByIdSync(id: string): AgentConfig | undefined {
   console.warn('⚠️  Using legacy sync access - migrate orchestrator to async when possible')
-  return getStaticAgentById(id)
+  return getPredefinedAgentById(id)
 }

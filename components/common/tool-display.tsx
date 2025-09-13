@@ -1,5 +1,6 @@
 import React from 'react'
 import { GoogleCalendarIcon } from '@/components/icons/google-calendar'
+import { XTwitterIcon } from '@/components/icons/tool-icons'
 import Icon from '@/components/icons/google'
 
 interface ToolWithIcon {
@@ -63,6 +64,37 @@ export const availableTools: ToolWithIcon[] = [
     ),
     description: 'Raw SerpAPI search with custom parameters',
     category: 'research'
+  },
+  // Twitter/X Tools
+  {
+    name: 'postTweet',
+    icon: XTwitterIcon,
+    description: 'Post tweets to X/Twitter',
+    category: 'productivity'
+  },
+  {
+    name: 'generateTweet',
+    icon: XTwitterIcon,
+    description: 'Generate optimized tweet content',
+    category: 'productivity'
+  },
+  {
+    name: 'hashtagResearch',
+    icon: XTwitterIcon,
+    description: 'Research trending hashtags',
+    category: 'research'
+  },
+  {
+    name: 'twitterTrendsAnalysis',
+    icon: XTwitterIcon,
+    description: 'Analyze X/Twitter trends',
+    category: 'research'
+  },
+  {
+    name: 'twitterAnalytics',
+    icon: XTwitterIcon,
+    description: 'Get X/Twitter analytics and metrics',
+    category: 'information'
   }
 ]
 

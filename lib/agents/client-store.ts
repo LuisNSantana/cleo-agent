@@ -151,7 +151,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       }
 
       try {
-        const res = await fetch('/api/agents', { method: 'GET', credentials: 'same-origin' })
+  const res = await fetch('/api/agents?includeSubAgents=1', { method: 'GET', credentials: 'same-origin' })
         if (!res.ok) throw new Error('Failed to fetch agents from server')
         const payload = await res.json()
         // Support both shapes: array or { agents: [...] }
@@ -159,7 +159,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         const parentCandidates = Array.isArray(payload?.parentCandidates) ? payload.parentCandidates : []
 
         // Map API to AgentConfig (preserving sub-agent hints)
-        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+  const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
         let agents: AgentConfig[] = list.map((agent: any) => ({
           id: agent.id,
           name: agent.name,
@@ -177,7 +177,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           priority: agent.priority,
           createdAt: agent.createdAt ?? agent.created_at,
           updatedAt: agent.updatedAt ?? agent.updated_at,
-          parentAgentId: (isUUID(agent.parent_agent_id) ? agent.parent_agent_id : (isUUID(agent.parentAgentId) ? agent.parentAgentId : '')) || '',
+          // Preserve parentAgentId even if not UUID for predefined agents
+          // DB-created agents will naturally provide UUIDs here
+          parentAgentId: (agent.parent_agent_id ?? agent.parentAgentId ?? '') as string,
           isSubAgent: agent.isSubAgent ?? agent.is_sub_agent ?? false
         }))
 
@@ -349,27 +351,10 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         }
       })
 
-      // Create edges from handoffs (simplified for client)
-      const edges: AgentEdge[] = []
-      
-      // Add static connections based on agent roles
-  const cleoAgent = agents.find(a => a.role === 'supervisor')
-  const specialists = agents.filter(a => a.role === 'specialist')
-      
-      if (cleoAgent) {
-        specialists.forEach(specialist => {
-          edges.push({
-            id: `${cleoAgent.id}-${specialist.id}`,
-            source: cleoAgent.id,
-            target: specialist.id,
-            type: 'delegation',
-            animated: false,
-            label: 'delegate'
-          })
-        })
-      }
+  // Create edges array; we'll add only explicit parent → sub-agent relationships
+  const edges: AgentEdge[] = []
 
-  // Add explicit parent → sub-agent relationships from DB (e.g., Emma → Sofi)
+  // Add explicit parent → sub-agent relationships (e.g., Nora → Luna/Zara)
       agents.forEach(child => {
         if (child.isSubAgent && child.parentAgentId) {
           edges.push({

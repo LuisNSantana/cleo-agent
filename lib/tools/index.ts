@@ -58,6 +58,9 @@ import { skyvernTools } from '../skyvern'
 // SerpAPI
 import { serpapiTools, serpapiCredentialTools } from '@/lib/serpapi/tools'
 
+// Twitter/X Tools
+import { twitterTools, twitterToolMeta } from './twitter'
+
 // Delegation tools (static predefined + dynamic generator)
 import { delegationTools } from './delegation'
 
@@ -289,6 +292,7 @@ export const tools = {
 	...shopifyTools,
 	...skyvernTools,
 	...delegationTools,
+	...twitterTools,
 	// Notion tools (explicit keys)
 	'get-notion-page': getNotionPageTool,
 	'create-notion-page': createNotionPageTool,
@@ -321,6 +325,11 @@ export const tools = {
 
 	...serpapiTools,
 	...serpapiCredentialTools,
+}
+
+// Export tool metadata maps for UI consumption
+export const toolMeta = {
+	twitter: twitterToolMeta,
 }
 
 export type ToolName = keyof typeof tools

@@ -5,6 +5,7 @@
 
 import { AgentExecution } from '../types'
 import { ErrorMetrics } from './error-handler'
+import logger from '@/lib/utils/logger'
 
 export interface SystemMetrics {
   activeExecutions: number
@@ -111,7 +112,7 @@ export class MetricsCollector {
 
   async flush(): Promise<void> {
     // Could write metrics to file or send to analytics service
-    console.log('[MetricsCollector] Flushing metrics:', this.getAllMetrics())
+  logger.info('[MetricsCollector] Flushing metrics:', this.getAllMetrics())
   }
 
   reset(): void {

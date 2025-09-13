@@ -18,7 +18,9 @@ export interface UnifiedAgent {
   isDefault: boolean | null
   priority: number | null
   tags: string[] | null
-  userId: string
+  isSubAgent: boolean | null
+  parentAgentId: string | null
+  userId: string | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -45,6 +47,8 @@ export function transformDatabaseAgent(dbAgent: DatabaseAgent): UnifiedAgent {
     isDefault: dbAgent.is_default,
     priority: dbAgent.priority,
     tags: dbAgent.tags,
+    isSubAgent: (dbAgent as any).is_sub_agent || false,
+    parentAgentId: (dbAgent as any).parent_agent_id || null,
     userId: dbAgent.user_id,
     createdAt: dbAgent.created_at,
     updatedAt: dbAgent.updated_at
@@ -69,6 +73,8 @@ export function transformToInsertAgent(agent: Partial<UnifiedAgent>): Database['
     is_default: agent.isDefault,
     priority: agent.priority,
     tags: agent.tags,
+    is_sub_agent: agent.isSubAgent || false,
+    parent_agent_id: agent.parentAgentId || null,
     user_id: agent.userId!
   }
 }
@@ -107,6 +113,8 @@ export function transformAgentConfig(agentConfig: any, userId: string): UnifiedA
     isDefault: true,
     priority: agentConfig.role === 'supervisor' ? 1 : 2,
     tags: [agentConfig.role],
+    isSubAgent: agentConfig.isSubAgent || false,
+    parentAgentId: agentConfig.parentAgentId || null,
     userId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

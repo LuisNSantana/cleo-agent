@@ -58,17 +58,25 @@ export function SmartMessage({
 
   return (
     <div className="space-y-4">
-      {/* Contenido original - SIEMPRE mostrar */}
-      <MessageContent
+      {/* Contenido original - SIEMPRE mostrar (minimalist, no bubble) */}
+    <MessageContent
         className={cn(
-          // Mobile: softer frosted glass to avoid harsh white
-          "prose dark:prose-invert relative min-w-full rounded-2xl p-4 shadow-lg backdrop-blur-xl",
-          "bg-white/70 text-gray-900 border border-white/30 dark:bg-zinc-900/50 dark:text-zinc-50 dark:border-white/10",
-          // Desktop: keep current appearance
-          "md:bg-white/90 md:border md:border-white/20 md:backdrop-blur-md",
-          "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-8 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-3 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-h4:scroll-m-20 prose-h5:scroll-m-20 prose-h6:scroll-m-20 prose-strong:font-medium prose-table:block prose-table:overflow-y-auto"
+          // Plain text block, no surface/background; rely on page bg
+      "prose dark:prose-invert w-full max-w-[72ch]",
+          // Subtle typography polish for readability
+      "leading-relaxed tracking-[0.003em]",
+      // Warm pastel text color in dark mode (avoid pure white)
+      "dark:text-stone-100",
+      "dark:[--tw-prose-body:theme(colors.stone.100)]",
+      "dark:[--tw-prose-headings:theme(colors.stone.100)]",
+      "dark:[--tw-prose-bold:theme(colors.stone.100)]",
+      "dark:[--tw-prose-counters:theme(colors.stone.300)]",
+      "dark:[--tw-prose-bullets:theme(colors.stone.300)]",
+          // Prose tuning for compact, premium feel
+          "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-6 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-2 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-p:my-3 prose-li:my-1.5 prose-table:block prose-table:overflow-y-auto"
         )}
-        markdown={true}
+  markdown={true}
+  variant="plain"
       >
         {cleanResponse}
       </MessageContent>

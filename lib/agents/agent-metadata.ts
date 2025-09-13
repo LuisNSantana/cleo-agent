@@ -68,6 +68,34 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     avatar: '/img/agents/wex4.png', // Using wex avatar as placeholder for now
     color: '#6366F1',
     emoji: '🕸️'
+  },
+  'nora-community': {
+    id: 'nora-community',
+    name: 'Nora',
+    avatar: '/img/agents/nora4.png',
+    color: '#E879F9',
+    emoji: '💬'
+  },
+  'luna-content': {
+    id: 'luna-content',
+    name: 'Luna',
+    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    color: '#F472B6',
+    emoji: '✨'
+  },
+  'zara-analytics': {
+    id: 'zara-analytics',
+    name: 'Zara',
+    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    color: '#FB7185',
+    emoji: '📊'
+  },
+  'viktor-publisher': {
+    id: 'viktor-publisher',
+    name: 'Viktor',
+    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    color: '#EC4899',
+    emoji: '🚀'
   }
 }
 
@@ -93,12 +121,27 @@ function normalizeAgentId(agentId: string): string {
   const idMap: Record<string, string> = {
     'cleo': 'cleo-supervisor',
     'apu': 'apu-research',
+  'apu-markets': 'apu-research',
     'emma': 'emma-ecommerce',
     'toby': 'toby-technical',
     'ami': 'ami-creative',
-    'peter': 'peter-google',
+  'peter': 'peter-google',
+  'peter-workspace': 'peter-google',
     'wex': 'wex-automation',
-    'skyvern': 'skyvern-agent'
+    'skyvern': 'skyvern-agent',
+    'nora': 'nora-community',
+  'luna': 'luna-content',
+  'luna-content-creator': 'luna-content',
+  'zara': 'zara-analytics',
+  'zara-analytics-specialist': 'zara-analytics',
+  'viktor': 'viktor-publisher',
+  'viktor-publishing-specialist': 'viktor-publisher',
+  'apu-research': 'apu-research',
+  'nora-community': 'nora-community',
+  'ami-creative': 'ami-creative',
+  'emma-ecommerce': 'emma-ecommerce',
+  'toby-technical': 'toby-technical',
+  'astra-email': 'astra-email'
   }
   
   return idMap[agentId.toLowerCase()] || agentId

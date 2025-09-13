@@ -6,8 +6,10 @@
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { AgentOrchestrator as CoreOrchestrator, ExecutionContext } from '@/lib/agents/core/orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
+import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { getCurrentUserId } from '@/lib/server/request-context'
-import { getAllAgentsSync as getAllAgents, getAgentByIdSync as getAgentById } from '@/lib/agents/unified-config'
+import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
+import logger from '@/lib/utils/logger'
 
 // ----------------------------------------------------------------------------
 // Global singletons/state (survives route reloads)
@@ -27,7 +29,7 @@ function getCore(): CoreOrchestrator {
 		coreInstance = new CoreOrchestrator({ enableMetrics: true, enableMemory: true })
 		
 		// CRITICAL: Set up event propagation from core to legacy/UI
-		console.log('🔍 [LEGACY] Setting up core orchestrator event listeners')
+		logger.debug('🔍 [LEGACY] Setting up core orchestrator event listeners')
 		
 		// Listen for delegation progress events from core and propagate to window
 		coreInstance.on('delegation.progress', (data: any) => {
@@ -133,7 +135,7 @@ function createAndRunExecution(
 	// Set up tool event listeners for this execution
 	const toolExecutingListener = (event: any) => {
 		if (event.executionId === executionId || event.agentId === exec.agentId) {
-			console.log('🔧 [DEBUG] Tool executing:', event.toolName)
+			logger.debug('🔧 [DEBUG] Tool executing:', event.toolName)
 			const toolCall = {
 				id: event.callId || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
 				name: event.toolName,
@@ -145,7 +147,7 @@ function createAndRunExecution(
 	
 	const toolCompletedListener = (event: any) => {
 		if (event.executionId === executionId || event.agentId === exec.agentId) {
-			console.log('✅ [DEBUG] Tool completed:', event.toolName, 'result preview:', String(event.result || '').slice(0, 100))
+			logger.debug('✅ [DEBUG] Tool completed:', event.toolName, 'result preview:', String(event.result || '').slice(0, 100))
 			// Update the corresponding tool call with result
 			const toolCall = toolCallsUsed.find(tc => tc.id === event.callId || tc.name === event.toolName)
 			if (toolCall) {
@@ -159,7 +161,11 @@ function createAndRunExecution(
 	core.on('tool.executing', toolExecutingListener)
 	core.on('tool.completed', toolCompletedListener)
 
-	const allAgents = getAllAgents()
+	// Include runtime agents registered at runtime in addition to predefined
+	const allAgents: AgentConfig[] = [
+		...ALL_PREDEFINED_AGENTS as unknown as AgentConfig[],
+		...Array.from(runtimeAgents.values())
+	]
 	const target = allAgents.find(a => a.id === (agentId || 'cleo-supervisor')) || allAgents.find(a => a.id === 'cleo-supervisor')!
 
 	const ctx: ExecutionContext = {
@@ -170,10 +176,11 @@ function createAndRunExecution(
 		metadata: { source: 'legacy-orchestrator', executionId }
 	}
 
-	// Run via core orchestrator (includes routing/delegation)
-	// Research agents like Apu need more time for search + analysis
-	const timeoutMs = target.id === 'apu-research' ? 180000 : 90000 // Increased timeout for all agents
-	console.log(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs}ms for agent ${target.id}`)
+		// Run via core orchestrator (includes routing/delegation)
+		// Use centralized runtime-config for timeouts
+		const runtime = getRuntimeConfig()
+		const timeoutMs = target.role === 'supervisor' ? runtime.maxExecutionMsSupervisor : runtime.maxExecutionMsSpecialist
+	logger.debug(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs}ms for agent ${target.id}`)
 	
 	// Add timeout wrapper to prevent hanging
 	const executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs })
@@ -219,13 +226,13 @@ function createAndRunExecution(
 			core.off?.('tool.executing', toolExecutingListener)
 			core.off?.('tool.completed', toolCompletedListener)
 		} catch (pushError) {
-			console.error('🔍 [DEBUG] Error pushing message:', pushError)
+			logger.error('🔍 [DEBUG] Error pushing message:', pushError)
 		}
 		
 		try {
 			listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
 		} catch (listenerError) {
-			console.error('🔍 [DEBUG] Error notifying listeners:', listenerError)
+			logger.error('🔍 [DEBUG] Error notifying listeners:', listenerError)
 		}
 	}).catch(err => {
 		// For timeout errors, try to capture any partial results
@@ -251,7 +258,7 @@ function createAndRunExecution(
 					
 					exec.metrics.toolCallsCount = toolCallsUsed.length
 					
-					console.log('🔍 [DEBUG] Partial results saved, tool calls:', toolCallsUsed.length)
+					logger.info('🔍 [DEBUG] Partial results saved, tool calls:', toolCallsUsed.length)
 					
 					// Notify listeners of successful completion with partial results
 					listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id, partial: true } }))
@@ -262,7 +269,7 @@ function createAndRunExecution(
 					
 					return // Exit early since we handled the timeout gracefully
 				} catch (partialError) {
-					console.error('🔍 [DEBUG] Error saving partial results:', partialError)
+					logger.error('🔍 [DEBUG] Error saving partial results:', partialError)
 				}
 			}
 		}
@@ -348,8 +355,8 @@ export function getAgentOrchestrator() {
 
 		getAgentConfigs(): Map<string, AgentConfig> {
 			const map = new Map<string, AgentConfig>()
-			const allAgents = getAllAgents()
-			allAgents.forEach(a => map.set(a.id, a))
+			const allAgents: AgentConfig[] = [...ALL_PREDEFINED_AGENTS]
+			allAgents.forEach((a: AgentConfig) => map.set(a.id, a))
 			runtimeAgents.forEach((a, id) => map.set(id, a))
 			return map
 		},
@@ -385,13 +392,13 @@ export function getAgentOrchestrator() {
 
 		// CRITICAL FIX: Handle completion notifications from Core Orchestrator
 		handleExecutionCompletion(execution: any) {
-			console.log('🔍 [LEGACY] Received execution completion from core:', execution.id)
+			logger.debug('🔍 [LEGACY] Received execution completion from core:', execution.id)
 			
 			// Find the execution in our registry and mark it completed
 			let exec = execRegistry.find((e: any) => e.id === execution.id)
 			
 			if (!exec) {
-				console.log('🔍 [LEGACY] Execution not found in registry, creating new entry:', execution.id)
+				logger.debug('🔍 [LEGACY] Execution not found in registry, creating new entry:', execution.id)
 				// Create a new execution entry for delegated executions that weren't tracked
 				const newExec: AgentExecution = {
 					id: execution.id,
@@ -420,7 +427,7 @@ export function getAgentOrchestrator() {
 					const existingMessage = exec.messages.find((m: any) => m.id === lastMessage.id)
 					if (!existingMessage) {
 						exec.messages.push(lastMessage)
-						console.log('🔍 [LEGACY] Added final AI message to execution')
+						logger.debug('🔍 [LEGACY] Added final AI message to execution')
 					}
 				}
 			}
@@ -434,9 +441,9 @@ export function getAgentOrchestrator() {
 						timestamp: new Date(), 
 						data: { executionId: exec!.id } 
 					}))
-					console.log('🔍 [LEGACY] Listeners notified of completion for:', exec.id)
+					logger.debug('🔍 [LEGACY] Listeners notified of completion for:', exec.id)
 				} catch (error) {
-					console.error('🔍 [LEGACY] Error notifying listeners:', error)
+					logger.error('🔍 [LEGACY] Error notifying listeners:', error)
 				}
 			}
 		}

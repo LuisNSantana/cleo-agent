@@ -4,14 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/utils/logger'
 import { createClient } from '@/lib/supabase/server'
 import { ensureDelegationToolForAgent } from '@/lib/tools'
 import { APU_AGENT, WEX_AGENT, PETER_AGENT } from '@/lib/agents/config'
 import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import { AgentRegistry } from '@/lib/agents/registry'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+  const url = new URL(request.url)
+  const includeParam = url.searchParams.get('includeSubAgents')
+  const includeSubAgents = includeParam === '1' || includeParam === 'true'
     const supabase = await createClient()
     
     if (!supabase) {
@@ -24,7 +28,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('Current user ID:', user.id)
+  logger.debug('Current user ID:', user.id)
 
     // OPTIMIZED APPROACH: Hybrid architecture
     // 1. Default agents from local config (immutable, fast)
@@ -36,20 +40,25 @@ export async function GET() {
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
+      .eq('is_sub_agent', false) // only top-level agents here by default
       .order('created_at', { ascending: false })
 
     if (userAgentsError) {
-      console.error('Error fetching user agents:', userAgentsError)
+      logger.error('Error fetching user agents:', userAgentsError)
       return NextResponse.json({ error: 'Failed to fetch user agents' }, { status: 500 })
     }
 
-    console.log('User agents from DB:', userAgents?.length || 0)
+    logger.debug('User agents from DB:', userAgents?.length || 0)
 
     // Create hybrid agent list: Local defaults + User agents
     const enrichedAgents: any[] = []
     
-    // 1. Add ALL predefined agents from local config (no DB lookup needed)
-    for (const cfg of ALL_PREDEFINED_AGENTS) {
+    // 1. Add predefined agents from local config
+    const predefinedList = includeSubAgents
+      ? ALL_PREDEFINED_AGENTS
+      : ALL_PREDEFINED_AGENTS.filter(a => !a.isSubAgent)
+
+    for (const cfg of predefinedList) {
       enrichedAgents.push({
         id: cfg.id,
         name: cfg.name,
@@ -76,7 +85,7 @@ export async function GET() {
       })
     }
 
-    // 2. Add user-created agents from database (exclude those with same names as predefined)
+  // 2. Add user-created agents from database (exclude those with same names as predefined)
     const predefinedNames = new Set(ALL_PREDEFINED_AGENTS.map(cfg => cfg.name.toLowerCase()))
     
     if (userAgents && userAgents.length > 0) {
@@ -97,17 +106,43 @@ export async function GET() {
       }
     }
 
+    // 2b. Optionally include user sub-agents from DB
+    if (includeSubAgents) {
+      const { data: userSubs, error: userSubsError } = await supabase
+        .from('agents' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('is_sub_agent', true)
+        .order('created_at', { ascending: false })
+
+      if (userSubsError) {
+        console.error('Error fetching user sub-agents:', userSubsError)
+      } else if (userSubs && userSubs.length > 0) {
+        for (const agent of userSubs) {
+          enrichedAgents.push({
+            ...(agent as any),
+            predefined: false,
+            is_default: false,
+            immutable: false,
+            source: 'database'
+          })
+        }
+      }
+    }
+
     // 3. Sort agents: predefined first, then user agents by creation date
     enrichedAgents.sort((a, b) => {
-      if (a.predefined && !b.predefined) return -1
+  if (a.predefined && !b.predefined) return -1
       if (!a.predefined && b.predefined) return 1
       if (a.predefined && b.predefined) return a.priority - b.priority
       return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
     })
 
-    console.log('Total agents returned:', enrichedAgents.length, 
-                '(predefined:', enrichedAgents.filter(a => a.predefined).length, 
-                'user:', enrichedAgents.filter(a => !a.predefined).length, ')')
+  logger.debug('Total agents returned:', enrichedAgents.length, 
+        '(predefined:', enrichedAgents.filter(a => a.predefined).length, 
+        'user:', enrichedAgents.filter(a => !a.predefined).length, 
+        'includeSubAgents:', includeSubAgents, ')')
 
     // 4. Transform to frontend format
     const transformedAgents = enrichedAgents.map((agent: any) => ({
@@ -147,7 +182,7 @@ export async function GET() {
     })
 
   } catch (error) {
-    console.error('Agents API error:', error)
+    logger.error('Agents API error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -193,7 +228,7 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
 
     if (countError) {
-      console.error('Error checking agent count:', countError)
+      logger.error('Error checking agent count:', countError)
       return NextResponse.json({ 
         error: 'Failed to check agent limit' 
       }, { status: 500 })
@@ -282,7 +317,7 @@ export async function POST(request: NextRequest) {
       if ((error as any).code === '23505') {
         return NextResponse.json({ error: 'Agent name already exists' }, { status: 409 })
       }
-      console.error('Error creating agent:', error)
+      logger.error('Error creating agent:', error)
       return NextResponse.json({ 
         error: (error as any).message || 'Failed to create agent' 
       }, { status: 500 })
@@ -313,12 +348,12 @@ export async function POST(request: NextRequest) {
       parentAgentId: agent.parent_agent_id || null
     }
 
-    console.log('Created new user agent:', transformedAgent.name, 'ID:', transformedAgent.id)
+  logger.info('Created new user agent:', transformedAgent.name, 'ID:', transformedAgent.id)
 
     return NextResponse.json({ agent: transformedAgent }, { status: 201 })
 
   } catch (error) {
-    console.error('Create agent error:', error)
+    logger.error('Create agent error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

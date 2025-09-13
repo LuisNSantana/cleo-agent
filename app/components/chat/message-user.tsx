@@ -34,10 +34,10 @@ export type MessageUserProps = {
   attachments?: Attachment[]
   children: string | Array<{ type: string; text?: string; mediaType?: string; url?: string }>
   copied: boolean
-  copyToClipboard: () => void
-  onEdit: (id: string, newText: string) => void
-  onReload: () => void
-  onDelete: (id: string) => void
+  copyToClipboardAction: () => void
+  onEditAction: (id: string, newText: string) => void
+  onReloadAction: () => void
+  onDeleteAction: (id: string) => void
   id: string
   className?: string
 }
@@ -47,10 +47,10 @@ export function MessageUser({
   attachments,
   children,
   copied,
-  copyToClipboard,
-  onEdit,
-  onReload,
-  onDelete,
+  copyToClipboardAction,
+  onEditAction,
+  onReloadAction,
+  onDeleteAction,
   id,
   className,
 }: MessageUserProps) {
@@ -90,15 +90,15 @@ export function MessageUser({
   }
 
   const handleSave = () => {
-    if (onEdit) {
-      onEdit(id, editInput)
+    if (onEditAction) {
+      onEditAction(id, editInput)
     }
-    onReload()
+    onReloadAction()
     setIsEditing(false)
   }
 
   const handleDelete = () => {
-    onDelete(id)
+  onDeleteAction(id)
   }
 
   return (
@@ -238,7 +238,7 @@ export function MessageUser({
           
           {/* Render text content */}
           <MessageContent
-            className="bg-blue-800 text-white relative max-w-[70%] rounded-3xl px-5 py-2.5 shadow-lg backdrop-blur-sm"
+            className="relative max-w-[72%] rounded-3xl px-4 py-2 text-stone-900 dark:text-stone-100 shadow-[0_4px_14px_-10px_rgba(0,0,0,0.28)] ring-0 backdrop-blur-0 border bg-gradient-to-b from-amber-50/95 to-stone-50/95 dark:bg-gradient-to-b dark:from-stone-800/70 dark:to-stone-700/60 border-amber-100/70 dark:border-stone-600/60"
             markdown={false}
             ref={contentRef}
           >
@@ -251,7 +251,7 @@ export function MessageUser({
           <button
             className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
             aria-label="Copy text"
-            onClick={copyToClipboard}
+            onClick={copyToClipboardAction}
             type="button"
           >
             {copied ? (

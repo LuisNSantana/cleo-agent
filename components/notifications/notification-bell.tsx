@@ -196,16 +196,31 @@ export function NotificationBell() {
     }
   }, [isOpen])
 
-  // Poll for new notifications every 30 seconds
+  // Event-driven refresh: listen to delegation and execution events
   useEffect(() => {
-    const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    const onDelegation = () => fetchNotifications()
+    const onExecution = () => fetchNotifications()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('delegation-progress', onDelegation as any)
+      window.addEventListener('agent-delegation', onDelegation as any)
+      window.addEventListener('agent-execution', onExecution as any)
+    }
+    // Reduced fallback polling every 90 seconds to keep badge fresh even if events missed
+    const interval = setInterval(fetchNotifications, 90_000)
+    return () => {
+      clearInterval(interval)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('delegation-progress', onDelegation as any)
+        window.removeEventListener('agent-delegation', onDelegation as any)
+        window.removeEventListener('agent-execution', onExecution as any)
+      }
+    }
   }, [])
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative">
+        <Button variant="ghost" size="icon" className="relative size-9 rounded-full bg-background hover:bg-muted text-muted-foreground">
           {stats.unread > 0 ? (
             <BellRing className="h-5 w-5 text-orange-500" />
           ) : (

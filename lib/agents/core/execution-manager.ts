@@ -1,3 +1,4 @@
+import logger from '@/lib/utils/logger'
 /**
  * Simplified Execution Manager for Agent System
  * Handles basic execution coordination
@@ -79,10 +80,12 @@ export class ExecutionManager {
       const filteredMessages = this.filterStaleToolMessages(context.messageHistory)
 
       // Prepare initial state compatible with MessagesAnnotation
+      // IMPORTANT: include metadata so parentExecutionId and other flags propagate into the graph state
       const initialState = {
         messages: filteredMessages,
         executionId: execution.id,
-        userId: context.userId // Include userId for tool context propagation
+        userId: context.userId, // Include userId for tool context propagation
+        metadata: context.metadata || {}
       }
 
       // Compile graph and execute within request context so tools can read userId
@@ -259,8 +262,8 @@ export class ExecutionManager {
    */
   cleanupExecutionContext(executionId: string): void {
     if ((globalThis as any).__currentExecutionId === executionId) {
-      delete (globalThis as any).__currentExecutionId
-      console.log(`🧹 [EXECUTION] Cleaned up execution context for: ${executionId}`)
+  delete (globalThis as any).__currentExecutionId
+  logger.debug(`🧹 [EXECUTION] Cleaned up execution context for: ${executionId}`)
     }
   }
 
@@ -269,7 +272,7 @@ export class ExecutionManager {
    * @deprecated Use ExecutionManager.runWithExecutionId instead
    */
   setExecutionContext(executionId: string): void {
-    (globalThis as any).__currentExecutionId = executionId
-    console.log(`🔄 [EXECUTION] Set execution context for: ${executionId}`)
+  (globalThis as any).__currentExecutionId = executionId
+  logger.debug(`🔄 [EXECUTION] Set execution context for: ${executionId}`)
   }
 }

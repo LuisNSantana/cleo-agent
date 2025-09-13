@@ -91,6 +91,13 @@ Privacy: Don't reveal chain-of-thought; present results.`,nitions export
  */
 
 import { AgentConfig, AgentRole, LangGraphConfig, HandoffTool } from './types'
+
+// Import predefined agents
+import { NORA_AGENT } from './predefined/nora'
+import { LUNA_AGENT } from './predefined/luna'
+import { ZARA_AGENT } from './predefined/zara'
+import { VIKTOR_AGENT } from './predefined/viktor'
+
 // =============================================================================
 // AGENT CONFIGURATIONS
 
@@ -797,7 +804,7 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
  * Get all available agents in the system
  */
 export function getAllAgents(): AgentConfig[] {
-  return [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
+  return [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT, NORA_AGENT, LUNA_AGENT, ZARA_AGENT, VIKTOR_AGENT]
 }
 
 /**
@@ -809,7 +816,7 @@ export function getAllAgents(): AgentConfig[] {
 /**
  * Export all agents for unified-service seeding
  */
-export const ALL_AGENTS = [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT]
+export const ALL_AGENTS = [CLEO_AGENT, WEX_AGENT, TOBY_AGENT, AMI_AGENT, PETER_AGENT, EMMA_AGENT, APU_AGENT, NORA_AGENT, LUNA_AGENT, ZARA_AGENT, VIKTOR_AGENT]
 
 /**
  * @deprecated Use unified-config getAgentById() instead

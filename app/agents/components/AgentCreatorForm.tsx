@@ -62,7 +62,13 @@ export function AgentCreatorForm() {
     'serpScholarSearch',
     'serpAutocomplete',
     'serpLocationSearch',
-    'serpRaw'
+    'serpRaw',
+    // Twitter/X Tools - Social Media Management
+    'postTweet',
+    'generateTweet',
+    'hashtagResearch',
+    'twitterTrendsAnalysis',
+    'twitterAnalytics'
   ]
 
   const cloneToby = () => {

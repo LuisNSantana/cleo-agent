@@ -9,6 +9,7 @@ import { ChatAnthropic } from '@langchain/anthropic'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { getFallbackModel, getModelWithFallback } from '@/lib/models/fallback-system'
 import { allModelsWithFallbacks } from '@/lib/models/data/optimized-tiers'
+import logger from '@/lib/utils/logger'
 
 // AI SDK imports for additional providers
 import { createMistral } from '@ai-sdk/mistral'
@@ -64,7 +65,7 @@ class AISdkChatModel extends BaseChatModel {
         }]
       }
     } catch (error) {
-      console.error(`Error with AI SDK model ${this.modelName}:`, error)
+  logger.error(`Error with AI SDK model ${this.modelName}:`, error)
       throw error
     }
   }
@@ -85,23 +86,23 @@ export class ModelFactory {
       this.modelCache.set(cacheKey, model)
       return model
     } catch (error) {
-      console.error(`[ModelFactory] Failed to create model ${modelName}:`, error)
+      logger.error(`[ModelFactory] Failed to create model ${modelName}:`, error)
       
       // Try fallback model if available
       const fallbackModelName = getFallbackModel(modelName)
       if (fallbackModelName) {
-        console.log(`[ModelFactory] Attempting fallback model: ${fallbackModelName}`)
+        logger.info(`[ModelFactory] Attempting fallback model: ${fallbackModelName}`)
         try {
           const fallbackModel = this.createModel(fallbackModelName, config)
           this.modelCache.set(cacheKey, fallbackModel)
           return fallbackModel
         } catch (fallbackError) {
-          console.error(`[ModelFactory] Fallback model ${fallbackModelName} also failed:`, fallbackError)
+          logger.error(`[ModelFactory] Fallback model ${fallbackModelName} also failed:`, fallbackError)
         }
       }
       
       // Final fallback to GPT-4o-mini
-      console.warn(`[ModelFactory] Using final fallback: GPT-4o-mini`)
+      logger.warn(`[ModelFactory] Using final fallback: GPT-4o-mini`)
       const finalFallback = this.createModel('gpt-4o-mini', config)
       this.modelCache.set(cacheKey, finalFallback)
       return finalFallback
@@ -115,7 +116,7 @@ export class ModelFactory {
       throw new Error(`Model ${modelName} not found in configuration`)
     }
     
-    console.log(`[ModelFactory] Creating model: ${modelName}${fallback ? ` (fallback: ${fallback.id})` : ''}`)
+  logger.info(`[ModelFactory] Creating model: ${modelName}${fallback ? ` (fallback: ${fallback.id})` : ''}`)
     return this.createModel(modelName, config)
   }
 
@@ -184,10 +185,15 @@ export class ModelFactory {
 
     // Anthropic models (Claude) - including claude-3-5-haiku-latest and claude-3-5-sonnet-latest
     if (cleanModelName.startsWith('claude-') || cleanModelName.includes('anthropic')) {
+      // Clamp to recommended Anthropic limits when known
+      let safeMax = maxTokens
+      if (cleanModelName.includes('claude-3-5-haiku')) {
+        safeMax = Math.min(maxTokens, 8192)
+      }
       return new ChatAnthropic({
         modelName: cleanModelName.replace('anthropic/', ''),
         temperature,
-        maxTokens,
+        maxTokens: safeMax,
         streaming,
         apiKey: process.env.ANTHROPIC_API_KEY
       })
@@ -203,7 +209,7 @@ export class ModelFactory {
     }
 
     // Default to OpenAI GPT-4o-mini (cost-effective fallback)
-    console.warn(`[ModelFactory] Unknown model ${cleanModelName}, defaulting to GPT-4o-mini`)
+  logger.warn(`[ModelFactory] Unknown model ${cleanModelName}, defaulting to GPT-4o-mini`)
     return new ChatOpenAI({
       modelName: 'gpt-4o-mini',
       temperature,

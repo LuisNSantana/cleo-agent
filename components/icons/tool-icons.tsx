@@ -42,6 +42,12 @@ export const toolIconMap = {
   sendGmailMessage: GmailIcon,
   trashGmailMessage: GmailIcon,
   modifyGmailLabels: GmailIcon,
+  // Twitter/X tools
+  postTweet: XTwitterIcon,
+  generateTweet: XTwitterIcon,
+  hashtagResearch: XTwitterIcon,
+  twitterTrendsAnalysis: XTwitterIcon,
+  twitterAnalytics: XTwitterIcon,
 } as const
 
 export type ToolName = keyof typeof toolIconMap
@@ -114,6 +120,20 @@ export function GoogleSheetsIcon({ className }: { className?: string }) {
     <Image 
       src="/icons/sheets.png" 
       alt="Google Sheets"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom X/Twitter icon component using the official icon
+export function XTwitterIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/x_twitter.png" 
+      alt="X (Twitter)"
       className={className}
       width={16}
       height={16}

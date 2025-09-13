@@ -3,8 +3,7 @@
  * Server-only interface for agent operations with database access
  */
 
-import { getAgentByIdForUser, getAllAgentsForUser, ensureDefaultAgentsForUser } from './unified-service'
-import { getAllAgents as getStaticAgents, getAgentById as getStaticAgentById } from './config'
+import { getAgentByIdForUser, getAllAgentsForUser } from './unified-service'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 import type { UnifiedAgent } from './unified-types'
@@ -24,12 +23,14 @@ function transformToAgentConfig(unifiedAgent: UnifiedAgent): AgentConfig {
     tools: unifiedAgent.tools || [],
     prompt: unifiedAgent.systemPrompt,
     color: unifiedAgent.color || '#FF6B6B',
-    icon: unifiedAgent.icon || '🤖'
+    icon: unifiedAgent.icon || '🤖',
+    isSubAgent: unifiedAgent.isSubAgent || false,
+    parentAgentId: unifiedAgent.parentAgentId || undefined
   }
 }
 
 /**
- * Get agent by ID - Database-first approach with automatic default agent creation
+ * Get agent by ID - Predefined-first approach
  */
 export async function getAgentById(id: string, userId?: string): Promise<AgentConfig | undefined> {
   try {
@@ -40,28 +41,23 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
 
     console.log('🔍 Looking for agent:', id, 'for user:', userId)
     
-    // Ensure default agents exist for this user
-    await ensureDefaultAgentsForUser(userId)
-    
-    // Get agent from database
-    const unifiedAgent = await getAgentByIdForUser(id, userId)
-    
-    if (unifiedAgent) {
-      console.log('🔍 Found agent in database:', unifiedAgent.name)
-      return transformToAgentConfig(unifiedAgent)
-    }
-
-    console.warn(`🔍 Agent not found in database: ${id}`)
-    
-    // Fallback: Check predefined agents (includes sub-agents)
+    // First check predefined agents (immutable system agents)
     console.log('🔍 Checking predefined agents for:', id)
     const predefinedAgent = getPredefinedAgentById(id)
     if (predefinedAgent) {
       console.log('🔍 Found predefined agent:', predefinedAgent.name)
       return predefinedAgent
     }
+    
+    // Then check user's custom agents in database
+    const unifiedAgent = await getAgentByIdForUser(id, userId)
+    
+    if (unifiedAgent) {
+      console.log('🔍 Found user agent in database:', unifiedAgent.name)
+      return transformToAgentConfig(unifiedAgent)
+    }
 
-    console.warn(`🔍 Agent not found in predefined agents either: ${id}`)
+    console.warn(`🔍 Agent not found: ${id}`)
     return undefined
   } catch (error) {
     console.error('🔍 Error getting agent by ID:', error)
@@ -70,7 +66,7 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
 }
 
 /**
- * Get all agents for a user - Database-first with automatic default agent creation
+ * Get all agents for a user - Combines predefined + user custom agents
  */
 export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
   try {
@@ -80,19 +76,27 @@ export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
     }
 
     console.log('🔍 Getting all agents for user:', userId)
+  // If userId is not a UUID, skip DB fetch to avoid errors in server logs
+  const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+
+    // Start with all predefined agents (immutable system agents)
+    const predefinedAgents: AgentConfig[] = [...ALL_PREDEFINED_AGENTS]
+    console.log(`🔍 Found ${predefinedAgents.length} predefined agents`)
     
-    // Ensure default agents exist for this user
-    await ensureDefaultAgentsForUser(userId)
+    // Get user's custom agents from database
+  const unifiedAgents = isUUID(userId) ? await getAllAgentsForUser(userId) : []
+    const userAgents = unifiedAgents.map(transformToAgentConfig)
+    console.log(`🔍 Found ${userAgents.length} user custom agents`)
     
-    // Get all agents from database
-    const unifiedAgents = await getAllAgentsForUser(userId)
+    // Combine both lists
+    const allAgents = [...predefinedAgents, ...userAgents]
+    console.log(`🔍 Total agents for user ${userId}: ${allAgents.length}`)
     
-    console.log(`🔍 Found ${unifiedAgents.length} agents for user ${userId}`)
-    
-    return unifiedAgents.map(transformToAgentConfig)
+    return allAgents
   } catch (error) {
     console.error('🔍 Error getting all agents:', error)
-    return []
+    // Fallback to predefined agents only
+    return [...ALL_PREDEFINED_AGENTS]
   }
 }
 
@@ -117,7 +121,8 @@ export async function getAgentByName(name: string, userId?: string): Promise<Age
  */
 export function getAllAgentsSync(): AgentConfig[] {
   console.warn('⚠️  Using legacy sync access - migrate orchestrator to async when possible')
-  return getStaticAgents()
+  // Return predefined agents only to avoid pulling legacy static config
+  return [...ALL_PREDEFINED_AGENTS]
 }
 
 /**
@@ -125,5 +130,6 @@ export function getAllAgentsSync(): AgentConfig[] {
  */
 export function getAgentByIdSync(id: string): AgentConfig | undefined {
   console.warn('⚠️  Using legacy sync access - migrate orchestrator to async when possible')
-  return getStaticAgentById(id)
+  // Return from predefined agents only to avoid pulling legacy static config
+  return getPredefinedAgentById(id)
 }

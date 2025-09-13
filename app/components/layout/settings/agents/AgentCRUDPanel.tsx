@@ -29,6 +29,7 @@ import Image from 'next/image'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { useModel } from '@/lib/model-store/provider'
 import { useClientAgentStore } from '@/lib/agents/client-store'
+import { toast } from '@/components/ui/toast'
 
 // Tool information for the agent details modal
 interface ToolInfo {
@@ -40,6 +41,42 @@ interface ToolInfo {
 }
 
 const TOOL_REGISTRY: Record<string, ToolInfo> = {
+  // Social Media – Twitter/X Tools
+  'postTweet': {
+    name: 'Post to X/Twitter',
+    description: 'Publish a tweet from the configured Twitter/X account',
+    category: 'Social Media',
+    useCases: ['Announcements', 'Community updates', 'Engagement', 'Support replies'],
+    icon: '/icons/x_twitter.png'
+  },
+  'generateTweet': {
+    name: 'Generate Tweet',
+    description: 'Create optimized tweet copy based on topic and style',
+    category: 'Social Media',
+    useCases: ['Content ideation', 'Copy suggestions', 'Tone variations'],
+    icon: '/icons/x_twitter.png'
+  },
+  'hashtagResearch': {
+    name: 'Hashtag Research',
+    description: 'Find relevant and trending hashtags for a topic',
+    category: 'Social Media',
+    useCases: ['Discoverability', 'Trend alignment', 'SEO for social'],
+    icon: '/icons/x_twitter.png'
+  },
+  'twitterTrendsAnalysis': {
+    name: 'Trends Analysis',
+    description: 'Analyze current X/Twitter trends for strategy',
+    category: 'Social Media',
+    useCases: ['Content planning', 'Timing strategy', 'Topic selection'],
+    icon: '/icons/x_twitter.png'
+  },
+  'twitterAnalytics': {
+    name: 'Twitter Analytics',
+    description: 'Simulated analytics for learning and planning',
+    category: 'Social Media',
+    useCases: ['Performance review', 'Reporting', 'Optimization'],
+    icon: '/icons/x_twitter.png'
+  },
   // Web & Search Tools
   'webSearch': {
     name: 'Web Search',
@@ -795,6 +832,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
               const avatar = name.includes('toby') ? '/img/agents/toby4.png'
                 : name.includes('ami') ? '/img/agents/ami4.png'
                 : name.includes('peter') ? '/img/agents/peter4.png'
+                : name.includes('nora') ? '/img/agents/nora4.png'
                 : name.includes('emma') ? '/img/agents/emma4.png'
                 : name.includes('apu') ? '/img/agents/apu4.png'
                 : name.includes('wex') ? '/img/agents/wex4.png'
@@ -896,6 +934,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
                         || (lower.includes('toby') ? '/img/agents/toby4.png'
                         : lower.includes('ami') ? '/img/agents/ami4.png'
                         : lower.includes('peter') ? '/img/agents/peter4.png'
+                        : lower.includes('nora') ? '/img/agents/nora4.png'
                         : lower.includes('emma') ? '/img/agents/emma4.png'
                         : lower.includes('apu') ? '/img/agents/apu4.png'
                         : lower.includes('wex') ? '/img/agents/wex4.png'
@@ -1301,9 +1340,17 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     try {
       await syncAgents()
       // TODO: Add refresh functions for complexity-scorer and intelligent-analyzer when available
-      console.log('🔄 Agents synchronized successfully')
+      toast({
+        title: 'Agents synchronized',
+        description: 'Your agent list is up to date.',
+        status: 'success'
+      })
     } catch (error) {
-      console.error('❌ Error refreshing agents:', error)
+      toast({
+        title: 'Sync failed',
+        description: 'Could not refresh agents. Please try again.',
+        status: 'error'
+      })
     } finally {
       setIsRefreshing(false)
     }
@@ -1467,6 +1514,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     if (key.includes('toby')) return '/img/agents/toby4.png'
     if (key.includes('ami')) return '/img/agents/ami4.png'
     if (key.includes('peter')) return '/img/agents/peter4.png'
+  if (key.includes('nora')) return '/img/agents/nora4.png'
     if (key.includes('cleo')) return '/img/agents/logocleo4.png'
     if (key.includes('emma')) return '/img/agents/emma4.png'
     if (key.includes('wex')) return '/img/agents/wex4.png'

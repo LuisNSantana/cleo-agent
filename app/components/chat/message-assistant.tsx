@@ -25,8 +25,8 @@ type MessageAssistantProps = {
   isLast?: boolean
   hasScrollAnchor?: boolean
   copied?: boolean
-  copyToClipboard?: () => void
-  onReload?: () => void
+  copyToClipboardAction?: () => void
+  onReloadAction?: () => void
   parts?: MessageAISDK["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
@@ -40,8 +40,8 @@ export function MessageAssistant({
   isLast,
   hasScrollAnchor,
   copied,
-  copyToClipboard,
-  onReload,
+  copyToClipboardAction,
+  onReloadAction,
   parts,
   status,
   className,
@@ -233,7 +233,7 @@ export function MessageAssistant({
 
         {contentNullOrEmpty ? (
           status === 'streaming' && pipelineSteps.length === 0 ? (
-            <div className="bg-white/70 dark:bg-zinc-900/50 md:bg-white/90 md:border md:border-white/20 md:backdrop-blur-md border border-white/30 dark:border-white/10 rounded-2xl p-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
               <Loader />
               <span>Escribiendo…</span>
             </div>
@@ -261,7 +261,7 @@ export function MessageAssistant({
               <button
                 className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
                 aria-label="Copy text"
-                onClick={copyToClipboard}
+                onClick={copyToClipboardAction}
                 type="button"
               >
                 {copied ? (
@@ -280,7 +280,7 @@ export function MessageAssistant({
                 <button
                   className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
                   aria-label="Regenerate"
-                  onClick={onReload}
+                  onClick={onReloadAction}
                   type="button"
                 >
                   <ArrowClockwiseIcon className="size-4" />

@@ -2,6 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getCurrentUserId } from '@/lib/server/request-context'
+import { logger } from '@/lib/utils/logger'
 
 // Global event controller for pipeline streaming
 let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -25,7 +26,8 @@ function emitPipelineEvent(event: any) {
     try {
       globalEventController.enqueue(globalEventEncoder.encode(`data: ${JSON.stringify(event)}\n\n`))
     } catch (error) {
-      console.warn('Failed to emit pipeline event:', error)
+  // Non-fatal: keep warn level
+  logger.warn('Failed to emit pipeline event:', error)
     }
   }
 }
@@ -39,10 +41,15 @@ function getAgentDisplayName(agentId: string): string {
     'emma-ecommerce': 'Emma',
     'apu-research': 'Apu',
     'wex-automation': 'Wex',
+    'nora-community': 'Nora',
     // Sub-agents
     'apu-markets': 'Apu Markets',
     'astra-email': 'Astra',
-    'notion-agent': 'Notion Agent'
+    'notion-agent': 'Notion Agent',
+    // Nora sub-agents
+    'luna-content-creator': 'Luna',
+    'zara-analytics-specialist': 'Zara',
+    'viktor-publishing-specialist': 'Viktor'
   }
   return agentNames[agentId] || agentId
 }
@@ -103,8 +110,11 @@ async function runDelegation(params: {
 
   const execId: string | undefined = exec?.id
   const startedAt = Date.now()
-  const TIMEOUT_MS = 120_000
-  const POLL_MS = 600
+  const { getRuntimeConfig } = await import('../agents/runtime-config')
+  const runtime = getRuntimeConfig()
+  let timeoutMs = runtime.delegationTimeoutMs
+  const POLL_MS = runtime.delegationPollMs
+  let lastProgressAt = startedAt
 
   // Emit processing event
   emitPipelineEvent({
@@ -119,8 +129,10 @@ async function runDelegation(params: {
   let finalResult: string | null = null
   let status: string = 'running'
   let lastStatus = ''
+  let lastProgress = 0
+  let extendedMs = 0
   
-  while (Date.now() - startedAt < TIMEOUT_MS) {
+  while (Date.now() - startedAt < timeoutMs) {
     // Small delay
     // eslint-disable-next-line no-await-in-loop
     await new Promise(r => setTimeout(r, POLL_MS))
@@ -140,6 +152,26 @@ async function runDelegation(params: {
           timestamp: new Date().toISOString()
         })
         lastStatus = status
+      }
+      // Extend timeout based on progress threshold and recent activity, capped by max extension
+      const raw = Number(snapshot?.progress ?? 0)
+      const progress = Math.max(0, Math.min(100, raw))
+      const delta = progress - lastProgress
+      const now = Date.now()
+      const tooLongWithoutProgress = now - lastProgressAt >= runtime.noProgressNoExtendMs
+      if (delta > 0) {
+        lastProgress = progress
+        lastProgressAt = now
+      }
+      if (delta >= runtime.progressMinDeltaPercent && extendedMs < runtime.delegationMaxExtensionMs) {
+        const add = Math.min(runtime.delegationExtendOnProgressMs, runtime.delegationMaxExtensionMs - extendedMs)
+        timeoutMs += add
+        extendedMs += add
+      } else if (!tooLongWithoutProgress && delta > 0 && extendedMs < runtime.delegationMaxExtensionMs) {
+        // Small incremental progress: extend lightly
+        const add = Math.min(Math.floor(runtime.delegationExtendOnProgressMs / 2), runtime.delegationMaxExtensionMs - extendedMs)
+        timeoutMs += add
+        extendedMs += add
       }
       
       if (snapshot?.status === 'completed') {
@@ -174,7 +206,8 @@ async function runDelegation(params: {
   }
 
   if (!finalResult) {
-    finalResult = 'Delegation timed out. Partial results may be available in the agent center.'
+    const elapsed = Date.now() - startedAt
+    finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
   }
 
   return {
@@ -215,7 +248,6 @@ export const delegateToPeterTool = tool({
     return runDelegation({ agentId: 'peter-google', task, context, priority, requirements })
   }
 });
-
 export const delegateToEmmaTool = tool({
   description: 'Delegate e-commerce and Shopify management tasks to Emma specialist. Use for online store operations, e-commerce sales analytics, Shopify product management, inventory optimization, or business operations related to online retail.',
   inputSchema: delegationSchema,
@@ -256,6 +288,39 @@ export const delegateToNotionTool = tool({
   }
 });
 
+// Nora sub-agent delegation tools
+export const delegateToLunaTool = tool({
+  description: 'Delegate content creation, copywriting, and social media content tasks to Luna specialist. Use for creating tweets, developing engaging content, hashtag research, trend adaptation, and creative social media campaigns.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'luna-content-creator', task, context, priority, requirements })
+  }
+});
+
+export const delegateToZaraTool = tool({
+  description: 'Delegate analytics, metrics analysis, and trend research tasks to Zara specialist. Use for social media analytics, performance reporting, trend analysis, competitive intelligence, and data-driven insights.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'zara-analytics-specialist', task, context, priority, requirements })
+  }
+});
+
+export const delegateToViktorTool = tool({
+  description: 'Delegate publishing, scheduling, and community management tasks to Viktor specialist. Use for posting content, optimal timing strategies, community engagement, crisis management, and publication workflow optimization.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'viktor-publishing-specialist', task, context, priority, requirements })
+  }
+});
+
+export const delegateToNoraTool = tool({
+  description: 'Delegate community management, social media strategy, and comprehensive social platform coordination tasks to Nora specialist. Use for social media campaigns, community engagement strategies, Twitter/X management, cross-platform content coordination, brand social presence, and social media crisis management.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements }) => {
+    return runDelegation({ agentId: 'nora-community', task, context, priority, requirements })
+  }
+});
+
 // Export all delegation tools
 export const delegationTools = {
   delegate_to_toby: delegateToTobyTool,
@@ -265,5 +330,9 @@ export const delegationTools = {
   delegate_to_apu: delegateToApuTool,
   delegate_to_apu_markets: delegateToApuMarketsTool,
   delegate_to_astra: delegateToAstraTool,
-  delegate_to_notion_agent: delegateToNotionTool
+  delegate_to_notion_agent: delegateToNotionTool,
+  delegate_to_nora: delegateToNoraTool,
+  delegate_to_luna: delegateToLunaTool,
+  delegate_to_zara: delegateToZaraTool,
+  delegate_to_viktor: delegateToViktorTool
 };

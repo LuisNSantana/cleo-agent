@@ -56,7 +56,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
       'what are the trends', 'analyze the market', 'analizar el mercado', 'research shows', 'latest data', 'industry analysis', 
       'análisis de la industria', 'compare competitors', 'analizar competidores', 'find sources', 'encontrar fuentes'
     ],
-    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets']
+    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets', 'tweet', 'twitter', 'social media', 'post', 'publish']
   },
   'ami-creative': {
     primary: [
@@ -91,7 +91,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
       'draft reply', 'borrador de respuesta', 'reply email', 'responde correo', 'manage my calendar', 'gestionar mi calendario', 
       'organize my notion', 'search online', 'news today', 'noticias de hoy', 'what happened', 'qué pasó'
     ],
-    exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda']
+    exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda', 'tweet', 'twitter', 'social media', 'post', 'hashtag', 'social']
   },
   'peter-google': {
     primary: ['google', 'docs', 'sheets', 'drive', 'calendar', 'workspace', 'document', 'spreadsheet', 'gmail', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
@@ -141,6 +141,31 @@ const AGENT_PATTERNS: KeywordPatterns = {
     secondary: ['portfolio', 'ticker', 'analysis', 'forecast', 'bull', 'bear', 'dividend', 'earnings', 'quarterly'],
     contextual: ['stock price', 'market analysis', 'financial data', 'investment research', 'market trends'],
     exclusions: ['shopify', 'ecommerce', 'calendar']
+  },
+  // Social Media & Twitter Specialists
+  'nora-community': {
+    primary: ['twitter', 'tweet', 'tweets', 'x', 'social media', 'community', 'post', 'publish', 'publicar', 'redes sociales', 'hashtag', 'hashtags'],
+    secondary: ['engagement', 'community', 'brand', 'audience', 'followers', 'seguidores', 'viral', 'trending', 'tendencias', 'social', 'content'],
+    contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags'],
+    exclusions: ['email', 'calendar', 'shopify', 'google docs', 'research only', 'technical analysis']
+  },
+  'luna-content': {
+    primary: ['content', 'copy', 'copywriting', 'writing', 'creative', 'creativo', 'campaign', 'campaña', 'brand', 'marca'],
+    secondary: ['messaging', 'tone', 'voice', 'style', 'estilo', 'narrative', 'storytelling', 'engagement', 'caption'],
+    contextual: ['write content', 'create copy', 'social media copy', 'campaign content', 'brand messaging', 'creative writing'],
+    exclusions: ['technical', 'code', 'database', 'shopify']
+  },
+  'zara-analytics': {
+    primary: ['analytics', 'analíticas', 'analiticas', 'metrics', 'métricas', 'metricas', 'performance', 'rendimiento', 'data', 'datos'],
+    secondary: ['insights', 'trends', 'engagement', 'reach', 'impressions', 'clicks', 'conversion', 'roi', 'kpi'],
+    contextual: ['analyze performance', 'social media analytics', 'engagement metrics', 'performance report', 'twitter analytics'],
+    exclusions: ['creation', 'writing', 'posting']
+  },
+  'viktor-publisher': {
+    primary: ['schedule', 'scheduling', 'publish', 'publishing', 'timing', 'automation', 'workflow', 'calendar'],
+    secondary: ['optimal', 'timing', 'frequency', 'queue', 'batch', 'strategy', 'planning', 'coordination'],
+    contextual: ['schedule posts', 'publishing strategy', 'optimal timing', 'social media scheduling', 'content calendar'],
+    exclusions: ['creation', 'writing', 'analytics']
   }
 }
 
@@ -153,7 +178,12 @@ const AGENT_METADATA = {
   // Sub-agents
   'astra-email': { name: 'Astra', toolName: 'delegate_to_astra' },
   'notion-agent': { name: 'Notion Agent', toolName: 'delegate_to_notion_agent' },
-  'apu-markets': { name: 'Apu Markets', toolName: 'delegate_to_apu_markets' }
+  'apu-markets': { name: 'Apu Markets', toolName: 'delegate_to_apu_markets' },
+  // Social Media & Twitter Specialists
+  'nora-community': { name: 'Nora', toolName: 'delegate_to_nora' },
+  'luna-content': { name: 'Luna', toolName: 'delegate_to_luna' },
+  'zara-analytics': { name: 'Zara', toolName: 'delegate_to_zara' },
+  'viktor-publisher': { name: 'Viktor', toolName: 'delegate_to_viktor' }
 }
 
 // Scoring configuration

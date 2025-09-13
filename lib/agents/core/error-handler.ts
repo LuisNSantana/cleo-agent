@@ -4,6 +4,7 @@
  */
 
 import { AgentExecution } from '../types'
+import logger from '@/lib/utils/logger'
 
 export type ErrorCategory = 
   | 'network'
@@ -193,7 +194,7 @@ export class AgentErrorHandler {
         )
         const jitteredDelay = baseDelay + Math.random() * baseDelay * 0.1
         
-        console.warn(
+  logger.warn(
           `[ErrorHandler] Attempt ${attempt}/${config.maxAttempts} failed for ${context}:`,
           lastError.message,
           `Retrying in ${jitteredDelay.toFixed(0)}ms`
@@ -246,7 +247,7 @@ export class AgentErrorHandler {
 
     if (state.failureCount >= threshold) {
       state.isOpen = true
-      console.warn(`[Circuit Breaker] Opened circuit for ${context} after ${threshold} failures`)
+  logger.warn(`[Circuit Breaker] Opened circuit for ${context} after ${threshold} failures`)
     }
   }
 
@@ -276,7 +277,7 @@ export class AgentErrorHandler {
     execution.endTime = new Date()
     execution.metrics.errorCount++
 
-    console.error(
+  logger.error(
       `[AgentError] Execution ${execution.id} failed:`,
       {
         category,
@@ -290,9 +291,9 @@ export class AgentErrorHandler {
     if (recovery && this.isRetryableError(error)) {
       try {
         await this.withRetry(recovery, `execution_recovery_${execution.id}`)
-        console.log(`[AgentError] Successfully recovered execution ${execution.id}`)
+  logger.info(`[AgentError] Successfully recovered execution ${execution.id}`)
       } catch (recoveryError) {
-        console.error(
+  logger.error(
           `[AgentError] Recovery failed for execution ${execution.id}:`,
           recoveryError
         )

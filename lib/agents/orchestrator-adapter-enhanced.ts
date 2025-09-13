@@ -5,7 +5,7 @@
 
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
-import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
+import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Import legacy orchestrator as backup for complex delegation logic
@@ -47,7 +47,7 @@ class EnhancedCoreOrchestrator {
   
   constructor() {
     // Load built-in agents
-    getAllAgents().forEach(agent => this.agentConfigs.set(agent.id, agent))
+    ;[...ALL_PREDEFINED_AGENTS].forEach((agent: AgentConfig) => this.agentConfigs.set(agent.id, agent))
   }
   
   getModelInfo(agentId?: string) {

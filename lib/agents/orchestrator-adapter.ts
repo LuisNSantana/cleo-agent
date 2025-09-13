@@ -9,7 +9,8 @@ import { AgentOrchestrator as CoreOrchestrator, ExecutionContext, ExecutionOptio
 // Lazy-init legacy orchestrator when needed for delegation/tooling parity
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
-import { getAllAgentsSync as getAllAgents } from '@/lib/agents/unified-config'
+import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
+import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Singleton core orchestrator (globalThis to survive route reloads)
@@ -92,7 +93,7 @@ export function getAgentOrchestrator() {
     },
     // Agent runtime management (adapter-local)
     getAgentConfigs(): Map<string, AgentConfig> {
-      const builtIns = getAllAgents()
+      const builtIns = [...ALL_PREDEFINED_AGENTS]
       const map = new Map<string, AgentConfig>()
       builtIns.forEach(a => map.set(a.id, a))
       Array.from(runtimeAgents.values()).forEach(a => map.set(a.id, a))
@@ -218,12 +219,15 @@ function createAndRunExecution(
   }
   
   // Get target agent config for core execution
-  const targetAgent = getAllAgents().find(a => a.id === (agentId || 'cleo-supervisor')) || getAllAgents().find(a => a.id === 'cleo-supervisor')!
+  const targetAgentList: AgentConfig[] = [...ALL_PREDEFINED_AGENTS]
+  const targetAgent = targetAgentList.find((a: AgentConfig) => a.id === (agentId || 'cleo-supervisor')) || targetAgentList.find((a: AgentConfig) => a.id === 'cleo-supervisor')!
   
   console.log(`[Adapter] Starting core execution for agent: ${targetAgent.name} (${targetAgent.id})`)
   
   // Execute with core orchestrator (includes delegation logic, tools, etc.)
-  core.executeAgent(targetAgent, ctx, { timeout: 60000 }).then(res => {
+  const runtime = getRuntimeConfig()
+  const execTimeout = targetAgent.role === 'supervisor' ? runtime.maxExecutionMsSupervisor : runtime.maxExecutionMsSpecialist
+  core.executeAgent(targetAgent, ctx, { timeout: execTimeout }).then(res => {
     exec.status = 'completed'
     exec.endTime = new Date()
     exec.result = (res && (res as any).content) || ''

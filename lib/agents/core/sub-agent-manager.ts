@@ -7,6 +7,7 @@ import { EventEmitter } from './event-emitter'
 import { SubAgentService, SubAgent, SubAgentData } from '../services/sub-agent-service'
 import { tools as appTools } from '@/lib/tools'
 import { z } from 'zod'
+import logger from '@/lib/utils/logger'
 
 export interface SubAgentTemplate {
   name: string
@@ -32,6 +33,15 @@ export class SubAgentManager {
   constructor(userId: string, eventEmitter: EventEmitter) {
     this.userId = userId
     this.eventEmitter = eventEmitter
+  }
+
+  /**
+   * Update the active user for this manager and refresh cache if changed
+   */
+  async setUser(userId: string): Promise<void> {
+    if (!userId || userId === this.userId) return
+    this.userId = userId
+    await this.refreshCache()
   }
 
   /**
@@ -67,7 +77,7 @@ export class SubAgentManager {
 
       return subAgent
     } catch (error) {
-      console.error('Error creating sub-agent:', error)
+      logger.error('Error creating sub-agent:', error)
       throw error
     }
   }
@@ -84,12 +94,28 @@ export class SubAgentManager {
       }
 
       // Filter cached sub-agents by parent
-      const subAgents = Array.from(this.subAgentsCache.values())
+      let subAgents = Array.from(this.subAgentsCache.values())
         .filter(agent => agent.parentAgentId === parentAgentId)
+
+      // Fallback: if none in cache (e.g., unauthenticated user), fetch from service (includes predefined)
+      if (subAgents.length === 0) {
+        try {
+          const fetched = await SubAgentService.getSubAgents(parentAgentId)
+          for (const sa of fetched) {
+            this.subAgentsCache.set(sa.id, sa)
+            const tool = this.createDelegationTool(sa)
+            this.delegationTools.set(sa.delegationToolName, tool)
+          }
+          this.lastCacheUpdate = Date.now()
+          subAgents = fetched
+        } catch (e) {
+          logger.warn('[SubAgentManager] Fallback getSubAgents failed:', e)
+        }
+      }
 
       return subAgents
     } catch (error) {
-      console.error('Error getting sub-agents:', error)
+      logger.error('Error getting sub-agents:', error)
       return []
     }
   }
@@ -113,7 +139,7 @@ export class SubAgentManager {
 
       return subAgent
     } catch (error) {
-      console.error('Error getting sub-agent:', error)
+      logger.error('Error getting sub-agent:', error)
       return null
     }
   }
@@ -152,7 +178,7 @@ export class SubAgentManager {
 
       return success
     } catch (error) {
-      console.error('Error updating sub-agent:', error)
+      logger.error('Error updating sub-agent:', error)
       return false
     }
   }
@@ -184,7 +210,7 @@ export class SubAgentManager {
 
       return success
     } catch (error) {
-      console.error('Error deleting sub-agent:', error)
+      logger.error('Error deleting sub-agent:', error)
       return false
     }
   }
@@ -225,7 +251,7 @@ export class SubAgentManager {
     try {
       return await SubAgentService.getSubAgentStatistics(this.userId)
     } catch (error) {
-      console.error('Error getting sub-agent statistics:', error)
+      logger.error('Error getting sub-agent statistics:', error)
       return {
         totalSubAgents: 0,
         subAgentsByParent: {},
@@ -261,7 +287,7 @@ export class SubAgentManager {
 
       this.lastCacheUpdate = Date.now()
     } catch (error) {
-      console.error('Error refreshing sub-agent cache:', error)
+      logger.error('Error refreshing sub-agent cache:', error)
     }
   }
 
@@ -303,7 +329,7 @@ export class SubAgentManager {
     try {
       (appTools as any)[toolName] = toolImpl
     } catch (e) {
-      console.warn('[SUB-AGENT-MANAGER] Failed to register delegation tool globally:', toolName, e)
+      logger.warn('[SUB-AGENT-MANAGER] Failed to register delegation tool globally:', toolName, e)
     }
 
     return toolImpl
@@ -314,7 +340,7 @@ export class SubAgentManager {
    */
   async initialize(): Promise<void> {
     await this.refreshCache()
-    console.log(`[SUB-AGENT-MANAGER] Initialized for user ${this.userId} with ${this.subAgentsCache.size} sub-agents`)
+  logger.info(`[SUB-AGENT-MANAGER] Initialized for user ${this.userId} with ${this.subAgentsCache.size} sub-agents`)
   }
 
   /**

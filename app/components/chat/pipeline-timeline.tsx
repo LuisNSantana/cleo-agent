@@ -41,7 +41,7 @@ function actionLabel(action: PipelineStep['action']) {
 }
 
 export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; className?: string }) {
-  const [isExpanded, setIsExpanded] = useState(true) // Start expanded for live updates
+  const [isExpanded, setIsExpanded] = useState(false) // Default collapsed to reduce UI footprint
 
   const normalized = useMemo(() => {
     return (steps || []).map(s => {
@@ -95,22 +95,26 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     )
   }, [normalized])
 
-  // Show all unique steps when expanded, last 3 when collapsed  
+  // Show all unique steps when expanded; show none when collapsed for minimal footprint
   const hasSteps = uniqueSteps.length > 0
-  const visibleSteps = isExpanded ? uniqueSteps : uniqueSteps.slice(-3)
-  const hiddenCount = uniqueSteps.length - visibleSteps.length
+  const visibleSteps = isExpanded ? uniqueSteps : []
+  const hiddenCount = uniqueSteps.length
 
   if (!hasSteps) return null
 
   return (
-    <div className={cn("border-border/60 bg-muted/30 relative w-full overflow-hidden rounded-xl border", className)}>
+    <div className={cn(
+      "border-border/50 bg-muted/20 relative w-full overflow-hidden rounded-xl border",
+      !isExpanded && "py-1.5",
+      className
+    )}>
       <div className="bg-gradient-to-b from-background/60 to-transparent pointer-events-none absolute inset-0" />
-      <div className="relative p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-muted-foreground/80 text-xs uppercase tracking-wide font-medium">
-            🚀 Optimized Pipeline ({uniqueSteps.length} step{uniqueSteps.length !== 1 ? 's' : ''})
+      <div className="relative p-2 sm:p-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-muted-foreground/80 text-[11px] uppercase tracking-wide font-medium">
+            ⛓️ Pipeline {isExpanded ? `(${uniqueSteps.length})` : `(collapsed)`}
           </div>
-          {uniqueSteps.length > 3 && (
+          {hasSteps && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1 text-xs transition-colors"
@@ -129,22 +133,23 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
             </button>
           )}
         </div>
-        <ul className="grid gap-2">
-          <AnimatePresence initial={false}>
-            {visibleSteps.map((s) => (
+        {isExpanded && (
+          <ul className="grid gap-1.5">
+            <AnimatePresence initial={false}>
+              {visibleSteps.map((s) => (
               <motion.li
                 key={s.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
-                className="bg-card/40 border-border/60 hover:bg-card/60 group relative grid grid-cols-[auto_auto_1fr_auto] items-start gap-3 rounded-lg border p-2.5 pr-3 text-sm sm:text-[15px] transition-colors"
+                transition={{ type: 'spring', duration: 0.22, bounce: 0 }}
+                className="bg-card/30 border-border/60 hover:bg-card/50 group relative grid grid-cols-[auto_auto_1fr_auto] items-start gap-2 rounded-lg border p-2 pr-2.5 text-xs sm:text-sm transition-colors"
               >
                 <StatusDot action={s.action} />
                 <AgentAvatar agentId={s.agent} />
                 <div className="min-w-0">
                   <div className="text-foreground/90 truncate font-medium">
-                    {actionLabel(s.action)} <span className="text-muted-foreground/80">·</span> <span className="text-muted-foreground text-sm sm:text-base font-semibold"><AgentName agentId={s.agent} /></span>
+                    {actionLabel(s.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={s.agent} /></span>
                   </div>
                   {s.content ? (
                     <div className="text-muted-foreground/90 mt-0.5 line-clamp-2 whitespace-pre-wrap">
@@ -152,18 +157,19 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     </div>
                   ) : null}
                   {typeof s.progress === 'number' ? (
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div className="bg-primary h-full" style={{ width: `${Math.min(100, Math.max(0, s.progress))}%` }} />
                     </div>
                   ) : null}
                 </div>
-                <div className="text-muted-foreground/70 whitespace-nowrap pl-1 font-mono">
+                <div className="text-muted-foreground/70 whitespace-nowrap pl-1 font-mono text-[10px] sm:text-xs">
                   {formatTime(s.timestamp)}
                 </div>
               </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
       </div>
     </div>
   )
@@ -193,7 +199,10 @@ function AgentAvatar({ agentId }: { agentId: string }) {
   const meta = getAgentMetadata(agentId)
   const size = 28
   return (
-    <div className="mt-0.5 h-[28px] w-[28px] flex items-center justify-center">
+    <div
+      className="flex-shrink-0 h-[28px] w-[28px] overflow-hidden rounded-full ring ring-border/60 flex items-center justify-center"
+      aria-label={meta.name || agentId}
+    >
       {meta.avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -201,10 +210,10 @@ function AgentAvatar({ agentId }: { agentId: string }) {
           alt={meta.name || agentId}
           width={size}
           height={size}
-          className="ring-border/60 rounded-full ring"
+          className="h-full w-full object-cover"
         />
       ) : (
-        <div className="bg-muted ring-border/60 flex h-[28px] w-[28px] items-center justify-center rounded-full ring text-[12px]">
+        <div className="bg-muted flex h-full w-full items-center justify-center text-[12px]">
           {meta.emoji || '🤖'}
         </div>
       )}

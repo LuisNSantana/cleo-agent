@@ -21,7 +21,7 @@ export function ThemeToggle() {
   // Prevent hydration mismatch
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="size-9">
+  <Button variant="ghost" size="icon" className="size-9 rounded-full bg-background hover:bg-muted text-muted-foreground">
         <Sun className="size-4" />
       </Button>
     )
@@ -39,7 +39,7 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          className="pointer-events-auto size-9"
+          className="pointer-events-auto size-9 rounded-full bg-background hover:bg-muted text-muted-foreground"
           onClick={toggleTheme}
         >
           {isDark ? (

@@ -1,3 +1,4 @@
+import logger from '@/lib/utils/logger'
 /**
  * Simple Event Emitter for Agent System
  */
@@ -31,7 +32,7 @@ export class EventEmitter {
         try {
           handler(...args)
         } catch (error) {
-          console.error(`[EventEmitter] Error in handler for event "${event}":`, error)
+          logger.error(`[EventEmitter] Error in handler for event "${event}":`, error)
         }
       })
     }

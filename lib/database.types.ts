@@ -15,66 +15,87 @@ export type Database = {
           color: string | null
           created_at: string | null
           delegated_by: Json | null
+          delegation_tool_name: string | null
           description: string | null
+          dynamic: boolean | null
           icon: string | null
           id: string
+          immutable: boolean | null
           is_active: boolean | null
           is_default: boolean | null
+          is_sub_agent: boolean | null
           max_tokens: number | null
           model: string
           name: string
+          parent_agent_id: string | null
+          predefined: boolean | null
           priority: number | null
           role: string
+          sub_agent_config: Json | null
           system_prompt: string
           tags: string[] | null
           temperature: number | null
           tools: string[] | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
-          can_delegate?: boolean | null
-          color?: string | null
-          created_at?: string | null
-          delegated_by?: Json | null
-          description?: string | null
-          icon?: string | null
           id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          max_tokens?: number | null
-          model?: string
           name: string
-          priority?: number | null
           role: string
           system_prompt: string
-          tags?: string[] | null
-          temperature?: number | null
-          tools?: string[] | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
+          model?: string | null
           can_delegate?: boolean | null
           color?: string | null
           created_at?: string | null
           delegated_by?: Json | null
+          delegation_tool_name?: string | null
           description?: string | null
+          dynamic?: boolean | null
           icon?: string | null
-          id?: string
+          immutable?: boolean | null
           is_active?: boolean | null
           is_default?: boolean | null
+          is_sub_agent?: boolean | null
           max_tokens?: number | null
-          model?: string
-          name?: string
+          parent_agent_id?: string | null
+          predefined?: boolean | null
           priority?: number | null
-          role?: string
-          system_prompt?: string
+          sub_agent_config?: Json | null
           tags?: string[] | null
           temperature?: number | null
           tools?: string[] | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          role?: string
+          system_prompt?: string
+          model?: string | null
+          can_delegate?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          delegated_by?: Json | null
+          delegation_tool_name?: string | null
+          description?: string | null
+          dynamic?: boolean | null
+          icon?: string | null
+          immutable?: boolean | null
+          is_active?: boolean | null
+          is_default?: boolean | null
+          is_sub_agent?: boolean | null
+          max_tokens?: number | null
+          parent_agent_id?: string | null
+          predefined?: boolean | null
+          priority?: number | null
+          sub_agent_config?: Json | null
+          tags?: string[] | null
+          temperature?: number | null
+          tools?: string[] | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -92,26 +113,26 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          id?: string
           agent_id: string
+          title: string
+          status?: string
+          priority?: string | null
+          description?: string | null
           completed_at?: string | null
           created_at?: string | null
-          description?: string | null
-          id?: string
-          priority?: string | null
-          status?: string
-          title: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          id?: string
           agent_id?: string
+          title?: string
+          status?: string
+          priority?: string | null
+          description?: string | null
           completed_at?: string | null
           created_at?: string | null
-          description?: string | null
-          id?: string
-          priority?: string | null
-          status?: string
-          title?: string
           updated_at?: string | null
           user_id?: string
         }

@@ -11,8 +11,10 @@ import { EventEmitter } from './event-emitter'
 import { ExecutionManager } from './execution-manager'
 import { buildToolRuntime } from '@/lib/langchain/tooling'
 import { applyToolHeuristics } from './tool-heuristics'
+import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
 import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/tool-selection-logger'
 import { resolveNotionKey } from '@/lib/notion/credentials'
+import logger from '@/lib/utils/logger'
 
 export interface GraphBuilderConfig {
   modelFactory: ModelFactory
@@ -37,11 +39,13 @@ export class GraphBuilder {
   private modelFactory: ModelFactory
   private eventEmitter: EventEmitter
   private executionManager: ExecutionManager
+  private runtime: RuntimeConfig
 
   constructor(config: GraphBuilderConfig) {
     this.modelFactory = config.modelFactory
     this.eventEmitter = config.eventEmitter
     this.executionManager = config.executionManager
+  this.runtime = getRuntimeConfig()
   }
 
   /**
@@ -54,15 +58,17 @@ export class GraphBuilder {
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i]
       
-      if (msg.constructor.name === 'ToolMessage') {
+    if (msg.constructor.name === 'ToolMessage') {
         // Check if previous message is AIMessage with tool_calls
         const prevMsg = result[result.length - 1]
         if (prevMsg && prevMsg.constructor.name === 'AIMessage' && (prevMsg as any).tool_calls?.length > 0) {
           // Valid ToolMessage - keep it
           result.push(msg)
         } else {
-          // Invalid/stale ToolMessage - convert to SystemMessage
-          result.push(new SystemMessage(`[tool:${(msg as any).tool_call_id || 'unknown'}] ${msg.content.toString().slice(0, 400)}`))
+      // Invalid/stale ToolMessage - convert to AIMessage text to preserve order
+      // Avoid inserting SystemMessage mid-conversation (Anthropic constraint)
+      const text = `[tool:${(msg as any).tool_call_id || 'unknown'}] ${msg.content?.toString?.().slice(0, 400) || ''}`
+      result.push(new AIMessage({ content: text }))
         }
       } else {
         result.push(msg)
@@ -79,11 +85,11 @@ export class GraphBuilder {
     const graphBuilder = new StateGraph(MessagesAnnotation)
     const { agents, supervisorAgent, enableDirectMode } = config
 
-    console.log('🏗️ Building dual-mode graph with agents:', Array.from(agents.keys()))
+  logger.debug('🏗️ Building dual-mode graph with agents:', Array.from(agents.keys()))
 
     // Add router node for conversation mode detection
     graphBuilder.addNode('router' as any, async (state: any) => {
-      console.log('🧭 Router: Analyzing conversation mode...')
+  logger.debug('🧭 Router: Analyzing conversation mode...')
       
       const lastMessage = state.messages[state.messages.length - 1]
       const conversationMode = this.detectConversationMode(state, lastMessage)
@@ -91,7 +97,7 @@ export class GraphBuilder {
       // Create proper LangChain message with mode metadata
       const updatedMessages = this.preserveConversationMode(state.messages, conversationMode)
       
-      console.log(`🎯 Router: Mode detected - ${conversationMode.mode} (target: ${conversationMode.targetAgent})`)
+  logger.info(`🎯 Router: Mode detected - ${conversationMode.mode} (target: ${conversationMode.targetAgent})`)
       
       return { messages: updatedMessages }
     })
@@ -131,7 +137,7 @@ export class GraphBuilder {
     // Set entry point
     graphBuilder.addEdge(START, 'router' as any)
 
-    console.log('✅ Dual-mode graph built successfully')
+  logger.debug('✅ Dual-mode graph built successfully')
     return graphBuilder
   }
 
@@ -209,7 +215,7 @@ export class GraphBuilder {
         state.metadata.executionId = ExecutionManager.getCurrentExecutionId()
       }
       
-      console.log('🔍 [DEBUG] Agent node starting with executionId:', state.metadata.executionId)
+  logger.debug('🔍 [DEBUG] Agent node starting with executionId:', state.metadata.executionId)
 
       // Filter out stale ToolMessages that don't follow LangChain's rules
       // ToolMessages must immediately follow AIMessages with tool_calls
@@ -241,8 +247,14 @@ export class GraphBuilder {
   let messages: any[] = [systemMessage, ...filteredStateMessages]
   // Execution safety caps - higher for supervisor agents with delegation
   const EXECUTION_START = Date.now()
-  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' ? 180_000 : 45_000 // 3 minutes for supervisors, 45s for others
-  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' ? 15 : 6 // More tool calls for supervisors
+  const { getRuntimeConfig } = await import('../runtime-config')
+  const runtime = getRuntimeConfig()
+  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' 
+    ? runtime.maxExecutionMsSupervisor 
+    : runtime.maxExecutionMsSpecialist
+  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' 
+    ? runtime.maxToolCallsSupervisor 
+    : runtime.maxToolCallsSpecialist
   let totalToolCalls = 0
 
         // Execute model with basic tool loop (max 3 iterations)
@@ -250,7 +262,7 @@ export class GraphBuilder {
         try {
           response = await model.invoke(messages)
         } catch (error) {
-          console.error('🔍 [DEBUG] First model invocation failed:', error)
+          logger.error('🔍 [DEBUG] First model invocation failed:', error)
           throw error
         }
 
@@ -268,10 +280,10 @@ export class GraphBuilder {
           for (const call of toolCalls) {
             // Stop if we are running out of budget
             if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
+              logger.info('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
               messages = [
                 ...messages,
-                new HumanMessage({ content: 'Ahora finaliza con un resumen claro y concreto usando lo ya obtenido. Incluye 5 modelos con enlaces. No llames más herramientas.' })
+                new HumanMessage({ content: 'Please finalize with a concise, clear summary using the results gathered so far. Do not call more tools.' })
               ]
               response = await model.invoke(messages)
               break
@@ -296,27 +308,27 @@ export class GraphBuilder {
               
               // Check if this is a delegation tool response that requires handoff
               if (this.isDelegationToolResponse(output)) {
-                console.log('🔄 [HANDOFF] Delegation detected:', output)
+                logger.info('🔄 [HANDOFF] Delegation detected:', output)
                 
                 const delegationData = this.parseDelegationResponse(output)
                 
                 // Create promise to wait for delegation completion
                 const delegationPromise = new Promise((resolve, reject) => {
                   const timeout = setTimeout(() => {
-                    reject(new Error('Delegation timeout after 120 seconds'))
-                  }, 120000)
+                    reject(new Error(`Delegation timeout after ${runtime.delegationTimeoutMs} ms`))
+                  }, runtime.delegationTimeoutMs)
                   
                   const onCompleted = (result: any) => {
                     // Compare using execution context ID instead of agent names for more reliable matching
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (result.sourceExecutionId === currentExecutionId) {
-                      console.log('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
+                      logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       resolve(result)
                     } else {
-                      console.log('🔍 [DELEGATION] Ignoring completion for different execution:', {
+                      logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
                         resultExecutionId: result.sourceExecutionId,
                         currentExecutionId: currentExecutionId,
                         sourceAgent: result.sourceAgent,
@@ -329,13 +341,13 @@ export class GraphBuilder {
                     // Compare using execution context ID instead of agent names
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (error.sourceExecutionId === currentExecutionId) {
-                      console.log('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
+                      logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       reject(new Error(error.error || 'Delegation failed'))
                     } else {
-                      console.log('🔍 [DELEGATION] Ignoring failure for different execution:', {
+                      logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
                         errorExecutionId: error.sourceExecutionId,
                         currentExecutionId: currentExecutionId
                       })
@@ -348,7 +360,7 @@ export class GraphBuilder {
                 
                 // Emit handoff event for external processing
                 const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
-                console.log('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
+                logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
                   targetAgent: delegationData.agentId || delegationData.targetAgent,
@@ -362,10 +374,10 @@ export class GraphBuilder {
                 
                 try {
                   // Wait for delegation to complete
-                  console.log('⏳ [DELEGATION] Waiting for delegation to complete...')
+                  logger.debug('⏳ [DELEGATION] Waiting for delegation to complete...')
                   const delegationResult = await delegationPromise
                   
-                  console.log('✅ [DELEGATION] Delegation completed, adding result to conversation')
+                  logger.info('✅ [DELEGATION] Delegation completed, adding result to conversation')
                   messages = [
                     ...messages,
                     new ToolMessage({ 
@@ -374,7 +386,7 @@ export class GraphBuilder {
                     })
                   ]
                 } catch (delegationError) {
-                  console.error('❌ [DELEGATION] Delegation failed:', delegationError)
+                  logger.error('❌ [DELEGATION] Delegation failed:', delegationError)
                   messages = [
                     ...messages,
                     new ToolMessage({ 
@@ -403,7 +415,7 @@ export class GraphBuilder {
 
           // Check budgets before re-invocation
           if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-            console.log('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
+            logger.info('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
             messages = [
               ...messages,
               new HumanMessage({ content: 'Por favor, entrega la respuesta final ahora. Resume los hallazgos con 5 opciones y enlaces. No llames más herramientas.' })
@@ -460,7 +472,7 @@ export class GraphBuilder {
       const lastMessage = state.messages[state.messages.length - 1]
       const conversationMode = lastMessage?.additional_kwargs?.conversation_mode
 
-      console.log(`🚦 ${agentId} routing decision: ${conversationMode === 'direct' ? 'END' : 'finalize'}`)
+  logger.debug(`🚦 ${agentId} routing decision: ${conversationMode === 'direct' ? 'END' : 'finalize'}`)
 
       // Direct mode: bypass supervisor
       if (conversationMode === 'direct') {
@@ -500,19 +512,19 @@ export class GraphBuilder {
 
       // Direct mode with specific target
       if (conversationMode === 'direct' && targetAgent && agents.has(targetAgent)) {
-        console.log(`🎯 Router: Direct routing to ${targetAgent}`)
+  logger.info(`🎯 Router: Direct routing to ${targetAgent}`)
         return targetAgent
       }
 
       // Requested agent
       const requestedAgent = lastMessage?.additional_kwargs?.requested_agent_id
       if (requestedAgent && agents.has(requestedAgent)) {
-        console.log(`🔀 Router: Routing to requested agent ${requestedAgent}`)
+  logger.info(`🔀 Router: Routing to requested agent ${requestedAgent}`)
         return requestedAgent
       }
 
       // Default: route to supervisor
-      console.log('🔀 Router: Routing to finalize (supervised mode)')
+  logger.info('🔀 Router: Routing to finalize (supervised mode)')
       return 'finalize'
     }
   }
@@ -560,8 +572,13 @@ export class GraphBuilder {
   let messages: any[] = [systemMessage, ...filteredStateMessages]
   // Execution safety caps - higher for supervisor agents with delegation
   const EXECUTION_START = Date.now()
-  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' ? 180_000 : 45_000 // 3 minutes for supervisors, 45s for others
-  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' ? 15 : 6 // More tool calls for supervisors
+  const runtimeLocal = this.runtime || getRuntimeConfig()
+  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' 
+    ? runtimeLocal.maxExecutionMsSupervisor 
+    : runtimeLocal.maxExecutionMsSpecialist
+  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' 
+    ? runtimeLocal.maxToolCallsSupervisor 
+    : runtimeLocal.maxToolCallsSpecialist
   let totalToolCalls = 0
 
         // Execute model with basic tool loop (max 3 iterations)
@@ -569,7 +586,7 @@ export class GraphBuilder {
         try {
           response = await model.invoke(messages)
         } catch (error) {
-          console.error('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
+          logger.error('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
           throw error
         }
 
@@ -601,12 +618,12 @@ export class GraphBuilder {
             count: toolCalls.length,
             tools: toolCalls.map((t: any) => t?.name)
           })
-          console.log(`🛠️  [Graph] ${agentConfig.id} invoked ${toolCalls.length} tools:`, toolCalls.map((t: any) => t?.name).join(', '))
+          logger.debug(`🛠️  [Graph] ${agentConfig.id} invoked ${toolCalls.length} tools:`, toolCalls.map((t: any) => t?.name).join(', '))
 
           for (const call of toolCalls) {
             // Stop if we are running out of budget
             if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-              console.log('⏱️ [SAFEGUARD] Budget hit before executing tool. Adding fallback tool response.')
+              logger.info('⏱️ [SAFEGUARD] Budget hit before executing tool. Adding fallback tool response.')
               // Add fallback tool response for this call to maintain LangChain message structure
               const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
               messages.push(new ToolMessage({ 
@@ -648,9 +665,9 @@ export class GraphBuilder {
                 argsShape: args && typeof args === 'object' ? Object.keys(args) : [],
                 notionCredentialPresent
               })
-              console.log(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args).slice(0, 100)}...)`)
+              logger.debug(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args).slice(0, 100)}...)`)
               const output = await toolRuntime.run(String(name), args)
-              console.log(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
+              logger.debug(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
               // Structured execution end log (success)
               logToolExecutionEnd({
                 event: 'tool_end',
@@ -664,26 +681,26 @@ export class GraphBuilder {
               })
               // Delegation-aware handling: if tool output indicates a handoff, orchestrate delegation
               if (this.isDelegationToolResponse(output)) {
-                console.log('� [HANDOFF] Delegation detected in buildGraph:', output)
+                logger.info('� [HANDOFF] Delegation detected in buildGraph:', output)
                 const delegationData = this.parseDelegationResponse(output)
 
                 // Create promise to await delegation completion
                 const delegationPromise = new Promise((resolve, reject) => {
                   const timeout = setTimeout(() => {
-                    reject(new Error('Delegation timeout after 120 seconds'))
-                  }, 120000)
+                    reject(new Error(`Delegation timeout after ${this.runtime.delegationTimeoutMs / 1000} seconds`))
+                  }, this.runtime.delegationTimeoutMs)
 
                   const onCompleted = (result: any) => {
                     // Compare using execution context ID instead of agent names for more reliable matching
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (result.sourceExecutionId === currentExecutionId) {
-                      console.log('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
+                      logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       resolve(result)
                     } else {
-                      console.log('🔍 [DELEGATION] Ignoring completion for different execution:', {
+                      logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
                         resultExecutionId: result.sourceExecutionId,
                         currentExecutionId: currentExecutionId,
                         sourceAgent: result.sourceAgent,
@@ -696,13 +713,13 @@ export class GraphBuilder {
                     // Compare using execution context ID instead of agent names
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (error.sourceExecutionId === currentExecutionId) {
-                      console.log('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
+                      logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
                       clearTimeout(timeout)
                       this.eventEmitter.off('delegation.completed', onCompleted)
                       this.eventEmitter.off('delegation.failed', onFailed)
                       reject(new Error(error.error || 'Delegation failed'))
                     } else {
-                      console.log('🔍 [DELEGATION] Ignoring failure for different execution:', {
+                      logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
                         errorExecutionId: error.sourceExecutionId,
                         currentExecutionId: currentExecutionId
                       })
@@ -715,7 +732,7 @@ export class GraphBuilder {
 
                 // Emit request
                 const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
-                console.log('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
+                logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
                   targetAgent: delegationData.agentId || delegationData.targetAgent,
@@ -728,9 +745,9 @@ export class GraphBuilder {
                 })
 
                 try {
-                  console.log('⏳ [DELEGATION] Waiting for delegated task to complete... executionId:', currentExecutionId)
+                  logger.debug('⏳ [DELEGATION] Waiting for delegated task to complete... executionId:', currentExecutionId)
                   const delegationResult: any = await delegationPromise
-                  console.log('✅ [DELEGATION] Completed, injecting result into conversation. ExecutionId:', currentExecutionId)
+                  logger.info('✅ [DELEGATION] Completed, injecting result into conversation. ExecutionId:', currentExecutionId)
                   const contentStr = typeof (delegationResult?.result) === 'string' 
                     ? delegationResult.result 
                     : JSON.stringify(delegationResult?.result || {})
@@ -741,9 +758,9 @@ export class GraphBuilder {
                       tool_call_id: String(callId) 
                     })
                   ]
-                  console.log('🔄 [DELEGATION] ToolMessage injected, continuing graph execution...')
+                  logger.debug('🔄 [DELEGATION] ToolMessage injected, continuing graph execution...')
                 } catch (delegationError) {
-                  console.error('❌ [DELEGATION] Delegation failed in buildGraph:', delegationError)
+                  logger.error('❌ [DELEGATION] Delegation failed in buildGraph:', delegationError)
                   messages = [
                     ...messages,
                     new ToolMessage({ 
@@ -766,7 +783,7 @@ export class GraphBuilder {
                 ...messages,
                 new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
               ]
-              console.error(`❌ [Tool] ${name} failed:`, err)
+              logger.error(`❌ [Tool] ${name} failed:`, err)
               // Structured execution end log (failure)
               logToolExecutionEnd({
                 event: 'tool_end',
@@ -784,12 +801,12 @@ export class GraphBuilder {
 
           // Check budgets before re-invocation
           if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-            console.log('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
+            logger.info('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
             
             // CRITICAL: Ensure all tool_calls are resolved before forcing finalization
             const lastMessage = messages[messages.length - 1]
             if (lastMessage && 'tool_calls' in lastMessage && lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
-              console.log('🔧 [SAFEGUARD] Found unresolved tool_calls, adding fallback ToolMessages')
+              logger.debug('🔧 [SAFEGUARD] Found unresolved tool_calls, adding fallback ToolMessages')
               const existingToolCallIds = new Set()
               
               // Collect all existing tool_call_ids from ToolMessages
@@ -802,7 +819,7 @@ export class GraphBuilder {
               // Add fallback ToolMessages for any unresolved tool_calls
               for (const toolCall of lastMessage.tool_calls) {
                 if (!existingToolCallIds.has(toolCall.id)) {
-                  console.log(`🔧 [SAFEGUARD] Adding fallback ToolMessage for unresolved tool_call: ${toolCall.id}`)
+                  logger.debug(`🔧 [SAFEGUARD] Adding fallback ToolMessage for unresolved tool_call: ${toolCall.id}`)
                   messages.push(new ToolMessage({
                     content: 'Budget exceeded. Task completed with available resources.',
                     tool_call_id: toolCall.id
@@ -817,7 +834,7 @@ export class GraphBuilder {
           try {
             response = await model.invoke(messages)
           } catch (error) {
-            console.error('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
+            logger.error('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
             throw error
           }
         }
@@ -825,7 +842,7 @@ export class GraphBuilder {
         // FINAL SAFEGUARD: Ensure all tool_calls are resolved before finalizing
         const finalMessage = messages[messages.length - 1]
         if (finalMessage && 'tool_calls' in finalMessage && finalMessage.tool_calls && finalMessage.tool_calls.length > 0) {
-          console.log('🚨 [FINAL SAFEGUARD] Unresolved tool_calls detected at end of loop, resolving them')
+          logger.info('🚨 [FINAL SAFEGUARD] Unresolved tool_calls detected at end of loop, resolving them')
           const existingToolCallIds = new Set()
           
           // Collect all existing tool_call_ids from ToolMessages
@@ -838,7 +855,7 @@ export class GraphBuilder {
           // Add fallback ToolMessages for any unresolved tool_calls
           for (const toolCall of finalMessage.tool_calls) {
             if (!existingToolCallIds.has(toolCall.id)) {
-              console.log(`🚨 [FINAL SAFEGUARD] Adding final fallback ToolMessage for: ${toolCall.id}`)
+              logger.debug(`🚨 [FINAL SAFEGUARD] Adding final fallback ToolMessage for: ${toolCall.id}`)
               messages.push(new ToolMessage({
                 content: 'Tool execution completed.',
                 tool_call_id: toolCall.id
@@ -849,33 +866,33 @@ export class GraphBuilder {
           // Re-invoke model one last time to get proper response
           try {
             response = await model.invoke(messages)
-            console.log('🚨 [FINAL SAFEGUARD] Model re-invoked after resolving tool_calls')
+            logger.debug('🚨 [FINAL SAFEGUARD] Model re-invoked after resolving tool_calls')
           } catch (error) {
-            console.log('🚨 [FINAL SAFEGUARD] Final re-invocation failed, using existing response')
+            logger.warn('🚨 [FINAL SAFEGUARD] Final re-invocation failed, using existing response')
           }
         }
 
         // Ensure we always have a final response
         if (!response.content || response.content.trim() === '') {
-          console.log('🔍 [DEBUG] BuildGraph - Empty response detected, requesting final summary')
+          logger.debug('🔍 [DEBUG] BuildGraph - Empty response detected, requesting final summary')
           // Add a system message to force a response
           messages.push(new HumanMessage({
             content: "Please provide a summary of the current task status and any results obtained so far."
           }))
           try {
             response = await model.invoke(messages)
-            console.log('🔍 [DEBUG] BuildGraph - Final summary response generated')
+            logger.debug('🔍 [DEBUG] BuildGraph - Final summary response generated')
           } catch (error) {
-            console.log('🔍 [DEBUG] BuildGraph - Final summary failed, using fallback')
+            logger.warn('🔍 [DEBUG] BuildGraph - Final summary failed, using fallback')
             response = {
               content: "Task execution completed. Please check the task status for detailed results."
             }
           }
         }
 
-        console.log('🔍 [DEBUG] BuildGraph - Final response content:', response.content)
-        console.log('🔍 [DEBUG] BuildGraph - Final response type:', typeof response.content)
-        console.log('🔍 [DEBUG] BuildGraph - Final response length:', response.content?.length || 0)
+  logger.debug('🔍 [DEBUG] BuildGraph - Final response content:', response.content)
+  logger.debug('🔍 [DEBUG] BuildGraph - Final response type:', typeof response.content)
+  logger.debug('🔍 [DEBUG] BuildGraph - Final response length:', response.content?.length || 0)
 
         this.eventEmitter.emit('node.completed', {
           nodeId: 'execute',

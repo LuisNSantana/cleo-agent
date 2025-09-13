@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useClientAgentStore } from '@/lib/agents/client-store'
+import { toast } from '@/components/ui/toast'
 import {
   RobotIcon,
   BrainIcon,
@@ -30,9 +31,17 @@ export function AgentsSettings() {
     setIsRefreshing(true)
     try {
       await syncAgents()
-      console.log('✅ Agents synchronized successfully')
+      toast({
+        title: 'Agents synchronized',
+        description: 'Your agent list is up to date.',
+        status: 'success'
+      })
     } catch (error) {
-      console.error('❌ Failed to sync agents:', error)
+      toast({
+        title: 'Sync failed',
+        description: 'Could not refresh agents. Please try again.',
+        status: 'error'
+      })
     } finally {
       setIsRefreshing(false)
     }

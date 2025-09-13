@@ -27,6 +27,10 @@ export { ASTRA_AGENT } from './astra'
 export { KHIPU_AGENT } from './khipu'
 export { APU_MARKETS_AGENT } from './apu-markets'
 export { NOTION_AGENT } from './notion-agent'
+export { NORA_AGENT } from './nora'
+export { LUNA_AGENT } from './luna'
+export { ZARA_AGENT } from './zara'
+export { VIKTOR_AGENT } from './viktor'
 // AMI_CALENDAR_AGENT removed - consolidated into AMI_AGENT
 
 import { CLEO_AGENT } from './cleo'
@@ -40,6 +44,10 @@ import { ASTRA_AGENT } from './astra'
 import { KHIPU_AGENT } from './khipu'
 import { APU_MARKETS_AGENT } from './apu-markets'
 import { NOTION_AGENT } from './notion-agent'
+import { NORA_AGENT } from './nora'
+import { LUNA_AGENT } from './luna'
+import { ZARA_AGENT } from './zara'
+import { VIKTOR_AGENT } from './viktor'
 // import { AMI_CALENDAR_AGENT } from './ami-calendar'  // REMOVED - consolidated
 
 /**
@@ -57,6 +65,10 @@ export const ALL_PREDEFINED_AGENTS = [
   KHIPU_AGENT,
   APU_MARKETS_AGENT,
   NOTION_AGENT,
+  NORA_AGENT,
+  LUNA_AGENT,
+  ZARA_AGENT,
+  VIKTOR_AGENT,
   // AMI_CALENDAR_AGENT  // REMOVED - consolidated into AMI_AGENT
 ] as const
 

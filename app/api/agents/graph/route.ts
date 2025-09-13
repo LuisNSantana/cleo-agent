@@ -13,28 +13,84 @@ export async function GET() {
     const orchestrator = getAgentOrchestrator()
     const executions = orchestrator.getAllExecutions()
 
-    // Create nodes for visualization
-    const nodes = agents.map((agent, index) => ({
-      id: agent.id,
-      type: 'agent',
-      position: {
-        x: (index % 2) * 300 + 100,
-        y: Math.floor(index / 2) * 200 + 100
-      },
-      data: {
-        label: agent.name,
-        agent,
-        status: 'pending',
-        executionCount: executions.filter(e => e.agentId === agent.id).length,
-        lastExecution: executions
-          .filter(e => e.agentId === agent.id)
-          .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0]?.startTime,
-        connections: [] as string[]
+    // Create nodes for visualization with hierarchical positioning
+    const nodes = agents.map((agent, index) => {
+      let position = { x: 100, y: 100 }
+      
+      // Hierarchical positioning
+      if (agent.id === 'cleo-supervisor') {
+        // Cleo at the top center
+        position = { x: 400, y: 50 }
+      } else if (agent.isSubAgent) {
+        // Sub-agents positioned below their parents
+        const parentIndex = agents.findIndex(a => a.id === agent.parentAgentId)
+        const subAgentIndex = agents.filter(a => 
+          a.isSubAgent && a.parentAgentId === agent.parentAgentId
+        ).findIndex(a => a.id === agent.id)
+        
+        position = {
+          x: 200 + (parentIndex * 200) + (subAgentIndex * 150),
+          y: 350
+        }
+      } else {
+        // Main agents in middle row
+        const mainAgentIndex = agents.filter(a => 
+          !a.isSubAgent && a.id !== 'cleo-supervisor'
+        ).findIndex(a => a.id === agent.id)
+        
+        position = {
+          x: 100 + (mainAgentIndex * 200),
+          y: 200
+        }
       }
-    }))
 
-    // Create edges for handoffs
+      return {
+        id: agent.id,
+        type: 'agent',
+        position,
+        data: {
+          label: agent.name,
+          agent,
+          status: 'pending',
+          executionCount: executions.filter(e => e.agentId === agent.id).length,
+          lastExecution: executions
+            .filter(e => e.agentId === agent.id)
+            .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0]?.startTime,
+          connections: [] as string[],
+          isSubAgent: agent.isSubAgent,
+          parentAgentId: agent.parentAgentId
+        }
+      }
+    })
+
+    // Create edges for handoffs and parent-child relationships
     const edges: any[] = []
+    
+    // First, create edges for parent-child relationships
+    agents.forEach(agent => {
+      if (agent.isSubAgent && agent.parentAgentId) {
+        const parentAgent = agents.find(a => a.id === agent.parentAgentId)
+        if (parentAgent) {
+          edges.push({
+            id: `parent_${agent.parentAgentId}_${agent.id}`,
+            source: agent.parentAgentId,
+            target: agent.id,
+            type: 'hierarchy',
+            animated: false,
+            label: 'Sub-agent',
+            style: { stroke: '#8B5CF6', strokeWidth: 2 },
+            data: {
+              type: 'parent-child',
+              messageCount: 0,
+              lastMessage: null,
+              errorCount: 0
+            }
+          })
+        }
+      }
+    })
+    
+    // Then, create edges for execution handoffs
     executions.forEach(execution => {
       for (let i = 0; i < (execution.messages || []).length - 1; i++) {
         const currentMessage = (execution.messages || [])[i]
@@ -49,19 +105,28 @@ export async function GET() {
             )
 
             if (targetAgent) {
-              edges.push({
-                id: `edge_${execution.id}_${i}`,
-                source: execution.agentId,
-                target: targetAgent.id,
-                type: 'handoff',
-                animated: true,
-                label: 'Handoff',
-                data: {
-                  messageCount: 1,
-                  lastMessage: nextMessage.timestamp,
-                  errorCount: 0
-                }
-              })
+              // Check if this edge already exists (avoid duplicates)
+              const existingEdge = edges.find(e => 
+                e.source === execution.agentId && e.target === targetAgent.id
+              )
+              
+              if (!existingEdge) {
+                edges.push({
+                  id: `handoff_${execution.id}_${i}`,
+                  source: execution.agentId,
+                  target: targetAgent.id,
+                  type: 'handoff',
+                  animated: true,
+                  label: 'Handoff',
+                  style: { stroke: '#10B981', strokeWidth: 1 },
+                  data: {
+                    type: 'execution',
+                    messageCount: 1,
+                    lastMessage: nextMessage.timestamp,
+                    errorCount: 0
+                  }
+                })
+              }
             }
           }
         }

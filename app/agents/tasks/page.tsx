@@ -199,7 +199,7 @@ export default function AgentsTasksPage() {
 
   const fetchAgents = async () => {
     try {
-      const res = await fetch('/api/agents')
+  const res = await fetch('/api/agents?includeSubAgents=1')
       const data = await res.json()
       if (Array.isArray(data.agents)) {
         setAgents(data.agents.map((a: any) => ({ 

@@ -3,6 +3,7 @@ import { defaultEmbeddingProvider } from './embeddings'
 import { defaultReranker } from './reranking'
 import { detectLanguage, type SupportedLanguage } from '@/lib/language-detection'
 import { translateQuery } from './translate'
+import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 
 export interface RetrieveOptions {
   userId: string
@@ -64,6 +65,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   const supabase = await createClient()
   if (!supabase) return []
+  const runtime = getRuntimeConfig()
 
   // Multilingual support: expand query if user/doc language likely differs
   const detected: SupportedLanguage = detectLanguage(query)
@@ -113,12 +115,13 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     }
 
     // Merge & dedupe by chunk_id, keep highest similarity
-    const dedupMap = new Map<string, RetrievedChunk>()
+  const dedupMap = new Map<string, RetrievedChunk>()
     for (const r of hybridResults) {
       const prev = dedupMap.get(r.chunk_id)
       if (!prev || (r.similarity > prev.similarity)) dedupMap.set(r.chunk_id, r)
     }
-    results = Array.from(dedupMap.values())
+  // Apply minimum hybrid score filter
+  results = Array.from(dedupMap.values()).filter(r => (r.hybrid_score ?? r.similarity ?? 0) >= runtime.ragMinHybridScore)
 
       // Keep only essential hybrid search logging
       if (results.length > 0) {
@@ -136,11 +139,13 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       // Use the original query for reranking to keep intent, but this already contains multilingual candidates
       const rerankResults = await defaultReranker.rerank(query, documents, { 
         topK: dynamicTopK, 
-        minScore: 0.1 
+        minScore: runtime.ragMinRerankScore
       })
       
       // Map reranked results back to chunks
-      const rerankedChunks = rerankResults.map(rr => {
+      const rerankedChunks = rerankResults
+        .filter(rr => rr.score >= runtime.ragMinRerankScore)
+        .map(rr => {
         const originalChunk = results[rr.index]
         return {
           ...originalChunk,

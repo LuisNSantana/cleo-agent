@@ -17,6 +17,8 @@ import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgents, getAgentById } from '../unified-config'
 import { getCurrentUserId } from '@/lib/server/request-context'
+import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
+import logger from '@/lib/utils/logger'
 
 // Helper function to emit browser events for UI updates
 function emitBrowserEvent(eventName: string, detail: any) {
@@ -88,6 +90,9 @@ export class AgentOrchestrator {
   private metricsCollector?: MetricsCollector
   private subAgentManager!: SubAgentManager
   private config: OrchestratorConfig
+  private runtime: RuntimeConfig
+  // Track executions that performed at least one delegation
+  private delegationsSeen: Set<string> = new Set()
 
   private graphs = new Map<string, StateGraph<AgentState>>()
   private activeExecutions = new Map<string, AgentExecution>()
@@ -110,6 +115,7 @@ export class AgentOrchestrator {
     }
 
     this.initializeModules()
+  this.runtime = getRuntimeConfig()
   }
 
   private initializeModules(): void {
@@ -169,13 +175,13 @@ export class AgentOrchestrator {
           legacyOrch.handleExecutionCompletion(execution)
         }
       } catch (error) {
-        console.warn('Failed to notify legacy orchestrator of completion:', error)
+  logger.warn('Failed to notify legacy orchestrator of completion:', error)
       }
     })
 
     this.eventEmitter.on('execution.failed', (execution: AgentExecution) => {
-      this.activeExecutions.delete(execution.id)
-      this.metricsCollector?.recordExecutionFailure(execution)
+  this.activeExecutions.delete(execution.id)
+  this.metricsCollector?.recordExecutionFailure(execution)
     })
 
     // Delegation events - handle multi-agent handoffs
@@ -188,6 +194,84 @@ export class AgentOrchestrator {
       this.addDelegationProgressStep(progressData)
     })
 
+    // Graph node lifecycle -> execution steps for graph UI
+    this.eventEmitter.on('node.entered', (data: any) => {
+      try {
+        const execId = ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
+        if (!execId) return
+        const exec = this.activeExecutions.get(execId)
+        if (!exec) return
+        if (!exec.steps) exec.steps = []
+        const action: any = data?.nodeId === 'router' ? 'routing' : 'analyzing'
+        exec.steps.push({
+          id: `node_enter_${data?.nodeId || 'unknown'}_${Date.now()}`,
+          timestamp: new Date(),
+          agent: data?.agentId || exec.agentId,
+          action,
+          content: `Entered node ${String(data?.nodeId || 'unknown')}`,
+          progress: 0,
+          metadata: { nodeId: data?.nodeId, stage: 'entered' }
+        } as any)
+
+        // Mirror step to parent execution if present (quick exec UI watches parent)
+        const parentId = data?.state?.metadata?.parentExecutionId
+        if (parentId && parentId !== execId) {
+          const parentExec = this.activeExecutions.get(parentId)
+          if (parentExec) {
+            if (!parentExec.steps) parentExec.steps = []
+            parentExec.steps.push({
+              id: `node_enter_mirror_${data?.nodeId || 'unknown'}_${Date.now()}`,
+              timestamp: new Date(),
+              agent: data?.agentId || exec.agentId,
+              action,
+              content: `(${exec.agentId}) entered ${String(data?.nodeId || 'unknown')}`,
+              progress: 0,
+              metadata: { nodeId: data?.nodeId, stage: 'entered', mirroredFrom: execId }
+            } as any)
+          }
+        }
+      } catch {}
+    })
+
+    this.eventEmitter.on('node.completed', (data: any) => {
+      try {
+        const execId = ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
+        if (!execId) return
+        const exec = this.activeExecutions.get(execId)
+        if (!exec) return
+        if (!exec.steps) exec.steps = []
+        const isFinalize = data?.nodeId === 'finalize'
+        const action: any = isFinalize ? 'completing' : 'responding'
+        exec.steps.push({
+          id: `node_complete_${data?.nodeId || 'unknown'}_${Date.now()}`,
+          timestamp: new Date(),
+          agent: data?.agentId || exec.agentId,
+          action,
+          content: `Completed node ${String(data?.nodeId || 'unknown')}`,
+          progress: isFinalize ? 100 : 75,
+          metadata: { nodeId: data?.nodeId, stage: 'completed' }
+        } as any)
+
+        // Mirror to parent if applicable
+        const parentId = data?.state?.metadata?.parentExecutionId
+        if (parentId && parentId !== execId) {
+          const parentExec = this.activeExecutions.get(parentId)
+          if (parentExec) {
+            if (!parentExec.steps) parentExec.steps = []
+            parentExec.steps.push({
+              id: `node_complete_mirror_${data?.nodeId || 'unknown'}_${Date.now()}`,
+              timestamp: new Date(),
+              agent: data?.agentId || exec.agentId,
+              action,
+              content: `(${exec.agentId}) completed ${String(data?.nodeId || 'unknown')}`,
+              progress: isFinalize ? 100 : 75,
+              metadata: { nodeId: data?.nodeId, stage: 'completed', mirroredFrom: execId }
+            } as any)
+          }
+        }
+      } catch {}
+    })
+
     // Memory management events
     if (this.memoryManager) {
       this.eventEmitter.on('messages.loaded', (context: ExecutionContext) => {
@@ -195,7 +279,7 @@ export class AgentOrchestrator {
       })
 
       this.eventEmitter.on('messages.compressed', (data: { threadId: string, originalCount: number, compressedCount: number }) => {
-        console.log(`[Memory] Compressed ${data.originalCount} to ${data.compressedCount} messages for thread ${data.threadId}`)
+        logger.debug('[Memory] Compressed messages', { threadId: data.threadId, original: data.originalCount, compressed: data.compressedCount })
       })
     }
   }
@@ -233,7 +317,14 @@ export class AgentOrchestrator {
   await this.subAgentManager.initialize()
 
   // Dynamically include sub-agent delegation tools for this agent (if any)
-  const subAgentTools = Object.keys(this.subAgentManager.getDelegationTools(agentConfig.id) || {})
+  // First, try cached tools; if empty, fetch sub-agents and build tools on the fly
+  let subAgentToolsMap = this.subAgentManager.getDelegationTools(agentConfig.id) || {}
+  if (Object.keys(subAgentToolsMap).length === 0) {
+    const subs = await this.subAgentManager.getSubAgents(agentConfig.id)
+    // getSubAgents will populate delegationTools internally
+    subAgentToolsMap = this.subAgentManager.getDelegationTools(agentConfig.id) || {}
+  }
+  const subAgentTools = Object.keys(subAgentToolsMap)
   const uniqueTools = Array.from(new Set([...(agentConfig.tools || []), ...subAgentTools]))
   const effectiveAgentConfig = { ...agentConfig, tools: uniqueTools }
 
@@ -273,6 +364,7 @@ export class AgentOrchestrator {
       input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
       result: undefined,
       messages: [],
+      steps: [],
       options,
       metrics: {
         totalTokens: 0,
@@ -341,13 +433,13 @@ export class AgentOrchestrator {
       
       // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
       setTimeout(() => {
-        this.activeExecutions.delete(execution.id)
-        console.log('🧹 [CLEANUP] Removed completed execution from memory:', execution.id)
+  this.activeExecutions.delete(execution.id)
+  logger.debug('🧹 [CLEANUP] Removed completed execution from memory:', execution.id)
       }, 60000) // 60 seconds
       
       return result as ExecutionResult
       } catch (error) {
-        console.error('🔍 [DEBUG] Core executeAgent - Error caught:', error)
+  logger.error('🔍 [DEBUG] Core executeAgent - Error caught:', error)
         await this.errorHandler.handleExecutionError(execution, error as Error)
         this.eventEmitter.emit('execution.failed', execution)
         throw error
@@ -394,7 +486,7 @@ export class AgentOrchestrator {
     execution.result = (result as ExecutionResult).content
     execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
 
-    // Emit completion for supervisor execution
+  // Emit completion for supervisor execution
     this.eventEmitter.emit('execution.completed', execution)
     
     // Emit browser event for UI updates when supervisor completes
@@ -406,6 +498,39 @@ export class AgentOrchestrator {
       threadId: execution.threadId
     })
     
+    // If no delegation occurred during this supervisor run, emit a clear UI signal
+    if (!this.delegationsSeen.has(execution.id)) {
+      // Add an explicit step to the execution timeline for visibility
+      if (!execution.steps) execution.steps = []
+      execution.steps.push({
+        id: `delegation_skipped_${Date.now()}`,
+        timestamp: new Date(),
+        agent: supervisorConfig.id,
+        action: 'delegating',
+        content: `${supervisorConfig.name} handled directly (no delegation)`,
+        progress: 100,
+        metadata: {
+          status: 'skipped',
+          stage: 'decision',
+          reason: 'direct_or_clarify'
+        }
+      } as any)
+
+      this.eventEmitter.emit('delegation.skipped', {
+        executionId: execution.id,
+        agentId: supervisorConfig.id,
+        reason: 'direct_or_clarify'
+      })
+      emitBrowserEvent('delegation-skipped', {
+        executionId: execution.id,
+        agentId: supervisorConfig.id,
+        reason: 'direct_or_clarify'
+      })
+    } else {
+      // Clear flag for next runs
+      this.delegationsSeen.delete(execution.id)
+    }
+
     // Clean up execution context for supervisor AFTER all delegations are complete
     if (this.executionManager?.cleanupExecutionContext) {
       this.executionManager.cleanupExecutionContext(execution.id)
@@ -512,7 +637,7 @@ export class AgentOrchestrator {
       
       return true
     } catch (error) {
-      console.error(`[Orchestrator] Failed to cancel execution ${executionId}:`, error)
+  logger.error(`[Orchestrator] Failed to cancel execution ${executionId}:`, error)
       return false
     }
   }
@@ -521,7 +646,7 @@ export class AgentOrchestrator {
    * Cleanup resources and shutdown gracefully
    */
   async shutdown(): Promise<void> {
-    console.log('[Orchestrator] Initiating shutdown...')
+  logger.info('[Orchestrator] Initiating shutdown...')
 
     // Cancel all active executions
     const activeExecutionIds = Array.from(this.activeExecutions.keys())
@@ -544,7 +669,7 @@ export class AgentOrchestrator {
 
     this.eventEmitter.removeAllListeners()
 
-    console.log('[Orchestrator] Shutdown complete')
+  logger.info('[Orchestrator] Shutdown complete')
   }
 
   /**
@@ -623,7 +748,8 @@ export class AgentOrchestrator {
     // Add delegation progress as execution step for client tracking
     if (progressData.sourceExecutionId) {
       const sourceExecution = this.activeExecutions.get(progressData.sourceExecutionId)
-      if (sourceExecution && sourceExecution.steps) {
+      if (sourceExecution) {
+        if (!sourceExecution.steps) sourceExecution.steps = []
         const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
         
         // Get agent metadata for display names
@@ -645,21 +771,21 @@ export class AgentOrchestrator {
             message: progressData.message
           }
         }
-        sourceExecution.steps.push(newStep)
+  sourceExecution.steps.push(newStep)
         
         // Keep only essential logs
-        if (process.env.NODE_ENV === 'development') {
-          console.log('📝 [DELEGATION] Progress step added:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
+        if (process.env.NODE_ENV !== 'production') {
+          logger.debug('📝 [DELEGATION] Progress step added:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
         }
       } else {
-        console.warn('❌ [ORCHESTRATOR] Could not find source execution or steps array:', {
+  logger.warn('❌ [ORCHESTRATOR] Could not find source execution or steps array:', {
           sourceExecutionId: progressData.sourceExecutionId,
           executionFound: !!sourceExecution,
-          stepsArrayExists: !!(sourceExecution?.steps)
+          hasStepsArray: Boolean(sourceExecution && (sourceExecution as any).steps)
         })
       }
     } else {
-      console.warn('❌ [ORCHESTRATOR] No sourceExecutionId in progress data:', progressData)
+  logger.warn('❌ [ORCHESTRATOR] No sourceExecutionId in progress data:', progressData)
     }
   }
 
@@ -668,7 +794,11 @@ export class AgentOrchestrator {
    */
   private async handleDelegation(delegationData: any): Promise<void> {
     try {
-      console.log(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
+      logger.info(`🔄 [DELEGATION] ${delegationData.sourceAgent} → ${delegationData.targetAgent}`)
+      // Mark that the source execution performed a delegation
+      if (delegationData.sourceExecutionId) {
+        this.delegationsSeen.add(delegationData.sourceExecutionId)
+      }
       
       // Add delegation step to original execution for UI tracking
       if (delegationData.sourceExecutionId) {
@@ -697,7 +827,7 @@ export class AgentOrchestrator {
           })
           
           if (process.env.NODE_ENV === 'development') {
-            console.log(`📝 [DELEGATION] Step added: ${sourceMetadata.name} → ${targetMetadata.name}`)
+            logger.debug(`📝 [DELEGATION] Step added: ${sourceMetadata.name} → ${targetMetadata.name}`)
           }
         }
       }
@@ -739,7 +869,7 @@ export class AgentOrchestrator {
         
         // Handle legacy agent ID mappings for backward compatibility
         if (!targetAgentConfig && delegationData.targetAgent === 'ami-assistant') {
-          console.log('🔄 [DELEGATION] Mapping legacy agent ID ami-assistant to ami-creative')
+          logger.debug('🔄 [DELEGATION] Mapping legacy agent ID ami-assistant to ami-creative')
           targetAgentConfig = allAgents.find(agent => agent.id === 'ami-creative')
           delegationData.targetAgent = 'ami-creative' // Update the reference
         }
@@ -750,7 +880,7 @@ export class AgentOrchestrator {
       }
       
       if (!targetAgentConfig) {
-        console.error(`❌ [DELEGATION] Target agent not found: ${delegationData.targetAgent}`)
+        logger.error(`❌ [DELEGATION] Target agent not found: ${delegationData.targetAgent}`)
         this.eventEmitter.emit('delegation.failed', {
           sourceAgent: delegationData.sourceAgent,
           targetAgent: delegationData.targetAgent,
@@ -759,7 +889,7 @@ export class AgentOrchestrator {
         return
       }
       
-      console.log(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
+      logger.debug(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
       
       // Add progress step: agent found and accepted
       if (delegationData.sourceExecutionId) {
@@ -816,7 +946,7 @@ export class AgentOrchestrator {
       const contextUserId = getCurrentUserId()
       const preferredUserId = [delegationData.userId, sourceUserId, contextUserId].find(id => isValidUuid(id))
 
-      console.log('👤 [DELEGATION] User resolution:', {
+  logger.debug('👤 [DELEGATION] User resolution:', {
         providedUserId: delegationData.userId,
         sourceUserId,
         contextUserId,
@@ -840,11 +970,13 @@ export class AgentOrchestrator {
           isDelegation: true,
           sourceAgent: delegationData.sourceAgent,
           delegationPriority: normalizedPriority,
-          isSubAgentDelegation: isSubAgent
+          isSubAgentDelegation: isSubAgent,
+          // Link delegated execution to its parent so UI can mirror steps
+          parentExecutionId: delegationData.sourceExecutionId
         }
       }
       
-      console.log(`🚀 [DELEGATION] Executing ${targetAgentConfig.name} with delegated task`)
+  logger.info(`🚀 [DELEGATION] Executing ${targetAgentConfig.name} with delegated task`)
       
       // Emit progress: starting execution
       this.eventEmitter.emit('delegation.progress', {
@@ -872,7 +1004,7 @@ export class AgentOrchestrator {
 
       if (isSubAgent && 'isSubAgent' in targetAgentConfig) {
         // Execute sub-agent as a real agent by mapping to AgentConfig
-        console.log(`📋 [SUB-AGENT] Delegating to sub-agent: ${targetAgentConfig.name}`)
+  logger.debug(`📋 [SUB-AGENT] Delegating to sub-agent: ${targetAgentConfig.name}`)
 
         // Add progress step: sub-agent analyzing
         if (delegationData.sourceExecutionId) {
@@ -989,7 +1121,7 @@ export class AgentOrchestrator {
           subAgentConfig,
           delegationContext,
           {
-            timeout: 90000, // 90 seconds timeout for sub-agents (was 30 seconds)
+            timeout: this.runtime.maxExecutionMsSpecialist,
             priority: normalizedPriority
           }
         )
@@ -1044,13 +1176,13 @@ export class AgentOrchestrator {
           targetAgentConfig as AgentConfig,
           delegationContext,
           {
-            timeout: 120000, // 2 minutes timeout for delegated tasks (was 30 seconds)
+            timeout: this.runtime.maxExecutionMsSupervisor,
             priority: normalizedPriority
           }
         )
       }
       
-      console.log(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
+  logger.info(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
       
       // Add progress step: delegation completing
       if (delegationData.sourceExecutionId) {
@@ -1146,12 +1278,12 @@ export class AgentOrchestrator {
 
       // CRITICAL FIX: Update the original execution with delegation result
       if (delegationData.sourceExecutionId) {
-        console.log('🔄 [DELEGATION] Looking for original execution:', delegationData.sourceExecutionId)
-        console.log('🔄 [DELEGATION] Active executions keys:', Array.from(this.activeExecutions.keys()))
+        logger.debug('🔄 [DELEGATION] Looking for original execution:', delegationData.sourceExecutionId)
+        logger.debug('🔄 [DELEGATION] Active executions keys:', Array.from(this.activeExecutions.keys()))
         
         const originalExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
         if (originalExecution) {
-          console.log('🔄 [DELEGATION] Found original execution, adding delegation result:', delegationData.sourceExecutionId)
+          logger.debug('🔄 [DELEGATION] Found original execution, adding delegation result:', delegationData.sourceExecutionId)
           
           // Add delegation result as a message to the execution (but DON'T mark as completed yet)
           const delegationMessage = {
@@ -1172,19 +1304,19 @@ export class AgentOrchestrator {
           originalExecution.metrics.executionTime += delegationResult.executionTime || 0
           originalExecution.metrics.tokensUsed += delegationResult.tokensUsed || 0
           
-          console.log('🔄 [DELEGATION] Delegation result added to original execution, keeping it active for more delegations')
+          logger.debug('🔄 [DELEGATION] Delegation result added to original execution, keeping it active for more delegations')
           
           // DO NOT mark as completed or remove from activeExecutions yet
           // The original agent (Cleo) may have more delegations to do
           // It will be completed when the agent's graph execution finishes
           
         } else {
-          console.warn('🔄 [DELEGATION] Original execution not found:', delegationData.sourceExecutionId)
+          logger.warn('🔄 [DELEGATION] Original execution not found:', delegationData.sourceExecutionId)
         }
       }
       
     } catch (error) {
-      console.error('❌ [DELEGATION] Error handling delegation:', error)
+      logger.error('❌ [DELEGATION] Error handling delegation:', error)
       this.eventEmitter.emit('delegation.failed', {
         sourceAgent: delegationData.sourceAgent,
         targetAgent: delegationData.targetAgent,

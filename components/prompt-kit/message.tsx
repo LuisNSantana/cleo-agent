@@ -49,6 +49,7 @@ export type MessageContentProps = {
   children: React.ReactNode
   markdown?: boolean
   className?: string
+  variant?: 'bubble' | 'plain'
 } & React.ComponentProps<typeof Markdown> &
   React.HTMLProps<HTMLDivElement>
 
@@ -56,12 +57,15 @@ const MessageContent = ({
   children,
   markdown = false,
   className,
+  variant = 'bubble',
   ...props
 }: MessageContentProps) => {
-  const classNames = cn(
-    "rounded-lg p-2 text-foreground bg-secondary prose break-words whitespace-normal",
-    className
-  )
+  const base =
+    variant === 'plain'
+      ? "prose dark:prose-invert break-words whitespace-normal"
+      : "rounded-lg p-2 text-foreground bg-secondary prose break-words whitespace-normal"
+
+  const classNames = cn(base, className)
 
   return markdown ? (
     <Markdown className={classNames} {...props}>

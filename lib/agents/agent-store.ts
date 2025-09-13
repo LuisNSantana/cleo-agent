@@ -15,7 +15,7 @@ import {
   AgentActivity,
   AgentStore as AgentStoreType
 } from './types'
-import { getAllAgentsSync as getAllAgents } from './unified-config'
+import { ALL_PREDEFINED_AGENTS } from './predefined'
 // import { getAgentOrchestrator } from './agent-orchestrator' // Moved to dynamic import
 
 interface AgentStoreState extends AgentStoreType {
@@ -55,7 +55,7 @@ export const useAgentStore = create<AgentStoreState>()(
     initializeAgents: async () => {
       try {
         // Get built-in agents
-        const builtInAgents = getAllAgents()
+  const builtInAgents = [...ALL_PREDEFINED_AGENTS]
         
         // Get runtime agents from orchestrator
   const { getAgentOrchestrator } = await import('./orchestrator-adapter')
@@ -74,7 +74,7 @@ export const useAgentStore = create<AgentStoreState>()(
       } catch (error) {
         console.error('Error initializing agents:', error)
         // Fallback to built-in agents only
-        const agents = getAllAgents()
+  const agents = [...ALL_PREDEFINED_AGENTS]
         set({ agents })
         get().updateGraphData()
       }
@@ -256,7 +256,7 @@ export const useAgentStore = create<AgentStoreState>()(
         console.log(`📋 Server agents:`, result.agents)
 
         // Get built-in agents
-        const builtInAgents = getAllAgents()
+  const builtInAgents = [...ALL_PREDEFINED_AGENTS]
         
         // Get runtime agents from server response
         const runtimeAgents = result.agents?.filter((config: AgentConfig) => {

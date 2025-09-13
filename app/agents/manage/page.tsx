@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
 import { ShopifyCredentialsManager, SkyvernCredentialsManager, NotionCredentialsManager } from '@/components/common/CredentialsManager'
+import { TwitterCredentialsManager } from '@/components/twitter/twitter-credentials-manager'
 import dynamic from 'next/dynamic'
 const SerpapiCredentialsManager = dynamic(()=>import('@/components/serpapi/serpapi-credentials-manager').then(m=>m.SerpapiCredentialsManager), { ssr:false })
 import { useClientAgentStore } from '@/lib/agents/client-store'
@@ -17,7 +18,7 @@ export default function AgentsManagePage() {
     addAgent,
     updateAgent,
     deleteAgent,
-    syncAgents
+  syncAgents
   } = useClientAgentStore()
 
   return (
@@ -37,7 +38,7 @@ export default function AgentsManagePage() {
         // Ensure we only send UUIDs for parentAgentId
         const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
         const parentAgentId = isUUID((agent as any).parentAgentId) ? (agent as any).parentAgentId : undefined
-                const res = await fetch('/api/agents', {
+                const res = await fetch('/api/agents?includeSubAgents=1', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   credentials: 'same-origin',
@@ -75,6 +76,14 @@ export default function AgentsManagePage() {
           isSubAgent: data.agent.isSubAgent,
           parentAgentId: data.agent.parentAgentId || ''
                   })
+                  // Auto-sync to ensure any server-side derived fields are reflected (and other tabs updated)
+                  try {
+                    await syncAgents()
+                    toast({ title: 'Agente creado', description: 'Se sincronizó tu lista de agentes.', status: 'success' })
+                  } catch (_) {
+                    // If sync fails silently, at least show success for creation
+                    toast({ title: 'Agente creado', description: 'El agente fue creado. (Sincronización diferida)', status: 'success' })
+                  }
                 }
               } catch (e) {
                 console.error('Create agent failed:', e)
@@ -93,6 +102,11 @@ export default function AgentsManagePage() {
                   icon: agent.icon || '🤖',
                   tags: agent.tags || []
                 })
+                // Attempt a best-effort sync for visibility
+                try {
+                  await syncAgents()
+                } catch {}
+                toast({ title: 'Agente creado localmente', description: 'No se pudo confirmar en el servidor. Revisa tu conexión.', status: 'warning' })
               }
             }}
             onUpdateAgent={async (id, updatedAgent) => {
@@ -188,6 +202,9 @@ export default function AgentsManagePage() {
 
             {/* Notion Credentials for Workspace Management */}
             <NotionCredentialsManager />
+
+            {/* Twitter Credentials for Nora */}
+            <TwitterCredentialsManager />
           </div>
         </motion.div>
 

@@ -292,23 +292,154 @@ export const marketNewsTool = tool({
 		gl: z.string().optional(),
 		num: z.number().min(1).max(10).default(6)
 	}),
-	execute: async ({ symbol, tbs, hl, gl, num }) => {
+		execute: async ({ symbol, tbs, hl, gl, num }) => {
 		const userId = getCurrentUserId()
 		const key = await resolveSerpapiKey(userId)
 		if (!key) return { error: 'No SerpAPI key configured.' }
 		checkLimit(userId || 'anon')
 		try {
 			const q = `${symbol} stock`
-			const json = await serpFetch({ engine: 'google_news', q, hl, gl, num, tbs }, key)
-			const articles = (json.articles || []).slice(0, num).map((a: any) => ({
-				title: a.title,
-				link: a.link,
-				source: a.source,
-				date: a.date,
-				snippet: a.snippet
-			}))
-			return { symbol, query: q, articles, engine: 'google_news' }
-		} catch (e) { return { error: e instanceof Error ? e.message : 'Unknown error' } }
+				// Primary: Google News
+				try {
+					const json = await serpFetch({ engine: 'google_news', q, hl, gl, num, tbs }, key)
+					const articles = (json.articles || []).slice(0, num).map((a: any) => ({
+						title: a.title,
+						link: a.link,
+						source: a.source,
+						date: a.date,
+						snippet: a.snippet
+					}))
+					if (articles.length > 0) return { symbol, query: q, articles, engine: 'google_news' }
+				} catch (err) {
+					// Proceed to fallback
+				}
+				// Fallback: General Google search restricted to news-y sources
+				const altQ = `${symbol} stock site:reuters.com OR site:bloomberg.com OR site:cnbc.com OR site:finance.yahoo.com`
+				const count = Math.min(10, Math.max(5, typeof num === 'number' ? num : 6))
+				const gjson = await serpFetch({ engine: 'google', q: altQ, hl, gl, num: count }, key)
+				const organic = normalizeOrganic(gjson.organic_results)
+				const articles = organic.slice(0, num).map((r: any) => ({
+					title: r.title,
+					link: r.link,
+					source: (r.link || '').split('/')[2] || 'source',
+					date: undefined,
+					snippet: r.snippet
+				}))
+				return { symbol, query: altQ, articles, engine: 'google (fallback)' }
+			} catch (e) { return { error: e instanceof Error ? e.message : 'Unknown error' } }
+	}
+})
+
+// GOOGLE TRENDS SEARCH -----------------------------------------------------
+export const serpTrendsSearchTool = tool({
+	description: 'SerpAPI Google Trends search for trending topics, interest over time, and related queries.',
+	inputSchema: z.object({
+		q: z.string().min(1).max(200).describe('Search query or topic to analyze trends for'),
+		geo: z.string().optional().describe('Geographic location (e.g., "US", "ES", "US-CA", "worldwide")'),
+		date: z.string().optional().describe('Date range (e.g., "today 12-m", "today 5-y", "2023-01-01 2023-12-31")'),
+		cat: z.string().optional().describe('Category ID (e.g., "0" for all, "3" for business, "7" for health)'),
+		data_type: z.enum(['TIMESERIES', 'GEO_MAP', 'RELATED_TOPICS', 'RELATED_QUERIES']).default('TIMESERIES').describe('Type of trends data to retrieve')
+	}),
+	execute: async (input) => {
+		const userId = getCurrentUserId()
+		const key = await resolveSerpapiKey(userId)
+		if (!key) return { error: 'No SerpAPI key configured.' }
+		
+		const cacheKey = `trends:${JSON.stringify(input)}:${userId || 'anon'}`
+		const cached = getCache(cacheKey)
+		if (cached) return { ...cached, cached: true }
+		
+		checkLimit(userId || 'anon')
+		
+		try {
+			const json = await serpFetch({ 
+				engine: 'google_trends', 
+				q: input.q,
+				geo: input.geo,
+				date: input.date,
+				cat: input.cat,
+				data_type: input.data_type
+			}, key)
+			
+			let result: any = { query: input.q, data_type: input.data_type, engine: 'google_trends' }
+			
+			// Parse different types of trends data
+			if (input.data_type === 'TIMESERIES' && json.interest_over_time) {
+				result.interest_over_time = json.interest_over_time.timeline_data
+			} else if (input.data_type === 'RELATED_TOPICS' && json.related_topics) {
+				result.related_topics = {
+					rising: json.related_topics.rising?.map((t: any) => ({ topic: t.topic?.title, value: t.value })) || [],
+					top: json.related_topics.top?.map((t: any) => ({ topic: t.topic?.title, value: t.value })) || []
+				}
+			} else if (input.data_type === 'RELATED_QUERIES' && json.related_queries) {
+				result.related_queries = {
+					rising: json.related_queries.rising?.map((q: any) => ({ query: q.query, value: q.value })) || [],
+					top: json.related_queries.top?.map((q: any) => ({ query: q.query, value: q.value })) || []
+				}
+			} else if (input.data_type === 'GEO_MAP' && json.interest_by_region) {
+				result.interest_by_region = json.interest_by_region
+			}
+			
+			setCache(cacheKey, result, 300_000) // 5 minute cache for trends
+			return result
+		} catch (e) { 
+			return { error: e instanceof Error ? e.message : 'Unknown error' } 
+		}
+	}
+})
+
+// TRENDING NOW SEARCH ------------------------------------------------------
+export const serpTrendingNowTool = tool({
+	description: 'SerpAPI Google Trends Trending Now - get current trending search queries and topics.',
+	inputSchema: z.object({
+		geo: z.string().default('US').describe('Geographic location (e.g., "US", "ES", "GB", "worldwide")'),
+		hl: z.string().default('en').describe('Language code (e.g., "en", "es", "fr")')
+	}),
+	execute: async (input) => {
+		const userId = getCurrentUserId()
+		const key = await resolveSerpapiKey(userId)
+		if (!key) return { error: 'No SerpAPI key configured.' }
+		
+		const cacheKey = `trending_now:${JSON.stringify(input)}:${userId || 'anon'}`
+		const cached = getCache(cacheKey)
+		if (cached) return { ...cached, cached: true }
+		
+		checkLimit(userId || 'anon')
+		
+		try {
+			const json = await serpFetch({ 
+				engine: 'google_trends_trending_now',
+				geo: input.geo,
+				hl: input.hl
+			}, key)
+			
+			const trending = {
+				geo: input.geo,
+				language: input.hl,
+				trending_searches: json.trending_searches?.map((search: any) => ({
+					query: search.query?.query,
+					formattedTraffic: search.formattedTraffic,
+					relatedQueries: search.relatedQueries?.map((rq: any) => rq.query),
+					image: search.image?.imageUrl,
+					news: search.articles?.map((article: any) => ({
+						title: article.title,
+						url: article.url,
+						source: article.source,
+						time: article.timeAgo
+					}))
+				})) || [],
+				realtime_searches: json.realtime_searches?.map((search: any) => ({
+					query: search.query?.query,
+					formattedTraffic: search.formattedTraffic,
+					relatedQueries: search.relatedQueries?.map((rq: any) => rq.query)
+				})) || []
+			}
+			
+			setCache(cacheKey, trending, 180_000) // 3 minute cache for trending now
+			return trending
+		} catch (e) { 
+			return { error: e instanceof Error ? e.message : 'Unknown error' } 
+		}
 	}
 })
 
@@ -320,6 +451,9 @@ export const serpapiTools = {
 	serpAutocomplete: serpAutocompleteTool,
 	serpLocationSearch: serpLocationSearchTool,
 	serpRaw: serpRawTool,
+	// Trends
+	serpTrendsSearch: serpTrendsSearchTool,
+	serpTrendingNow: serpTrendingNowTool,
 	// Markets
 	stockQuote: stockQuoteTool,
 	marketNews: marketNewsTool

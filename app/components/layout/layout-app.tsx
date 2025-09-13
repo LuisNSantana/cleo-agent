@@ -5,7 +5,7 @@ import { AppSidebar } from "@/app/components/layout/sidebar/app-sidebar"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useCanvasEditorStore } from "@/lib/canvas-editor/store"
 import { CanvasEditorShell } from "@/components/canvas-editor/canvas-editor-shell"
-import { VideoBackground } from "@/app/components/ui/video-background"
+import { ChatBackground } from "@/app/components/ui/chat-background"
 import { useState, useEffect, useCallback } from "react"
 import { PencilSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
@@ -104,9 +104,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="bg-background flex h-dvh w-full overflow-hidden relative">
-      {/* Mobile-only video background */}
+      {/* Mobile-only static premium background (no video) */}
       <div className="block md:hidden">
-        <VideoBackground src="/cleo_agent_video.mp4" overlayOpacity={0.7} />
+        <ChatBackground overlayOpacity={0.9} />
       </div>
       {/* Foreground app chrome */}
       {hasSidebar && (

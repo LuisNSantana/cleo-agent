@@ -12,7 +12,6 @@ import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { Info } from "@phosphor-icons/react"
 import Link from "next/link"
-import { DialogPublish } from "./dialog-publish"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { ThemeToggle } from "./theme-toggle"
 import { NotificationBell } from "@/components/notifications/notification-bell"
@@ -68,7 +67,24 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
             </div>
           ) : (
             <div className="pointer-events-auto flex flex-1 items-center justify-end gap-2">
-              {!isMultiModelEnabled && <DialogPublish />}
+              {/* Agent Control - minimal premium icon */}
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                className="agent-cta pulse-init relative h-8 w-8 rounded-full overflow-hidden bg-background hover:bg-muted text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10"
+              >
+                <Link href="/agents" aria-label="Agent Control Center" title="Agent Control Center" className="group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/icons/ai-agents.png"
+                    alt="Agent Control Center"
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 opacity-90 transition-opacity group-hover:opacity-100"
+                  />
+                </Link>
+              </Button>
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
               <NotificationBell />
@@ -85,14 +101,64 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           will-change: transform, opacity;
           display: inline-block;
         }
+        /* Minimal subtle glow on hover/focus for importance */
+        .agent-cta::before {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border-radius: 9999px;
+          background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0.14), transparent 70%);
+          opacity: 0;
+          z-index: 1;
+          pointer-events: none;
+          transition: opacity 200ms ease;
+        }
+        .agent-cta:hover::before, .agent-cta:focus-visible::before { opacity: .55; }
+        /* Limited pulse animation */
+        .agent-cta.pulse-init::before {
+          animation: agent-pulse 2200ms ease-out 0ms 3;
+        }
+        .agent-cta:hover::before { animation-play-state: paused; }
+        /* Shiny sweep effect (Apple-like) */
+        .agent-cta::after {
+          content: "";
+          position: absolute;
+          top: -10%;
+          bottom: -10%;
+          left: -35%;
+          width: 40%;
+          border-radius: 9999px;
+          background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
+          transform: skewX(-22deg) translateX(-140%);
+          opacity: 0;
+          filter: blur(0.5px);
+          z-index: 2;
+          pointer-events: none;
+          transition: transform 700ms cubic-bezier(.2,.6,.2,1), opacity 240ms ease;
+        }
+        .agent-cta:hover::after, .agent-cta:focus-visible::after {
+          opacity: .7;
+          transform: skewX(-22deg) translateX(220%);
+        }
+        /* Icon polish on hover */
+        .agent-cta:hover img, .agent-cta:focus-visible img { filter: brightness(1.15) saturate(1.05); transform: scale(1.02); }
+        .agent-cta img { transition: opacity 200ms ease, filter 200ms ease, transform 140ms ease; }
         @keyframes brand-pop-in {
           0% { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(2px); }
           40% { opacity: 1; transform: translateY(-6px) scale(1.03); filter: blur(0); }
           70% { transform: translateY(3px) scale(0.998); }
           100% { transform: translateY(0) scale(1); }
         }
+        @keyframes agent-pulse {
+          0% { opacity: .0; box-shadow: 0 0 0 0 rgba(255,255,255,0.22); }
+          45% { opacity: .28; box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+          100% { opacity: 0; box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+        }
         @media (prefers-reduced-motion: reduce) {
           .brand-text { animation: none; opacity: 1; transform: none; }
+          .agent-cta::before { display: none; }
+          .agent-cta::after { display: none; }
+          .agent-cta.pulse-init::before { animation: none; }
         }
       `}</style>
     </header>

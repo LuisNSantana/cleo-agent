@@ -450,7 +450,12 @@ function SingleToolCard({
 
     // Handle string results
     if (typeof parsedResult === "string") {
-      return <div className="whitespace-pre-wrap">{parsedResult}</div>
+      const cleaned = parsedResult
+        .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '')
+        .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/g, '')
+        .replace(/<parameters?>[\s\S]*?<\/parameters?>/g, '')
+        .trim()
+      return <div className="whitespace-pre-wrap">{cleaned}</div>
     }
 
     // Fallback
@@ -473,14 +478,28 @@ function SingleToolCard({
         className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-          {delegationAgentId ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={getAgentMetadata(delegationAgentId).avatar || ''}
-              alt={getAgentMetadata(delegationAgentId).name}
-              className="ring-border/60 hidden h-6 w-6 rounded-full ring sm:inline"
-            />
-          ) : null}
+          {delegationAgentId ? (() => {
+            const meta = getAgentMetadata(delegationAgentId)
+            if (meta.avatar) {
+              // eslint-disable-next-line @next/next/no-img-element
+              return (
+                <img
+                  src={meta.avatar}
+                  alt={meta.name}
+                  className="ring-border/60 hidden h-6 w-6 rounded-full ring sm:inline"
+                />
+              )
+            }
+            return (
+              <div
+                className="ring-border/60 hidden h-6 w-6 select-none items-center justify-center rounded-full ring sm:inline"
+                aria-label={meta.name}
+                title={meta.name}
+              >
+                <span className="text-base leading-6">{meta.emoji || '🤖'}</span>
+              </div>
+            )
+          })() : null}
           {(() => {
             const ToolIcon = getToolIcon(toolName)
             return <ToolIcon className="text-muted-foreground size-4" />

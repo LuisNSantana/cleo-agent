@@ -1,3 +1,5 @@
+"use client"
+
 import type { UIMessage as MessageType } from "ai"
 import type { Attachment } from "@/lib/file-handling"
 import React, { useState } from "react"
@@ -10,9 +12,9 @@ type MessageProps = {
   id: string
   attachments?: Attachment[]
   isLast?: boolean
-  onDelete: (id: string) => void
-  onEdit: (id: string, newText: string) => void
-  onReload: () => void
+  onDeleteAction: (id: string) => void
+  onEditAction: (id: string, newText: string) => void
+  onReloadAction: () => void
   hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
@@ -26,9 +28,9 @@ export function Message({
   id,
   attachments,
   isLast,
-  onDelete,
-  onEdit,
-  onReload,
+  onDeleteAction,
+  onEditAction,
+  onReloadAction,
   hasScrollAnchor,
   parts,
   status,
@@ -45,11 +47,11 @@ export function Message({
   if (variant === "user") {
     return (
       <MessageUser
-        copied={copied}
-        copyToClipboard={copyToClipboard}
-        onReload={onReload}
-        onEdit={onEdit}
-        onDelete={onDelete}
+  copied={copied}
+  copyToClipboardAction={copyToClipboard}
+  onReloadAction={onReloadAction}
+  onEditAction={onEditAction}
+  onDeleteAction={onDeleteAction}
         id={id}
         hasScrollAnchor={hasScrollAnchor}
         attachments={attachments}
@@ -63,9 +65,9 @@ export function Message({
   if (variant === "assistant") {
     return (
       <MessageAssistant
-        copied={copied}
-        copyToClipboard={copyToClipboard}
-        onReload={onReload}
+  copied={copied}
+  copyToClipboardAction={copyToClipboard}
+  onReloadAction={onReloadAction}
         isLast={isLast}
         hasScrollAnchor={hasScrollAnchor}
         parts={parts}

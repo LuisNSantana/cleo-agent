@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/lib/database.types'
 import { UnifiedAgent, transformDatabaseAgent, transformAgentConfig, transformToInsertAgent } from './unified-types'
-import { ALL_AGENTS } from './config'
+import { ALL_PREDEFINED_AGENTS } from './predefined'
 import { AgentConfig } from './types'
 
 export class UnifiedAgentService {
@@ -38,21 +38,20 @@ export class UnifiedAgentService {
 
       if (error) {
         console.error('Error fetching agents from database:', error)
-        // Fallback to default agents if database fails
-        return this.getDefaultAgentsForUser(userId)
+        // Fallback: return only user agents (none) on DB failure to avoid duplication
+        return []
       }
 
-      // If no agents found, create default agents for user
+      // If no agents found, return empty (do NOT seed predefined agents into DB)
       if (!dbAgents || dbAgents.length === 0) {
-        await this.createDefaultAgentsForUser(userId)
-        return this.getAllAgents(userId) // Recursive call to get newly created agents
+        return []
       }
 
       return dbAgents.map(transformDatabaseAgent)
     } catch (error) {
       console.error('Error in getAllAgents:', error)
-      // Fallback to default agents
-      return this.getDefaultAgentsForUser(userId)
+      // Fallback: return only user agents (none) to avoid duplication
+      return []
     }
   }
 
@@ -179,53 +178,20 @@ export class UnifiedAgentService {
   /**
    * Create default system agents for a new user
    */
-  private async createDefaultAgentsForUser(userId: string): Promise<void> {
-    try {
-      console.log(`Creating default agents for user: ${userId}`)
-      
-      const defaultAgents = ALL_AGENTS.map((agent: AgentConfig) => 
-        transformAgentConfig(agent, userId)
-      )
-
-      const insertData = defaultAgents.map(transformToInsertAgent)
-
-      const { error } = await this.supabase
-        .from('agents')
-        .insert(insertData)
-
-      if (error) {
-        console.error('Error creating default agents:', error)
-      } else {
-        console.log(`Successfully created ${defaultAgents.length} default agents for user ${userId}`)
-      }
-    } catch (error) {
-      console.error('Error in createDefaultAgentsForUser:', error)
-    }
-  }
+  // Removed default seeding to DB: predefined agents live only in code now
 
   /**
    * Get default agents as fallback
    */
   private getDefaultAgentsForUser(userId: string): UnifiedAgent[] {
-    return ALL_AGENTS.map((agent: AgentConfig) => transformAgentConfig(agent, userId))
+    // Retain as utility if needed elsewhere, but not used for DB fallback
+    return ALL_PREDEFINED_AGENTS.map((agent: AgentConfig) => transformAgentConfig(agent, userId))
   }
 
   /**
    * Ensure default agents exist for a user
    */
-  async ensureDefaultAgents(userId: string): Promise<void> {
-    const agents = await this.getAllAgents(userId)
-    
-    // Check if we have the core system agents
-    const hasSystemAgents = agents.some(agent => 
-      agent.id.includes('cleo-supervisor') || 
-      agent.role === 'supervisor'
-    )
-
-    if (!hasSystemAgents) {
-      await this.createDefaultAgentsForUser(userId)
-    }
-  }
+  // Removed ensureDefaultAgents: no longer seeding predefined agents into DB
 }
 
 // Singleton instance for server-side usage
@@ -264,7 +230,4 @@ export async function deleteAgentForUser(agentId: string, userId: string): Promi
   return service.deleteAgent(agentId, userId)
 }
 
-export async function ensureDefaultAgentsForUser(userId: string): Promise<void> {
-  const service = getUnifiedAgentService()
-  return service.ensureDefaultAgents(userId)
-}
+// ensureDefaultAgentsForUser removed: predefined agents are not seeded into DB anymore
