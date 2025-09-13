@@ -263,7 +263,7 @@ export function useChatCore({
       // Intentionally silenced in production to avoid leaking internal details
       if (process.env.NODE_ENV !== 'production') {
   // eslint-disable-next-line no-console
-  console.debug(`🎯 Frontend using prompt variant: ${promptVariant} for model: ${currentModelName}`)
+  // ...existing code...
       }
 
       // If the user has a custom system prompt, append it as an addendum instead of replacing

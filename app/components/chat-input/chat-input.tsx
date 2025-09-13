@@ -84,7 +84,7 @@ export function ChatInput({
       }
 
       const processCanvasMessage = async () => {
-        console.log('Procesando mensaje del canvas en chat-input:', pendingMessage)
+  // ...existing code...
         
         try {
           // Marcar como procesado inmediatamente y mostrar indicador
@@ -125,7 +125,7 @@ export function ChatInput({
           await new Promise(resolve => setTimeout(resolve, 250))
           
           // Verificar que los archivos se agregaron correctamente antes de enviar
-          console.log('Auto-sending canvas message:', messageText, 'Files ready for send')
+          // ...existing code...
           setIsProcessingCanvas(false)
           onSendAction()
           

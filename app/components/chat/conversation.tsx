@@ -34,26 +34,20 @@ export function Conversation({
   const messagePipelineSteps = useMemo(() => {
     const messageSteps: Map<string, PipelineStep[]> = new Map()
     
-    console.log(`📊 [FRONTEND DEBUG] Processing ${messages.length} messages for per-message pipeline steps`)
+  // ...existing code...
     
     messages.forEach((msg, msgIndex) => {
       if (!msg.parts || !Array.isArray(msg.parts)) return
       
       const steps: PipelineStep[] = []
-      console.log(`📝 [FRONTEND DEBUG] Message ${msgIndex} (${msg.role}) has ${msg.parts.length} parts`)
+  // ...existing code...
       
       msg.parts.forEach((part, partIndex) => {
         // Use any casting to handle custom execution-step type
         const anyPart = part as any
         if (anyPart && anyPart.type === 'execution-step' && anyPart.step) {
           const step = anyPart.step as PipelineStep
-          console.log(`🎯 [FRONTEND DEBUG] Found execution step in msg ${msgIndex}, part ${partIndex}:`, {
-            id: step.id,
-            agent: step.agent,
-            action: step.action,
-            content: step.content?.slice(0, 50),
-            metadata: step.metadata
-          })
+          // ...existing code...
           steps.push(step)
         }
       })
