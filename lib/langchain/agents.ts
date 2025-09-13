@@ -279,7 +279,7 @@ export class GroqAgent extends BaseAgent {
       const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
       const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools
       if (toolsEnabled) {
-        const runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
+        const runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
         const modelWithTools = (this.model as any).bindTools
           ? (this.model as any).bindTools(runtime.lcTools)
           : (this.model as any).bind({ tools: runtime.lcTools })
@@ -612,7 +612,7 @@ export class OllamaAgent extends BaseAgent {
       const toolInvocations: Array<{ toolCallId: string; toolName: string; args?: any; result?: any }> = []
       const toolsEnabled = Boolean((input.metadata as any)?.enableTools)
   if (toolsEnabled) {
-        const runtime = buildToolRuntime((input.metadata as any)?.allowedTools)
+    const runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
         const modelWithTools = (this.model as any).bindTools
           ? (this.model as any).bindTools(runtime.lcTools)
           : (this.model as any).bind({ tools: runtime.lcTools })

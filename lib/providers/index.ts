@@ -12,7 +12,9 @@ import OpenAI from "@/components/icons/openai"
 import OpenRouter from "@/components/icons/openrouter"
 import Preplexity from "@/components/icons/perplexity"
 import Xai from "@/components/icons/xai"
-import { BrainIcon, RocketLaunch, Scales } from "@phosphor-icons/react"
+import NvidiaIcon from "@/components/icons/nvidia"
+import QwenIcon from "@/components/icons/qwen"
+import { BrainIcon, RocketLaunchIcon, ScalesIcon } from "@phosphor-icons/react"
 /**
  * Provider definitions for Cleo Agent models
  * Maps model providers to their display names and icons
@@ -29,12 +31,12 @@ export const PROVIDERS: Provider[] = [
   {
     id: "faster",
     name: "Fast", 
-    icon: RocketLaunch,
+    icon: RocketLaunchIcon,
   },
   {
     id: "balanced",
     name: "Balanced",
-    icon: Scales,
+    icon: ScalesIcon,
   },
   {
     id: "smarter",
@@ -96,6 +98,16 @@ export const PROVIDERS: Provider[] = [
     id: "perplexity",
     name: "Perplexity",
     icon: Preplexity,
+  },
+  {
+    id: "nvidia",
+    name: "Nvidia",
+    icon: NvidiaIcon,
+  },
+  {
+    id: "qwen",
+    name: "Qwen",
+    icon: QwenIcon,
   },
   {
     id: "langchain",
