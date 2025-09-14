@@ -383,8 +383,18 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 					}
 				}
 				
+				// Get agent timeout based on type
+				const getAgentTimeout = (agentId: string): number => {
+					// Research agents get longer timeout  
+					if (agentId.includes('apu') || agentId.includes('research')) return 180_000 // 3 minutes
+					// Email and complex workflow agents 
+					if (agentId.includes('ami') || agentId.includes('astra') || agentId.includes('email')) return 150_000 // 2.5 minutes
+					// Standard agents
+					return 90_000 // 1.5 minutes
+				}
+				
 				const startedAt = Date.now()
-				const TIMEOUT_MS = 60_000 // Reduced timeout to 60 seconds
+				const TIMEOUT_MS = getAgentTimeout(agentId)
 				const POLL_MS = 600
 
 				let finalResult: string | null = null
@@ -407,11 +417,13 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				}
 
 				if (!finalResult) {
-					finalResult = 'Delegation timed out. Partial results may be available in the agent center.'
+					const timeoutMessage = `Task timed out after ${TIMEOUT_MS/1000}s (${agentId}). ` +
+						(status === 'running' ? 'Task may still be processing in background.' : `Status: ${status}`)
+					finalResult = timeoutMessage
 				}
 
 				// Determine status based on the result
-				const delegationStatus = finalResult.startsWith('Delegation failed:') || finalResult.startsWith('Delegation timed out') 
+				const delegationStatus = finalResult.startsWith('Delegation failed:') || finalResult.startsWith('Task timed out') 
 					? 'failed' 
 					: 'delegated'
 
@@ -427,7 +439,8 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 					agentId,
 					result: finalResult,
 					executionId: execId,
-					error: delegationStatus === 'failed' ? finalResult : undefined
+					error: delegationStatus === 'failed' ? finalResult : undefined,
+					partial: status === 'running' && finalResult.includes('timed out') // Mark as partial if still running
 				}
 			}
 		})

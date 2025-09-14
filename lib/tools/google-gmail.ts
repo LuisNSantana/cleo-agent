@@ -132,10 +132,10 @@ export const listGmailMessagesTool = tool({
   inputSchema: z.object({
     q: z.string().optional().describe('Gmail search query, e.g. "from:foo@bar.com is:unread newer_than:7d"'),
     labelIds: z.array(z.string()).optional().describe('Filter by label IDs (e.g., ["INBOX","UNREAD"])'),
-    maxResults: z.number().min(1).max(100).default(25).describe('Max messages to return (1-100). Default 25.'),
+    maxResults: z.number().min(1).max(20).default(10).describe('Max messages to return (1-20). Default 10.'),
     includeSpamTrash: z.boolean().optional().default(false),
   }),
-  execute: async ({ q, labelIds, maxResults = 25, includeSpamTrash = false }) => {
+  execute: async ({ q, labelIds, maxResults = 10, includeSpamTrash = false }) => {
   const userId = getCurrentUserId()
     try {
       const started = Date.now()
@@ -150,25 +150,32 @@ export const listGmailMessagesTool = tool({
       const list = await gmailRequest(token, `users/me/messages?${params}`)
       const ids: string[] = list.messages?.map((m: any) => m.id) ?? []
 
-      // Fetch metadata for each message (Subject, From, To, Date, Snippet)
+      // Fetch metadata for each message in parallel (max 10 concurrent)
       const results: any[] = []
-      for (const id of ids) {
-        try {
-          const msg = await gmailRequest(token, `users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`)
-          const headers = msg.payload?.headers ?? []
-          results.push({
-            id: msg.id,
-            threadId: msg.threadId,
-            from: getHeader(headers, 'From'),
-            to: getHeader(headers, 'To'),
-            subject: getHeader(headers, 'Subject') || '(No subject)',
-            date: getHeader(headers, 'Date'),
-            snippet: msg.snippet ?? '',
-            labelIds: msg.labelIds ?? [],
-          })
-        } catch (e) {
-          // Skip broken items
-        }
+      const chunkSize = 10
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize)
+        const promises = chunk.map(async (id) => {
+          try {
+            const msg = await gmailRequest(token, `users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`)
+            const headers = msg.payload?.headers ?? []
+            return {
+              id: msg.id,
+              threadId: msg.threadId,
+              from: getHeader(headers, 'From'),
+              to: getHeader(headers, 'To'),
+              subject: getHeader(headers, 'Subject') || '(No subject)',
+              date: getHeader(headers, 'Date'),
+              snippet: msg.snippet ?? '',
+              labelIds: msg.labelIds ?? [],
+            }
+          } catch (e) {
+            return null // Skip broken items
+          }
+        })
+        
+        const chunkResults = await Promise.all(promises)
+        results.push(...chunkResults.filter(r => r !== null))
       }
 
       const result = { success: true, message: `Found ${results.length} messages`, messages: results, total_count: results.length }

@@ -418,9 +418,9 @@ export class ModelRouter {
 
   private getDefaultRoute(): RoutingDecision {
     return {
-      selectedModel: 'groq:gpt-oss-120b',
-      reasoning: 'Default routing to cost-effective Groq GPT-OSS-120B model',
-      confidence: 0.7,
+      selectedModel: 'openrouter:z-ai/glm-4.5',
+      reasoning: 'Default routing to GLM 4.5 model for strong reasoning and reliable performance',
+      confidence: 0.8,
       fallbackModel: 'openai:gpt-4o-mini'
     }
   }

@@ -114,7 +114,7 @@ export function getRecommendedModel(requirements: {
   
   // For text-only tasks, optimize for speed/reasoning balance
   if (needsSpeed && budgetTier === 'free') {
-    return 'gpt-oss-120b' // Balanced tier - very fast via Groq
+    return 'groq:llama-3.3-70b-versatile' // Reliable fast model via Groq
   }
   
   if (needsReasoning && budgetTier === 'pro') {
@@ -122,15 +122,15 @@ export function getRecommendedModel(requirements: {
   }
   
   // Default recommendation
-  return budgetTier === 'free' ? 'claude-3-5-haiku-20241022' : 'gpt-5-mini-2025-08-07'
+  return budgetTier === 'free' ? 'openai:gpt-4o-mini' : 'gpt-5-mini-2025-08-07'
 }
 
 /**
  * Tier classification helpers
  */
 export function getModelTier(modelId: string): 'fast' | 'balanced' | 'smarter' | 'unknown' {
-  const fastModels = ['claude-3-5-haiku-20241022', 'grok-3-mini-fallback']
-  const balancedModels = ['gpt-oss-120b', 'mistral-large-latest-fallback']
+  const fastModels = ['claude-3-5-haiku-20241022', 'grok-3-mini-fallback', 'openai:gpt-4o-mini']
+  const balancedModels = ['groq:llama-3.3-70b-versatile', 'mistral-large-latest-fallback']
   const smarterModels = ['gpt-5-mini-2025-08-07', 'claude-3-5-sonnet-latest-fallback']
   
   if (fastModels.includes(modelId)) return 'fast'

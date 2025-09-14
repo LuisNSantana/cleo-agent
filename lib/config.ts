@@ -18,7 +18,7 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: Fast tier with vision support
   "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (primary)
-  "gpt-oss-120b", // Balanced - GPT-OSS 120B as default for guests (text-only)
+  "openrouter:z-ai/glm-4.5", // GLM 4.5 - Default for guests (strong reasoning & coding)
   "grok-3-mini-fallback", // Fast - Grok-3 Mini (fallback, text-only)
   "gpt-4o-mini", // Emergency fallback
   "langchain:fast",
@@ -47,8 +47,8 @@ export const FREE_MODELS_IDS = [
 // Default authenticated model: use Fast tier (best for most users)
 export const MODEL_DEFAULT = "claude-3-5-haiku-20241022"
 
-// Modelo predeterminado para invitados: Balanced text model for cost-effectiveness
-export const MODEL_DEFAULT_GUEST = "gpt-oss-120b"
+// Default guest model: GLM 4.5 for guests
+export const MODEL_DEFAULT_GUEST = "openrouter:z-ai/glm-4.5"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

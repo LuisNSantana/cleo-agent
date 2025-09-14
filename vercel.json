@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/*/route.ts": {
+      "maxDuration": 180
+    },
+    "app/api/*/*/route.ts": {
+      "maxDuration": 180
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
