@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/toast"
+import { fetchClient } from "@/lib/fetch"
 import { 
   CheckCircleIcon,
   LinkBreakIcon,
@@ -106,7 +107,7 @@ export function ServiceConnections() {
     )
 
     try {
-      const response = await fetch(`/api/connections/${serviceId}/connect`, {
+      const response = await fetchClient(`/api/connections/${serviceId}/connect`, {
         method: "POST"
       })
       
@@ -255,7 +256,7 @@ export function ServiceConnections() {
         )
       )
       
-      const response = await fetch(`/api/connections/${serviceId}/disconnect`, {
+      const response = await fetchClient(`/api/connections/${serviceId}/disconnect`, {
         method: "POST"
       })
       

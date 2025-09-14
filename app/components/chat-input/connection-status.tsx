@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
+import { fetchClient } from "@/lib/fetch"
 import { 
   CheckCircleIcon,
   LinkBreakIcon,
@@ -163,7 +164,7 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
     )
 
     try {
-      const response = await fetch(`/api/connections/${serviceId}/connect`, {
+      const response = await fetchClient(`/api/connections/${serviceId}/connect`, {
         method: "POST"
       })
       
