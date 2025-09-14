@@ -1,11 +1,9 @@
 {
   "functions": {
-    "app/api/*/route.ts": {
-      "maxDuration": 180
-    },
-    "app/api/*/*/route.ts": {
-      "maxDuration": 180
-    }
+    "app/api/*/route.ts": { "maxDuration": 300 },
+    "app/api/*/*/route.ts": { "maxDuration": 300 },
+    "app/api/*/*/*/route.ts": { "maxDuration": 300 },
+    "app/api/*/*/*/*/route.ts": { "maxDuration": 300 }
   },
   "rewrites": [
     {

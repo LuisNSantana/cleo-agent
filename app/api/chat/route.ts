@@ -31,7 +31,8 @@ import { createClient as createSupabaseServerClient } from '@/lib/supabase/serve
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
 export const runtime = "nodejs"
 
-export const maxDuration = 60
+// Increase max duration to avoid Vercel 60s timeouts during delegation, RAG, and tool-use
+export const maxDuration = 300
 
 export async function POST(req: Request) {
   try {
