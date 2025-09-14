@@ -25,9 +25,11 @@ export async function POST(req: NextRequest) {
       return new Response('Error: No message provided', { status: 400 })
     }
 
-    // Usar modelo fijo para guest
-    const guestModel = 'z-ai/glm-4.5'
-    const systemPrompt = getCleoPrompt('openrouter:z-ai/glm-4.5', 'guest')
+    // Modelo basado en entorno: GLM 4.5 para desarrollo, DeepSeek Free para producción
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+    const guestModel = isProduction ? 'deepseek/deepseek-chat-v3.1:free' : 'z-ai/glm-4.5'
+    const guestModelId = isProduction ? 'openrouter:deepseek/deepseek-chat-v3.1:free' : 'openrouter:z-ai/glm-4.5'
+    const systemPrompt = getCleoPrompt(guestModelId, 'guest')
 
     // Llamada directa a OpenRouter API
     const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {

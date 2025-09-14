@@ -790,6 +790,23 @@ export class AgentFactory {
         maxTokens: 32768,
         contextWindow: 131072
       },
+      'openrouter:deepseek/deepseek-chat-v3.1:free': {
+        id: 'openrouter:deepseek/deepseek-chat-v3.1:free',
+        name: 'DeepSeek Chat V3.1 Free',
+        provider: 'openrouter',
+        costPerToken: {
+          input: 0, // Free model
+          output: 0 // Free model
+        },
+        capabilities: {
+          text: true,
+          vision: false,
+          functionCalling: true,
+          reasoning: true
+        },
+        maxTokens: 8192,
+        contextWindow: 65536
+      },
       'openai:gpt-4o-mini': {
         id: 'openai:gpt-4o-mini',
         name: 'GPT-4o-mini',

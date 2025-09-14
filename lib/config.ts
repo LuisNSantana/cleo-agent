@@ -19,6 +19,7 @@ export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: Fast tier with vision support
   "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (primary)
   "openrouter:z-ai/glm-4.5", // GLM 4.5 - Default for guests (strong reasoning & coding)
+  "openrouter:deepseek/deepseek-chat-v3.1:free", // DeepSeek V3.1 Free - Production guest model
   "grok-3-mini-fallback", // Fast - Grok-3 Mini (fallback, text-only)
   "gpt-4o-mini", // Emergency fallback
   "langchain:fast",
@@ -35,6 +36,7 @@ export const FREE_MODELS_IDS = [
   "langchain:fast",
   // OpenRouter selected cost-effective models (for authenticated users)
   "openrouter:deepseek/deepseek-r1:free",
+  "openrouter:deepseek/deepseek-chat-v3.1:free", // Added for guest mode production
   "openrouter:qwen/qwen2.5-32b-instruct",
   // Added core provider models for authenticated users
   "mistral-large-latest",

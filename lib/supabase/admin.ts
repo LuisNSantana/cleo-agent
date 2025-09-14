@@ -24,7 +24,7 @@ export function getSupabaseAdmin() {
       }
     })
     
-    console.log('[SupabaseAdmin] Initialized admin client with service role key')
+    // Initialized admin client with service role key
   }
   
   return adminClient
