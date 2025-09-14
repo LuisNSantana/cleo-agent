@@ -94,10 +94,10 @@ const AGENT_PATTERNS: KeywordPatterns = {
     exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda', 'tweet', 'twitter', 'social media', 'post', 'hashtag', 'social']
   },
   'peter-google': {
-    primary: ['google', 'docs', 'sheets', 'drive', 'calendar', 'workspace', 'document', 'spreadsheet', 'gmail', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
+    primary: ['google', 'docs', 'sheets', 'drive', 'workspace', 'document', 'spreadsheet', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
     secondary: ['template', 'productivity', 'automation', 'workflow', 'organize', 'collaborate', 'permissions', 'share', 'invite', 'calendar invite', 'compartir', 'permisos'],
-    contextual: ['create a doc', 'share file', 'schedule meeting', 'track progress', 'organize data', 'create a sheet', 'build a form', 'send email via apps script'],
-    exclusions: ['shopify', 'ecommerce']
+    contextual: ['create a doc', 'share file', 'schedule meeting', 'track progress', 'organize data', 'create a sheet', 'build a form'],
+    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja']
   },
   'emma-ecommerce': {
     primary: [

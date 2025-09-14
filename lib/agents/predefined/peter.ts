@@ -1,10 +1,5 @@
 /**
- * P  id: 'peter-google',
-  name: 'Peter',
-  description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
-  role: 'specialist',
-  model: 'mistral-medium-3',
-  temperature: 0.3, Google Workspace & Productivity Specialist
+ * Peter – Google Workspace & Productivity Specialist
  * Expert in Google Docs, Sheets, Drive, Calendar and all Google productivity tools
  */
 
@@ -15,7 +10,7 @@ export const PETER_AGENT: AgentConfig = {
   name: 'Peter',
   description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
-  model: 'mistral-medium-3',
+  model: 'mistral-large-latest',
   temperature: 0.3,
   maxTokens: 32000,
   tools: [
