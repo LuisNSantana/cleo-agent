@@ -255,7 +255,7 @@ export function Chat() {
 
       <motion.div
         className={cn(
-          "fixed md:relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl bg-gradient-to-t from-background/80 to-transparent md:bg-transparent"
+          "fixed md:relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl pb-2 md:pb-0 bg-gradient-to-t from-background/80 to-transparent md:bg-transparent"
         )}
         layout="position"
         layoutId="chat-input-container"

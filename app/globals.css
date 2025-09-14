@@ -228,3 +228,8 @@ img {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
 }
+
+/* Scroll anchor for auto-scroll behavior */
+.min-h-scroll-anchor {
+  min-height: var(--spacing-scroll-anchor);
+}
