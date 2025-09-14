@@ -4,7 +4,7 @@ import { AgentsTopNav } from '@/app/agents/components/AgentsTopNav'
 
 export default function AgentsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex-1 w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="flex-1 w-full min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Sticky premium header */}
       <AgentsTopNav />
 

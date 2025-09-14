@@ -49,8 +49,8 @@ export const FREE_MODELS_IDS = [
 // Default authenticated model: use Fast tier (best for most users)
 export const MODEL_DEFAULT = "claude-3-5-haiku-20241022"
 
-// Default guest model: GLM 4.5 for guests
-export const MODEL_DEFAULT_GUEST = "openrouter:z-ai/glm-4.5"
+// MODELO POR DEFECTO PARA GUESTS - FORZADO A DEEPSEEK
+export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

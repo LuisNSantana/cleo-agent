@@ -63,9 +63,12 @@ export async function GET(
       case "google-drive":
       case "gmail":
       case "google-workspace":
+        console.log(`Processing Google OAuth for service: ${service}`)
         tokenData = await exchangeGoogleCode(code, service, baseUrl)
+        console.log('Google token exchange successful, fetching user info...')
         // Get Google user info with token
         accountInfo = await getGoogleUserInfo(tokenData.access_token)
+        console.log('Google user info retrieved successfully for:', accountInfo.email)
         break
       case "notion":
         tokenData = await exchangeNotionCode(code, baseUrl)
@@ -164,39 +167,53 @@ export async function GET(
 }
 
 async function exchangeGoogleCode(code: string, service: string, baseUrl: string): Promise<any> {
-  const redirectUri = `${baseUrl}/api/connections/${service}/callback`
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  
+  if (!clientId || !clientSecret) {
+    console.error('Missing Google OAuth credentials:', { 
+      hasClientId: !!clientId, 
+      hasClientSecret: !!clientSecret 
+    })
+    throw new Error('Google OAuth credentials not configured')
+  }
 
-  console.log('Exchanging Google code:', { service, redirectUri, codeLength: code.length })
+  const data = {
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri: `${baseUrl}/api/connections/${service}/callback`,
+  }
 
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
+  console.log('Exchanging Google code with data:', { 
+    ...data, 
+    client_secret: '[REDACTED]',
+    code: code.substring(0, 10) + '...'
+  })
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || "",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-    }),
+    body: new URLSearchParams(data),
   })
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('Google token exchange error:', response.status, errorText)
-    throw new Error(`Failed to exchange Google code for token: ${response.status} ${errorText}`)
+    console.error('Google token exchange failed:', response.status, errorText)
+    throw new Error(`Failed to exchange Google code: ${response.status} ${errorText}`)
   }
 
-  const tokenData = await response.json()
-  console.log('Google token exchange success:', { 
-    hasAccessToken: !!tokenData.access_token,
-    tokenType: tokenData.token_type,
-    scope: tokenData.scope,
-    accessTokenStart: tokenData.access_token ? tokenData.access_token.substring(0, 20) + '...' : 'none'
+  const result = await response.json()
+  console.log('Google token exchange successful:', { 
+    access_token_length: result.access_token?.length,
+    has_refresh_token: !!result.refresh_token,
+    expires_in: result.expires_in
   })
-
-  return tokenData
+  
+  return result
 }
 
 async function getGoogleUserInfo(accessToken: string): Promise<any> {
@@ -214,7 +231,19 @@ async function getGoogleUserInfo(accessToken: string): Promise<any> {
     throw new Error(`Failed to get Google user info: ${response.status} ${errorText}`)
   }
 
-  return response.json()
+  const contentType = response.headers.get('content-type')
+  if (!contentType || !contentType.includes('application/json')) {
+    const errorText = await response.text()
+    console.error('Google API returned non-JSON response:', { contentType, body: errorText.substring(0, 200) })
+    throw new Error(`Google API returned non-JSON response: ${contentType}`)
+  }
+
+  try {
+    return await response.json()
+  } catch (parseError) {
+    console.error('Failed to parse Google API response as JSON:', parseError)
+    throw new Error('Failed to parse Google API response')
+  }
 }
 
 async function exchangeNotionCode(code: string, baseUrl: string): Promise<any> {
