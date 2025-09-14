@@ -35,15 +35,18 @@ function numFromEnv(name: string, fallback: number): number {
 
 export function getRuntimeConfig(): RuntimeConfig {
   return {
-    delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 180_000), // 3 min
+    // Default delegation timeout set to 300s to match API route maxDuration
+    delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 300_000),
     delegationPollMs: intFromEnv('DELEGATION_POLL_MS', 750),
+    // Disable auto-extensions by default to avoid exceeding serverless function time limits
     delegationExtendOnProgressMs: intFromEnv('DELEGATION_EXTEND_ON_PROGRESS_MS', 60_000),
-    delegationMaxExtensionMs: intFromEnv('DELEGATION_MAX_EXTENSION_MS', 180_000),
+    delegationMaxExtensionMs: intFromEnv('DELEGATION_MAX_EXTENSION_MS', 0),
   progressMinDeltaPercent: intFromEnv('PROGRESS_MIN_DELTA', 5),
   noProgressNoExtendMs: intFromEnv('NO_PROGRESS_NO_EXTEND_MS', 60_000),
 
-    maxExecutionMsSpecialist: intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', 90_000),
-    maxExecutionMsSupervisor: intFromEnv('AGENT_SUPERVISOR_MAX_EXECUTION_MS', 180_000),
+    maxExecutionMsSpecialist: intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', 120_000),
+    // Supervisor may orchestrate delegations; allow up to 300s
+    maxExecutionMsSupervisor: intFromEnv('AGENT_SUPERVISOR_MAX_EXECUTION_MS', 300_000),
     maxToolCallsSpecialist: intFromEnv('AGENT_SPECIALIST_MAX_TOOL_CALLS', 8),
   maxToolCallsSupervisor: intFromEnv('AGENT_SUPERVISOR_MAX_TOOL_CALLS', 15),
 
