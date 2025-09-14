@@ -74,12 +74,13 @@ export class ModelRouter {
     // Respect explicit routing override if provided
     const fm = input.metadata?.forceModel
     if (fm) {
-      if (fm === 'local' || fm === 'ollama') {
+      // Removed Ollama/local forceModel for fast/balanced/default
+      if (fm === 'anthropic') {
         return {
-          selectedModel: 'ollama:llama3.1:8b',
-          reasoning: 'Forced local model via metadata.forceModel',
+          selectedModel: 'claude-3-5-haiku-latest',
+          reasoning: 'Forced Anthropic via metadata.forceModel',
           confidence: 1.0,
-          fallbackModel: 'groq:gpt-oss-120b'
+          fallbackModel: 'openai:gpt-4o-mini'
         }
       }
       if (fm === 'groq') {
@@ -203,7 +204,7 @@ export class ModelRouter {
 
   /**
    * Route for fast configuration
-   * Primary: groq:gpt-oss-120b, Backup: groq:llama-3.3-70b-versatile
+   * Primary: Anthropic Claude 3.5 Haiku, Fallback: OpenAI GPT-4o-mini
    */
   private routeFast(input: TaskInput): RoutingDecision {
     console.log('⚡ Routing with fast configuration')
@@ -217,18 +218,18 @@ export class ModelRouter {
         selectedModel: 'openai:gpt-4o-mini',
         reasoning: 'Fast: Vision task requires multimodal - using fastest multimodal model with full context support',
         confidence: 0.9,
-        fallbackModel: 'groq:llama-3.3-70b-versatile'
+        fallbackModel: 'claude-3-5-haiku-latest'
       }
     }
     
-    // All text/tool tasks prioritize speed with Groq GPT-OSS-120B - NO LOCAL ROUTING FOR FAST
+    // All text/tool tasks prioritize speed with Claude 3.5 Haiku; fallback to GPT-4o-mini
     return {
-      selectedModel: 'groq:gpt-oss-120b',
+      selectedModel: 'claude-3-5-haiku-latest',
       reasoning: hasTools 
-        ? 'Fast: Tool task routed to Groq GPT-OSS-120B for ultra-fast inference with full tool support and context'
-        : 'Fast: Task routed to Groq GPT-OSS-120B for ultra-fast inference with enhanced context support',
+        ? 'Fast: Tool task routed to Claude 3.5 Haiku for ultra-fast inference with strong tool-use behavior'
+        : 'Fast: Task routed to Claude 3.5 Haiku for ultra-fast, high-quality responses',
       confidence: 0.95,
-      fallbackModel: 'groq:llama-3.3-70b-versatile'
+      fallbackModel: 'openai:gpt-4o-mini'
     }
   }
 
@@ -236,17 +237,7 @@ export class ModelRouter {
    * Default routing (legacy support)
    */
   private routeDefault(input: TaskInput, taskType: TaskType): RoutingDecision {
-    // Optional: prefer local quick model for short text/tool tasks
-    const allowLocal = process.env.OLLAMA_ENABLE_ROUTING === 'true' || input.metadata?.preferLocal === true
-    const isShort = input.content.length < 240 && !this.isImageContent(input) && !this.isDocumentContent(input)
-    if (allowLocal && isShort) {
-      return {
-        selectedModel: 'ollama:llama3.1:8b',
-        reasoning: 'Short prompt routed to local Llama 3.1 8B for fast, capable tool-calls',
-        confidence: 0.8,
-        fallbackModel: 'groq:gpt-oss-120b'
-      }
-    }
+    // Removed Ollama from default routing. Always use Groq for short/fast tasks.
 
     // Route based on task type
     let decision: RoutingDecision
@@ -271,13 +262,15 @@ export class ModelRouter {
         decision = this.getDefaultRoute()
     }
 
+    // Log userId for debugging
+    const userId = input.metadata?.userId || 'guest-or-undefined'
     console.log('🎯 ModelRouter: Routing decision made:', {
       selectedModel: decision.selectedModel,
       reasoning: decision.reasoning,
       confidence: decision.confidence,
-      fallbackModel: decision.fallbackModel
+      fallbackModel: decision.fallbackModel,
+      userId
     })
-
     return decision
   }
 

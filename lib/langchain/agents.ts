@@ -705,9 +705,9 @@ export class AgentFactory {
       console.log('🚀 AgentFactory: Creating GroqAgent (Groq/OpenRouter)')
       return new GroqAgent(config)
     }
-    // Use OpenAIAgent for OpenAI and Google Gemini
-    if (['openai', 'google'].includes(config.provider)) {
-      console.log('🤖 AgentFactory: Creating OpenAIAgent (OpenAI/Google)')
+    // Use OpenAIAgent for OpenAI, Google Gemini, and Anthropic (handled via openproviders)
+    if (['openai', 'google', 'anthropic'].includes(config.provider)) {
+      console.log('🤖 AgentFactory: Creating OpenAIAgent (OpenAI/Google/Anthropic)')
       return new OpenAIAgent(config)
     }
     // Use OllamaAgent for Ollama
@@ -738,6 +738,23 @@ export class AgentFactory {
         },
         maxTokens: 4096,
         contextWindow: 32768
+      },
+      'claude-3-5-haiku-latest': {
+        id: 'claude-3-5-haiku-latest',
+        name: 'Claude 3.5 Haiku',
+        provider: 'anthropic',
+        costPerToken: {
+          input: 0.000000080, // $0.08 per 1M tokens (example)
+          output: 0.000000400  // $0.40 per 1M tokens (example)
+        },
+        capabilities: {
+          text: true,
+          vision: false,
+          functionCalling: true,
+          reasoning: true
+        },
+        maxTokens: 8192,
+        contextWindow: 200000
       },
       'groq:llama-3.3-70b-versatile': {
         id: 'groq:llama-3.3-70b-versatile',

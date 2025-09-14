@@ -28,7 +28,7 @@ export interface TaskInput {
   enableTools?: boolean
   allowedTools?: string[]
   // Routing controls
-  forceModel?: string | 'local' | 'ollama' | 'groq' | 'openai'
+  forceModel?: string | 'local' | 'ollama' | 'groq' | 'openai' | 'anthropic'
   preferLocal?: boolean
   maxLocalContext?: number
   // LangChain router type for optimized configurations
@@ -68,7 +68,7 @@ export interface TaskOutput {
 export interface ModelConfig {
   id: string
   name: string
-  provider: 'groq' | 'openai' | 'xai' | 'ollama'
+  provider: 'groq' | 'openai' | 'xai' | 'ollama' | 'anthropic' | 'google'
   costPerToken: {
     input: number
     output: number
