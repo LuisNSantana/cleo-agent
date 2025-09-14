@@ -242,8 +242,9 @@ export class NotionClient {
     return this.makeRequest('/pages', 'POST', pageData)
   }
 
-  async updatePage(pageId: string, properties: any) {
-    return this.makeRequest(`/pages/${pageId}`, 'PATCH', { properties })
+  async updatePage(pageId: string, updates: any) {
+    // Accept full update payload (properties, archived, icon, cover, etc.)
+    return this.makeRequest(`/pages/${pageId}`, 'PATCH', updates)
   }
 
   async getPageProperty(pageId: string, propertyId: string, pagination?: PaginationOptions) {

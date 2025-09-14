@@ -140,7 +140,24 @@ export const createNotionPageTool = tool({
         parent: {
           [params.parent_type]: params.parent_id
         },
-        properties: {
+        properties: {}
+      }
+
+      // Determine title property depending on parent type
+      if (params.parent_type === 'database_id') {
+        // Fetch database to detect the actual title property name
+        const db = await client.getDatabase(params.parent_id)
+        let titlePropName = 'Name'
+        if (db.success && db.data?.properties) {
+          // Find first property with type 'title'
+          for (const [propName, propDef] of Object.entries<any>(db.data.properties)) {
+            if (propDef?.type === 'title') { titlePropName = propName; break }
+          }
+        }
+        pageData.properties[titlePropName] = { title: [{ text: { content: params.title } }] }
+      } else {
+        // Page parent: use standard title property
+        pageData.properties = {
           title: {
             title: [{ text: { content: params.title } }]
           }

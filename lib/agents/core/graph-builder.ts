@@ -255,7 +255,8 @@ export class GraphBuilder {
             selectedTools: agentConfig.tools || [],
             executionId: state.metadata?.executionId
           })
-          const toolRuntime = buildToolRuntime(selectedTools)
+          // Pass model id to runtime to allow provider-specific adjustments (e.g., Gemini name sanitization)
+          const toolRuntime = buildToolRuntime(selectedTools, agentConfig.model)
         const model: any = (typeof (baseModel as any).bindTools === 'function')
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
@@ -582,7 +583,8 @@ export class GraphBuilder {
           selectedTools: agentConfig.tools || [],
           executionId: state.metadata?.executionId
         })
-        const toolRuntime = buildToolRuntime(selectedToolsLegacy)
+  // Pass model id here as well (legacy path)
+  const toolRuntime = buildToolRuntime(selectedToolsLegacy, agentConfig.model)
         const model: any = (typeof (baseModel as any).bindTools === 'function')
           ? (baseModel as any).bindTools(toolRuntime.lcTools)
           : baseModel
