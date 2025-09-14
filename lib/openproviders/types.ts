@@ -136,6 +136,8 @@ export type OpenRouterModel =
   | "openrouter:openai/o4-mini"
   | "openrouter:x-ai/grok-3-mini-beta"
   | "openrouter:qwen/qwen2.5-32b-instruct"
+  | "openrouter:z-ai/glm-4.5"
+  | "openrouter:deepseek/deepseek-chat-v3.1:free"
 
 // Static Ollama models for type safety
 export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"

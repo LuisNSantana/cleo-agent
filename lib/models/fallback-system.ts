@@ -10,6 +10,10 @@ import { allModelsWithFallbacks } from "@/lib/models/data/optimized-tiers"
 
 // Mapping of primary models to their fallbacks
 const modelFallbacks: Record<string, string> = {
+  // FREE TIER - DeepSeek V3.1 as primary for guests, Llama 3.3 as fallback
+  "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:meta-llama/llama-3.3-8b-instruct:free",
+  "openrouter:meta-llama/llama-3.3-8b-instruct:free": "gpt-4o-mini",
+  
   // FAST TIER - Claude 3.5 Haiku as primary, Grok-3 Mini as fallback
   "claude-3-5-haiku-20241022": "grok-3-mini",
   
@@ -100,8 +104,17 @@ export function getRecommendedModel(requirements: {
   needsSpeed?: boolean
   needsReasoning?: boolean
   budgetTier?: 'free' | 'pro'
+  isGuest?: boolean
 }): string {
-  const { needsVision = false, needsSpeed = false, needsReasoning = false, budgetTier = 'free' } = requirements
+  const { needsVision = false, needsSpeed = false, needsReasoning = false, budgetTier = 'free', isGuest = false } = requirements
+  
+  // For guests, always use free models
+  if (isGuest) {
+    if (needsVision) {
+      return 'claude-3-5-haiku-20241022' // Fast tier with vision (might need auth check)
+    }
+    return 'openrouter:deepseek/deepseek-chat-v3.1:free' // Primary free model for guests
+  }
   
   // If vision is required, prioritize models with vision capabilities
   if (needsVision) {
@@ -122,17 +135,19 @@ export function getRecommendedModel(requirements: {
   }
   
   // Default recommendation
-  return budgetTier === 'free' ? 'openai:gpt-4o-mini' : 'gpt-5-mini-2025-08-07'
+  return budgetTier === 'free' ? 'openrouter:deepseek/deepseek-chat-v3.1:free' : 'gpt-5-mini-2025-08-07'
 }
 
 /**
  * Tier classification helpers
  */
-export function getModelTier(modelId: string): 'fast' | 'balanced' | 'smarter' | 'unknown' {
+export function getModelTier(modelId: string): 'free' | 'fast' | 'balanced' | 'smarter' | 'unknown' {
+  const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:meta-llama/llama-3.3-8b-instruct:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free']
   const fastModels = ['claude-3-5-haiku-20241022', 'grok-3-mini-fallback', 'openai:gpt-4o-mini']
   const balancedModels = ['groq:llama-3.3-70b-versatile', 'mistral-large-latest-fallback']
   const smarterModels = ['gpt-5-mini-2025-08-07', 'claude-3-5-sonnet-latest-fallback']
   
+  if (freeModels.includes(modelId)) return 'free'
   if (fastModels.includes(modelId)) return 'fast'
   if (balancedModels.includes(modelId)) return 'balanced'
   if (smarterModels.includes(modelId)) return 'smarter'

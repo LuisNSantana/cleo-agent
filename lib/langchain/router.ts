@@ -55,6 +55,17 @@ export class ModelRouter {
       routerType: input.metadata?.routerType
     })
     
+    // Forzar GLM 4.5 para guest (sin userId ni isAuthenticated true)
+    const isGuest = !input.metadata?.userId && input.metadata?.isAuthenticated === false
+    if (isGuest) {
+      return {
+        selectedModel: 'openrouter:z-ai/glm-4.5',
+        reasoning: 'Guest mode: forzado a GLM 4.5 para máxima compatibilidad',
+        confidence: 1.0,
+        fallbackModel: 'openai:gpt-4o-mini'
+      }
+    }
+
     // Check for explicit router type from LangChain model selection
     const routerType = input.metadata?.routerType
     if (routerType) {

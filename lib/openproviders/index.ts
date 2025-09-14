@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI, google } from "@ai-sdk/google"
 import { createMistral, mistral } from "@ai-sdk/mistral"
 import { createPerplexity, perplexity } from "@ai-sdk/perplexity"
 import { createGroq, groq } from "@ai-sdk/groq"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import type { LanguageModel } from "ai"
 import { createXai, xai } from "@ai-sdk/xai"
 import { getProviderForModel, normalizeModelId } from "./provider-map"
@@ -17,6 +18,7 @@ import type {
   PerplexityModel,
   SupportedModel,
   XaiModel,
+  OpenRouterModel,
 } from "./types"
 
 // Simplify: current AI SDK factory helpers generally accept only modelId.
@@ -108,7 +110,14 @@ export function openproviders<T extends SupportedModel>(modelId: T, _settings?: 
 
   if (provider === "ollama") {
     const ollamaProvider = createOllamaProvider()
-  return ollamaProvider(normalized as OllamaModel)
+    return ollamaProvider(normalized as OllamaModel)
+  }
+
+  if (provider === "openrouter") {
+    const openrouterProvider = createOpenRouter({
+      apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+    })
+    return openrouterProvider.chat(normalized.replace('openrouter:', ''))
   }
 
   throw new Error(`Unsupported model: ${modelId}`)

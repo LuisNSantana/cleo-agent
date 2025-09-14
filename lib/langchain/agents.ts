@@ -722,6 +722,23 @@ export class AgentFactory {
   private static getModelConfig(modelId: string): ModelConfig {
     // This would normally come from your model configuration
     const configs: Record<string, ModelConfig> = {
+      'openrouter:z-ai/glm-4.5': {
+        id: 'openrouter:z-ai/glm-4.5',
+        name: 'GLM 4.5',
+        provider: 'openrouter',
+        costPerToken: {
+          input: 0.00000014, // $0.14 per 1M tokens
+          output: 0.00000086 // $0.86 per 1M tokens
+        },
+        capabilities: {
+          text: true,
+          vision: false,
+          functionCalling: true,
+          reasoning: true
+        },
+        maxTokens: 32768,
+        contextWindow: 131072
+      },
       'groq:gpt-oss-120b': {
         id: 'groq:gpt-oss-120b',
         name: 'GPT-OSS-120B',

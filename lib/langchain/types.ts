@@ -68,7 +68,7 @@ export interface TaskOutput {
 export interface ModelConfig {
   id: string
   name: string
-  provider: 'groq' | 'openai' | 'xai' | 'ollama' | 'anthropic' | 'google'
+  provider: 'groq' | 'openai' | 'xai' | 'ollama' | 'anthropic' | 'google' | 'openrouter'
   costPerToken: {
     input: number
     output: number

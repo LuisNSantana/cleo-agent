@@ -2,6 +2,12 @@ import type { Provider, SupportedModel } from "./types"
 
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
+  // OpenRouter models
+  "openrouter:z-ai/glm-4.5": "openrouter",
+  "z-ai/glm-4.5": "openrouter",
+  "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
+  "deepseek/deepseek-chat-v3.1:free": "openrouter",
+
   o1: "openai",
   "o1-2024-12-17": "openai",
   "o1-mini": "openai",

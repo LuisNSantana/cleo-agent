@@ -1,78 +1,109 @@
-import { NextResponse } from 'next/server'
-
-// Guest chat endpoint: forwards request to internal /api/multi-model-chat without
-// forwarding cookies or authorization. This avoids requiring a user session and
-// mirrors the minimal payload the client sends in guest mode.
-export const runtime = 'nodejs'
-
 import { NextRequest } from "next/server"
 import { getCleoPrompt } from "@/lib/prompts"
 
-// Guest chat endpoint: forwards request to internal /api/multi-model-chat without
-// delegation capabilities - guests can only chat directly with Cleo
+export const runtime = 'nodejs'
+
+// Implementación simple y directa para guest mode usando OpenRouter API
+// NO usa LangChain, agentes, pipeline, ni delegation - solo chat directo
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-
-    // The client may send a `messages` array (full chat) or a single `message`.
-    // Normalize to the shape expected by /api/multi-model-chat: { message, type, options, metadata }
-    let messageForForward: any = body.message
-    let typeForForward: string | undefined = body.type
-
+    
+    // Extraer el último mensaje del usuario
+    let userMessage = ''
+    
     if (Array.isArray(body.messages) && body.messages.length > 0) {
-      // Find last user message from messages array
-      const lastUser = [...body.messages].reverse().find((m: any) => m.role === 'user')
-      if (lastUser) {
-        // The chat client sends parts/experimental attachments; forward as-is
-        messageForForward = (lastUser.parts && lastUser.parts.length > 0) ? lastUser.parts : (lastUser.content || '')
-        // determine type based on whether it's an array (multimodal) or string
-        typeForForward = Array.isArray(messageForForward) ? 'multimodal' : 'text'
+      const lastUserMsg = [...body.messages].reverse().find((m: any) => m.role === 'user')
+      if (lastUserMsg) {
+        userMessage = lastUserMsg.content || ''
       }
+    } else if (body.message) {
+      userMessage = typeof body.message === 'string' ? body.message : (body.message.content || '')
     }
 
-    const payload = {
-      message: messageForForward,
-      type: typeForForward || 'text',
-      options: body.options || {},
-      metadata: {
-        chatId: body.chatId || body.metadata?.chatId,
-        userId: body.userId || body.metadata?.userId,
-        isAuthenticated: false,
-        systemPrompt: getCleoPrompt(body.model || 'langchain:fast', 'guest'), // Use guest-specific prompt
-        originalModel: body.model || body.metadata?.originalModel || body.model,
-        message_group_id: body.message_group_id || body.metadata?.message_group_id,
-        documentId: body.documentId || body.metadata?.documentId,
-        debugRag: body.debugRag || body.metadata?.debugRag,
-      },
+    if (!userMessage) {
+      return new Response('Error: No message provided', { status: 400 })
     }
 
-    // Guest mode: NEVER delegate to agents - always use direct Cleo conversation
-    // If user asks for delegation, Cleo will suggest them to sign in with Gmail
-    const endpointPath = '/api/multi-model-chat' // Always use direct chat, no delegation
-    const baseUrl = new URL(endpointPath, req.url)
-    try {
-      const host = baseUrl.hostname
-      if (host === 'localhost' || host === '127.0.0.1') {
-        baseUrl.protocol = 'http:'
-      }
-    } catch {}
-    const fRes = await fetch(baseUrl.toString(), {
+    // Usar modelo fijo para guest
+    const guestModel = 'z-ai/glm-4.5'
+    const systemPrompt = getCleoPrompt('openrouter:z-ai/glm-4.5', 'guest')
+
+    // Llamada directa a OpenRouter API
+    const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload), // Always use payload (no delegation) in guest mode
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'Cleo Chat Guest Mode'
+      },
+      body: JSON.stringify({
+        model: guestModel,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user', 
+            content: userMessage
+          }
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 2048
+      })
     })
 
-    const contentType = fRes.headers.get('Content-Type') || 'text/event-stream; charset=utf-8'
-    return new Response(fRes.body, {
-      status: fRes.status,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': fRes.headers.get('Cache-Control') || 'no-cache, no-transform',
-        Connection: fRes.headers.get('Connection') || 'keep-alive',
-      },
+    if (!openrouterResponse.ok) {
+      return new Response('Error communicating with AI service', { status: 500 })
+    }
+
+    // Crear stream de respuesta compatible con el cliente
+    const stream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk)
+        const lines = text.split('\n')
+        
+        for (const line of lines) {
+          if (line.trim().startsWith('data: ') && !line.includes('[DONE]')) {
+            try {
+              const jsonStr = line.slice(5).trim() // Remove "data:" prefix
+              if (jsonStr) {
+                const data = JSON.parse(jsonStr)
+                const content = data.choices?.[0]?.delta?.content
+                
+                if (content) {
+                  // El cliente espera texto plano que falle el JSON.parse 
+                  // para ser tratado como contenido directo
+                  const responseChunk = `data: ${content}\n\n`
+                  controller.enqueue(new TextEncoder().encode(responseChunk))
+                }
+              }
+            } catch (e) {
+              // Ignorar líneas mal formateadas
+            }
+          } else if (line.includes('[DONE]')) {
+            // Enviar señal de fin
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'))
+          }
+        }
+      }
     })
+
+    return new Response(openrouterResponse.body?.pipeThrough(stream), {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }
+    })
+
   } catch (err) {
-    console.error('[GuestChat] Failed to forward guest chat:', err)
-    return new Response(JSON.stringify({ error: 'Guest chat failed' }), { status: 500 })
+    return new Response('Internal server error', { status: 500 })
   }
 }
