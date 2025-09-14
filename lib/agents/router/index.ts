@@ -44,12 +44,25 @@ const EMAIL_COMPOSE_KEYWORDS = [
   'redacta un correo', 'redactar correo', 'escribe un correo', 'responder correo', 'responde correo', 'enviar correo', 'borrador de respuesta'
 ]
 
-// Google Workspace intents (Docs/Sheets/Drive/Calendar/Gmail/Meet/Slides)
+// General email mention keywords (route to Ami/Astra by default)
+const EMAIL_GENERAL_KEYWORDS = [
+  'email', 'gmail', 'correo', 'inbox', 'bandeja', 'mail'
+]
+
+// Google Workspace intents (Docs/Sheets/Drive/Meet/Slides)
 const GOOGLE_WORKSPACE_KEYWORDS = [
   // English
-  'google', 'docs', 'sheets', 'slides', 'drive', 'calendar', 'gmail', 'meet', 'workspace', 'spreadsheet', 'document', 'presentation', 'form', 'apps script', 'appsscript',
+  'google', 'docs', 'sheets', 'slides', 'drive', 'meet', 'workspace', 'spreadsheet', 'document', 'presentation', 'form', 'apps script', 'appsscript',
   // Spanish
-  'documento', 'hoja de cálculo', 'hoja de calculo', 'presentación', 'presentacion', 'calendario', 'formulario', 'compartir', 'invitar'
+  'documento', 'hoja de cálculo', 'hoja de calculo', 'presentación', 'presentacion', 'formulario', 'compartir', 'invitar'
+]
+
+// Calendar intents (always route to Ami)
+const CALENDAR_KEYWORDS = [
+  // English
+  'calendar', 'schedule', 'meeting', 'appointment', 'invite', 'event', 'book a meeting', 'calendar invite', 'set up a meeting',
+  // Spanish
+  'calendario', 'agendar', 'reunión', 'reunion', 'cita', 'invitar', 'evento', 'agendar reunión', 'agendar reunion', 'programar reunión'
 ]
 
 // Notion intents
@@ -106,16 +119,34 @@ export function detectEarlyIntent(userText: string): RouterRecommendation | unde
     }
   }
 
-  // 4) Google Workspace → delegate to Peter
+  // If any general email/gmail mention exists (without explicit triage/compose), prefer Ami triage
+  if (includesAny(text, EMAIL_GENERAL_KEYWORDS)) {
+    return {
+      name: 'Ami (Email Triage)',
+      toolName: 'listGmailMessages',
+      reasons: ['general email/gmail intent detected', 'route to Ami for safe triage by default']
+    }
+  }
+
+  // 4) Calendar → Ami (manager/secretary)
+  if (includesAny(text, CALENDAR_KEYWORDS)) {
+    return {
+      name: 'Ami (Calendar Management)',
+      toolName: 'createCalendarEvent',
+      reasons: ['calendar intent detected (Capa 0)', 'Ami handles scheduling and calendar management']
+    }
+  }
+
+  // 5) Google Workspace (Docs/Sheets/Drive/Slides) → Peter
   if (includesAny(text, GOOGLE_WORKSPACE_KEYWORDS)) {
     return {
       name: 'Peter (Google Workspace)',
       toolName: 'delegate_to_peter',
-      reasons: ['google workspace intent detected (Docs/Sheets/Drive/Calendar/Gmail/Slides)', 'delegate to Peter for creation/organization']
+      reasons: ['google workspace intent detected (Docs/Sheets/Drive/Slides)', 'delegate to Peter for creation/organization']
     }
   }
 
-  // 5) Notion → delegate to Notion Agent
+  // 6) Notion → delegate to Notion Agent
   if (includesAny(text, NOTION_KEYWORDS)) {
     return {
       name: 'Notion Agent (Workspace)',

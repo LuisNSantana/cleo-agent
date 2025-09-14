@@ -41,7 +41,7 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 const extraProviderModels: ModelConfig[] = [
   // Mistral (flagship + small)
   ...pickById(mistralModels, [
-    "mistral-large-latest",
+    "mistral-medium-2508",
     "mistral-small-latest",
   ]),
   // Meta (Llama) main variants

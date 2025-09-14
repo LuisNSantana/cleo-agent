@@ -113,6 +113,32 @@ const mistralModels: ModelConfig[] = [
       openproviders("mistral-large-latest", undefined, apiKey),
   },
   {
+    id: "mistral-medium-2508",
+    name: "Mistral Medium 3 (2508)",
+    provider: "Mistral",
+    providerId: "mistral",
+    baseProviderId: "mistral",
+    modelFamily: "Mistral",
+    description: "Agentic, multimodal-capable medium model offering strong performance at efficient cost.",
+    tags: ["agentic", "multimodal", "text-to-text"],
+    contextWindow: 131072,
+    inputCost: 0.4, // per 1M tokens (from screenshot)
+    outputCost: 2.0, // per 1M tokens
+    priceUnit: "per 1M tokens",
+    vision: true, // labeled multimodal
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://mistral.ai",
+    apiDocs: "https://docs.mistral.ai/models",
+    icon: "mistral",
+    apiSdk: (apiKey?: string) =>
+      openproviders("mistral-medium-2508", undefined, apiKey),
+  },
+  {
     id: "mistral-small-latest",
     name: "Mistral Small",
     provider: "Mistral",

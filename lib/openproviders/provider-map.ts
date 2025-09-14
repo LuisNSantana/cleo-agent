@@ -60,6 +60,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Mistral
   "ministral-3b-latest": "mistral",
   "ministral-8b-latest": "mistral",
+  "mistral-medium-2508": "mistral",
   "mistral-large-latest": "mistral",
   "mistral-small-latest": "mistral",
   "pixtral-large-latest": "mistral",

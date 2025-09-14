@@ -123,10 +123,11 @@ export class ModelFactory {
     const { primary, fallback } = getModelWithFallback(modelName)
     
     if (!primary) {
-      throw new Error(`Model ${modelName} not found in configuration`)
+      logger.warn(`[ModelFactory] Model ${modelName} not in optimized tiers registry; creating directly without tier metadata`)
+      return this.createModel(modelName, config)
     }
     
-  logger.info(`[ModelFactory] Creating model: ${modelName}${fallback ? ` (fallback: ${fallback.id})` : ''}`)
+    logger.info(`[ModelFactory] Creating model: ${modelName}${fallback ? ` (fallback: ${fallback.id})` : ''}`)
     return this.createModel(modelName, config)
   }
 

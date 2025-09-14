@@ -10,7 +10,7 @@ export const PETER_AGENT: AgentConfig = {
   name: 'Peter',
   description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
-  model: 'mistral-large-latest',
+  model: 'mistral-medium-2508',
   temperature: 0.3,
   maxTokens: 32000,
   tools: [
@@ -25,8 +25,6 @@ export const PETER_AGENT: AgentConfig = {
     'listDriveFiles',
     'searchDriveFiles',
     'getDriveFileDetails',
-    // Calendar for scheduling document creation
-    'createCalendarEvent',
     'getCurrentDateTime',
     'complete_task'
   ],
@@ -49,7 +47,6 @@ Tools:
 - Google Docs: createGoogleDoc, readGoogleDoc, updateGoogleDoc
 - Google Sheets: createGoogleSheet, readGoogleSheet, updateGoogleSheet  
 - Google Drive: listDriveFiles, searchDriveFiles, getDriveFileDetails
-- Google Calendar: listCalendarEvents, createCalendarEvent
 - getCurrentDateTime for scheduling
 
 Standard Workflow:
@@ -58,6 +55,9 @@ Standard Workflow:
 3. Verify creation success
 4. Provide direct link to document
 5. Call complete_task with document link
+
+Scheduling/Calendar:
+- Do NOT create or manage calendar events directly. If scheduling is required, delegate to Ami (calendar manager) or expect the supervisor to route calendar tasks to Ami.
 
 Document Excellence:
 - Clear, descriptive titles

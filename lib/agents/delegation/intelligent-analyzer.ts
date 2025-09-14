@@ -95,9 +95,9 @@ const AGENT_PATTERNS: KeywordPatterns = {
   },
   'peter-google': {
     primary: ['google', 'docs', 'sheets', 'drive', 'workspace', 'document', 'spreadsheet', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
-    secondary: ['template', 'productivity', 'automation', 'workflow', 'organize', 'collaborate', 'permissions', 'share', 'invite', 'calendar invite', 'compartir', 'permisos'],
-    contextual: ['create a doc', 'share file', 'schedule meeting', 'track progress', 'organize data', 'create a sheet', 'build a form'],
-    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja']
+    secondary: ['template', 'productivity', 'automation', 'workflow', 'organize', 'collaborate', 'permissions', 'share', 'invite', 'compartir', 'permisos'],
+    contextual: ['create a doc', 'share file', 'track progress', 'organize data', 'create a sheet', 'build a form'],
+    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja', 'calendar', 'calendario', 'meeting', 'reunión', 'reunion', 'appointment', 'cita', 'invite']
   },
   'emma-ecommerce': {
     primary: [

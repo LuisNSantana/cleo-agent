@@ -54,6 +54,7 @@ export type GroqModel =
 export type MistralModel =
   | "ministral-3b-latest"
   | "ministral-8b-latest"
+  | "mistral-medium-2508"
   | "mistral-large-latest"
   | "mistral-small-latest"
   | "pixtral-large-latest"

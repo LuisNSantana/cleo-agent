@@ -14,7 +14,7 @@ const modelFallbacks: Record<string, string> = {
   "claude-3-5-haiku-20241022": "grok-3-mini",
   
   // BALANCED TIER - GPT-OSS 120B as primary, Mistral Large as fallback  
-  "gpt-oss-120b": "mistral-large-2411",
+  "gpt-oss-120b": "mistral-large-latest-fallback",
   
   // SMARTER TIER - GPT-5 Mini as primary, Claude 3.5 Sonnet as fallback
   "gpt-5-mini": "claude-3-5-sonnet-20241022",
