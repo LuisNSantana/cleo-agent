@@ -12,7 +12,8 @@ import { allModelsWithFallbacks } from '@/lib/models/data/optimized-tiers'
 import logger from '@/lib/utils/logger'
 
 // AI SDK imports for additional providers
-import { createMistral } from '@ai-sdk/mistral'
+// import { createMistral } from '@ai-sdk/mistral'
+import { ChatMistralAI } from '@langchain/mistralai'
 import { createXai } from '@ai-sdk/xai'
 import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
 
@@ -183,12 +184,14 @@ export class ModelFactory {
 
     // Mistral models
     if (cleanModelName.startsWith('mistral-') || cleanModelName.includes('mistral')) {
-      const mistral = createMistral({
+      // Use LangChain's official ChatMistralAI wrapper (2025 best practice)
+      return new ChatMistralAI({
+        model: cleanModelName,
+        temperature,
+        maxTokens: safeMax,
+        streaming,
         apiKey: process.env.MISTRAL_API_KEY
       })
-      
-      const model = mistral(cleanModelName.replace('mistral/', ''))
-  return new AISdkChatModel(model, cleanModelName, temperature, safeMax)
     }
 
     // xAI models (Grok) - including grok-3-mini-fallback -> grok-3-mini

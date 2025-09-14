@@ -11,7 +11,7 @@ export const PETER_AGENT: AgentConfig = {
   description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
   model: 'mistral-medium-2508',
-  temperature: 0.3,
+  temperature: 0.6,
   maxTokens: 32000,
   tools: [
     // Document CREATION tools (primary focus)

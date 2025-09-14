@@ -42,6 +42,7 @@
     "@langchain/groq": "^0.2.3",
     "@langchain/langgraph": "^0.4.6",
     "@langchain/mcp-adapters": "^0.6.0",
+    "@langchain/mistralai": "^0.2.1",
     "@langchain/openai": "^0.6.9",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@openrouter/ai-sdk-provider": "1.0.0-beta.7",
