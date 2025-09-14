@@ -95,6 +95,19 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     )
   }, [normalized])
 
+  // Identify the latest step overall for collapsed preview
+  const latestStep = useMemo(() => {
+    if (!normalized.length) return null
+    let latest = normalized[0]
+    for (let i = 1; i < normalized.length; i++) {
+      const s = normalized[i]
+      if (new Date(s.timestamp).getTime() > new Date(latest.timestamp).getTime()) {
+        latest = s
+      }
+    }
+    return latest
+  }, [normalized])
+
   // Show all unique steps when expanded; show none when collapsed for minimal footprint
   const hasSteps = uniqueSteps.length > 0
   const visibleSteps = isExpanded ? uniqueSteps : []
@@ -133,6 +146,36 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
             </button>
           )}
         </div>
+        {!isExpanded && latestStep && (
+          <div aria-live="polite" aria-atomic="true">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={latestStep.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: 'spring', duration: 0.22, bounce: 0 }}
+                className="bg-card/30 border-border/60 group relative grid grid-cols-[auto_auto_1fr_auto] items-start gap-2 rounded-lg border p-2 pr-2.5 text-xs sm:text-sm"
+              >
+                <StatusDot action={latestStep.action} />
+                <AgentAvatar agentId={latestStep.agent} />
+                <div className="min-w-0">
+                  <div className="text-foreground/90 truncate font-medium">
+                    {actionLabel(latestStep.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={latestStep.agent} /></span>
+                  </div>
+                  {latestStep.content ? (
+                    <div className="text-muted-foreground/90 mt-0.5 line-clamp-1 whitespace-pre-wrap">
+                      {latestStep.content}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="text-muted-foreground/70 whitespace-nowrap pl-1 font-mono text-[10px] sm:text-xs">
+                  {formatTime(latestStep.timestamp)}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
         {isExpanded && (
           <ul className="grid gap-1.5">
             <AnimatePresence initial={false}>
