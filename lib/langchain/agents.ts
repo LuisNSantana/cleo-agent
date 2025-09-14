@@ -336,7 +336,7 @@ export class GroqAgent extends BaseAgent {
     textOut = renderToolResultReadable(lastToolName, lastToolResult)
   }
   // Last-resort B: if empty output but we have a tool result, present it
-  if ((!textOut || !textOut.trim()) && lastToolResult) {
+  if ((!textOut || !String(textOut).trim()) && lastToolResult) {
     textOut = renderToolResultReadable(lastToolName, lastToolResult)
   }
   // Estimate token usage (rough approximation)
@@ -513,7 +513,7 @@ export class OpenAIAgent extends BaseAgent {
   if ((/<\/?function|CALL_TOOL\(|tool[_-]?call/i.test(textOut)) && lastToolResult) {
     textOut = renderToolResultReadable(lastToolName, lastToolResult)
   }
-  if ((!textOut || !textOut.trim()) && lastToolResult) {
+  if ((!textOut || !String(textOut).trim()) && lastToolResult) {
     textOut = renderToolResultReadable(lastToolName, lastToolResult)
   }
   // Estimate token usage

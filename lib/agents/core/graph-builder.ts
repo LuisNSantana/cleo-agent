@@ -897,7 +897,7 @@ export class GraphBuilder {
         }
 
         // Ensure we always have a final response
-        if (!response.content || response.content.trim() === '') {
+        if (!response.content || String(response.content || '').trim() === '') {
           logger.debug('🔍 [DEBUG] BuildGraph - Empty response detected, requesting final summary')
           // Add a system message to force a response
           messages.push(new HumanMessage({
