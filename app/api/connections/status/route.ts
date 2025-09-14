@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Ensure all services have a status
-    const services = ["google-calendar", "google-drive", "gmail", "notion"]
+    // Ensure all services have a status (use canonical google-workspace)
+    const services = ["google-workspace", "notion"]
     services.forEach((serviceId) => {
       if (!connectionStatus[serviceId]) {
         connectionStatus[serviceId] = { connected: false }

@@ -6,6 +6,19 @@ export async function GET(
   { params }: { params: Promise<{ service: string }> }
 ) {
   const { service } = await params
+  // Canonicalize service IDs so all Google variants resolve to a single row
+  const canonicalService = (() => {
+    if (
+      service === 'google-workspace' ||
+      service === 'gmail' ||
+      service === 'google-calendar' ||
+      service === 'google-drive' ||
+      service === 'google-docs' ||
+      service === 'google-sheets' ||
+      service === 'google-slides'
+    ) return 'google-workspace'
+    return service
+  })()
   
   try {
     console.log(`[STATUS API] Checking ${service} status...`)
@@ -50,7 +63,7 @@ export async function GET(
       .from("user_service_connections")
       .select("connected, account_info, access_token, refresh_token, token_expires_at, updated_at")
       .eq("user_id", userData.user.id)
-      .eq("service_id", service)
+      .eq("service_id", canonicalService)
       .single()
 
     if (error && error.code !== "PGRST116") { // PGRST116 is "not found"
@@ -62,15 +75,44 @@ export async function GET(
     }
 
     if (!connection) {
-      console.log(`[STATUS API] No connection found for user ${userData.user.id} and service ${service}`)
-      return NextResponse.json({
-        connected: false,
-        account: null
-      })
+      console.log(`[STATUS API] No canonical row for user ${userData.user.id} and service ${service} (canonical: ${canonicalService})`)
+      // Fallback: for Google, check legacy variant rows and surface best match
+      if (canonicalService === 'google-workspace') {
+        const variants = ['gmail','google-calendar','google-drive','google-docs','google-sheets','google-slides']
+        const { data: legacyRows, error: legacyErr } = await (supabase as any)
+          .from('user_service_connections')
+          .select('connected, account_info, access_token, refresh_token, token_expires_at, updated_at, service_id')
+          .eq('user_id', userData.user.id)
+          .in('service_id', variants)
+
+        if (legacyErr) {
+          console.error('[STATUS API] Legacy variant fetch error:', legacyErr)
+        }
+
+        const best = (legacyRows || [])
+          .sort((a: any, b: any) => {
+            // Prefer connected rows, then most recently updated
+            if (!!b.connected !== !!a.connected) return (b.connected ? 1 : 0) - (a.connected ? 1 : 0)
+            const at = a.updated_at ? new Date(a.updated_at).getTime() : 0
+            const bt = b.updated_at ? new Date(b.updated_at).getTime() : 0
+            return bt - at
+          })[0]
+
+        if (best) {
+          console.log(`[STATUS API] Using legacy variant row ${best.service_id} for status surface`)
+          return NextResponse.json({
+            connected: !!best.connected,
+            account: best.account_info?.email || best.account_info?.name || null,
+            lastUpdated: best.updated_at
+          })
+        }
+      }
+
+      return NextResponse.json({ connected: false, account: null })
     }
 
     // Check if token needs refresh (for Google services)
-    if (service.startsWith('google') && connection.token_expires_at) {
+    if (canonicalService === 'google-workspace' && connection.token_expires_at) {
       const expiresAt = new Date(connection.token_expires_at)
       const now = new Date()
       const isExpired = expiresAt <= now
@@ -88,7 +130,7 @@ export async function GET(
       lastUpdated: connection?.updated_at
     }
 
-    console.log(`[STATUS API] Returning connection status for ${service}:`, response)
+  console.log(`[STATUS API] Returning connection status for ${service} (canonical: ${canonicalService}):`, response)
     return NextResponse.json(response)
   } catch (error) {
     console.error(`[STATUS API] Error checking ${service} status:`, error)

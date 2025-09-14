@@ -6,6 +6,16 @@ export async function GET(
   { params }: { params: Promise<{ service: string }> }
 ) {
   const { service } = await params
+  // Canonicalize Google variants to a unified service_id row
+  const canonicalService = (
+    service === 'google-workspace' ||
+    service === 'gmail' ||
+    service === 'google-calendar' ||
+    service === 'google-drive' ||
+    service === 'google-docs' ||
+    service === 'google-sheets' ||
+    service === 'google-slides'
+  ) ? 'google-workspace' : service
   
   try {
     const { searchParams } = new URL(request.url)
@@ -91,7 +101,7 @@ export async function GET(
     // Store connection data with explicit connected=true
     const connectionData = {
       user_id: userData.user.id,
-      service_id: service,
+      service_id: canonicalService,
       connected: true,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
@@ -101,7 +111,7 @@ export async function GET(
       updated_at: new Date().toISOString()
     }
     
-    console.log("Storing connection data for user:", userData.user.id, "service:", service)
+  console.log("Storing connection data for user:", userData.user.id, "service:", canonicalService, "(original:", service, ")")
 
     const { error: dbError } = await (supabase as any)
       .from("user_service_connections")
@@ -112,7 +122,7 @@ export async function GET(
       return NextResponse.redirect(`${returnTo}?error=storage_failed&details=${encodeURIComponent(dbError.message)}`)
     }
     
-    console.log("Connection stored successfully for service:", service)
+  console.log("Connection stored successfully for service:", canonicalService)
     
     // Connection stored successfully
 

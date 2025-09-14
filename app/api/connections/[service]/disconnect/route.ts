@@ -6,6 +6,16 @@ export async function POST(
   { params }: { params: Promise<{ service: string }> }
 ) {
   const { service } = await params
+  // Canonicalize service so all Google variants target the same row
+  const canonicalService = (
+    service === 'google-workspace' ||
+    service === 'gmail' ||
+    service === 'google-calendar' ||
+    service === 'google-drive' ||
+    service === 'google-docs' ||
+    service === 'google-sheets' ||
+    service === 'google-slides'
+  ) ? 'google-workspace' : service
   
   try {
     const supabase = await createClient()
@@ -33,8 +43,8 @@ export async function POST(
         account_info: null,
         updated_at: new Date().toISOString()
       })
-      .eq("user_id", userData.user.id)
-      .eq("service_id", service)
+  .eq("user_id", userData.user.id)
+  .eq("service_id", canonicalService)
 
     if (error) {
       console.error("Error disconnecting service:", error)
@@ -44,7 +54,7 @@ export async function POST(
     // Successfully disconnected service
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error(`Error disconnecting ${service}:`, error)
+    console.error(`Error disconnecting ${service} (canonical: ${canonicalService}):`, error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
