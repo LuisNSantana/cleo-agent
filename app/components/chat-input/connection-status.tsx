@@ -120,14 +120,29 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
     try {
       const statusPromises = services.map(async (service) => {
         try {
-          const response = await fetch(`/api/connections/${service.id}/status`)
+          console.log(`[CONNECTION STATUS] Fetching status for ${service.id}...`)
+          const response = await fetchClient(`/api/connections/${service.id}/status`)
+          console.log(`[CONNECTION STATUS] Response for ${service.id}:`, response.status, response.statusText)
+          
           if (response.ok) {
-            const data = await response.json()
-            return {
-              serviceId: service.id,
-              connected: data.connected,
-              account: data.account
+            const contentType = response.headers.get('content-type')
+            console.log(`[CONNECTION STATUS] Content-Type for ${service.id}:`, contentType)
+            
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json()
+              console.log(`[CONNECTION STATUS] Data for ${service.id}:`, data)
+              return {
+                serviceId: service.id,
+                connected: data.connected,
+                account: data.account
+              }
+            } else {
+              const text = await response.text()
+              console.error(`[CONNECTION STATUS] Non-JSON response for ${service.id}:`, text.substring(0, 200))
             }
+          } else {
+            const text = await response.text()
+            console.error(`[CONNECTION STATUS] Error response for ${service.id}:`, response.status, text.substring(0, 200))
           }
         } catch (error) {
           console.error(`Error checking ${service.id} status:`, error)

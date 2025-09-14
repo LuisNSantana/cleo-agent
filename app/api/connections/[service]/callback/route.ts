@@ -45,14 +45,24 @@ export async function GET(
     const supabase = await createClient()
     
     if (!supabase) {
+      console.error("Failed to create Supabase client")
       return NextResponse.redirect(`${returnTo}?error=database_error`)
     }
 
+    console.log("Attempting to get user session...")
     const { data: userData, error: userError } = await supabase.auth.getUser()
     
-    if (userError || !userData?.user) {
-      return NextResponse.redirect(`${returnTo}?error=unauthorized`)
+    if (userError) {
+      console.error("Supabase auth error:", userError)
+      return NextResponse.redirect(`${returnTo}?error=auth_error&details=${encodeURIComponent(userError.message)}`)
     }
+    
+    if (!userData?.user) {
+      console.error("No user found in session")
+      return NextResponse.redirect(`${returnTo}?error=no_session`)
+    }
+
+    console.log(`Processing OAuth callback for user: ${userData.user.id}, service: ${service}`)
 
     // Exchange code for access token
     let tokenData: any
@@ -91,7 +101,7 @@ export async function GET(
       updated_at: new Date().toISOString()
     }
     
-    // Store connection data
+    console.log("Storing connection data for user:", userData.user.id, "service:", service)
 
     const { error: dbError } = await (supabase as any)
       .from("user_service_connections")
@@ -99,8 +109,10 @@ export async function GET(
 
     if (dbError) {
       console.error("Error storing connection:", dbError)
-      return NextResponse.redirect(`${returnTo}?error=storage_failed`)
+      return NextResponse.redirect(`${returnTo}?error=storage_failed&details=${encodeURIComponent(dbError.message)}`)
     }
+    
+    console.log("Connection stored successfully for service:", service)
     
     // Connection stored successfully
 
