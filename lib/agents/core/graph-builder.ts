@@ -79,6 +79,25 @@ export class GraphBuilder {
   }
 
   /**
+   * Ensure only the first SystemMessage remains and is placed at the beginning.
+   * Prevents provider errors like "System messages are only permitted as the first passed message."
+   */
+  private normalizeSystemFirst(messages: BaseMessage[]): BaseMessage[] {
+    const system: BaseMessage[] = []
+    const rest: BaseMessage[] = []
+    for (const m of messages) {
+      const t = (m as any)?._getType ? (m as any)._getType() : undefined
+      if (t === 'system') {
+        if (system.length === 0) system.push(m)
+        // skip duplicates
+      } else {
+        rest.push(m)
+      }
+    }
+    return system.length > 0 ? [system[0], ...rest] : rest
+  }
+
+  /**
    * Build a dual-mode agent graph
    */
   async buildDualModeGraph(config: DualModeGraphConfig): Promise<StateGraph<any>> {
@@ -260,6 +279,7 @@ export class GraphBuilder {
         // Execute model with basic tool loop (max 3 iterations)
         let response
         try {
+          messages = this.normalizeSystemFirst(messages)
           response = await model.invoke(messages)
         } catch (error) {
           logger.error('🔍 [DEBUG] First model invocation failed:', error)
@@ -422,6 +442,7 @@ export class GraphBuilder {
             ]
           }
           // Re-invoke model with tool outputs
+          messages = this.normalizeSystemFirst(messages)
           response = await model.invoke(messages)
         }
 
@@ -497,8 +518,7 @@ export class GraphBuilder {
     }
     
     map['finalize'] = 'finalize' as any
-    
-    return map
+  return map
   }
 
   /**
@@ -514,6 +534,7 @@ export class GraphBuilder {
       if (conversationMode === 'direct' && targetAgent && agents.has(targetAgent)) {
   logger.info(`🎯 Router: Direct routing to ${targetAgent}`)
         return targetAgent
+        // No model invocation here; just routing
       }
 
       // Requested agent
@@ -584,6 +605,7 @@ export class GraphBuilder {
         // Execute model with basic tool loop (max 3 iterations)
         let response
         try {
+          messages = this.normalizeSystemFirst(messages)
           response = await model.invoke(messages)
         } catch (error) {
           logger.error('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
@@ -832,6 +854,7 @@ export class GraphBuilder {
           }
           // Re-invoke model with tool outputs
           try {
+            messages = this.normalizeSystemFirst(messages)
             response = await model.invoke(messages)
           } catch (error) {
             logger.error('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
@@ -865,6 +888,7 @@ export class GraphBuilder {
           
           // Re-invoke model one last time to get proper response
           try {
+            messages = this.normalizeSystemFirst(messages)
             response = await model.invoke(messages)
             logger.debug('🚨 [FINAL SAFEGUARD] Model re-invoked after resolving tool_calls')
           } catch (error) {
@@ -880,6 +904,7 @@ export class GraphBuilder {
             content: "Please provide a summary of the current task status and any results obtained so far."
           }))
           try {
+            messages = this.normalizeSystemFirst(messages)
             response = await model.invoke(messages)
             logger.debug('🔍 [DEBUG] BuildGraph - Final summary response generated')
           } catch (error) {

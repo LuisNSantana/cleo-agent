@@ -43,10 +43,29 @@ class AISdkChatModel extends BaseChatModel {
 
   async _generate(messages: any[], options?: any): Promise<any> {
     // Convert LangChain messages to AI SDK format and ensure system-first ordering
-    const convertedMessagesRaw = messages.map((msg) => ({
-      role: msg._getType() === 'human' ? 'user' : msg._getType() === 'ai' ? 'assistant' : 'system',
-      content: msg.content
-    }))
+      const convertedMessagesRaw = messages.map((msg: any) => {
+        const t = typeof msg._getType === 'function' ? msg._getType() : undefined
+        if (t === 'human') {
+          return { role: 'user', content: msg.content }
+        }
+        if (t === 'ai') {
+          // Preserve tool_calls if present on assistant messages
+          const tool_calls = (msg as any)?.additional_kwargs?.tool_calls
+          return tool_calls
+            ? { role: 'assistant', content: msg.content ?? '', tool_calls }
+            : { role: 'assistant', content: msg.content ?? '' }
+        }
+        if (t === 'tool') {
+          // Map ToolMessage correctly to 'tool' role with tool_call_id
+          return {
+            role: 'tool',
+            content: String(msg.content ?? ''),
+            tool_call_id: (msg as any)?.tool_call_id || (msg as any)?.additional_kwargs?.tool_call_id || undefined,
+          }
+        }
+        // Default to system for explicit system messages only
+        return { role: 'system', content: msg.content ?? '' }
+      })
 
     // Remove duplicate or mid-stream system messages; keep only the first system at the beginning if present
     const systemMsgs = convertedMessagesRaw.filter(m => m.role === 'system')
@@ -79,6 +98,7 @@ class AISdkChatModel extends BaseChatModel {
       throw error
     }
   }
+  // Note: downstream processing uses result.text; responseMessages handled by AI SDK
 }
 
 export class ModelFactory {
