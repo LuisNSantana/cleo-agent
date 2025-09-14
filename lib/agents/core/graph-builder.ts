@@ -447,17 +447,58 @@ export class GraphBuilder {
           response = await model.invoke(messages)
         }
 
+        // FINAL SAFEGUARD: Ensure we always produce a user-visible message
+        const toText = (v: any) => (typeof v === 'string' ? v : (v?.toString?.() ?? ''))
+        let textContent = toText(response?.content ?? '')
+        if (!textContent || !String(textContent).trim()) {
+          // Try to get a short confirmation by asking the model
+          try {
+            messages.push(new HumanMessage({ content: 'Provide a concise confirmation of the actions taken (1-3 lines). If you created or updated any items, include the direct link(s). Do not call tools.' }))
+            messages = this.normalizeSystemFirst(messages)
+            const retry = await model.invoke(messages)
+            textContent = toText(retry?.content ?? '')
+            response = retry
+          } catch {
+            // ignore and synthesize from tool output below
+          }
+        }
+
+        // If still empty, synthesize from last ToolMessage (e.g., Notion URL)
+        if (!textContent || !String(textContent).trim()) {
+          let url: string | undefined
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i]
+            if (m instanceof ToolMessage) {
+              const c = toText((m as any).content)
+              try {
+                const parsed = JSON.parse(c)
+                if (parsed?.url && typeof parsed.url === 'string') { url = parsed.url; break }
+                // Sometimes nested
+                if (parsed?.page?.url) { url = String(parsed.page.url); break }
+                if (parsed?.database?.url) { url = String(parsed.database.url); break }
+              } catch {
+                // not JSON; attempt simple URL regex
+                const match = c.match(/https?:\/\/[\w.-]+\.[\w.-]+[^\s)\]}]*/)
+                if (match) { url = match[0]; break }
+              }
+            }
+          }
+          textContent = url
+            ? `Listo. He completado la acción solicitada y aquí tienes el enlace: ${url}`
+            : 'Listo. He completado la acción solicitada.'
+        }
+
         this.eventEmitter.emit('node.completed', {
           nodeId: agentConfig.id,
           agentId: agentConfig.id,
-          response: response.content
+          response: textContent
         })
 
         return {
           messages: [
-            ...filteredStateMessages,  // Use filtered messages instead of raw state.messages
+            ...filteredStateMessages,
             new AIMessage({
-              content: response.content,
+              content: textContent,
               additional_kwargs: { 
                 sender: agentConfig.id,
                 conversation_mode: state.messages[state.messages.length - 1]?.additional_kwargs?.conversation_mode
