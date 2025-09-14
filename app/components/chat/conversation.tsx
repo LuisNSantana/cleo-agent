@@ -127,10 +127,12 @@ export function Conversation({
       </div>
       <ChatContainerRoot className="relative w-full">
         <ChatContainerContent
-          className="flex w-full h-full flex-col items-center pt-16 md:pt-20 pb-[calc(env(safe-area-inset-bottom)+96px)] overscroll-y-contain"
+          className="flex w-full h-full flex-col items-center pt-16 md:pt-20 pb-[calc(env(safe-area-inset-bottom)+80px)] overscroll-y-contain"
           style={{
             scrollbarGutter: "stable both-edges",
             scrollbarWidth: "none",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
           }}
         >
           {messages?.map((message, index) => {
