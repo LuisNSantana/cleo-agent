@@ -238,8 +238,12 @@ export const tools = {
 	memoryAddNote: memoryAddNoteTool,
 
 	// Utilities
+	// Canonical keys
 	weather: weatherTool,
 	time: timeTool,
+	// Aliases for backwards-compatibility with prompts/seed data
+	weatherInfo: weatherTool,
+	getCurrentDateTime: timeTool,
 	calculator: calculatorTool,
 	cryptoPrices: cryptoPriceTool,
 	randomFact: randomFactTool,

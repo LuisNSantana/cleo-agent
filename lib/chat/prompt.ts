@@ -5,6 +5,8 @@ import { generatePersonalizedPrompt } from '@/lib/prompts/personality'
 import { defaultPreferences, type PersonalitySettings } from '@/lib/user-preference-store/utils'
 import { getCleoPrompt } from '@/lib/prompts'
 import { pickBestAgent, analyzeDelegationIntent } from '@/lib/agents/delegation'
+import { detectEarlyIntent } from '@/lib/agents/router'
+import { trackFeatureUsage } from '@/lib/analytics'
 import { makeDelegationDecision, analyzeTaskComplexity } from '@/lib/agents/complexity-scorer'
 import type { AgentConfig } from '@/lib/agents/types'
 
@@ -112,6 +114,14 @@ const CLEO_IDENTITY_HEADER = `CLEO IDENTITY (TOP PRIORITY)
 - Safety: Refuse or safely decline illegal, harmful, or policy-violating requests and offer safe alternatives.
 - Language: Reply in the user's language by default unless the user specifies otherwise.
 - Size note: Keep this header compact so it survives trimming while preserving the above identity and behavior rules.`
+
+// Compact, model-agnostic directive to standardize agent behavior for reliability and speed
+const AGENT_WORKFLOW_DIRECTIVE = `AGENT WORKFLOW (RELIABILITY & SPEED)
+- Routing: If an internal router hint is present, prefer that tool/agent (time→time, weather→weather, email triage→Gmail list/read, email compose→delegate_to_astra, Google Workspace→delegate_to_peter, Notion→delegate_to_notion_agent).
+- Plan-then-act (brief): Form a short plan internally (1–2 steps). Do NOT reveal chain-of-thought; output only final answers and tool results.
+- Tool-first: Prefer a single correct tool call. Use at most 3 calls per turn. Stop early when sufficient.
+- Safety/timeouts: Keep calls quick; if a tool stalls or partial data is enough, stop and summarize. Ask one concise follow-up only if truly needed.
+- Verification: After a tool returns, verify it answers the user’s request; fix trivial gaps; then present a concise result with clear next action.`
 
 export type BuildPromptParams = {
   baseSystemPrompt?: string
@@ -283,7 +293,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     }
   }
 
-  // Phase 1: lightweight routing recommendation (capability-based)
+  // Phase 1: layered router hint (Capa 0 early rules -> capability-based)
   let routerHint: { name: string; toolName?: string; reasons?: string[] } | undefined
   try {
     const lastUser = messages.slice().reverse().find((m) => m.role === 'user')
@@ -298,7 +308,33 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
       }
     }
 
-    if (supabase && realUserId && userPlain.trim()) {
+    if (userPlain.trim()) {
+      // 0) Try early intent detector first (time/weather/email)
+      const early = detectEarlyIntent(userPlain)
+      if (early) {
+        routerHint = early
+        // Fire-and-forget telemetry for early router trigger (non-blocking, guarded)
+        if (realUserId) {
+          ;(async () => {
+            try {
+              await trackFeatureUsage(realUserId, 'router.early', {
+                delta: 1,
+                metadata: {
+                  recommendation: early.name,
+                  tool: early.toolName || null,
+                  reasons: early.reasons || [],
+                },
+              })
+            } catch {}
+          })()
+        }
+        // Skip further ranking; early rules are deterministic
+        // and should guide the LLM toward direct tool/clear delegation
+        throw new Error('__EARLY_ROUTER_HINT_FOUND__')
+      }
+
+      // 1) Fall back to capability-based ranking using active agents in DB
+      if (supabase && realUserId) {
       const { data: agents } = await (supabase as any)
         .from('agents')
         .select('id, name, description, role, tags, tools, is_active')
@@ -331,9 +367,10 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           routerHint = { name: ranked.agent.name, toolName, reasons: ranked.reasons }
         }
       }
+      }
     }
   } catch (e) {
-    // Non-blocking
+    // Non-blocking; ignore early-router sentinel error
   }
 
   // Fetch user personality settings (if available) and build a compact personalized header
@@ -392,8 +429,8 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
   const internalHint = buildInternalDelegationHint(userMessage, routerHint)
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
 
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
 }

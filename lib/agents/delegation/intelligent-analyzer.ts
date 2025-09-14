@@ -149,19 +149,19 @@ const AGENT_PATTERNS: KeywordPatterns = {
     contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags'],
     exclusions: ['email', 'calendar', 'shopify', 'google docs', 'research only', 'technical analysis']
   },
-  'luna-content': {
+  'luna-content-creator': {
     primary: ['content', 'copy', 'copywriting', 'writing', 'creative', 'creativo', 'campaign', 'campaña', 'brand', 'marca'],
     secondary: ['messaging', 'tone', 'voice', 'style', 'estilo', 'narrative', 'storytelling', 'engagement', 'caption'],
     contextual: ['write content', 'create copy', 'social media copy', 'campaign content', 'brand messaging', 'creative writing'],
     exclusions: ['technical', 'code', 'database', 'shopify']
   },
-  'zara-analytics': {
+  'zara-analytics-specialist': {
     primary: ['analytics', 'analíticas', 'analiticas', 'metrics', 'métricas', 'metricas', 'performance', 'rendimiento', 'data', 'datos'],
     secondary: ['insights', 'trends', 'engagement', 'reach', 'impressions', 'clicks', 'conversion', 'roi', 'kpi'],
     contextual: ['analyze performance', 'social media analytics', 'engagement metrics', 'performance report', 'twitter analytics'],
     exclusions: ['creation', 'writing', 'posting']
   },
-  'viktor-publisher': {
+  'viktor-publishing-specialist': {
     primary: ['schedule', 'scheduling', 'publish', 'publishing', 'timing', 'automation', 'workflow', 'calendar'],
     secondary: ['optimal', 'timing', 'frequency', 'queue', 'batch', 'strategy', 'planning', 'coordination'],
     contextual: ['schedule posts', 'publishing strategy', 'optimal timing', 'social media scheduling', 'content calendar'],
@@ -181,9 +181,9 @@ const AGENT_METADATA = {
   'apu-markets': { name: 'Apu Markets', toolName: 'delegate_to_apu_markets' },
   // Social Media & Twitter Specialists
   'nora-community': { name: 'Nora', toolName: 'delegate_to_nora' },
-  'luna-content': { name: 'Luna', toolName: 'delegate_to_luna' },
-  'zara-analytics': { name: 'Zara', toolName: 'delegate_to_zara' },
-  'viktor-publisher': { name: 'Viktor', toolName: 'delegate_to_viktor' }
+  'luna-content-creator': { name: 'Luna', toolName: 'delegate_to_luna' },
+  'zara-analytics-specialist': { name: 'Zara', toolName: 'delegate_to_zara' },
+  'viktor-publishing-specialist': { name: 'Viktor', toolName: 'delegate_to_viktor' }
 }
 
 // Scoring configuration
