@@ -16,37 +16,26 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
-  // Guest mode: Fast tier (text-only) + fallbacks
-  // Removed GPT-OSS-120B free (policy/tool issues)
-  "openrouter:z-ai/glm-4.5", // GLM 4.5 - optional guest model
-  "openrouter:deepseek/deepseek-chat-v3.1:free", // DeepSeek V3.1 Free - fallback
-  "openrouter:mistralai/mistral-small-3.2-24b-instruct:free", // Mistral Small 3.2 24B (free)
-  "openrouter:google/gemma-3-27b-it:free", // Gemma 3 27B IT (free)
-  "openrouter:meta-llama/llama-4-maverick:free", // Llama 4 Maverick (free)
-  "openrouter:meta-llama/llama-4-scout:free", // Llama 4 Scout (free)
-  "gpt-4o-mini", // Emergency fallback (vision)
+  // Guest mode: only validated tool-capable models
+  "openrouter:deepseek/deepseek-chat-v3.1:free",
+  "openrouter:z-ai/glm-4.5",
+  "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
+  // Keep one vision-capable emergency fallback
+  "gpt-4o-mini",
 ]
 
 // Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
-  // Free tier: Fast + Balanced with fallbacks
-  // Removed GPT-OSS-120B free (policy/tool issues)
-  "openrouter:openrouter/sonoma-dusk-alpha", // Fast Vision - Sonoma Dusk (free)
-  // Balanced-class free choices via OpenRouter
+  // Curated free/tool-capable list for authenticated users
+  // Prefer Sonoma Sky; keep Dusk hidden from selector
+  // "openrouter:openrouter/sonoma-dusk-alpha", // intentionally not free list
+  "openrouter:openrouter/sonoma-sky-alpha",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
-  "openrouter:google/gemma-3-27b-it:free",
-  "openrouter:meta-llama/llama-4-maverick:free",
-  "openrouter:meta-llama/llama-4-scout:free",
-  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-  "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
-  // Removed DeepSeek Chimera R1T free (no tool endpoints)
-  "openrouter:deepseek/deepseek-chat-v3.1:free", // Fast fallback
-  "gpt-4o-mini", // Emergency fallback  
-  // OpenRouter selected cost-effective models (for authenticated users)
-  "openrouter:deepseek/deepseek-r1:free",
-  "openrouter:qwen/qwen2.5-32b-instruct",
-  // Added core provider models for authenticated users
-  // Removed Mistral SDK Small/Medium and Groq Llama variants from default lists
+  "openrouter:deepseek/deepseek-chat-v3.1:free",
+  // High-end free options
+  // paid Nemotron is excluded from FREE list
+  // Emergency fallback
+  "gpt-4o-mini",
 ]
 
 // Default authenticated model: GPT-4.1-mini via OpenRouter (majority standard)
@@ -71,6 +60,13 @@ export const DISABLED_MODEL_IDS: string[] = [
   // Problematic free models (policy/tool endpoint issues)
   "openrouter:openai/gpt-oss-120b:free",
   "openrouter:tngtech/deepseek-r1t-chimera:free",
+  // Remove confusing non-validated freebies from selector
+  "openrouter:google/gemma-3-27b-it:free",
+  "openrouter:meta-llama/llama-4-maverick:free",
+  "openrouter:meta-llama/llama-4-scout:free",
+  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  // Prefer Sky over Dusk in UI
+  // "openrouter:openrouter/sonoma-dusk-alpha",
 ]
 
 export const APP_NAME = "Cleo"

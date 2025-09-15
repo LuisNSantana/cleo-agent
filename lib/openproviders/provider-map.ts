@@ -5,12 +5,21 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // OpenRouter models
   "openrouter:z-ai/glm-4.5": "openrouter",
   "z-ai/glm-4.5": "openrouter",
-  "openrouter:openai/gpt-oss-120b:free": "openrouter",
+  "openrouter:openai/gpt-oss-120b": "openrouter",
   "openrouter:openai/gpt-4.1-mini": "openrouter",
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
   "deepseek/deepseek-chat-v3.1:free": "openrouter",
   "openrouter:openrouter/sonoma-dusk-alpha": "openrouter",
   "openrouter/sonoma-dusk-alpha": "openrouter",
+  "openrouter:openrouter/sonoma-sky-alpha": "openrouter",
+  "openrouter/sonoma-sky-alpha": "openrouter",
+  // Curated OpenRouter additions (tool-capable)
+  "openrouter:qwen/qwen3-next-80b-a3b-thinking": "openrouter",
+  "qwen/qwen3-next-80b-a3b-thinking": "openrouter",
+  "openrouter:nvidia/nemotron-nano-9b-v2:free": "openrouter",
+  "nvidia/nemotron-nano-9b-v2:free": "openrouter",
+  "openrouter:meta-llama/meta-llama-3.1-405b-instruct": "openrouter",
+  "meta-llama/meta-llama-3.1-405b-instruct": "openrouter",
   // New OpenRouter free additions
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free": "openrouter",
   "mistralai/mistral-small-3.2-24b-instruct:free": "openrouter",
@@ -22,7 +31,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "meta-llama/llama-4-scout:free": "openrouter",
   // Additional OpenRouter free models
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
-  "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free": "openrouter",
+  "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1": "openrouter",
   "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
 
   o1: "openai",
@@ -144,6 +153,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "grok-3-mini-latest": "xai",
   "grok-3-mini-fast": "xai",
   "grok-3-mini-fast-latest": "xai",
+  "grok-code-fast-1": "xai",
   "grok-2-vision-1212": "xai",
   "grok-2-vision": "xai",
   "grok-2-vision-latest": "xai",

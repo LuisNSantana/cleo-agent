@@ -10,7 +10,7 @@ export const TOBY_AGENT: AgentConfig = {
   name: 'Toby',
   description: 'Senior software engineering and IoT specialist for programming, debugging, architecture, APIs, and device integrations',
   role: 'specialist',
-  model: 'openrouter:openai/gpt-4.1-mini',
+  model: 'x-ai/grok-code-fast-1',
   temperature: 0.2,
   maxTokens: 32768,
   tools: ['webSearch', 'calculator', 'getCurrentDateTime', 'cryptoPrices', 'complete_task'],

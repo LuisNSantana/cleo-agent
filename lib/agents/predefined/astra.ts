@@ -12,7 +12,7 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:openai/gpt-4.1-mini',
+  model: 'openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1',
   temperature: 0.6,
   maxTokens: 8192,
   tools: [

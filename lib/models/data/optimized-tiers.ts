@@ -26,22 +26,20 @@ import { ModelConfig } from "../types"
 // FAST TIER - Optimized for speed and cost
 const fastModels: ModelConfig[] = [
   {
-    id: "openrouter:openai/gpt-oss-120b:free",
+    id: "openrouter:openai/gpt-oss-120b",
     name: "Fast",
     provider: "OpenRouter",
     providerId: "openrouter",
     modelFamily: "GPT-OSS",
     baseProviderId: "openrouter",
-    description: "OpenAI GPT-OSS 120B via OpenRouter (free). Great balance of speed and quality for text tasks.",
+    description: "OpenAI GPT-OSS 120B via OpenRouter (paid). Fast text model with tool-calling.",
     inputCost: 0,
     outputCost: 0,
-    priceUnit: "free tier",
+  priceUnit: "per 1M tokens",
     tags: ["fast", "open-source", "cost-effective", "free"],
     contextWindow: 32768, // per OpenRouter page as of 2025-09-15
-    vision: false, // text-only primary fast model
-    // Important: OpenRouter free route for GPT-OSS-120B does NOT support tool/function calling
-    // We mark tools=false to avoid runtime tool invocation attempts
-    tools: false,
+  vision: false, // text-only primary fast model
+  tools: true,
     audio: false,
     reasoning: true,
     openSource: true,
@@ -54,7 +52,7 @@ const fastModels: ModelConfig[] = [
       topP: 0.9,
       maxTokens: 8192, // optimize for larger generations while staying safe
     },
-    apiSdk: (apiKey?: string) => openproviders("openrouter:openai/gpt-oss-120b:free", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("openrouter:openai/gpt-oss-120b", undefined, apiKey),
   }
 ]
 
@@ -122,6 +120,37 @@ const smarterModels: ModelConfig[] = [
     },
     apiSdk: (apiKey?: string) => openproviders("gpt-5-mini-2025-08-07", undefined, apiKey),
   }
+  ,
+  // Add Mistral Medium to Smarter tier options
+  {
+    id: "mistral-medium-2508",
+    name: "Mistral Medium",
+    provider: "Mistral",
+    providerId: "mistral",
+    modelFamily: "Mistral",
+    baseProviderId: "mistral",
+    description: "Agentic medium model with strong reasoning; included in Smarter options.",
+    inputCost: 0.4,
+    outputCost: 2.0,
+    priceUnit: "per 1M tokens",
+    tags: ["smart", "reasoning", "tools"],
+    contextWindow: 131072,
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://mistral.ai",
+    icon: "smarter",
+    defaults: {
+      temperature: 0.6,
+      topP: 0.9,
+      maxTokens: 16384,
+    },
+    apiSdk: (apiKey?: string) => openproviders("mistral-medium-2508", undefined, apiKey),
+  }
 ]
 
 // Combined optimized models for the 3-tier system
@@ -133,19 +162,19 @@ const optimizedModels: ModelConfig[] = [
 
 // FALLBACK MODELS - Secondary options when primary models fail
 const fallbackModels: ModelConfig[] = [
-  // Fast tier vision companion - Sonoma Dusk Alpha (OpenRouter, free, vision-enabled)
+  // Fast tier vision companion - Sonoma Sky Alpha (OpenRouter, vision-enabled)
   {
-    id: "openrouter:openrouter/sonoma-dusk-alpha",
-    name: "Fast Vision",
+    id: "openrouter:openrouter/sonoma-sky-alpha",
+    name: "Fast Vision (Sky)",
     provider: "OpenRouter",
     providerId: "openrouter",
-    modelFamily: "Sonoma Dusk",
+    modelFamily: "Sonoma Sky",
     baseProviderId: "openrouter",
-    description: "Vision-capable Fast-tier model for analyzing images and documents (free via OpenRouter).",
+    description: "Vision-capable Fast-tier model for analyzing images and documents via OpenRouter.",
     inputCost: 0,
     outputCost: 0,
-    priceUnit: "free tier",
-    tags: ["fast", "vision", "multimodal", "free"],
+    priceUnit: "per 1M tokens",
+    tags: ["fast", "vision", "multimodal"],
     contextWindow: 32768,
     vision: true,
     tools: true,
@@ -154,14 +183,14 @@ const fallbackModels: ModelConfig[] = [
     openSource: false,
     speed: "Fast",
     intelligence: "High",
-    website: "https://openrouter.ai/openrouter/sonoma-dusk-alpha",
+    website: "https://openrouter.ai/openrouter/sonoma-sky-alpha",
     icon: "faster",
     defaults: {
       temperature: 0.4,
       topP: 0.9,
       maxTokens: 4096,
     },
-    apiSdk: (apiKey?: string) => openproviders("openrouter:openrouter/sonoma-dusk-alpha", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("openrouter:openrouter/sonoma-sky-alpha", undefined, apiKey),
   },
 
   // Fast tier fallback - DeepSeek Chat (free)
@@ -194,34 +223,34 @@ const fallbackModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) => openproviders("openrouter:deepseek/deepseek-chat-v3.1:free", undefined, apiKey),
   },
   
-  // Balanced tier fallback - Mistral Large
+  // Balanced tier fallback - GLM 4.5
   {
-    id: "mistral-large-latest-fallback",
+    id: "openrouter:z-ai/glm-4.5",
     name: "Balanced (Fallback)",
-    provider: "Mistral",
-    providerId: "mistral",
-    modelFamily: "Mistral",
-    baseProviderId: "mistral",
-    description: "Fallback option for Balanced tier. Mistral's flagship model with strong reasoning capabilities.",
-    inputCost: 2.0,
-    outputCost: 6.0,
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GLM",
+    baseProviderId: "z-ai",
+    description: "Fallback option for Balanced tier. Z.AI GLM-4.5 with strong reasoning and tool use.",
+    inputCost: 0.14,
+    outputCost: 0.86,
     priceUnit: "per 1M tokens",
-    tags: ["fallback", "reasoning", "flagship", "reliable"],
-    contextWindow: 128000,
+    tags: ["fallback", "reasoning", "reliable"],
+    contextWindow: 131072,
     vision: false,
     tools: true,
     audio: false,
     reasoning: true,
     openSource: false,
-    speed: "Medium",
+    speed: "Fast",
     intelligence: "High",
-    website: "https://mistral.ai",
+    website: "https://openrouter.ai/z-ai/glm-4.5",
     icon: "balanced",
     defaults: {
       temperature: 0.5,
       topP: 0.9,
     },
-    apiSdk: (apiKey?: string) => openproviders("mistral-large-latest", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("openrouter:z-ai/glm-4.5", undefined, apiKey),
   },
   
   // Smarter tier fallback - Claude 3.5 Sonnet

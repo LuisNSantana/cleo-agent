@@ -14,10 +14,10 @@ const modelFallbacks: Record<string, string> = {
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:meta-llama/llama-3.3-8b-instruct:free",
   "openrouter:meta-llama/llama-3.3-8b-instruct:free": "gpt-4o-mini",
 
-  // FAST TIER - OpenRouter GPT-OSS 120B (free) as primary, DeepSeek free as fallback
-  "openrouter:openai/gpt-oss-120b:free": "openrouter:deepseek/deepseek-chat-v3.1:free",
-  // Fast Vision companion - Sonoma falls back to GPT-4o-mini if unavailable
-  "openrouter:openrouter/sonoma-dusk-alpha": "gpt-4o-mini",
+  // FAST TIER - OpenRouter GPT-OSS 120B (paid) as primary, DeepSeek free as fallback
+  "openrouter:openai/gpt-oss-120b": "openrouter:deepseek/deepseek-chat-v3.1:free",
+  // Fast Vision companion - Sonoma Sky falls back to GPT-4o-mini if unavailable
+  "openrouter:openrouter/sonoma-sky-alpha": "gpt-4o-mini",
 
   // BALANCED TIER - GPT-OSS 120B as primary, Mistral Large as fallback  
   "gpt-oss-120b": "mistral-large-latest-fallback",
@@ -35,7 +35,7 @@ const modelFallbacks: Record<string, string> = {
 // Reverse mapping for fallback to primary
 const FALLBACK_TO_PRIMARY_MAP: Record<string, string> = {
   // Fast
-  "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:openai/gpt-oss-120b:free",
+  "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:openai/gpt-oss-120b",
   // Balanced
   "mistral-large-latest-fallback": "gpt-oss-120b", 
   // Smarter
@@ -147,9 +147,9 @@ export function getRecommendedModel(requirements: {
  * Tier classification helpers
  */
 export function getModelTier(modelId: string): 'free' | 'fast' | 'balanced' | 'smarter' | 'unknown' {
-  const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:meta-llama/llama-3.3-8b-instruct:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free']
-  const fastModels = ['openrouter:openai/gpt-oss-120b:free', 'openrouter:openrouter/sonoma-dusk-alpha', 'openai:gpt-4o-mini']
-  const balancedModels = ['groq:llama-3.3-70b-versatile', 'mistral-large-latest-fallback']
+  const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free']
+  const fastModels = ['openrouter:openai/gpt-oss-120b', 'openrouter:openrouter/sonoma-sky-alpha', 'gpt-4o-mini']
+  const balancedModels = ['gpt-oss-120b', 'openrouter:z-ai/glm-4.5']
   const smarterModels = ['gpt-5-mini-2025-08-07', 'claude-3-5-sonnet-latest-fallback']
   
   if (freeModels.includes(modelId)) return 'free'
