@@ -10,7 +10,7 @@ export const PETER_AGENT: AgentConfig = {
   name: 'Peter',
   description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
-  model: 'openrouter:openai/gpt-4.1-mini',
+  model: 'gpt-4o-mini',
   temperature: 0.6,
   maxTokens: 32768,
   tools: [

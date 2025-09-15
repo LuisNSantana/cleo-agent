@@ -12,8 +12,8 @@ export const NOTION_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:openrouter/sonoma-sky-alpha',
-  temperature: 0.3,
+  model: 'gpt-4o-mini',
+  temperature: 0.5,
   maxTokens: 16384,
   tools: [
     // Core Notion management

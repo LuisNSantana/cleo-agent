@@ -11,7 +11,7 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'openrouter:openrouter/sonoma-sky-alpha',
+  model: 'openrouter:deepseek/deepseek-chat-v3.1',
   temperature: 0.5,
   maxTokens: 16384,
   tools: [

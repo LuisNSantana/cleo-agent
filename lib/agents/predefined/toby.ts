@@ -11,7 +11,7 @@ export const TOBY_AGENT: AgentConfig = {
   description: 'Senior software engineering and IoT specialist for programming, debugging, architecture, APIs, and device integrations',
   role: 'specialist',
   model: 'x-ai/grok-code-fast-1',
-  temperature: 0.2,
+  temperature: 0.3,
   maxTokens: 32768,
   tools: ['webSearch', 'calculator', 'getCurrentDateTime', 'cryptoPrices', 'complete_task'],
   tags: [

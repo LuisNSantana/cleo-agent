@@ -10,7 +10,7 @@ export const APU_AGENT: AgentConfig = {
   name: 'Apu',
   description: 'Specialist in advanced web intelligence using SerpAPI (Google, News, Scholar, Maps) with structured summarization.',
   role: 'specialist',
-  model: 'openrouter:openai/gpt-4.1-mini',
+  model: 'gpt-4.1-mini',
   temperature: 0.5,
   maxTokens: 32768,
   tools: [

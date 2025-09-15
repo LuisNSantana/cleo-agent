@@ -161,6 +161,22 @@ export class ModelFactory {
     // Apply provider-safe clamp for output tokens
     const safeMax = clampMaxOutputTokens(cleanModelName, maxTokens)
 
+    // OpenRouter models via OpenAI-compatible API (function/tool calling supported)
+    if (cleanModelName.startsWith('openrouter:')) {
+      const resolved = cleanModelName.replace('openrouter:', '')
+      const safeMax = clampMaxOutputTokens(resolved, maxTokens)
+      return new ChatOpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        modelName: resolved,
+        temperature,
+        maxTokens: safeMax,
+        streaming,
+        configuration: {
+          baseURL: 'https://openrouter.ai/api/v1',
+        } as any,
+      })
+    }
+
     // Groq models (including GPT-OSS and Llama)
     if (cleanModelName.includes('gpt-oss') || 
         cleanModelName.includes('groq/') || 

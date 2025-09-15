@@ -10,7 +10,7 @@ export const NORA_AGENT: AgentConfig = {
   name: 'Nora',
   description: 'Community management specialist with expertise in social media strategy, content coordination, and audience engagement across platforms',
   role: 'specialist',
-   model: 'openrouter:openai/gpt-4.1-mini',
+   model: 'openrouter:deepseek/deepseek-chat-v3.1',
   temperature: 0.7,
    maxTokens: 8192,
   color: '#E879F9',

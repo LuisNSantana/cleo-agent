@@ -12,9 +12,9 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:openrouter/sonoma-sky-alpha',
+  model: 'openrouter:deepseek/deepseek-chat-v3.1',
   temperature: 0.6,
-  maxTokens: 12000,
+  maxTokens: 16384,
   tools: [
     // Email management suite
     'listGmailMessages',
