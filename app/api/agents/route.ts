@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (userAgentsError) {
-      logger.error('Error fetching user agents:', userAgentsError)
-      return NextResponse.json({ error: 'Failed to fetch user agents' }, { status: 500 })
+      // Degrade gracefully: return only predefined (local) agents if DB user agents query fails
+      logger.error('Error fetching user agents (continuing with local predefined only):', userAgentsError)
     }
 
     logger.debug('User agents from DB:', userAgents?.length || 0)
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
   // 2. Add user-created agents from database (exclude those with same names as predefined)
     const predefinedNames = new Set(ALL_PREDEFINED_AGENTS.map(cfg => cfg.name.toLowerCase()))
     
-    if (userAgents && userAgents.length > 0) {
+    if (!userAgentsError && userAgents && userAgents.length > 0) {
       for (const agent of userAgents) {
         // Skip user agents that have the same name as predefined agents
         if (predefinedNames.has((agent as any).name?.toLowerCase())) {

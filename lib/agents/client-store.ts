@@ -212,14 +212,16 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           return m ? decodeURIComponent(m[1]) : undefined
         }
 
-        // Abort if the network is stuck
+    // Abort if the network is stuck
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 30000)
 
-  // Use composite key so direct/supervised conversations don't mix
-  const map = get()._agentThreadMap || {}
-  const key = agentId ? `${agentId}_${forceSupervised ? 'supervised' : 'direct'}` : undefined
-  const threadId = key ? map[key] : undefined
+    // Use composite key so direct/supervised conversations don't mix
+    // For supervised (no agentId provided), use 'cleo-supervisor' as effective agent id
+    const map = get()._agentThreadMap || {}
+    const effectiveAgentId = agentId || 'cleo-supervisor'
+    const key = `${effectiveAgentId}_${forceSupervised ? 'supervised' : 'direct'}`
+    const threadId = map[key]
         // Call API with dual-mode support
         const response = await fetch('/api/agents/execute', {
           method: 'POST',
@@ -261,12 +263,12 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         })
 
         // Persist thread mapping per agent for subsequent messages
-        if (data.thread?.id && agentId) {
-          // Persist mapping under composite key
+        if (data.thread?.id) {
+          // Persist mapping under composite key (use effective agent id so supervised chats map to cleo-supervisor)
           const newMap = { ...(get()._agentThreadMap || {}) }
-          const composite = `${agentId}_${forceSupervised ? 'supervised' : 'direct'}`
+          const composite = `${effectiveAgentId}_${forceSupervised ? 'supervised' : 'direct'}`
           newMap[composite] = data.thread.id
-          // Track execution -> thread mapping for final message persistence
+          // Track execution -> thread mapping for final message persistence (always)
           const execMap = { ...(get()._executionThreadMap || {}) }
           execMap[data.execution.id] = data.thread.id
           set({ _agentThreadMap: newMap, _executionThreadMap: execMap })

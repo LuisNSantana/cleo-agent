@@ -167,17 +167,41 @@ export async function POST(request: NextRequest) {
         return execution
       })
 
+      // BEST-EFFORT: Wait briefly (<= ~22s) for the execution to complete in-process.
+      // This mitigates serverless cross-request global state loss so the UI receives a final message on first response.
+      let finalExecution: any = result
+      try {
+        if (finalExecution && finalExecution.status === 'running') {
+          const waitMs = Math.min(
+            Number.parseInt(process.env.AGENT_EXECUTE_WAIT_MS || '22000', 10) || 22000,
+            60000
+          )
+          const start = Date.now()
+          while (Date.now() - start < waitMs) {
+            await new Promise(r => setTimeout(r, 700))
+            const current = (orchestrator as any).getExecution?.(finalExecution.id)
+            if (current) {
+              finalExecution = current
+              if (current.status && current.status !== 'running') break
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[API/execute] Wait-for-completion failed (continuing):', e)
+      }
+
       return NextResponse.json({
         success: true,
         execution: {
-          id: result.id,
-          agentId: result.agentId,
-          status: result.status,
-          startTime: result.startTime,
-          messages: result.messages,
-          metrics: result.metrics,
-          error: result.error,
-          steps: result.steps || []
+          id: finalExecution.id,
+          agentId: finalExecution.agentId,
+          status: finalExecution.status,
+          startTime: finalExecution.startTime,
+          endTime: finalExecution.endTime,
+          messages: finalExecution.messages,
+          metrics: finalExecution.metrics,
+          error: finalExecution.error,
+          steps: finalExecution.steps || []
         },
         thread: effectiveThreadId ? { id: effectiveThreadId } : null
       })
