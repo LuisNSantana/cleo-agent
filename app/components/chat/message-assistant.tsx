@@ -15,6 +15,7 @@ import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
 import { AssistantMessageWithFiles } from '@/components/chat/smart-message'
 import { OpenDocumentToolDisplay } from '@/components/chat/open-document-tool-display'
+import { DocumentToolDisplay } from '@/components/chat/document-tool-display'
 import { useMemo } from 'react'
 import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from '@/app/components/chat/optimization-insights'
@@ -71,6 +72,9 @@ export function MessageAssistant({
         })
         return false
       }
+
+      // Hide createDocument tool chip because we render an inline card in the message body
+      if (toolName === 'createDocument') return false
       
       return true
     }
@@ -95,6 +99,40 @@ export function MessageAssistant({
     return extractPipelineOptimizations(pipelineSteps, toolInvocationParts || [])
   }, [pipelineSteps, toolInvocationParts])
 
+  // Extract createDocument result so we can render the document card inline in the assistant message
+  const createDocumentResult = (() => {
+    try {
+      const docPart = parts?.find(
+        (part: any) =>
+          part.type === 'tool-invocation' &&
+          part.toolInvocation?.state === 'result' &&
+          part.toolInvocation?.toolName === 'createDocument' &&
+          part.toolInvocation?.result
+      ) as any
+
+      if (!docPart) return null
+      const result = docPart.toolInvocation?.result
+
+      // Result can be a raw object or an object with AI-SDK style { content: [{ type: 'text', text }] }
+      if (Array.isArray(result)) return null
+
+      if (result && typeof result === 'object' && 'content' in result) {
+        const textItem = (result as any).content?.find?.((i: any) => i?.type === 'text')
+        if (textItem?.text) {
+          try {
+            return JSON.parse(textItem.text)
+          } catch {
+            return null
+          }
+        }
+      }
+
+      return result ?? null
+    } catch {
+      return null
+    }
+  })()
+  
   // Extract openDocument result so we can render the document card inline in the assistant message
   const openDocumentResult = (() => {
     try {
@@ -223,6 +261,13 @@ export function MessageAssistant({
         )}        {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
         )}
+
+        {/* Show the createDocument card inline in the assistant body for better UX */}
+        {createDocumentResult ? (
+          <div className="mb-3">
+            <DocumentToolDisplay result={createDocumentResult as any} />
+          </div>
+        ) : null}
 
         {/* Show the openDocument card inline in the assistant body for better UX */}
         {openDocumentResult ? (

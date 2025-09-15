@@ -310,16 +310,34 @@ export const searchDriveFilesTool = tool({
         searchQuery += ` and sharedWithMe = true`
       }
 
-      const params = new URLSearchParams({
+      // Use a safe orderBy: 'relevance' only when doing fullText search; otherwise prefer recency
+      const orderBy = includeContent ? 'relevance' : 'modifiedTime desc'
+      const baseParams: Record<string, string> = {
         q: searchQuery,
         pageSize: maxResults.toString(),
-        orderBy: 'relevance',
         fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,iconLink,thumbnailLink,fileExtension,shared,ownedByMe)',
         supportsAllDrives: 'true',
         includeItemsFromAllDrives: 'true'
-      })
+      }
+      let params = new URLSearchParams({ ...baseParams, orderBy })
 
-      const data = await makeGoogleDriveRequest(accessToken, `files?${params}`)
+      let data: any
+      try {
+        data = await makeGoogleDriveRequest(accessToken, `files?${params}`)
+      } catch (err: any) {
+        const msg = (err && err.message) ? String(err.message) : ''
+        // Fallback: if the API complains about orderBy, retry without it
+        if (/orderBy/.test(msg) || /Invalid Value/.test(msg)) {
+          try {
+            params = new URLSearchParams(baseParams) // drop orderBy
+            data = await makeGoogleDriveRequest(accessToken, `files?${params}`)
+          } catch (err2) {
+            throw err2
+          }
+        } else {
+          throw err
+        }
+      }
 
       const files = data.files?.map((file: any) => ({
         id: file.id,

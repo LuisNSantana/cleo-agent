@@ -104,17 +104,28 @@ function buildInternalDelegationHint(userMessage?: string, recommended?: { name:
       sendGmailMessage: 'delegate_to_astra',
     }
     let mappedTool = recommended.toolName && leafToDelegateMap[recommended.toolName]
+    // Guard: if the recommendation was a generic utility (time/weather) but the user message clearly mentions email/gmail, force Ami
+    try {
+      const low = (userMessage || '').toLowerCase()
+      const mentionsEmail = /(email|gmail|correo|bandeja|inbox|correos)/.test(low)
+      if (!mappedTool && mentionsEmail && (recommended.toolName === 'time' || recommended.toolName === 'weather')) {
+        mappedTool = 'delegate_to_ami'
+      }
+    } catch {}
     // Fallback by agent name if tool not provided
     if (!mappedTool && /ami/i.test(recommended.name || '')) mappedTool = 'delegate_to_ami'
     if (!mappedTool && /astra/i.test(recommended.name || '')) mappedTool = 'delegate_to_astra'
 
+    // If relative dates are present, recommend resolving time first
+    const hasRelativeTime = /\b(hoy|mañana|ayer|esta semana|esta noche|today|tomorrow|yesterday|tonight|this week)\b/i.test(userMessage || '')
+    const timeNudge = hasRelativeTime ? ' First, call getCurrentDateTime to resolve the exact date/time; then proceed.' : ''
     const toolPart = (mappedTool || recommended.toolName)
       ? ` Prefer tool: ${mappedTool || recommended.toolName}.`
       : ''
     const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
     // Encourage immediate action to avoid "direct_or_clarify" fallthroughs
     const actionPart = mappedTool ? ' Action: Call this tool now; do not answer directly.' : ''
-    return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}${actionPart}`
+  return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${timeNudge}${reasonPart}${actionPart}`
   }
   
   console.log(`🔄 [DELEGATION] No delegation hints available`)
@@ -137,6 +148,7 @@ const CLEO_IDENTITY_HEADER = `CLEO IDENTITY (TOP PRIORITY)
 // Compact, model-agnostic directive to standardize agent behavior for reliability and speed
 const AGENT_WORKFLOW_DIRECTIVE = `AGENT WORKFLOW (RELIABILITY & SPEED)
 - Routing: If an internal router hint is present, you MUST delegate via the matching delegate tool instead of answering directly. Examples: email triage→delegate_to_ami (which will use Gmail list/read), email compose→delegate_to_astra, Google Workspace→delegate_to_peter, Notion→delegate_to_notion_agent.
+- Relative-time resolution: If the user mentions relative dates (e.g., today/mañana/ayer/this week/tonight), first call getCurrentDateTime to resolve exact date/time in the user’s locale, then proceed with the appropriate tool/delegation.
 - Plan-then-act (brief): Form a short plan internally (1–2 steps). Do NOT reveal chain-of-thought; output only final answers and tool results.
 - Tool-first: Prefer a single correct tool call. Use at most 3 calls per turn. Stop early when sufficient.
 - Safety/timeouts: Keep calls quick; if a tool stalls or partial data is enough, stop and summarize. Ask one concise follow-up only if truly needed.

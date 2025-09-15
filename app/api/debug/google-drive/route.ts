@@ -18,12 +18,14 @@ export async function GET(request: NextRequest) {
     // Debug Google Drive connection
 
     // Check Google Drive connection
-    const { data: connection, error } = await (supabase as any)
+    // Support either legacy 'google-drive' or consolidated 'google-workspace' service IDs; prefer the most recent
+    const { data: connections, error } = await (supabase as any)
       .from("user_service_connections")
       .select("*")
       .eq("user_id", userData.user.id)
-      .eq("service_id", "google-drive")
-      .single()
+      .in("service_id", ["google-drive", "google-workspace"])
+      .order('updated_at', { ascending: false })
+      .limit(1)
 
     // Connection query completed
 
@@ -32,7 +34,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch connection", details: error }, { status: 500 })
     }
 
-    if (!connection) {
+  const connection = Array.isArray(connections) ? connections[0] : null
+
+  if (!connection) {
       return NextResponse.json({ 
         status: "not_connected",
         message: "No Google Drive connection found for this user",

@@ -20,7 +20,7 @@ const TIME_KEYWORDS = [
   // English
   'time', 'what time is it', 'current time', 'now', 'today', 'date', 'today\'s date',
   // Spanish
-  'hora', 'qué hora es', 'que hora es', 'fecha', 'fecha de hoy', 'hoy', 'ahora'
+  'hora', 'qué hora es', 'que hora es', 'fecha', 'fecha de hoy', 'ahora'
 ]
 
 const WEATHER_KEYWORDS = [
@@ -34,7 +34,8 @@ const EMAIL_TRIAGE_KEYWORDS = [
   // English triage/read/summarize
   'read my email', 'check inbox', 'check my inbox', 'summarize emails', 'email summary', 'unread emails', 'search emails', 'find emails',
   // Spanish triage
-  'lee mi correo', 'revisa bandeja', 'revisa mi bandeja', 'resumen de correos', 'correos no leídos', 'correos no leidos', 'buscar correos'
+  'lee mi correo', 'revisa bandeja', 'revisa mi bandeja', 'resumen de correos', 'correos no leídos', 'correos no leidos', 'buscar correos',
+  'correos de hoy', 'mis correos de hoy', 'revisa correos de hoy', 'dime mis correos de hoy'
 ]
 
 const EMAIL_COMPOSE_KEYWORDS = [
@@ -82,25 +83,7 @@ export function detectEarlyIntent(userText: string): RouterRecommendation | unde
   const text = (userText || '').toLowerCase().trim()
   if (!text) return undefined
 
-  // 1) Utility: Time / Date
-  if (includesAny(text, TIME_KEYWORDS)) {
-    return {
-      name: 'Direct Utility Tooling',
-      toolName: 'time',
-      reasons: ['time/date intent detected (Capa 0)', 'use getCurrentDateTime/time tool directly']
-    }
-  }
-
-  // 2) Utility: Weather
-  if (includesAny(text, WEATHER_KEYWORDS)) {
-    return {
-      name: 'Direct Utility Tooling',
-      toolName: 'weather',
-      reasons: ['weather intent detected (Capa 0)', 'use weather/weatherInfo tool directly']
-    }
-  }
-
-  // 3) Email triage vs compose
+  // 1) Email triage vs compose (PRIORITY over time/weather to avoid 'today' collisions)
   if (includesAny(text, EMAIL_TRIAGE_KEYWORDS)) {
     // Triage stays local to Ami via Gmail tools
     return {
@@ -125,6 +108,24 @@ export function detectEarlyIntent(userText: string): RouterRecommendation | unde
       name: 'Ami (Email Triage)',
       toolName: 'listGmailMessages',
       reasons: ['general email/gmail intent detected', 'route to Ami for safe triage by default']
+    }
+  }
+
+  // 2) Utility: Time / Date
+  if (includesAny(text, TIME_KEYWORDS)) {
+    return {
+      name: 'Direct Utility Tooling',
+      toolName: 'time',
+      reasons: ['time/date intent detected (Capa 0)', 'use getCurrentDateTime/time tool directly']
+    }
+  }
+
+  // 3) Utility: Weather
+  if (includesAny(text, WEATHER_KEYWORDS)) {
+    return {
+      name: 'Direct Utility Tooling',
+      toolName: 'weather',
+      reasons: ['weather intent detected (Capa 0)', 'use weather/weatherInfo tool directly']
     }
   }
 
