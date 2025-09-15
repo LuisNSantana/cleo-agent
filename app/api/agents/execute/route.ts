@@ -190,6 +190,66 @@ export async function POST(request: NextRequest) {
         console.warn('[API/execute] Wait-for-completion failed (continuing):', e)
       }
 
+      // Server-side persistence of assistant final message (best-effort, de-duped)
+      try {
+        if (
+          finalExecution &&
+          finalExecution.status === 'completed' &&
+          effectiveThreadId &&
+          authedUserId &&
+          Array.isArray(finalExecution.messages)
+        ) {
+          const aiMessages = (finalExecution.messages || []).filter((m: any) => m.type === 'ai' && (m.content || '').trim().length > 0)
+          const last = aiMessages[aiMessages.length - 1]
+          if (last) {
+            // Check if this execution's final message already exists (by metadata.executionId)
+            let exists = false
+            try {
+              const { data: existing, error: existErr } = await (supabase as any)
+                .from('agent_messages')
+                .select('id')
+                .eq('thread_id', effectiveThreadId)
+                .eq('user_id', authedUserId)
+                .eq('role', 'assistant')
+                .contains('metadata', { executionId: finalExecution.id })
+                .limit(1)
+              if (!existErr && Array.isArray(existing) && existing.length > 0) {
+                exists = true
+              }
+            } catch (e) {
+              // Non-fatal: proceed to try insert
+            }
+
+            if (!exists) {
+              const payload = {
+                thread_id: effectiveThreadId,
+                user_id: authedUserId,
+                role: 'assistant',
+                content: last.content || '',
+                tool_calls: last.toolCalls || null,
+                tool_results: null,
+                metadata: {
+                  ...(last.metadata || {}),
+                  sender: (last.metadata && (last.metadata as any).sender) || finalExecution.agentId || 'cleo-supervisor',
+                  executionId: finalExecution.id,
+                  source: 'server_execute_persist'
+                }
+              }
+              const { error: insertErr } = await (supabase as any)
+                .from('agent_messages')
+                .insert(payload)
+              if (insertErr) {
+                console.warn('[API/execute] Failed to persist assistant final message:', insertErr)
+              } else {
+                console.log('[API/execute] Persisted assistant final message for execution:', finalExecution.id)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[API/execute] Error during server-side final message persistence:', e)
+      }
+
       return NextResponse.json({
         success: true,
         execution: {

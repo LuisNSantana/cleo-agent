@@ -1132,7 +1132,7 @@ export default function AgentsChatPage() {
 
   return (
     <TooltipProvider>
-      <div className="py-2 sm:py-4">
+  <div className="py-2 sm:py-4 h-full overflow-hidden">
         {/* Dual-Mode Header with Controls */}
         {selectedAgent && (
           <motion.div 
@@ -1193,18 +1193,18 @@ export default function AgentsChatPage() {
           </motion.div>
         )}
 
-        <div className="space-y-4 sm:space-y-6 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 min-h-[calc(100dvh-160px)] sm:min-h-[calc(100dvh-200px)] w-full">
+        <div className="space-y-4 sm:space-y-6 w-full h-full overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 h-[calc(100dvh-200px)] sm:h-[calc(100dvh-220px)] w-full overflow-hidden">
             {/* Agent Selection Sidebar */}
-            <div className="hidden lg:block lg:col-span-1">
-            <Card className="h-full bg-slate-800/50 border-slate-700/50">
+            <div className="hidden lg:block lg:col-span-1 h-full overflow-hidden">
+            <Card className="h-full bg-slate-800/50 border-slate-700/50 overflow-hidden flex flex-col">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <RobotIcon className="w-6 h-6" />
                   Available Agents
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 p-4">
+              <CardContent className="space-y-3 p-4 overflow-y-auto">
                 {agents.length === 0 ? (
                   <div className="text-center py-8">
                     <RobotIcon className="w-12 h-12 mx-auto text-slate-600 mb-3" />
@@ -1258,8 +1258,8 @@ export default function AgentsChatPage() {
           </div>
 
           {/* Chat Area */}
-          <div className="lg:col-span-3">
-            <Card className="h-full bg-slate-800/50 border-slate-700/50 flex flex-col">
+          <div className="lg:col-span-3 h-full overflow-hidden">
+            <Card className="h-full bg-slate-800/50 border-slate-700/50 flex flex-col overflow-hidden">
               {selectedAgent ? (
                 <>
                   {/* Chat Header with avatar */}
