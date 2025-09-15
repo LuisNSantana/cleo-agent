@@ -44,7 +44,7 @@ export const openrouterModels: ModelConfig[] = [
   },
   // New: Meta Llama 3.1 405B Instruct (paid)
   {
-    id: "openrouter:meta-llama/meta-llama-3.1-405b-instruct",
+    id: "openrouter:meta-llama/llama-3.1-405b-instruct",
     name: "Meta Llama 3.1 405B Instruct",
     provider: "OpenRouter",
     providerId: "openrouter",
@@ -65,8 +65,8 @@ export const openrouterModels: ModelConfig[] = [
     openSource: false,
     speed: "Medium",
     intelligence: "High",
-    website: "https://openrouter.ai/meta-llama/meta-llama-3.1-405b-instruct",
-    apiDocs: "https://openrouter.ai/meta-llama/meta-llama-3.1-405b-instruct",
+  website: "https://openrouter.ai/meta-llama/llama-3.1-405b-instruct",
+  apiDocs: "https://openrouter.ai/meta-llama/llama-3.1-405b-instruct",
     modelPage: "https://ai.meta.com/llama/",
     releasedAt: "2025-08-01",
     icon: "meta",
@@ -78,7 +78,7 @@ export const openrouterModels: ModelConfig[] = [
           'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
         },
         baseURL: 'https://openrouter.ai/api/v1',
-      }).chat("meta-llama/meta-llama-3.1-405b-instruct"),
+    }).chat("meta-llama/llama-3.1-405b-instruct"),
   },
   // New free additions: Mistral Small 3.2 24B Instruct (free)
   {
@@ -319,46 +319,6 @@ export const openrouterModels: ModelConfig[] = [
         },
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("nvidia/nemotron-nano-9b-v2:free"),
-  },
-  // New: Llama 3.1 Nemotron Ultra 253B v1 (paid)
-  {
-    id: "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    name: "Llama 3.1 Nemotron Ultra 253B v1",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "Nemotron",
-    baseProviderId: "nvidia",
-    description:
-      "NVIDIA Llama 3.1 Nemotron Ultra 253B v1: advanced reasoning and tool-calling; free tier via OpenRouter.",
-    tags: ["nvidia", "nemotron", "ultra", "reasoning", "tool-calling", "openrouter", "free"],
-    contextWindow: 131072,
-  inputCost: 0.0,
-  outputCost: 0.0,
-    priceUnit: "per 1M tokens",
-    vision: false,
-    tools: true,
-    audio: false,
-    reasoning: true,
-    webSearch: false,
-    openSource: true,
-    speed: "Medium",
-    intelligence: "High",
-  website: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1",
-  apiDocs: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1",
-  modelPage: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    releasedAt: "2025-07-22",
-    icon: "nvidia",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-        headers: {
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
-        },
-        baseURL: 'https://openrouter.ai/api/v1',
-      }).chat(
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1"
-      ),
   },
   // New: Sonoma Sky Alpha (tools: true)
   {

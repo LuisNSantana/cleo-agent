@@ -51,8 +51,8 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:nvidia/nemotron-nano-9b-v2:free",
     "openrouter:qwen/qwen3-next-80b-a3b-thinking",
     // High-end additions (paid)
-    "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "openrouter:meta-llama/meta-llama-3.1-405b-instruct",
+  // Removed deprecated Nemotron Ultra 253B
+  "openrouter:meta-llama/llama-3.1-405b-instruct",
     // Meta Llama 4 Maverick
     "openrouter:meta-llama/llama-4-maverick",
     // Fast vision companion

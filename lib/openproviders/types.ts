@@ -149,11 +149,11 @@ export type OpenRouterModel =
   | "openrouter:openrouter/sonoma-sky-alpha"
   | "openrouter:mistralai/mistral-small-3.2-24b-instruct:free"
   | "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
-  | "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1"
+  // removed deprecated: "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1"
   | "openrouter:tngtech/deepseek-r1t-chimera:free"
   | "openrouter:nvidia/nemotron-nano-9b-v2:free"
   | "openrouter:qwen/qwen3-next-80b-a3b-thinking"
-  | "openrouter:meta-llama/meta-llama-3.1-405b-instruct"
+  | "openrouter:meta-llama/llama-3.1-405b-instruct"
 
 // Static Ollama models for type safety
 export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"
