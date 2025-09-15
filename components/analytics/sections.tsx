@@ -101,7 +101,16 @@ export function ToolsSection({ tools }: { tools: Array<{ tool_name: string; usag
         <CardDescription>Tool invocations</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} colors={[CHART_PALETTE[8], CHART_PALETTE[0], CHART_PALETTE[1], CHART_PALETTE[3], CHART_PALETTE[4]]} /> : <div className="text-muted-foreground text-sm">No data.</div>}
+  {data.length ? (
+          <BarChart
+            data={data}
+            colors={[CHART_PALETTE[8], CHART_PALETTE[0], CHART_PALETTE[1], CHART_PALETTE[3], CHART_PALETTE[4]]}
+            scrollable
+            minBarWidth={22}
+          />
+        ) : (
+          <div className="text-muted-foreground text-sm">No data.</div>
+        )}
       </CardContent>
     </Card>
   )
