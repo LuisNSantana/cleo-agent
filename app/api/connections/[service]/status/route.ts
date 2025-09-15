@@ -42,18 +42,11 @@ export async function GET(
       userError = authError
     }
     
-    if (userError) {
-      console.error("[STATUS API] Supabase auth error:", userError)
-      return NextResponse.json({ 
-        error: "Authentication failed", 
-        details: (userError as any)?.message || 'Unknown auth error',
-        code: (userError as any)?.code || 'unknown'
-      }, { status: 401 })
-    }
-    
-    if (!userData?.user) {
-      console.error("[STATUS API] No user data found in session")
-      return NextResponse.json({ error: "No user session" }, { status: 401 })
+    if (userError || !userData?.user) {
+      // Graceful unauthenticated fallback: return disconnected instead of 401
+      console.warn("[STATUS API] No auth session; returning disconnected status for:", canonicalService)
+      // For aggregated UI, it's better to respond 200 with a safe default
+      return NextResponse.json({ connected: false, account: null })
     }
 
     console.log(`[STATUS API] User authenticated: ${userData.user.id}`)

@@ -12,7 +12,13 @@ export async function GET(request: NextRequest) {
     const { data: userData, error: userError } = await supabase.auth.getUser()
     
     if (userError || !userData?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      // Graceful unauthenticated fallback: return default map
+      const services = ["google-workspace", "notion"]
+      const connectionStatus: Record<string, { connected: boolean; account?: string | null }> = {}
+      services.forEach((serviceId) => {
+        connectionStatus[serviceId] = { connected: false, account: null }
+      })
+      return NextResponse.json(connectionStatus)
     }
 
     // Check connection status for each service
