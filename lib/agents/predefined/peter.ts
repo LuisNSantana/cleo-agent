@@ -10,9 +10,9 @@ export const PETER_AGENT: AgentConfig = {
   name: 'Peter',
   description: 'Google Workspace specialist with expertise in Google Docs, Sheets, Drive, Calendar, and productivity automation',
   role: 'specialist',
-  model: 'mistral-medium-2508',
+  model: 'openrouter:meta-llama/llama-4-maverick:free',
   temperature: 0.6,
-  maxTokens: 32000,
+  maxTokens: 32768,
   tools: [
     // Document CREATION tools (primary focus)
     'createGoogleDoc',

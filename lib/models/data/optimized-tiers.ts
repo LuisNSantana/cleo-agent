@@ -23,36 +23,36 @@ import { ModelConfig } from "../types"
  * SMARTER: Premium models for complex reasoning and advanced tasks
  */
 
-// FAST TIER - Optimized for speed and cost with vision support
+// FAST TIER - Optimized for speed and cost
 const fastModels: ModelConfig[] = [
   {
-    id: "claude-3-5-haiku-20241022",
+    id: "openrouter:openai/gpt-oss-120b:free",
     name: "Fast",
-    provider: "Anthropic",
-    providerId: "anthropic", 
-    modelFamily: "Claude 3.5",
-    baseProviderId: "claude",
-    description: "Lightning-fast Claude 3.5 Haiku with excellent vision capabilities. Perfect for quick document analysis and multimodal tasks.",
-    inputCost: 0.25,
-    outputCost: 1.25,
-    priceUnit: "per 1M tokens",
-    tags: ["fast", "vision", "tools", "multimodal", "cost-effective"],
-    contextWindow: 200000,
-    vision: true,
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GPT-OSS",
+    baseProviderId: "openrouter",
+    description: "OpenAI GPT-OSS 120B via OpenRouter (free). Great balance of speed and quality for text tasks.",
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "free tier",
+    tags: ["fast", "open-source", "tools", "cost-effective", "free"],
+    contextWindow: 32768, // per OpenRouter page as of 2025-09-15
+    vision: false, // text-only primary fast model
     tools: true,
     audio: false,
     reasoning: true,
-    openSource: false,
+    openSource: true,
     speed: "Fast",
     intelligence: "High",
-    website: "https://www.anthropic.com",
+    website: "https://openrouter.ai",
     icon: "faster",
     defaults: {
-      temperature: 0.3,
+      temperature: 0.4,
       topP: 0.9,
-      maxTokens: 8192, // Claude 3.5 Haiku max output limit
+      maxTokens: 8192, // optimize for larger generations while staying safe
     },
-    apiSdk: (apiKey?: string) => openproviders("claude-3-5-haiku-20241022", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("openrouter:openai/gpt-oss-120b:free", undefined, apiKey),
   }
 ]
 
@@ -131,35 +131,65 @@ const optimizedModels: ModelConfig[] = [
 
 // FALLBACK MODELS - Secondary options when primary models fail
 const fallbackModels: ModelConfig[] = [
-  // Fast tier fallback - Grok-3 Mini (text-only, but very fast)
+  // Fast tier vision companion - Sonoma Dusk Alpha (OpenRouter, free, vision-enabled)
   {
-    id: "grok-3-mini-fallback",
-    name: "Fast (Fallback)",
-    provider: "xAI",
-    providerId: "xai",
-    modelFamily: "Grok",
-    baseProviderId: "xai",
-    description: "Fallback option for Fast tier. Ultra-fast text responses with live search, but limited vision capabilities.",
-    webSearch: true,
-    inputCost: 0.4,
-    outputCost: 0.4,
-    priceUnit: "per 1M tokens",
-    tags: ["fallback", "fast", "live-search", "text-only"],
-    contextWindow: 131072,
-    vision: false, // Limited vision capabilities
+    id: "openrouter:openrouter/sonoma-dusk-alpha",
+    name: "Fast Vision",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Sonoma Dusk",
+    baseProviderId: "openrouter",
+    description: "Vision-capable Fast-tier model for analyzing images and documents (free via OpenRouter).",
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "free tier",
+    tags: ["fast", "vision", "multimodal", "free"],
+    contextWindow: 32768,
+    vision: true,
     tools: true,
     audio: false,
-    reasoning: false,
+    reasoning: true,
     openSource: false,
     speed: "Fast",
-    intelligence: "Medium",
-    website: "https://x.ai",
+    intelligence: "High",
+    website: "https://openrouter.ai/openrouter/sonoma-dusk-alpha",
     icon: "faster",
     defaults: {
-      temperature: 0.3,
+      temperature: 0.4,
+      topP: 0.9,
+      maxTokens: 4096,
+    },
+    apiSdk: (apiKey?: string) => openproviders("openrouter:openrouter/sonoma-dusk-alpha", undefined, apiKey),
+  },
+
+  // Fast tier fallback - DeepSeek Chat (free)
+  {
+    id: "openrouter:deepseek/deepseek-chat-v3.1:free",
+    name: "Fast (Fallback)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "DeepSeek",
+    baseProviderId: "openrouter",
+    description: "Fallback option for Fast tier. DeepSeek Chat free via OpenRouter.",
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "free tier",
+    tags: ["fallback", "free", "text-only"],
+    contextWindow: 131072,
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "Medium",
+    website: "https://openrouter.ai",
+    icon: "faster",
+    defaults: {
+      temperature: 0.4,
       topP: 0.9,
     },
-    apiSdk: (apiKey?: string) => getXAIModel("grok-3-mini", apiKey) as any,
+    apiSdk: (apiKey?: string) => openproviders("openrouter:deepseek/deepseek-chat-v3.1:free", undefined, apiKey),
   },
   
   // Balanced tier fallback - Mistral Large

@@ -2,6 +2,171 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { ModelConfig } from "../types"
 
 export const openrouterModels: ModelConfig[] = [
+  // Venice Uncensored: Dolphin Mistral 24B Venice Edition (free)
+  {
+    id: "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    name: "Dolphin Mistral 24B Venice (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Mistral",
+    baseProviderId: "cognitivecomputations",
+    description:
+      "Venice Uncensored Dolphin Mistral 24B Venice Edition: steerable instruction model; minimal refusals. Use respectfully.",
+    tags: ["venice", "dolphin", "mistral", "uncensored", "tool-calling", "openrouter", "free"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "Medium",
+    website: "https://openrouter.ai/cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    apiDocs: "https://openrouter.ai/cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    modelPage: "https://venice.ai/blog/introducing-dolphin-mistral-24b-venice-edition-the-most-uncensored-ai-model-yet",
+    releasedAt: "2025-08-25",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+      ),
+  },
+  // New free additions: Mistral Small 3.2 24B Instruct (free)
+  {
+    id: "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
+    name: "Mistral Small 3.2 24B (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Mistral",
+    baseProviderId: "mistralai",
+    description:
+      "Mistral Small 3.2 24B Instruct (free): compact 24B model tuned for instruction following and tool use; good for assistants and productivity.",
+    tags: ["mistral", "instruction", "tool-calling", "openrouter", "free"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "Medium",
+    website: "https://openrouter.ai/mistralai/mistral-small-3.2-24b-instruct:free",
+    apiDocs: "https://openrouter.ai/mistralai/mistral-small-3.2-24b-instruct:free",
+    modelPage: "https://openrouter.ai/mistralai/mistral-small-3.2-24b-instruct:free",
+    releasedAt: "2025-06-15",
+    icon: "mistral",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "mistralai/mistral-small-3.2-24b-instruct:free"
+      ),
+  },
+  // New free additions: Google Gemma 3 27B IT (free)
+  {
+    id: "openrouter:google/gemma-3-27b-it:free",
+    name: "Gemma 3 27B IT (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Gemma",
+    baseProviderId: "google",
+    description:
+      "Gemma 3 27B IT (free): multimodal-capable IT-tuned model with strong chat, reasoning, and function calling; 128k context.",
+    tags: ["gemma", "google", "instruction", "tool-calling", "openrouter", "free"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/google/gemma-3-27b-it:free",
+    apiDocs: "https://openrouter.ai/google/gemma-3-27b-it:free",
+    modelPage: "https://openrouter.ai/google/gemma-3-27b-it:free",
+    releasedAt: "2025-07-10",
+    icon: "google",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "google/gemma-3-27b-it:free"
+      ),
+  },
+  // New free additions: Meta Llama 4 Maverick (free)
+  {
+    id: "openrouter:meta-llama/llama-4-maverick:free",
+    name: "Llama 4 Maverick (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Llama 4",
+    baseProviderId: "meta-llama",
+    description:
+      "Llama 4 Maverick (free): optimized for vision-language tasks with strong visual reasoning; large context window.",
+    tags: ["llama4", "vision", "multimodal", "reasoning", "openrouter", "free"],
+    contextWindow: 524288, // conservatively 512k; claims vary up to 1M
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
+    apiDocs: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
+    modelPage: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
+    releasedAt: "2025-04-05",
+    icon: "meta",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "meta-llama/llama-4-maverick:free"
+      ),
+  },
+  // New free additions: Meta Llama 4 Scout (free)
+  {
+    id: "openrouter:meta-llama/llama-4-scout:free",
+    name: "Llama 4 Scout (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Llama 4",
+    baseProviderId: "meta-llama",
+    description:
+      "Llama 4 Scout (free): MOE-based, assistant-style model with massive context and strong vision-language reasoning.",
+    tags: ["llama4", "moe", "vision", "multimodal", "reasoning", "openrouter", "free"],
+    contextWindow: 1048576, // 1M tokens typical claim for Scout
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/meta-llama/llama-4-scout:free",
+    apiDocs: "https://openrouter.ai/meta-llama/llama-4-scout:free",
+    modelPage: "https://openrouter.ai/meta-llama/llama-4-scout:free",
+    releasedAt: "2025-06-01",
+    icon: "meta",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "meta-llama/llama-4-scout:free"
+      ),
+  },
   // New: Z.AI GLM 4.5 (tools: likely true)
   {
     id: "openrouter:z-ai/glm-4.5",
@@ -67,6 +232,72 @@ export const openrouterModels: ModelConfig[] = [
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
       }).chat("nvidia/nemotron-nano-9b-v2:free"),
+  },
+  // New: Llama 3.1 Nemotron Ultra 253B v1 (free)
+  {
+    id: "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    name: "Llama 3.1 Nemotron Ultra 253B v1 (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Nemotron",
+    baseProviderId: "nvidia",
+    description:
+      "NVIDIA Llama 3.1 Nemotron Ultra 253B v1: advanced reasoning and tool-calling; free tier via OpenRouter.",
+    tags: ["nvidia", "nemotron", "ultra", "reasoning", "tool-calling", "openrouter", "free"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    apiDocs: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    modelPage: "https://openrouter.ai/nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    releasedAt: "2025-07-22",
+    icon: "nvidia",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1:free"
+      ),
+  },
+  // New: DeepSeek R1T Chimera (free)
+  {
+    id: "openrouter:tngtech/deepseek-r1t-chimera:free",
+    name: "DeepSeek R1T Chimera (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "DeepSeek",
+    baseProviderId: "tngtech",
+    description:
+      "DeepSeek R1T Chimera: merged R1 + V3 for reasoning with efficient generation. Free via OpenRouter.",
+    tags: ["deepseek", "chimera", "reasoning", "openrouter", "free"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/tngtech/deepseek-r1t-chimera:free",
+    apiDocs: "https://openrouter.ai/tngtech/deepseek-r1t-chimera:free",
+    modelPage: "https://huggingface.co/tngtech/DeepSeek-R1T-Chimera",
+    releasedAt: "2025-06-30",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+        "tngtech/deepseek-r1t-chimera:free"
+      ),
   },
   // New: Qwen3-Next 80B (tools: true)
   {

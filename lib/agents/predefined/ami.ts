@@ -11,9 +11,9 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'claude-3-5-haiku-20241022',
+  model: 'openrouter:openai/gpt-oss-120b:free',
   temperature: 0.5,
-  maxTokens: 8192,
+  maxTokens: 32768,
   tools: [
     'listCalendarEvents', // List calendar events
     'createCalendarEvent', // Create new events

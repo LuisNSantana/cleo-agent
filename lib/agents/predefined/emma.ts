@@ -10,9 +10,9 @@ export const EMMA_AGENT: AgentConfig = {
   name: 'Emma',
   description: 'E-commerce and Shopify specialist with expertise in store optimization, product management, and sales analytics',
   role: 'specialist',
-  model: 'claude-3-5-haiku-20241022',
-  temperature: 0.3,
-  maxTokens: 8192,
+  model: 'openrouter:google/gemma-3-27b-it:free',
+  temperature: 0.4,
+  maxTokens: 16384,
   tools: ['shopifyGetProducts', 'shopifyGetOrders', 'shopifyGetAnalytics', 'shopifyGetCustomers', 'shopifySearchProducts', 'shopifyUpdateProductPrice', 'complete_task'],
   tags: ['ecommerce', 'shopify', 'sales', 'inventory', 'store', 'analytics', 'business', 'customer'],
   prompt: `You are Emma, the e-commerce & Shopify specialist.

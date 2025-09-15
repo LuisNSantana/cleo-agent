@@ -16,41 +16,44 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
-  // Guest mode: Fast tier with vision support
-  "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (primary)
-  "openrouter:z-ai/glm-4.5", // GLM 4.5 - Default for guests (strong reasoning & coding)
-  "openrouter:deepseek/deepseek-chat-v3.1:free", // DeepSeek V3.1 Free - Production guest model
-  "grok-3-mini-fallback", // Fast - Grok-3 Mini (fallback, text-only)
-  "gpt-4o-mini", // Emergency fallback
-  "langchain:fast",
+  // Guest mode: Fast tier (text-only) + fallbacks
+  "openrouter:openai/gpt-oss-120b:free", // Fast - OpenRouter GPT-OSS 120B (free)
+  "openrouter:z-ai/glm-4.5", // GLM 4.5 - optional guest model
+  "openrouter:deepseek/deepseek-chat-v3.1:free", // DeepSeek V3.1 Free - fallback
+  "openrouter:mistralai/mistral-small-3.2-24b-instruct:free", // Mistral Small 3.2 24B (free)
+  "openrouter:google/gemma-3-27b-it:free", // Gemma 3 27B IT (free)
+  "openrouter:meta-llama/llama-4-maverick:free", // Llama 4 Maverick (free)
+  "openrouter:meta-llama/llama-4-scout:free", // Llama 4 Scout (free)
+  "gpt-4o-mini", // Emergency fallback (vision)
 ]
 
 // Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
   // Free tier: Fast + Balanced with fallbacks
-  "claude-3-5-haiku-20241022", // Fast - Claude 3.5 Haiku (vision support)
-  "gpt-oss-120b", // Balanced - GPT-OSS 120B via Groq
-  "grok-3-mini-fallback", // Fast fallback
-  "mistral-large-latest-fallback", // Balanced fallback
+  "openrouter:openai/gpt-oss-120b:free", // Fast - OpenRouter GPT-OSS 120B (text-only)
+  "openrouter:openrouter/sonoma-dusk-alpha", // Fast Vision - Sonoma Dusk (free)
+  // Balanced-class free choices via OpenRouter
+  "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
+  "openrouter:google/gemma-3-27b-it:free",
+  "openrouter:meta-llama/llama-4-maverick:free",
+  "openrouter:meta-llama/llama-4-scout:free",
+  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+  "openrouter:tngtech/deepseek-r1t-chimera:free",
+  "openrouter:deepseek/deepseek-chat-v3.1:free", // Fast fallback
   "gpt-4o-mini", // Emergency fallback  
-  "langchain:fast",
   // OpenRouter selected cost-effective models (for authenticated users)
   "openrouter:deepseek/deepseek-r1:free",
-  "openrouter:deepseek/deepseek-chat-v3.1:free", // Added for guest mode production
   "openrouter:qwen/qwen2.5-32b-instruct",
   // Added core provider models for authenticated users
-  "mistral-large-latest",
-  "mistral-small-latest",
-  "llama-4-maverick",
-  "llama-3-3-70b-groq",
-  "llama-3-1-8b-groq",
+  // Removed Mistral SDK Small/Medium and Groq Llama variants from default lists
 ]
 
 // Default authenticated model: use Fast tier (best for most users)
-export const MODEL_DEFAULT = "claude-3-5-haiku-20241022"
+export const MODEL_DEFAULT = "openrouter:openai/gpt-oss-120b:free"
 
 // MODELO POR DEFECTO PARA GUESTS - FORZADO A DEEPSEEK
-export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"
+export const MODEL_DEFAULT_GUEST = "openrouter:openai/gpt-oss-120b:free"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

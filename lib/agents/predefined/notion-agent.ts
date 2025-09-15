@@ -12,9 +12,9 @@ export const NOTION_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'claude-3-5-haiku-20241022',
+  model: 'openrouter:google/gemma-3-27b-it:free',
   temperature: 0.3,
-  maxTokens: 8192,
+  maxTokens: 16384,
   tools: [
     // Core Notion management
     'get-notion-page',

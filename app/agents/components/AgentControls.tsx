@@ -153,7 +153,7 @@ export function AgentControls({ selectedAgent, onAgentUpdate }: AgentControlsPro
                 </SelectTrigger>
               <SelectContent>
                 <SelectItem value="langchain:balanced">Balanced</SelectItem>
-                <SelectItem value="langchain:fast">Fast</SelectItem>
+                {/* Hidden: langchain fast preset removed in favor of OpenRouter Fast */}
               </SelectContent>
               </Select>
             </div>

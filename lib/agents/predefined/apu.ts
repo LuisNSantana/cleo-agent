@@ -1,11 +1,6 @@
 /**
- * A  id: 'apu-research',
-  name: 'Apu',
-  description: 'Specialist in advanced web intelligence using SerpAPI (Google, News, Scholar, Maps) with structured summarization.',
-  role: 'specialist',
-  model: 'llama-3.3-70b-versatile',
-  temperature: 0.3,erpAPI & Web Intelligence Research Specialist
- * High-performance multi-source search, news monitoring, academic lookup, local/business intelligence.
+ * Apu – SerpAPI & Web Intelligence Research Specialist
+ * High-performance multi-source search, news monitoring, academic lookup, and local/business intelligence.
  */
 
 import { AgentConfig } from '../types'
@@ -15,9 +10,9 @@ export const APU_AGENT: AgentConfig = {
   name: 'Apu',
   description: 'Specialist in advanced web intelligence using SerpAPI (Google, News, Scholar, Maps) with structured summarization.',
   role: 'specialist',
-  model: 'llama-3.3-70b-versatile',
-  temperature: 0.3,
-  maxTokens: 16384,
+  model: 'openrouter:openai/gpt-4.1-mini',
+  temperature: 0.5,
+  maxTokens: 32768,
   tools: [
     // Core SerpAPI suite (consolidated from Ami)
     'serpGeneralSearch',

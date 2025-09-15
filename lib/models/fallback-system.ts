@@ -13,17 +13,19 @@ const modelFallbacks: Record<string, string> = {
   // FREE TIER - DeepSeek V3.1 as primary for guests, Llama 3.3 as fallback
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:meta-llama/llama-3.3-8b-instruct:free",
   "openrouter:meta-llama/llama-3.3-8b-instruct:free": "gpt-4o-mini",
-  
-  // FAST TIER - Claude 3.5 Haiku as primary, Grok-3 Mini as fallback
-  "claude-3-5-haiku-20241022": "grok-3-mini",
-  
+
+  // FAST TIER - OpenRouter GPT-OSS 120B (free) as primary, DeepSeek free as fallback
+  "openrouter:openai/gpt-oss-120b:free": "openrouter:deepseek/deepseek-chat-v3.1:free",
+  // Fast Vision companion - Sonoma falls back to GPT-4o-mini if unavailable
+  "openrouter:openrouter/sonoma-dusk-alpha": "gpt-4o-mini",
+
   // BALANCED TIER - GPT-OSS 120B as primary, Mistral Large as fallback  
   "gpt-oss-120b": "mistral-large-latest-fallback",
-  
+
   // SMARTER TIER - GPT-5 Mini as primary, Claude 3.5 Sonnet as fallback
   "gpt-5-mini": "claude-3-5-sonnet-20241022",
   "gpt-5-mini-2025-08-07": "claude-3-5-sonnet-20241022", // Fixed: correct model name
-  
+
   // Additional fallbacks for common models
   "gpt-4o": "claude-3-5-sonnet-20241022",
   "gpt-4o-mini": "claude-3-5-haiku-20241022",
@@ -32,8 +34,11 @@ const modelFallbacks: Record<string, string> = {
 
 // Reverse mapping for fallback to primary
 const FALLBACK_TO_PRIMARY_MAP: Record<string, string> = {
-  "grok-3-mini-fallback": "claude-3-5-haiku-20241022",
+  // Fast
+  "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:openai/gpt-oss-120b:free",
+  // Balanced
   "mistral-large-latest-fallback": "gpt-oss-120b", 
+  // Smarter
   "claude-3-5-sonnet-latest-fallback": "gpt-5-mini-2025-08-07",
 }
 
@@ -84,15 +89,15 @@ export function modelHasVision(modelId: string): boolean {
 export function getBestVisionModel(tier: 'fast' | 'balanced' | 'smarter'): string {
   switch (tier) {
     case 'fast':
-      return 'claude-3-5-haiku-20241022' // Has vision
+      // Fast primary is text-only; use Sonoma Dusk Alpha (OpenRouter, free) for vision
+      return 'openrouter:openrouter/sonoma-dusk-alpha'
     case 'balanced':
-      // GPT-OSS 120B doesn't have vision, so use fallback that might have it
-      // or recommend upgrading to smarter tier
-      return 'claude-3-5-haiku-20241022' // Recommend fast tier for vision on budget
+      // Balanced primary doesn't have vision; borrow Fast's vision companion
+      return 'openrouter:openrouter/sonoma-dusk-alpha'
     case 'smarter':
       return 'gpt-5-mini-2025-08-07' // Has vision
     default:
-      return 'claude-3-5-haiku-20241022'
+      return 'openrouter:openrouter/sonoma-dusk-alpha'
   }
 }
 
@@ -143,7 +148,7 @@ export function getRecommendedModel(requirements: {
  */
 export function getModelTier(modelId: string): 'free' | 'fast' | 'balanced' | 'smarter' | 'unknown' {
   const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:meta-llama/llama-3.3-8b-instruct:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free']
-  const fastModels = ['claude-3-5-haiku-20241022', 'grok-3-mini-fallback', 'openai:gpt-4o-mini']
+  const fastModels = ['openrouter:openai/gpt-oss-120b:free', 'openrouter:openrouter/sonoma-dusk-alpha', 'openai:gpt-4o-mini']
   const balancedModels = ['groq:llama-3.3-70b-versatile', 'mistral-large-latest-fallback']
   const smarterModels = ['gpt-5-mini-2025-08-07', 'claude-3-5-sonnet-latest-fallback']
   

@@ -5,8 +5,25 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // OpenRouter models
   "openrouter:z-ai/glm-4.5": "openrouter",
   "z-ai/glm-4.5": "openrouter",
+  "openrouter:openai/gpt-oss-120b:free": "openrouter",
+  "openrouter:openai/gpt-4.1-mini": "openrouter",
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
   "deepseek/deepseek-chat-v3.1:free": "openrouter",
+  "openrouter:openrouter/sonoma-dusk-alpha": "openrouter",
+  "openrouter/sonoma-dusk-alpha": "openrouter",
+  // New OpenRouter free additions
+  "openrouter:mistralai/mistral-small-3.2-24b-instruct:free": "openrouter",
+  "mistralai/mistral-small-3.2-24b-instruct:free": "openrouter",
+  "openrouter:google/gemma-3-27b-it:free": "openrouter",
+  "google/gemma-3-27b-it:free": "openrouter",
+  "openrouter:meta-llama/llama-4-maverick:free": "openrouter",
+  "meta-llama/llama-4-maverick:free": "openrouter",
+  "openrouter:meta-llama/llama-4-scout:free": "openrouter",
+  "meta-llama/llama-4-scout:free": "openrouter",
+  // Additional OpenRouter free models
+  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
+  "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free": "openrouter",
+  "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
 
   o1: "openai",
   "o1-2024-12-17": "openai",

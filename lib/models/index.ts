@@ -37,19 +37,8 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Keep 3-tier primaries + LangChain orchestrators, and add key Mistral/Meta models
+// Keep 3-tier primaries + LangChain orchestrators, and add key OpenRouter free models
 const extraProviderModels: ModelConfig[] = [
-  // Mistral (flagship + small)
-  ...pickById(mistralModels, [
-    "mistral-medium-2508",
-    "mistral-small-latest",
-  ]),
-  // Meta (Llama) main variants
-  ...pickById(llamaModels, [
-    "llama-4-maverick",
-    "llama-3-3-70b-groq",
-    "llama-3-1-8b-groq",
-  ]),
   // OpenRouter: Tool-calling enabled models only
   ...pickById(openrouterModels, [
     "openrouter:nvidia/nemotron-nano-9b-v2:free",
@@ -58,11 +47,17 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:openrouter/sonoma-dusk-alpha",
     "openrouter:openai/gpt-4.1-mini",
     "openrouter:z-ai/glm-4.5",
+    // New free additions surfaced in selector
+    "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
+    "openrouter:google/gemma-3-27b-it:free",
+    "openrouter:meta-llama/llama-4-maverick:free",
+    "openrouter:meta-llama/llama-4-scout:free",
+    "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    "openrouter:tngtech/deepseek-r1t-chimera:free",
   ]),
-  // Google Gemini: Native Gemini 2.5 Flash Lite
-  ...pickById(geminiModels, [
-    "gemini-2.5-flash-lite",
-  ]),
+  // Google Gemini: Native Gemini 2.5 Flash Lite (keep)
+  ...pickById(geminiModels, ["gemini-2.5-flash-lite"]),
 ]
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([

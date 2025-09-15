@@ -82,7 +82,10 @@ export function AgentGraph({
 
   // Convert our data to React Flow format
   const initialNodes: Node[] = useMemo(() => {
-    const baseNodes = storeNodes.map((nodeData) => {
+    // Hide the raw cleo-supervisor agent node to avoid duplication with the dedicated router-node
+    const baseNodes = storeNodes
+      .filter((nodeData) => nodeData.id !== 'cleo-supervisor')
+      .map((nodeData) => {
       // Determine status based on current execution and execution steps
       let nodeStatus = 'idle'
       
@@ -214,8 +217,14 @@ export function AgentGraph({
 
     // Response node showing latest AI message (always visible)
     const responseNode: Node = (() => {
-      const exec = currentExecution || executions[0]
-      const lastAi = exec ? [...(exec.messages || [])].reverse().find(m => m.type === 'ai') : undefined
+      // Prefer the actively running execution, then a user-selected one, then the most recent by startTime
+      const pickLatest = (list: AgentExecution[]) =>
+        list && list.length > 0
+          ? [...list].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0]
+          : undefined
+      const exec = currentExecution || selectedExecution || pickLatest(executions)
+      const aiMessages = exec ? (exec.messages || []).filter(m => m.type === 'ai') : []
+      const lastAi = aiMessages.length > 0 ? aiMessages[aiMessages.length - 1] : undefined
       const isCompleted = exec?.status === 'completed'
       const content = lastAi?.content
         || (isCompleted
@@ -248,7 +257,7 @@ export function AgentGraph({
   const stateNode: Node | null = null
 
   return [...baseNodes, routerNode, finalizeNode, responseNode]
-  }, [storeNodes, executeAgent, executions, currentExecution, currentStep, minimalMode])
+  }, [storeNodes, executeAgent, executions, currentExecution, selectedExecution, currentStep, minimalMode])
 
   const initialEdges: Edge[] = useMemo(() => {
     // Base edges from store, but hide noisy tool/handoff edges (e.g., delegate, complete_task)
@@ -259,6 +268,12 @@ export function AgentGraph({
         if (edgeData.type === 'handoff') return false
         if (label.includes('delegate') || label.includes('delegar')) return false
         if (label.includes('complete_task') || label.includes('complete')) return false
+        // Also hide any edges that reference the hidden cleo-supervisor node
+        if (edgeData.source === 'cleo-supervisor' || edgeData.target === 'cleo-supervisor') return false
+        // Hide edges that would target or originate from our synthetic nodes to avoid duplication
+        if (edgeData.source === 'router-node' || edgeData.target === 'router-node') return false
+        if (edgeData.source === 'finalize-node' || edgeData.target === 'finalize-node') return false
+        if (edgeData.source === 'response-node' || edgeData.target === 'response-node') return false
         return true
       })
   .map((edgeData) => ({
@@ -276,8 +291,9 @@ export function AgentGraph({
     }))
 
     // Add router edges: router -> specialists (highlight if used recently)
-    const routerEdges: Edge[] = []
-    const specialistNodes = storeNodes.filter(n => n.data.agent?.role === 'specialist')
+  const routerEdges: Edge[] = []
+  // Only include real specialist nodes; exclude any accidental supervisor/base entries
+  const specialistNodes = storeNodes.filter(n => n.data?.agent && n.data.agent.role === 'specialist')
     specialistNodes.forEach(specialist => {
       const recentlyUsed = (() => {
         // Check if this specialist was used in recent executions via steps
