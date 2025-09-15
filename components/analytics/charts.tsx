@@ -107,15 +107,23 @@ type BarChartProps = {
   height?: number
   className?: string
   colors?: string[]
+  // When true, uses a fixed per-bar width and enables horizontal scroll if content exceeds container
+  scrollable?: boolean
+  // Only used when scrollable=true; default 20px
+  minBarWidth?: number
 }
 
-export function BarChart({ data, height = 140, className, colors = CHART_PALETTE }: BarChartProps) {
+export function BarChart({ data, height = 140, className, colors = CHART_PALETTE, scrollable = false, minBarWidth = 20 }: BarChartProps) {
   const max = Math.max(1, ...data.map(d => d.value))
-  const barWidth = Math.max(8, Math.floor(280 / Math.max(1, data.length)))
+  // In non-scrollable mode, keep compact bars to fit within typical card widths.
+  const compactBarWidth = Math.max(8, Math.floor(280 / Math.max(1, data.length)))
+  const barWidth = scrollable ? Math.max(12, minBarWidth) : compactBarWidth
 
   return (
     <TooltipProvider>
-      <div className={cn('flex items-end gap-2', className)} style={{ height }}>
+      {/* If scrollable, wrap in overflow-x container and make inner track min-w-max so it grows with content */}
+      <div className={cn(scrollable ? 'overflow-x-auto' : undefined, className)} style={{ height }}>
+        <div className={cn('flex items-end gap-2', scrollable ? 'min-w-max pr-2' : undefined)} style={{ height: '100%' }}>
         {data.map((d, i) => (
           <div key={i} className="group flex flex-col items-center">
             <Tooltip>
@@ -134,6 +142,7 @@ export function BarChart({ data, height = 140, className, colors = CHART_PALETTE
             <span className="text-muted-foreground mt-1 line-clamp-1 w-14 break-words text-2xs">{d.label}</span>
           </div>
         ))}
+        </div>
       </div>
     </TooltipProvider>
   )

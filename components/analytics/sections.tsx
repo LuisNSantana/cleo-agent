@@ -65,7 +65,7 @@ export function ModelsSection({ modelUsage }: { modelUsage: Array<{ model_name: 
         <CardDescription>Messages by model</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} /> : <div className="text-muted-foreground text-sm">No data.</div>}
+  {data.length ? <BarChart data={data} scrollable minBarWidth={22} /> : <div className="text-muted-foreground text-sm">No data.</div>}
       </CardContent>
     </Card>
   )
