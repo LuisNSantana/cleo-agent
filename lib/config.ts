@@ -17,7 +17,7 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: Fast tier (text-only) + fallbacks
-  "openrouter:openai/gpt-oss-120b:free", // Fast - OpenRouter GPT-OSS 120B (free)
+  // Removed GPT-OSS-120B free (policy/tool issues)
   "openrouter:z-ai/glm-4.5", // GLM 4.5 - optional guest model
   "openrouter:deepseek/deepseek-chat-v3.1:free", // DeepSeek V3.1 Free - fallback
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free", // Mistral Small 3.2 24B (free)
@@ -30,7 +30,7 @@ export const NON_AUTH_ALLOWED_MODELS = [
 // Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
   // Free tier: Fast + Balanced with fallbacks
-  "openrouter:openai/gpt-oss-120b:free", // Fast - OpenRouter GPT-OSS 120B (text-only)
+  // Removed GPT-OSS-120B free (policy/tool issues)
   "openrouter:openrouter/sonoma-dusk-alpha", // Fast Vision - Sonoma Dusk (free)
   // Balanced-class free choices via OpenRouter
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
@@ -39,7 +39,7 @@ export const FREE_MODELS_IDS = [
   "openrouter:meta-llama/llama-4-scout:free",
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
   "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
-  "openrouter:tngtech/deepseek-r1t-chimera:free",
+  // Removed DeepSeek Chimera R1T free (no tool endpoints)
   "openrouter:deepseek/deepseek-chat-v3.1:free", // Fast fallback
   "gpt-4o-mini", // Emergency fallback  
   // OpenRouter selected cost-effective models (for authenticated users)
@@ -49,11 +49,11 @@ export const FREE_MODELS_IDS = [
   // Removed Mistral SDK Small/Medium and Groq Llama variants from default lists
 ]
 
-// Default authenticated model: use Fast tier (best for most users)
-export const MODEL_DEFAULT = "openrouter:openai/gpt-oss-120b:free"
+// Default authenticated model: GPT-4.1-mini via OpenRouter (majority standard)
+export const MODEL_DEFAULT = "openrouter:openai/gpt-4.1-mini"
 
-// MODELO POR DEFECTO PARA GUESTS - FORZADO A DEEPSEEK
-export const MODEL_DEFAULT_GUEST = "openrouter:openai/gpt-oss-120b:free"
+// MODELO POR DEFECTO PARA GUESTS - DEEPSEEK (herramientas soportadas)
+export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [
@@ -68,6 +68,9 @@ export const DISABLED_MODEL_IDS: string[] = [
   "openrouter:google/gemini-2.0-flash-001",
   // Keep Lite if desired; we disable as outdated per request
   "openrouter:google/gemini-2.0-flash-lite-001",
+  // Problematic free models (policy/tool endpoint issues)
+  "openrouter:openai/gpt-oss-120b:free",
+  "openrouter:tngtech/deepseek-r1t-chimera:free",
 ]
 
 export const APP_NAME = "Cleo"

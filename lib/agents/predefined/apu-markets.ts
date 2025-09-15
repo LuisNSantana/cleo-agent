@@ -9,7 +9,7 @@ export const APU_MARKETS_AGENT: AgentConfig = {
   name: 'Apu-Markets',
   description: 'Financial markets and stock analysis sub-agent specializing in real-time market data and investment insights',
   role: 'specialist',
-  model: 'openrouter:openai/gpt-oss-120b:free',
+  model: 'openrouter:z-ai/glm-4.5',
   temperature: 0.2,
   maxTokens: 8192,
   tools: [

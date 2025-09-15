@@ -12,7 +12,7 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.6,
   maxTokens: 8192,
   tools: [

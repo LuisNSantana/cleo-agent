@@ -11,7 +11,7 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'openrouter:openai/gpt-oss-120b:free',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.5,
   maxTokens: 32768,
   tools: [

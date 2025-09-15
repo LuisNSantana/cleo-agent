@@ -10,7 +10,7 @@ export const EMMA_AGENT: AgentConfig = {
   name: 'Emma',
   description: 'E-commerce and Shopify specialist with expertise in store optimization, product management, and sales analytics',
   role: 'specialist',
-  model: 'openrouter:google/gemma-3-27b-it:free',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.4,
   maxTokens: 16384,
   tools: ['shopifyGetProducts', 'shopifyGetOrders', 'shopifyGetAnalytics', 'shopifyGetCustomers', 'shopifySearchProducts', 'shopifyUpdateProductPrice', 'complete_task'],

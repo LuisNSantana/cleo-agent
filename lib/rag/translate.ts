@@ -54,7 +54,7 @@ export async function translateQuery(text: string, target: TargetLang): Promise<
   try {
     const prompt = `Translate the following search query to ${target === 'es' ? 'Spanish' : 'English'}. Return only the translation without quotes.`
     const res = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+  model: 'openrouter:openai/gpt-4.1-mini',
       temperature: 0,
       messages: [
         { role: 'system', content: prompt },

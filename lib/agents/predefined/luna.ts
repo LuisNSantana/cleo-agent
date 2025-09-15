@@ -5,7 +5,7 @@ export const LUNA_AGENT: AgentConfig = {
   name: 'Luna',
   description: 'Sub-agent especializada en creación de contenido para redes sociales',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.8,
   maxTokens: 4000,
   color: '#8B5CF6',

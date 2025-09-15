@@ -28,7 +28,9 @@ const BlockSchema = z.object({
 
 const QueryDatabaseSchema = z.object({
   database_id: z.string().min(1).describe('Notion database ID to query'),
-  filter: z.any().optional().describe('Filter object to narrow results'),
+  // Use a permissive object schema so JSON Schema includes type: 'object'
+  // This avoids providers rejecting missing parameter types when tools are bound
+  filter: z.object({}).passthrough().optional().describe('Filter object to narrow results'),
   sorts: z.array(SortSchema).optional().describe('Array of sort objects'),
   start_cursor: z.string().optional().describe('Pagination cursor'),
   page_size: z.number().min(1).max(100).default(100).describe('Number of items per page')

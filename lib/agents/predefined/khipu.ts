@@ -10,7 +10,7 @@ export const KHIPU_AGENT: AgentConfig = {
   name: 'Khipu',
   description: 'Subagente de Ami para finanzas y Google Sheets: crea presupuestos, actualiza celdas y aplica fórmulas con claridad.',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.5,
   maxTokens: 8192,
   tools: [

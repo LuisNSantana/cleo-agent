@@ -12,7 +12,7 @@ export const CLEO_AGENT: AgentConfig = {
   name: 'Cleo',
   description: 'Advanced emotional intelligence supervisor with multi-agent coordination and empathetic user interaction capabilities.',
   role: 'supervisor',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:openai/gpt-4.1-mini',
   temperature: 0.7,
   maxTokens: 16384,
   tools: [
@@ -31,7 +31,7 @@ export const CLEO_AGENT: AgentConfig = {
   ],
   tags: ['supervisor', 'empathy', 'coordination', 'emotional-intelligence', 'delegation'],
   // Single source of truth: prompt built from lib/prompts
-  prompt: getCleoPrompt(sanitizeModelName('gpt-4o-mini'), 'default'),
+  prompt: getCleoPrompt(sanitizeModelName('openrouter:openai/gpt-4.1-mini'), 'default'),
   color: '#FF6B6B',
   icon: '❤️',
   immutable: true,
