@@ -123,8 +123,9 @@ export class AgentOrchestrator {
     // Initialize core modules
     this.eventEmitter = new EventEmitter()
     this.errorHandler = globalErrorHandler
-    this.modelFactory = new ModelFactory()
-    this.subAgentManager = new SubAgentManager('default-user', this.eventEmitter)
+  this.modelFactory = new ModelFactory()
+  // Use NIL UUID as a safe default to avoid non-UUID logs/DB errors; updated per-execution later
+  this.subAgentManager = new SubAgentManager('00000000-0000-0000-0000-000000000000', this.eventEmitter)
     this.executionManager = new ExecutionManager({
       eventEmitter: this.eventEmitter,
       errorHandler: this.errorHandler
@@ -385,6 +386,14 @@ export class AgentOrchestrator {
     // Wrap entire execution in AsyncLocalStorage context
     return ExecutionManager.runWithExecutionId(executionId, async () => {
       try {
+        // Ensure SubAgentManager uses a valid UUID for this execution
+        {
+          const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+          const isValidUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+          const ctxUserId = isValidUuid(context.userId) ? context.userId : (isValidUuid(getCurrentUserId()) ? (getCurrentUserId() as string) : NIL_UUID)
+          await this.subAgentManager.setUser(ctxUserId)
+        }
+
         // Use routing logic for supervisor agent
       if (agentConfig.id === 'cleo-supervisor') {
         return await this.executeWithRouting(agentConfig, context, execution, options)
@@ -467,6 +476,14 @@ export class AgentOrchestrator {
     
     // Always execute Cleo as intelligent supervisor
     // He has delegation tools and will decide if specialist help is needed
+    // Ensure SubAgentManager uses a valid UUID for this execution
+    {
+      const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+      const isValidUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+      const ctxUserId = isValidUuid(context.userId) ? context.userId : (isValidUuid(getCurrentUserId()) ? (getCurrentUserId() as string) : NIL_UUID)
+      await this.subAgentManager.setUser(ctxUserId)
+    }
+
     await this.initializeAgent(supervisorConfig)
     const processedContext = await this.prepareExecutionContext(context)
 
@@ -950,6 +967,11 @@ export class AgentOrchestrator {
         contextUserId,
         chosenUserId: preferredUserId || sourceUserId || contextUserId || NIL_UUID
       })
+
+      // Ensure SubAgentManager context is aligned with the chosen user id for this delegation
+      try {
+        await this.subAgentManager.setUser(preferredUserId || sourceUserId || contextUserId || NIL_UUID)
+      } catch {}
 
       const delegationContext: ExecutionContext = {
         threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,

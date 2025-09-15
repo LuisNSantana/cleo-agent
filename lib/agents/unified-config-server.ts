@@ -34,9 +34,10 @@ function transformToAgentConfig(unifiedAgent: UnifiedAgent): AgentConfig {
  */
 export async function getAgentById(id: string, userId?: string): Promise<AgentConfig | undefined> {
   try {
+    // Use NIL UUID to avoid non-UUID propagation; DB fetch later guarded by UUID check
     if (!userId) {
-      console.warn('🔍 No userId provided for getAgentById, using default user')
-      userId = 'default-user'
+      console.warn('🔍 No userId provided for getAgentById, using NIL UUID')
+      userId = '00000000-0000-0000-0000-000000000000'
     }
 
     console.log('🔍 Looking for agent:', id, 'for user:', userId)
@@ -50,7 +51,8 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
     }
     
     // Then check user's custom agents in database
-    const unifiedAgent = await getAgentByIdForUser(id, userId)
+  const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+  const unifiedAgent = isUUID(userId) ? await getAgentByIdForUser(id, userId) : undefined
     
     if (unifiedAgent) {
       console.log('🔍 Found user agent in database:', unifiedAgent.name)
@@ -71,8 +73,8 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
 export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
   try {
     if (!userId) {
-      console.warn('🔍 No userId provided for getAllAgents, using default user')
-      userId = 'default-user'
+      console.warn('🔍 No userId provided for getAllAgents, using NIL UUID')
+      userId = '00000000-0000-0000-0000-000000000000'
     }
 
     console.log('🔍 Getting all agents for user:', userId)

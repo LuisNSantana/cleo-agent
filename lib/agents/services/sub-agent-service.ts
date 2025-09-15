@@ -78,7 +78,7 @@ export class SubAgentService {
     let dbList: any[] = []
     const isUuid = this.isValidUUID(parentAgentId)
     if (!isUuid) {
-      console.log('[SubAgentService] Skipping RPC get_sub_agents for non-UUID parentAgentId:', parentAgentId)
+      // Skipping RPC get_sub_agents for non-UUID parentAgentId
     } else {
       try {
         const { data, error } = await supabase.rpc('get_sub_agents', {
@@ -139,13 +139,13 @@ export class SubAgentService {
     // If agentId is not a valid UUID, it's likely a built-in agent name like "apu-research"
     // Return null as it's not a sub-agent in the database
     if (!this.isValidUUID(agentId)) {
-      console.log(`[SubAgentService] Skipping sub-agent lookup for non-UUID agent: ${agentId}`)
+      // Skipping sub-agent lookup for non-UUID agent
       return null
     }
 
     // Also validate userId to prevent database errors
     if (!this.isValidUUID(userId)) {
-      console.log(`[SubAgentService] Skipping sub-agent lookup for non-UUID user: ${userId}`)
+      // Skipping sub-agent lookup for non-UUID user
       return null
     }
 
@@ -221,7 +221,7 @@ export class SubAgentService {
   }> {
     // If userId is not a valid UUID, return empty statistics
     if (!this.isValidUUID(userId)) {
-      console.log(`[SubAgentService] Skipping statistics for non-UUID user: ${userId}`)
+      // Skipping statistics for non-UUID user
       return {
         totalSubAgents: 0,
         subAgentsByParent: {},
