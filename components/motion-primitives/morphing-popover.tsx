@@ -6,9 +6,9 @@ import {
   AnimatePresence,
   motion,
   MotionConfig,
-  Transition,
-  Variants,
-} from "motion/react"
+  type Transition,
+  type Variants,
+} from "framer-motion"
 import {
   createContext,
   isValidElement,

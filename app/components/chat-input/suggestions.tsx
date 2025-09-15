@@ -37,24 +37,26 @@ export const Suggestions = memo(function Suggestions({
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
       setActiveCategory(null)
-      // Usar placeholder en lugar de inserción directa
+      // Mostrar placeholder visual sin insertar texto en el textarea todavía
       if (onShowPlaceholder) {
         onShowPlaceholder(suggestion)
-      } else {
-        // Fallback al comportamiento anterior
-        onSuggestionAction(suggestion)
-        onValueChangeAction("")
       }
+      // No llamar onSuggestionAction aquí para evitar que se interprete como acción inmediata
+      // No limpiar el value todavía; sólo se limpia cuando el usuario empieza a escribir o envía
     },
-    [onSuggestionAction, onValueChangeAction, onShowPlaceholder]
+    [onShowPlaceholder]
   )
 
   const handleCategoryClick = useCallback(
     (suggestion: { label: string; prompt: string }) => {
       setActiveCategory(suggestion.label)
-      onValueChangeAction(suggestion.prompt)
+      // En modo categoría, mostramos el prompt como placeholder ligero y no como value real
+      if (onShowPlaceholder) {
+        onShowPlaceholder(suggestion.prompt)
+      }
+      onValueChangeAction("")
     },
-    [onValueChangeAction]
+    [onShowPlaceholder, onValueChangeAction]
   )
 
   const suggestionsGrid = useMemo(

@@ -1,6 +1,6 @@
 "use client"
 
-import { AnimatePresence } from "motion/react"
+import { AnimatePresence } from "framer-motion"
 import React, { memo } from "react"
 import { Suggestions } from "../chat-input/suggestions"
 

@@ -2,13 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { X } from "@phosphor-icons/react"
-import {
-  AnimatePresence,
-  motion,
-  MotionConfig,
-  Transition,
-  Variant,
-} from "motion/react"
+import { AnimatePresence, motion, MotionConfig, type Transition, type Variants, type Variant } from "framer-motion"
 import React, {
   useCallback,
   useContext,

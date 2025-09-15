@@ -9,7 +9,7 @@ import {
 } from "@/components/motion-primitives/morphing-popover"
 import { isSupabaseEnabled } from "@/lib/supabase/config"
 import { QuestionMark } from "@phosphor-icons/react"
-import { motion, type Transition } from "motion/react"
+import { motion, type Transition } from "framer-motion"
 import { useState } from "react"
 
 const TRANSITION_POPOVER: Transition = {

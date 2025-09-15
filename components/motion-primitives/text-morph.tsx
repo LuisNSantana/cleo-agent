@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { AnimatePresence, motion, Transition, Variants } from "motion/react"
+import { AnimatePresence, motion, Transition, Variants } from "framer-motion"
 import { useId, useMemo } from "react"
 
 export type TextMorphProps = {

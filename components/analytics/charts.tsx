@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useId } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { motion } from 'motion/react'
+import { motion } from 'framer-motion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Lightweight SVG chart primitives to avoid heavy deps

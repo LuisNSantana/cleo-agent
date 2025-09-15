@@ -37,7 +37,7 @@ import {
   MagnifyingGlassIcon,
   StarIcon,
 } from "@phosphor-icons/react"
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
 import { SubMenu } from "../model-selector/sub-menu"
