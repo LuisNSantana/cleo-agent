@@ -38,8 +38,8 @@ export const FREE_MODELS_IDS = [
   "gpt-4o-mini",
 ]
 
-// Default authenticated model: GPT-4.1-mini via OpenRouter (majority standard)
-export const MODEL_DEFAULT = "openrouter:openai/gpt-4.1-mini"
+// Default authenticated model: Sonoma Sky Alpha via OpenRouter
+export const MODEL_DEFAULT = "openrouter:openrouter/sonoma-sky-alpha"
 
 // MODELO POR DEFECTO PARA GUESTS - DEEPSEEK (herramientas soportadas)
 export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"
@@ -70,7 +70,7 @@ export const DISABLED_MODEL_IDS: string[] = [
 ]
 
 export const APP_NAME = "Cleo"
-export const APP_DOMAIN = "https://zola.chat"
+export const APP_DOMAIN = "https://cleo-agent.vercel.app"
 
 export const SUGGESTIONS = [
   {

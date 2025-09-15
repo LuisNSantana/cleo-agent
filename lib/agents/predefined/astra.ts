@@ -12,7 +12,7 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:meta-llama/llama-4-maverick',
+  model: 'openrouter:openrouter/sonoma-sky-alpha',
   temperature: 0.6,
   maxTokens: 12000,
   tools: [

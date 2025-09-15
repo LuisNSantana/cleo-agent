@@ -12,7 +12,7 @@ export const NOTION_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:google/gemma-3-27b-it:free',
+  model: 'openrouter:openrouter/sonoma-sky-alpha',
   temperature: 0.3,
   maxTokens: 16384,
   tools: [
