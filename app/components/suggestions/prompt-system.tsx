@@ -7,12 +7,14 @@ import { Suggestions } from "../chat-input/suggestions"
 type PromptSystemProps = {
   onValueChangeAction: (value: string) => void
   onSuggestionAction: (suggestion: string) => void
+  onShowPlaceholder?: (placeholder: string) => void
   value: string
 }
 
 export const PromptSystem = memo(function PromptSystem({
   onValueChangeAction,
   onSuggestionAction,
+  onShowPlaceholder,
   value,
 }: PromptSystemProps) {
   return (
@@ -22,6 +24,7 @@ export const PromptSystem = memo(function PromptSystem({
           <Suggestions
             onValueChangeAction={onValueChangeAction}
             onSuggestionAction={onSuggestionAction}
+            onShowPlaceholder={onShowPlaceholder}
             value={value}
           />
         </AnimatePresence>

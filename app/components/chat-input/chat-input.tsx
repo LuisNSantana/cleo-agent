@@ -42,6 +42,9 @@ type ChatInputProps = {
   status?: "submitted" | "streaming" | "ready" | "error"
   setEnableSearchAction: (enabled: boolean) => void
   enableSearch: boolean
+  placeholder?: string
+  onClearPlaceholderAction?: () => void
+  onShowPlaceholderAction?: (placeholder: string) => void
 }
 
 export function ChatInput({
@@ -61,7 +64,19 @@ export function ChatInput({
   status,
   setEnableSearchAction,
   enableSearch,
+  placeholder,
+  onClearPlaceholderAction,
+  onShowPlaceholderAction,
 }: ChatInputProps) {
+  const handleValueChange = useCallback((newValue: string) => {
+    onValueChangeAction(newValue)
+    
+    // Clear placeholder when user starts typing
+    if (placeholder && newValue && onClearPlaceholderAction) {
+      onClearPlaceholderAction()
+    }
+  }, [onValueChangeAction, placeholder, onClearPlaceholderAction])
+
   const selectModelConfig = getModelInfo(selectedModel)
   const hasSearchSupport = Boolean(selectModelConfig?.webSearch)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
@@ -228,6 +243,7 @@ export function ChatInput({
         <PromptSystem
           onValueChangeAction={onValueChangeAction}
           onSuggestionAction={onSuggestionAction}
+          onShowPlaceholder={onShowPlaceholderAction}
           value={deferredValue}
         />
       )}
@@ -238,7 +254,7 @@ export function ChatInput({
       className="relative z-10 p-0 pt-1 shadow-lg backdrop-blur-lg bg-white/70 dark:bg-zinc-900/50 ring-1 ring-white/30 dark:ring-white/10 md:bg-popover md:backdrop-blur-xl md:ring-0 md:shadow-xs"
           maxHeight={200}
           value={value}
-          onValueChange={onValueChangeAction}
+          onValueChange={handleValueChange}
         >
           <FileList files={files} onFileRemoveAction={onFileRemoveAction} />
           
@@ -275,7 +291,7 @@ export function ChatInput({
             onSuggestionAction={onSuggestionAction} 
           />
           <PromptInputTextarea
-            placeholder="Ask Cleo"
+            placeholder={placeholder || "Ask Cleo"}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}

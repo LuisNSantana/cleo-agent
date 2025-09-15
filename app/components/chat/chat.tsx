@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
 import dynamic from "next/dynamic"
 import { redirect } from "next/navigation"
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import { useChatCore } from "./use-chat-core"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
@@ -73,6 +73,7 @@ export function Chat() {
 
   // State to pass between hooks
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
+  const [placeholder, setPlaceholder] = useState<string | undefined>()
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
   const systemPrompt = useMemo(
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
@@ -139,6 +140,16 @@ export function Chat() {
     [messages, conversationStatus, handleDelete, handleEdit, handleReload]
   )
 
+  const handleShowPlaceholder = useCallback((newPlaceholder: string) => {
+    setPlaceholder(newPlaceholder)
+  }, [])
+
+  const handleClearPlaceholder = useCallback(() => {
+    setPlaceholder(undefined)
+  }, [])
+
+  const showOnboarding = !chatId && messages.length === 0
+
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
@@ -159,6 +170,9 @@ export function Chat() {
       status: chatInputStatus,
   setEnableSearchAction: setEnableSearch,
       enableSearch,
+      placeholder,
+      onClearPlaceholderAction: handleClearPlaceholder,
+      onShowPlaceholderAction: handleShowPlaceholder,
     }),
     [
       input,
@@ -179,6 +193,9 @@ export function Chat() {
       chatInputStatus,
   setEnableSearch,
       enableSearch,
+      placeholder,
+      handleClearPlaceholder,
+      handleShowPlaceholder,
     ]
   )
 
@@ -195,8 +212,6 @@ export function Chat() {
   ) {
     return redirect("/")
   }
-
-  const showOnboarding = !chatId && messages.length === 0
 
   if (!mounted) return null
 

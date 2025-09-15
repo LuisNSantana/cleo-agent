@@ -10,6 +10,7 @@ type SuggestionsProps = {
   onValueChangeAction: (value: string) => void
   onSuggestionAction: (suggestion: string) => void
   value?: string
+  onShowPlaceholder?: (placeholder: string) => void
 }
 
 const MotionPromptSuggestion = motion.create(PromptSuggestion)
@@ -18,6 +19,7 @@ export const Suggestions = memo(function Suggestions({
   onValueChangeAction,
   onSuggestionAction,
   value,
+  onShowPlaceholder,
 }: SuggestionsProps) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
 
@@ -35,10 +37,16 @@ export const Suggestions = memo(function Suggestions({
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
       setActiveCategory(null)
-      onSuggestionAction(suggestion)
-      onValueChangeAction("")
+      // Usar placeholder en lugar de inserción directa
+      if (onShowPlaceholder) {
+        onShowPlaceholder(suggestion)
+      } else {
+        // Fallback al comportamiento anterior
+        onSuggestionAction(suggestion)
+        onValueChangeAction("")
+      }
     },
-    [onSuggestionAction, onValueChangeAction]
+    [onSuggestionAction, onValueChangeAction, onShowPlaceholder]
   )
 
   const handleCategoryClick = useCallback(
