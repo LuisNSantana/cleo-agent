@@ -79,9 +79,18 @@ export async function GET(request: NextRequest) {
 // POST - Create new notification
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    if (!supabase) {
+      return NextResponse.json({ success: false, error: 'Database not available' }, { status: 503 });
+    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'User not authenticated' }, { status: 401 });
+    }
     const body = await request.json();
     
     const notificationData: CreateNotificationInput = {
+      user_id: user.id,
       task_id: body.task_id,
       agent_id: body.agent_id,
       agent_name: body.agent_name,
@@ -172,7 +181,7 @@ export async function PATCH(request: NextRequest) {
             );
           }
 
-          const chatResult = await sendNotificationToChat(notification, target_chat_id);
+          const chatResult = await sendNotificationToChat(notification, target_chat_id, user.id);
           if (!chatResult.success) {
             return NextResponse.json(
               { success: false, error: chatResult.error },

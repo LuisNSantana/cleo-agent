@@ -41,6 +41,8 @@ export interface NotificationAction {
 }
 
 export interface CreateNotificationInput {
+  // Explicit user scoping (required for server-side executions)
+  user_id?: string;
   task_id: string;
   agent_id: string;
   agent_name: string;
@@ -70,39 +72,17 @@ export async function createTaskNotification(
       return { success: false, error: 'Database not available' };
     }
 
-    // Get user from Supabase auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      // For now, let's use a default user to avoid blocking the UI
-      const defaultUserId = 'anonymous-user';
-      console.warn('⚠️ No authenticated user found, using default user for notifications');
-      
-      // Create a mock notification for demo purposes
-      const mockNotification: TaskNotification = {
-        id: `mock-${Date.now()}`,
-        user_id: defaultUserId,
-        task_id: notificationData.task_id,
-        agent_id: notificationData.agent_id,
-        agent_name: notificationData.agent_name,
-        agent_avatar: notificationData.agent_avatar,
-        notification_type: notificationData.notification_type,
-        title: notificationData.title,
-        message: notificationData.message,
-        task_result: notificationData.task_result,
-        error_details: notificationData.error_details,
-        priority: notificationData.priority || 'medium',
-        read: false,
-        action_buttons: notificationData.action_buttons || getDefaultActions(notificationData),
-        metadata: notificationData.metadata || {},
-        expires_at: notificationData.expires_at,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      return { success: true, notification: mockNotification };
+    // Resolve user explicitly: prefer provided user_id, else use authenticated user
+    let userId = notificationData.user_id;
+    if (!userId) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!authError && user) {
+        userId = user.id;
+      }
     }
-
-    const userId = user.id;
+    if (!userId) {
+      return { success: false, error: 'User not authenticated' };
+    }
 
     // Crear notificación en el inbox
     const { data: notification, error: notifError } = await supabase
@@ -136,7 +116,7 @@ export async function createTaskNotification(
 
     // Si está configurado para enviar automáticamente al chat
     if (notificationData.auto_send_to_chat) {
-      await sendNotificationToChat(typedNotification, notificationData.target_chat_id);
+      await sendNotificationToChat(typedNotification, notificationData.target_chat_id, userId);
     }
 
     // Enviar Web Push al usuario con un resumen breve
@@ -266,17 +246,24 @@ export async function markNotificationAsRead(
  */
 export async function sendNotificationToChat(
   notification: TaskNotification,
-  targetChatId?: string
+  targetChatId?: string,
+  explicitUserId?: string
 ): Promise<{ success: boolean; message_id?: string; error?: string }> {
   try {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      return { success: false, error: 'User not authenticated' };
-    }
+    // Resolve user strictly
+    let userId = explicitUserId || getCurrentUserId();
 
     const supabase = await createClient();
     if (!supabase) {
       return { success: false, error: 'Database not available' };
+    }
+
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+    }
+    if (!userId) {
+      return { success: false, error: 'User not authenticated' };
     }
 
     // Si no se especifica chat, buscar el más reciente del usuario

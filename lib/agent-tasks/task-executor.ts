@@ -138,11 +138,12 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       }
     }
 
-    if (hasToolFailures) {
+  if (hasToolFailures) {
       console.log(`❌ Task failed due to tool failures: ${failureReasons.join(', ')}`);
       
       // Create failure notification
       await createTaskNotification({
+        user_id: task.user_id,
         task_id: task.task_id,
         agent_id: task.agent_id,
         agent_name: task.agent_name,
@@ -172,6 +173,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     // Create success notification
     await createTaskNotification({
+      user_id: task.user_id,
       task_id: task.task_id,
       agent_id: task.agent_id,
       agent_name: task.agent_name,
@@ -210,6 +212,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     // Create failure notification
     await createTaskNotification({
+      user_id: task.user_id,
       task_id: task.task_id,
       agent_id: task.agent_id,
       agent_name: task.agent_name,

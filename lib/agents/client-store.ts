@@ -600,34 +600,52 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         finalSender: last.metadata?.sender || execution.agentId
       })
 
-      try {
-        const res = await fetch('/api/agents/threads/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // pass csrf token when available (future-proof if API adds CSRF)
-            ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/)
-              ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') }
-              : {})
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            threadId,
-            role: 'assistant',
-            content: last.content,
-            toolCalls: last.toolCalls || null,
-            metadata: { sender: last.metadata?.sender || execution.agentId, executionId: execution.id }
+      const postOnce = async (): Promise<boolean> => {
+        try {
+          const res = await fetch('/api/agents/threads/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // pass csrf token when available (future-proof if API adds CSRF)
+              ...(typeof document !== 'undefined' && document.cookie.match(/(?:^|; )csrf_token=/)
+                ? { 'x-csrf-token': (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)?.[1] || '') }
+                : {})
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              threadId,
+              role: 'assistant',
+              content: last.content,
+              toolCalls: last.toolCalls || null,
+              metadata: { sender: last.metadata?.sender || execution.agentId, executionId: execution.id }
+            })
           })
-        })
-        if (!res.ok) {
-          const msg = await res.text().catch(() => '')
-          console.warn('Failed to append assistant message:', res.status, msg)
+          if (!res.ok) {
+            const msg = await res.text().catch(() => '')
+            console.warn('Failed to append assistant message:', res.status, msg)
+            return false
+          }
+          return true
+        } catch (e) {
+          console.warn('Error posting assistant message:', e)
+          return false
         }
-      } catch (e) {
-        console.warn('Error posting assistant message:', e)
-      } finally {
-        set({ _finalPosted: { ...posted, [execution.id]: true } })
       }
+
+      // Try immediately; on failure, retry once after a short delay
+      let ok = await postOnce()
+      if (!ok) {
+        // Give DB/thread consistency a moment, then retry
+        await new Promise(r => setTimeout(r, 1200))
+        ok = await postOnce()
+        if (!ok) {
+          // As a last resort, attempt to finalize from thread to hydrate UI
+          try { await get().finalizeExecutionFromThread(execution.id) } catch {}
+        }
+      }
+
+      // Mark as posted after success or after retry attempts to avoid duplicates
+      set({ _finalPosted: { ...posted, [execution.id]: true } })
     },
 
     addAgent: (agent: AgentConfig) => {

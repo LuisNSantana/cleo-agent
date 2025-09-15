@@ -225,6 +225,7 @@ export async function createAgentTask(
       const formattedDate = formatter.format(scheduledDate)
       
       await createTaskNotification({
+        user_id: createdTask.user_id,
         task_id: createdTask.task_id,
         agent_id: createdTask.agent_id,
         agent_name: createdTask.agent_name,

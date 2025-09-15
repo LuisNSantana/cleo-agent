@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (taskError || !taskData) {
-      return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 });
-    }
+      if (taskError || !taskData) {
+        return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 });
+      }
 
     const task = taskData as any; // Type assertion for now
 
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Create completion notification
     await createTaskNotification({
+      user_id: user.id,
       task_id: task.task_id,
       agent_id: task.agent_id,
       agent_name: task.agent_name,
