@@ -114,8 +114,19 @@ export function openproviders<T extends SupportedModel>(modelId: T, _settings?: 
   }
 
   if (provider === "openrouter") {
+    // Ensure OpenRouter receives required headers for attribution/routing
+    // and use explicit baseURL to avoid env/proxy interference.
+    const referer =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const title = process.env.OPENROUTER_APP_TITLE || 'Cleo Agent'
     const openrouterProvider = createOpenRouter({
       apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+      headers: {
+        'HTTP-Referer': referer,
+        'X-Title': title,
+      },
+      baseURL: 'https://openrouter.ai/api/v1',
     })
     return openrouterProvider.chat(normalized.replace('openrouter:', ''))
   }

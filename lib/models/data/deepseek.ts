@@ -31,6 +31,11 @@ const deepseekModels: ModelConfig[] = [
     apiSdk: () =>
       createOpenRouter({
         apiKey: process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("deepseek/deepseek-r1:free"),
   },
   {
@@ -61,6 +66,11 @@ const deepseekModels: ModelConfig[] = [
     apiSdk: () =>
       createOpenRouter({
         apiKey: process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("deepseek-v3"),
   },
 ]

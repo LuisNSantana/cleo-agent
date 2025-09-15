@@ -31,7 +31,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-08-25",
     icon: "openrouter",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
       ),
   },
@@ -64,7 +71,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-06-15",
     icon: "mistral",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "mistralai/mistral-small-3.2-24b-instruct:free"
       ),
   },
@@ -97,7 +111,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-07-10",
     icon: "google",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "google/gemma-3-27b-it:free"
       ),
   },
@@ -130,7 +151,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-04-05",
     icon: "meta",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "meta-llama/llama-4-maverick:free"
       ),
   },
@@ -163,7 +191,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-06-01",
     icon: "meta",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "meta-llama/llama-4-scout:free"
       ),
   },
@@ -198,6 +233,11 @@ export const openrouterModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("z-ai/glm-4.5"),
   },
   // New: Nemotron Nano 9B V2 (tools: true)
@@ -231,6 +271,11 @@ export const openrouterModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("nvidia/nemotron-nano-9b-v2:free"),
   },
   // New: Llama 3.1 Nemotron Ultra 253B v1 (free)
@@ -262,7 +307,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-07-22",
     icon: "nvidia",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "nvidia/llama-3.1-nemotron-ultra-253b-v1:free"
       ),
   },
@@ -295,7 +347,14 @@ export const openrouterModels: ModelConfig[] = [
     releasedAt: "2025-06-30",
     icon: "openrouter",
     apiSdk: (apiKey?: string) =>
-      createOpenRouter({ apiKey: apiKey || process.env.OPENROUTER_API_KEY }).chat(
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat(
         "tngtech/deepseek-r1t-chimera:free"
       ),
   },
@@ -330,6 +389,11 @@ export const openrouterModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("qwen/qwen3-next-80b-a3b-thinking"),
   },
   // New: DeepSeek Chat V3.1 (tools: true)
@@ -363,6 +427,11 @@ export const openrouterModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("deepseek/deepseek-chat-v3.1:free"),
   },
   // New: Sonoma Dusk Alpha (tools: true)
@@ -396,6 +465,11 @@ export const openrouterModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
       }).chat("openrouter/sonoma-dusk-alpha"),
   },
   {
