@@ -111,12 +111,19 @@ type BarChartProps = {
   scrollable?: boolean
   // Only used when scrollable=true; default 20px
   minBarWidth?: number
+  // If provided, trims to first N items and shows a trailing "+N more" indicator
+  maxItems?: number
 }
 
-export function BarChart({ data, height = 140, className, colors = CHART_PALETTE, scrollable = false, minBarWidth = 20 }: BarChartProps) {
-  const max = Math.max(1, ...data.map(d => d.value))
+export function BarChart({ data, height = 140, className, colors = CHART_PALETTE, scrollable = false, minBarWidth = 20, maxItems }: BarChartProps) {
+  // Optionally trim data and compute leftover count
+  const trimmed = typeof maxItems === 'number' && maxItems > 0 && data.length > maxItems
+    ? data.slice(0, maxItems)
+    : data
+  const leftover = Math.max(0, data.length - (trimmed === data ? data.length : trimmed.length))
+  const max = Math.max(1, ...trimmed.map(d => d.value))
   // In non-scrollable mode, keep compact bars to fit within typical card widths.
-  const compactBarWidth = Math.max(8, Math.floor(280 / Math.max(1, data.length)))
+  const compactBarWidth = Math.max(8, Math.floor(280 / Math.max(1, trimmed.length)))
   const barWidth = scrollable ? Math.max(12, minBarWidth) : compactBarWidth
 
   return (
@@ -124,7 +131,7 @@ export function BarChart({ data, height = 140, className, colors = CHART_PALETTE
       {/* If scrollable, wrap in overflow-x container and make inner track min-w-max so it grows with content */}
       <div className={cn(scrollable ? 'overflow-x-auto' : undefined, className)} style={{ height }}>
         <div className={cn('flex items-end gap-2', scrollable ? 'min-w-max pr-2' : undefined)} style={{ height: '100%' }}>
-        {data.map((d, i) => (
+        {trimmed.map((d, i) => (
           <div key={i} className="group flex flex-col items-center">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -142,6 +149,18 @@ export function BarChart({ data, height = 140, className, colors = CHART_PALETTE
             <span className="text-muted-foreground mt-1 line-clamp-1 w-14 break-words text-2xs">{d.label}</span>
           </div>
         ))}
+        {leftover > 0 && (
+            <div className="flex flex-col items-center justify-end">
+              <div
+                className="flex items-center justify-center rounded-md border text-xs text-muted-foreground"
+                style={{ width: barWidth, height: Math.max(24, Math.min(40, height - 20)) }}
+                aria-label={`and ${leftover} more`}
+              >
+                +{leftover}
+              </div>
+              <span className="text-muted-foreground mt-1 w-14 text-2xs">more</span>
+            </div>
+          )}
         </div>
       </div>
     </TooltipProvider>

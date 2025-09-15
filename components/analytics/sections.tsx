@@ -65,7 +65,7 @@ export function ModelsSection({ modelUsage }: { modelUsage: Array<{ model_name: 
         <CardDescription>Messages by model</CardDescription>
       </CardHeader>
       <CardContent>
-  {data.length ? <BarChart data={data} scrollable minBarWidth={22} /> : <div className="text-muted-foreground text-sm">No data.</div>}
+  {data.length ? <BarChart data={data} scrollable minBarWidth={22} maxItems={16} /> : <div className="text-muted-foreground text-sm">No data.</div>}
       </CardContent>
     </Card>
   )
@@ -107,6 +107,7 @@ export function ToolsSection({ tools }: { tools: Array<{ tool_name: string; usag
             colors={[CHART_PALETTE[8], CHART_PALETTE[0], CHART_PALETTE[1], CHART_PALETTE[3], CHART_PALETTE[4]]}
             scrollable
             minBarWidth={22}
+            maxItems={16}
           />
         ) : (
           <div className="text-muted-foreground text-sm">No data.</div>

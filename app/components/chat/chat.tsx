@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import { redirect } from "next/navigation"
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { useChatCore } from "./use-chat-core"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
@@ -33,6 +33,20 @@ const DialogAuth = dynamic(
 export function Chat() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+  // Measure ChatInput height for dynamic bottom padding (mobile)
+  const inputRef = useRef<HTMLDivElement | null>(null)
+  const [inputHeight, setInputHeight] = useState(0)
+  useEffect(() => {
+    if (!inputRef.current) return
+    const el = inputRef.current
+    const ro = new ResizeObserver(() => {
+      const h = el.getBoundingClientRect().height
+      // Add a small margin to ensure last message is fully visible
+      setInputHeight(Math.ceil(h + 8))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const { chatId } = useChatSession()
   const {
     createNewChat,
@@ -220,6 +234,7 @@ export function Chat() {
       className={cn(
         "@container/main relative flex h-full flex-col items-center justify-end md:justify-center overflow-hidden"
       )}
+      style={{ ['--chat-input-height' as any]: `${inputHeight}px` }}
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
 
@@ -264,7 +279,10 @@ export function Chat() {
             </div>
           </motion.div>
         ) : (
-          <Conversation key="conversation" {...conversationProps} />
+          <Conversation
+            key="conversation"
+            {...conversationProps}
+          />
         )}
       </AnimatePresence>
 
@@ -279,6 +297,7 @@ export function Chat() {
             duration: messages.length === 1 ? 0.3 : 0,
           },
         }}
+        ref={inputRef}
       >
         <ChatInput {...chatInputProps} />
       </motion.div>

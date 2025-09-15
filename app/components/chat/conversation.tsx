@@ -1,7 +1,4 @@
-import {
-  ChatContainerContent,
-  ChatContainerRoot,
-} from "@/components/prompt-kit/chat-container"
+import { ChatContainerContent, ChatContainerRoot } from "@/components/prompt-kit/chat-container"
 import { Loader } from "@/components/prompt-kit/loader"
 import { ScrollButton } from "@/components/prompt-kit/scroll-button"
 import { UIMessage as MessageType } from "ai"
@@ -127,10 +124,12 @@ export function Conversation({
       </div>
       <ChatContainerRoot className="relative w-full">
         <ChatContainerContent
-          className="flex w-full h-full flex-col items-center pt-16 md:pt-20 pb-[calc(env(safe-area-inset-bottom)+85px)]"
+          className="flex w-full h-full flex-col items-center pt-16 md:pt-20"
           style={{
             scrollbarGutter: "stable both-edges",
             scrollbarWidth: "none",
+            // Add dynamic bottom padding equal to input height + safe area, mobile only effect due to fixed input
+            paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 88px))`,
           }}
         >
           {messages?.map((message, index) => {
