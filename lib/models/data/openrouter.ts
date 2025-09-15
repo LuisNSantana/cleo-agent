@@ -69,7 +69,7 @@ export const openrouterModels: ModelConfig[] = [
     apiDocs: "https://openrouter.ai/meta-llama/meta-llama-3.1-405b-instruct",
     modelPage: "https://ai.meta.com/llama/",
     releasedAt: "2025-08-01",
-    icon: "llama",
+    icon: "meta",
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
@@ -162,7 +162,7 @@ export const openrouterModels: ModelConfig[] = [
   },
   // New free additions: Meta Llama 4 Maverick (free)
   {
-    id: "openrouter:meta-llama/llama-4-maverick:free",
+    id: "openrouter:meta-llama/llama-4-maverick",
     name: "Llama 4 Maverick (free)",
     provider: "OpenRouter",
     providerId: "openrouter",
@@ -171,7 +171,7 @@ export const openrouterModels: ModelConfig[] = [
     description:
       "Llama 4 Maverick (free): optimized for vision-language tasks with strong visual reasoning; large context window.",
     tags: ["llama4", "vision", "multimodal", "reasoning", "openrouter", "free"],
-    contextWindow: 524288, // conservatively 512k; claims vary up to 1M
+  contextWindow: 524288, // 512k tokens (OpenRouter pages often claim up to 1M)
     inputCost: 0,
     outputCost: 0,
     priceUnit: "per 1M tokens",
@@ -183,11 +183,15 @@ export const openrouterModels: ModelConfig[] = [
     openSource: true,
     speed: "Medium",
     intelligence: "High",
-    website: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
-    apiDocs: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
-    modelPage: "https://openrouter.ai/meta-llama/llama-4-maverick:free",
+    website: "https://openrouter.ai/meta-llama/llama-4-maverick",
+    apiDocs: "https://openrouter.ai/meta-llama/llama-4-maverick",
+    modelPage: "https://openrouter.ai/meta-llama/llama-4-maverick",
     releasedAt: "2025-04-05",
     icon: "meta",
+    defaults: {
+      temperature: 0.4,
+      maxTokens: 8192,
+    },
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,

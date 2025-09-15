@@ -12,9 +12,9 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  model: 'openrouter:meta-llama/llama-4-maverick',
   temperature: 0.6,
-  maxTokens: 8192,
+  maxTokens: 12000,
   tools: [
     // Email management suite
     'listGmailMessages',

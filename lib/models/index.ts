@@ -53,6 +53,8 @@ const extraProviderModels: ModelConfig[] = [
     // High-end additions (paid)
     "openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1",
     "openrouter:meta-llama/meta-llama-3.1-405b-instruct",
+    // Meta Llama 4 Maverick
+    "openrouter:meta-llama/llama-4-maverick",
     // Fast vision companion
     "openrouter:openrouter/sonoma-sky-alpha",
   ]),

@@ -11,9 +11,9 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'openrouter:nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  model: 'openrouter:meta-llama/llama-4-maverick',
   temperature: 0.5,
-  maxTokens: 32768,
+  maxTokens: 16384,
   tools: [
     'listCalendarEvents', // List calendar events
     'createCalendarEvent', // Create new events
