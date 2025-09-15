@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { logger } from '@/lib/utils/logger'
+import { getAgentDisplayName } from '@/lib/agents/id-canonicalization'
+import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver'
 
 // Global event controller for pipeline streaming
 let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -32,27 +34,7 @@ function emitPipelineEvent(event: any) {
   }
 }
 
-// Helper to get display name for agents
-function getAgentDisplayName(agentId: string): string {
-  const agentNames: Record<string, string> = {
-    'toby-technical': 'Toby',
-    'ami-creative': 'Ami', 
-    'peter-workspace': 'Peter',
-    'emma-ecommerce': 'Emma',
-    'apu-research': 'Apu',
-    'wex-automation': 'Wex',
-    'nora-community': 'Nora',
-    // Sub-agents
-    'apu-markets': 'Apu Markets',
-    'astra-email': 'Astra',
-    'notion-agent': 'Notion Agent',
-    // Nora sub-agents
-    'luna-content-creator': 'Luna',
-    'zara-analytics-specialist': 'Zara',
-    'viktor-publishing-specialist': 'Viktor'
-  }
-  return agentNames[agentId] || agentId
-}
+// Display names now resolved via shared helper
 
 // Delegation tool schema
 const delegationSchema = z.object({
@@ -78,7 +60,8 @@ async function runDelegation(params: {
   priority?: 'low'|'normal'|'high'|'medium'|'urgent'
   requirements?: string
 }) {
-  const { agentId, task, context, priority, requirements } = params
+  const { agentId: rawAgentId, task, context, priority, requirements } = params
+  const agentId = await resolveAgentCanonicalKey(rawAgentId)
   // Normalize to valid set used by orchestrator/tools
   const normPriority: 'low'|'normal'|'high' = (priority === 'medium')
     ? 'normal'
@@ -226,7 +209,7 @@ async function runDelegation(params: {
 }
 
 export const delegateToTobyTool = tool({
-  description: 'Delegate technical, data analysis, or research tasks to Toby specialist. Use for programming, debugging, system architecture, data processing, or technical problem-solving.',
+  description: 'Delegate software/programming and IoT tasks to Toby: coding, debugging, architecture, APIs, databases, DevOps, and embedded/IoT (ESP32, Arduino, Raspberry Pi, MQTT, BLE). Use this for any technical question or implementation request related to software systems.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return runDelegation({ agentId: 'toby-technical', task, context, priority, requirements })

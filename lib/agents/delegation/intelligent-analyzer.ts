@@ -30,33 +30,42 @@ interface KeywordPatterns {
 
 // Enhanced keyword patterns for each specialist
 const AGENT_PATTERNS: KeywordPatterns = {
-  'apu-research': {
+  'toby-technical': {
     primary: [
-      // Technical and development (consolidated from toby-technical)
+      // Core software/IoT technical
       'code', 'debug', 'api', 'database', 'sql', 'script', 'programming', 'development', 'technical', 'bug', 'fix', 'backend', 'frontend',
       // Stack-specific
       'typescript', 'react', 'next.js', 'nextjs', 'tailwind', 'node', 'npm', 'pnpm', 'docker', 'kubernetes', 'k8s', 'redis', 'websocket', 'sse',
       'supabase', 'postgres', 'rls', 'trigger', 'migration', 'endpoint', 'api route',
-      // Research and intelligence (original apu)
+      // IoT/embedded
+      'iot', 'embedded', 'firmware', 'esp32', 'arduino', 'raspberry pi', 'mqtt', 'ble', 'zigbee', 'z-wave', 'modbus', 'can', 'opc-ua', 'coap', 'lwM2M', 'sensor'
+    ],
+    secondary: [
+      'performance', 'optimization', 'security', 'deployment', 'server', 'framework', 'library', 'algorithm', 'cache', 'latency', 'timeout',
+      'refactor', 'testing', 'unit test', 'integration test', 'e2e', 'observability', 'ci/cd'
+    ],
+    contextual: [
+      'how to build', 'how to implement', 'error', 'not working', 'crash', 'slow', 'integrate', 'setup', 'type error', 'compile error', 'failed build',
+      'connect device', 'pair bluetooth', 'flash firmware', 'ota update', 'device not connecting'
+    ],
+    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'calendar', 'meeting', 'google docs', 'google sheets', 'tweet', 'twitter', 'social media']
+  },
+  'apu-research': {
+    primary: [
+      // Research and intelligence
       'research', 'investigación', 'investigar', 'analyze', 'analizar', 'investigate', 'trends', 'tendencias', 'data', 'datos', 'market', 'mercado', 
       'news', 'intelligence', 'study', 'estudio', 'benchmark', 'competitor', 'competidores', 'stock', 'stocks'
     ],
     secondary: [
-      // Technical
-      'performance', 'optimization', 'security', 'deployment', 'server', 'framework', 'library', 'algorithm', 'cache', 'latency', 'timeout',
-      // Research
       'competitive', 'competencia', 'industry', 'industria', 'insights', 'report', 'reporte', 'statistics', 'estadísticas', 'forecast', 
       'pronóstico', 'comparison', 'comparación', 'whitepaper', 'paper', 'journal', 'citation', 'source', 'dataset', 'press release', 
       'market size', 'tam', 'sam', 'som'
     ],
     contextual: [
-      // Technical
-      'how to build', 'how to implement', 'error', 'not working', 'crash', 'slow', 'integrate', 'setup', 'type error', 'compile error', 'failed build',
-      // Research
       'what are the trends', 'analyze the market', 'analizar el mercado', 'research shows', 'latest data', 'industry analysis', 
       'análisis de la industria', 'compare competitors', 'analizar competidores', 'find sources', 'encontrar fuentes'
     ],
-    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets', 'tweet', 'twitter', 'social media', 'post', 'publish']
+    exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets']
   },
   'ami-creative': {
     primary: [

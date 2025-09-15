@@ -16,6 +16,7 @@ import { MetricsCollector } from './metrics-collector'
 import { getAgentMetadata } from '../agent-metadata'
 import { SubAgentManager, type SubAgent } from './sub-agent-manager'
 import { getAllAgents, getAgentById } from '../unified-config'
+import { canonicalizeAgentId, getAgentDisplayName } from '../id-canonicalization'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
 import logger from '@/lib/utils/logger'
@@ -858,7 +859,9 @@ export class AgentOrchestrator {
       const normalizedPriority: 'low' | 'normal' | 'high' =
         delegationData.priority === 'medium' ? 'normal' : (delegationData.priority || 'normal')
       
-      // First, check if target is a sub-agent
+  // First, resolve canonical target via DB-backed alias resolver (fallback to static)
+  const { resolveAgentCanonicalKey } = await import('../alias-resolver')
+  delegationData.targetAgent = await resolveAgentCanonicalKey(delegationData.targetAgent)
       let targetAgentConfig: AgentConfig | SubAgent | null | undefined = await this.subAgentManager.getSubAgent(delegationData.targetAgent)
       let isSubAgent = false
       
@@ -867,12 +870,7 @@ export class AgentOrchestrator {
         const allAgents = await getAllAgents()
         targetAgentConfig = allAgents.find(agent => agent.id === delegationData.targetAgent)
         
-        // Handle legacy agent ID mappings for backward compatibility
-        if (!targetAgentConfig && delegationData.targetAgent === 'ami-assistant') {
-          logger.debug('🔄 [DELEGATION] Mapping legacy agent ID ami-assistant to ami-creative')
-          targetAgentConfig = allAgents.find(agent => agent.id === 'ami-creative')
-          delegationData.targetAgent = 'ami-creative' // Update the reference
-        }
+        // Legacy mappings now handled by canonicalizeAgentId()
         
         isSubAgent = false
       } else {
@@ -889,7 +887,7 @@ export class AgentOrchestrator {
         return
       }
       
-      logger.debug(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'}`)
+  logger.debug(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'} (${getAgentDisplayName(delegationData.targetAgent)})`)
       
       // Add progress step: agent found and accepted
       if (delegationData.sourceExecutionId) {
