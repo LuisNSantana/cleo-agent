@@ -1,6 +1,8 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { optimizedModels } from "./data/optimized-tiers"
-import { langchainModels } from "./data/langchain"
+// Note: We intentionally do not surface LangChain orchestration pseudo-models
+// in the UI model list to avoid confusion (they remain routable via API).
+// import { langchainModels } from "./data/langchain"
 import { mistralModels } from "./data/mistral"
 import { llamaModels } from "./data/llama"
 import { ModelConfig } from "./types"
@@ -37,7 +39,7 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Keep 3-tier primaries + LangChain orchestrators, and add key OpenRouter free models
+// Keep 3-tier primaries and add key OpenRouter free models
 const extraProviderModels: ModelConfig[] = [
   // OpenRouter: Tool-calling enabled models only
   ...pickById(openrouterModels, [
@@ -62,8 +64,8 @@ const extraProviderModels: ModelConfig[] = [
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([
   ...optimizedModels, // 3-tier primaries (Fast/Balanced/Smarter)
-  ...langchainModels, // Orchestration routes
-  ...extraProviderModels, // Key models from Mistral/Meta
+  // LangChain orchestration routes are hidden from UI intentionally
+  ...extraProviderModels, // Key models from OpenRouter & Gemini
 ])
 
 // Debug logs removed for production safety

@@ -59,6 +59,9 @@ export const MODEL_DEFAULT_GUEST = "openrouter:openai/gpt-oss-120b:free"
 export const DISABLED_MODEL_IDS: string[] = [
   // Hide all old model variants - keeping only optimized Fast/Balanced/Smarter
   "langchain:balanced-local",
+  // Hide orchestration pseudo-models from selectors
+  "langchain:fast",
+  "langchain:balanced",
   "gpt-oss-20b", 
   "llama-3.3-70b-versatile",
   // Hide outdated Google Flash 2.0 variants in favor of 2.5 Flash

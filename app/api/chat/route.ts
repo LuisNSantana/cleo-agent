@@ -399,6 +399,18 @@ export async function POST(req: Request) {
       console.warn('[ChatAPI] Delegation-only tools setup failed:', e)
     }
 
+    // If the selected model is not tool-capable, disable tools to avoid provider errors
+    try {
+      if (modelConfig && modelConfig.tools === false) {
+        const hadTools = Object.keys(toolsForRun || {}).length > 0
+        if (hadTools) {
+          console.warn(`[ChatAPI] Model ${normalizedModel} does not support tools; disabling tools for this run`)
+        }
+        toolsForRun = {} as any
+        activeTools = []
+      }
+    } catch {}
+
   // Note: For OpenRouter we set headers on the provider itself in its model config
   // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
   // leaking into the request body.
@@ -855,10 +867,26 @@ export async function POST(req: Request) {
     resultStart,
   })
 
-    const modelInstance = modelConfig.apiSdk ? modelConfig.apiSdk(apiKey, { enableSearch }) : undefined
+    // If tools are required (either because user enabled search or because tool registry is non-empty)
+    // and the selected model doesn't support tools, switch to a tool-capable fallback for this request only.
+    // We prefer DeepSeek Chat v3.1 (free via OpenRouter) which we know supports tools.
+    let effectiveModelId = originalModel
+    try {
+      const wantsTools = enableSearch || (toolsForRun && Object.keys(toolsForRun).length > 0)
+      if (wantsTools && modelConfig.tools === false) {
+        console.warn(`[ChatAPI] Swapping non-tool model ${normalizedModel} to tool-capable fallback 'openrouter:deepseek/deepseek-chat-v3.1:free' for this request`)
+        effectiveModelId = 'openrouter:deepseek/deepseek-chat-v3.1:free'
+      }
+    } catch {}
+
+    const effectiveModelConfig = effectiveModelId === originalModel
+      ? modelConfig
+      : (await getAllModels()).find((m) => m.id === effectiveModelId)
+
+    const modelInstance = effectiveModelConfig?.apiSdk ? effectiveModelConfig.apiSdk(apiKey, { enableSearch }) : undefined
     const additionalParams: any = {
       // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
-      model: modelInstance!,
+  model: modelInstance!,
       system: finalSystemPrompt,
       messages: convertedMessages,
       tools: toolsForRun,
@@ -882,7 +910,7 @@ export async function POST(req: Request) {
   additionalParams.maxTokens = clampMaxOutputTokens(originalModel, additionalParams.maxTokens)
     
     // Check if user is asking to open/view a document - reduce reasoning to avoid content in reasoning
-    const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
     const isOpeningDocument = /abrir.*archivo|open.*document|mostrar.*documento|show.*document|ver.*archivo|view.*file|editar.*documento|work on.*doc/i.test(lastUserMessage)
 
     // Add reasoning effort for GPT-5 models with model-specific tuning
@@ -910,7 +938,7 @@ export async function POST(req: Request) {
       }
     } catch {}
 
-  const result = await withRequestContext({ userId: realUserId, model, requestId: reqId }, async () => {
+  const result = await withRequestContext({ userId: realUserId, model: effectiveModelId, requestId: reqId }, async () => {
     return streamText(additionalParams)
   })
 

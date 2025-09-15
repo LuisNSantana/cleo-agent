@@ -36,10 +36,12 @@ const fastModels: ModelConfig[] = [
     inputCost: 0,
     outputCost: 0,
     priceUnit: "free tier",
-    tags: ["fast", "open-source", "tools", "cost-effective", "free"],
+    tags: ["fast", "open-source", "cost-effective", "free"],
     contextWindow: 32768, // per OpenRouter page as of 2025-09-15
     vision: false, // text-only primary fast model
-    tools: true,
+    // Important: OpenRouter free route for GPT-OSS-120B does NOT support tool/function calling
+    // We mark tools=false to avoid runtime tool invocation attempts
+    tools: false,
     audio: false,
     reasoning: true,
     openSource: true,
