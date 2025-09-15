@@ -1,16 +1,5 @@
 /**
- * Predefined Agimport { CLEO_AGENT } from './cleo'
-import { WEX_AGENT } from './wex'
-// import { TOBY_AGENT } from './toby'  // REMOVED
-import { AMI_AGENT } from './ami'
-import { PETER_AGENT } from './peter'
-import { EMMA_AGENT } from './emma'
-import { APU_AGENT } from './apu'
-import { ASTRA_AGENT } from './astra'
-import { KHIPU_AGENT } from './khipu'
-import { APU_MARKETS_AGENT } from './apu-markets'
-import { NOTION_AGENT } from './notion-agent'
-// import { AMI_CALENDAR_AGENT } from './ami-calendar'  // REMOVEDations
+ * Predefined Agents
  * 
  * Immutable agents that ship with the system.
  * These agents cannot be modified by users and are always available.
@@ -18,7 +7,7 @@ import { NOTION_AGENT } from './notion-agent'
 
 export { CLEO_AGENT } from './cleo'
 export { WEX_AGENT } from './wex'
-// TOBY REMOVED - functionality consolidated into APU for research optimization
+export { TOBY_AGENT } from './toby'
 export { AMI_AGENT } from './ami'
 export { PETER_AGENT } from './peter'
 export { EMMA_AGENT } from './emma'
@@ -35,7 +24,7 @@ export { VIKTOR_AGENT } from './viktor'
 
 import { CLEO_AGENT } from './cleo'
 import { WEX_AGENT } from './wex'
-// import { TOBY_AGENT } from './toby'  // REMOVED
+import { TOBY_AGENT } from './toby'
 import { AMI_AGENT } from './ami'
 import { PETER_AGENT } from './peter'
 import { EMMA_AGENT } from './emma'
@@ -56,7 +45,7 @@ import { VIKTOR_AGENT } from './viktor'
 export const ALL_PREDEFINED_AGENTS = [
   CLEO_AGENT,
   WEX_AGENT,
-  // TOBY_AGENT,  // REMOVED - consolidated into APU
+  TOBY_AGENT,
   AMI_AGENT,
   PETER_AGENT,
   EMMA_AGENT,
