@@ -71,7 +71,9 @@ const AGENT_PATTERNS: KeywordPatterns = {
     primary: [
       // Gestión administrativa y organización
       'task', 'tarea', 'project', 'proyecto', 'manage', 'gestión', 'gestionar', 'organize', 'organizar', 'schedule', 'scheduling', 'plan', 'planning','calendar', 'calendario', 'meeting', 'reunión', 'appointment', 'cita', 'agenda', 'schedule',
-      'notion', 'organize', 'organizar', 'manage', 'gestión', 'gestion', 'coordinate', 'coordinar', 'plan', 'planificar',
+      // Notion workspace & pages
+      'notion', 'workspace', 'page', 'database', 'notes', 'notas', 'knowledge base', 'wiki', 'template', 'plantilla',
+      'organize', 'organizar', 'manage', 'gestión', 'gestion', 'coordinate', 'coordinar', 'plan', 'planificar',
       // Investigación práctica y búsquedas del día a día (incluye vuelos y restaurantes)
       'restaurant', 'restaurante', 'cocina', 'cuisine', 'menu', 'menú', 'hours', 'horarios', 'near me', 'cerca', 
       'hotel', 'booking', 'reserva', 'reservación', 'reservacion', 'flight', 'flights', 'vuelo', 'vuelos', 'travel', 'viaje','find', 'encontrar', 'search', 'buscar', 'recommend', 'recomendar', 'where', 'dónde', 'donde',
@@ -80,7 +82,9 @@ const AGENT_PATTERNS: KeywordPatterns = {
       // Investigación de contactos y empresas / LinkedIn / Email
       'contact', 'contacto', 'client', 'cliente', 'lead', 'prospect', 'prospecto', 'person', 'persona', 'company', 'empresa',
       'linkedin', 'perfil', 'profile', 'research', 'investigar', 'information', 'información', 'informacion', 
-      'email', 'correo', 'inbox', 'bandeja', 'responder', 'reply', 'titulo', 'title', 'position'
+      // Email triage/reading/search intents (bias triage to Ami)
+      'email', 'gmail', 'correo', 'inbox', 'bandeja', 'responder', 'reply', 'titulo', 'title', 'position',
+      'buscar emails', 'search emails', 'find emails', 'unread emails', 'emails no leídos', 'emails no leidos'
   ],
     secondary: [
       'productivity', 'productividad', 'workflow', 'template', 'plantilla', 'deadline', 'agenda',
@@ -90,13 +94,16 @@ const AGENT_PATTERNS: KeywordPatterns = {
       'latest news', 'breaking', 'tendencias', 'noticias', 'news', 'hoy'
     ],
     contextual: [
-      'help me organize', 'ayúdame a organizar', 'ayudame a organizar', 'find a restaurant', 'buscar un restaurante', 'buscar restaurantes', 
+      'help me organize', 'ayúdame a organizar', 'ayudame a organizar',
+      // Notion intents
+      'create notion page', 'organize workspace', 'notion database', 'take notes', 'setup wiki', 'create template',
+      'find a restaurant', 'buscar un restaurante', 'buscar restaurantes', 
       'recommend restaurants', 'recomienda restaurantes', 'book a hotel', 'reservar hotel', 'book a table', 'reservar mesa', 
       'make a reservation', 'hacer una reserva', 'plan a trip', 'planificar viaje', 'find flights', 'buscar vuelos', 
       'cheap flights', 'vuelos baratos', 'google flights', 'skyscanner', 'where can i', 'dónde puedo', 'donde puedo', 
       'recommend me', 'recomiéndame', 'recomendame', 'best places', 'mejores lugares', 'nearby', 'cerca de mí', 'cerca de mi',
       'research company', 'investigar empresa', 'find contact', 'encontrar contacto', 'find linkedin', 'buscar linkedin', 
-      'lookup linkedin', 'perfil linkedin', 'read my email', 'lee mi correo', 'check inbox', 'revisa bandeja', 
+      'lookup linkedin', 'perfil linkedin', 'read my email', 'lee mi correo', 'check inbox', 'revisa bandeja', 'revisa mi gmail', 'revisa gmail', 'check my gmail', 'email summary', 'resumen de correos',
       'draft reply', 'borrador de respuesta', 'reply email', 'responde correo', 'manage my calendar', 'gestionar mi calendario', 
       'organize my notion', 'search online', 'news today', 'noticias de hoy', 'what happened', 'qué pasó'
     ],
@@ -134,9 +141,9 @@ const AGENT_PATTERNS: KeywordPatterns = {
   },
   // Sub-agents
   'astra-email': {
-    primary: ['email', 'gmail', 'correo', 'send', 'enviar', 'draft', 'borrador', 'reply', 'responder', 'compose', 'message', 'mensaje'],
-    secondary: ['inbox', 'bandeja', 'communication', 'comunicación', 'correspondence', 'correspondencia', 'mail', 'letter', 'carta'],
-    contextual: ['send email', 'enviar correo', 'check inbox', 'revisar bandeja', 'draft reply', 'write message', 'compose email'],
+    primary: ['send', 'enviar', 'draft', 'borrador', 'reply', 'responder', 'compose', 'message', 'mensaje'],
+    secondary: ['communication', 'comunicación', 'correspondence', 'correspondencia', 'mail', 'letter', 'carta'],
+    contextual: ['send email', 'enviar correo', 'draft reply', 'write message', 'compose email', 'responder este correo', 'reply to this email'],
     exclusions: ['calendar', 'meeting', 'schedule']
   },
   'notion-agent': {

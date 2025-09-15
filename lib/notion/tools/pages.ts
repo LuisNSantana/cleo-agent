@@ -26,7 +26,8 @@ const CreatePageSchema = z.object({
   parent_id: z.string().min(1).describe('ID of parent page or database'),
   title: z.string().min(1).describe('Page title'),
   properties: z.record(z.any()).optional().describe('Page properties (for database pages)'),
-  content: z.array(BlockSchema).optional().describe('Page content blocks'),
+  // Accept either full Notion block objects or plain strings (normalized to paragraphs)
+  content: z.array(z.union([BlockSchema, z.string()])).optional().describe('Page content blocks or plain text lines'),
   icon: z.object({
     type: z.enum(['emoji', 'external']),
     emoji: z.string().optional(),
@@ -179,9 +180,49 @@ export const createNotionPageTool = tool({
         pageData.cover = params.cover
       }
 
+      // Helper: build rich_text array
+      const toRichText = (text: string) => ([{ type: 'text', text: { content: String(text) } }])
+
+      // Helper: normalize a single block or string into a valid Notion block
+      const normalizeBlock = (item: any) => {
+        // Strings -> paragraph
+        if (typeof item === 'string') {
+          return { type: 'paragraph', paragraph: { rich_text: toRichText(item) } }
+        }
+        // Objects without type -> fallback to paragraph with serialized content
+        if (!item || typeof item !== 'object' || !item.type) {
+          return { type: 'paragraph', paragraph: { rich_text: toRichText(String(item)) } }
+        }
+        const type = String(item.type)
+        const allowed = new Set([
+          'paragraph','heading_1','heading_2','heading_3','bulleted_list_item','numbered_list_item','quote','callout','to_do','toggle','code'
+        ])
+        const blockType = allowed.has(type) ? type : 'paragraph'
+        // If the corresponding key exists and is well-formed, use it
+        if (item[blockType] && typeof item[blockType] === 'object') {
+          // Ensure rich_text exists for text-based blocks
+          if (['paragraph','heading_1','heading_2','heading_3','bulleted_list_item','numbered_list_item','quote','callout','to_do','toggle','code'].includes(blockType)) {
+            const node = { ...item[blockType] }
+            if (!Array.isArray(node.rich_text)) {
+              const text = item.text || item.content || ''
+              node.rich_text = toRichText(String(text))
+            }
+            return { type: blockType, [blockType]: node }
+          }
+          return { type: blockType, [blockType]: item[blockType] }
+        }
+        // Build minimal structure for text-based blocks
+        const text = item.text || item.content || ''
+        const base: any = { type: blockType, [blockType]: {} }
+        if (['paragraph','heading_1','heading_2','heading_3','bulleted_list_item','numbered_list_item','quote','callout','to_do','toggle','code'].includes(blockType)) {
+          base[blockType].rich_text = toRichText(String(text))
+        }
+        return base
+      }
+
       // Add content blocks if provided
       if (params.content && params.content.length > 0) {
-        pageData.children = params.content
+        pageData.children = params.content.map(normalizeBlock)
       }
 
       const response = await client.createPage(pageData)

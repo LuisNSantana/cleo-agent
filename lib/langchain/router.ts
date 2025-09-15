@@ -335,7 +335,7 @@ export class ModelRouter {
     const functionKeywords = [
       // Explicit tool requests
       'use tool', 'call tool', 'execute tool', 'run tool',
-      'search the web', 'web search for', 'google search',
+      'search the web', 'web search for', 'web search', 'google search', 'search online',
       'calculate this', 'compute this', 'what is the calculation',
       'check weather', 'weather in', 'forecast for',
       'crypto price', 'bitcoin price', 'check price of',
@@ -346,9 +346,9 @@ export class ModelRouter {
       'current time', 'what time is it', 'time now',
       'random fact', 'tell me a fact',
 
-      // Spanish explicit requests
+  // Spanish explicit requests
       'usa herramienta', 'ejecuta herramienta', 'corre herramienta',
-      'busca en internet', 'búsqueda web', 'google busca',
+  'busca en internet', 'búsqueda web', 'buscar en la web', 'google busca', 'buscar online',
       'calcula esto', 'haz el cálculo', 'cuál es el cálculo',
       'revisa el clima', 'clima en', 'pronóstico del',
       'precio de cripto', 'precio bitcoin', 'revisa precio',

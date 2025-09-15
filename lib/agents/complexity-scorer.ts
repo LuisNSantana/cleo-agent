@@ -194,9 +194,9 @@ export function suggestAgent(message: string): string | null {
     return 'apu';
   }
   
-  // Notion patterns (now via notion-agent)
+  // Notion patterns: default to Ami who orchestrates Notion tools
   if (/(notion|workspace|page|database|organize|notes|knowledge\s+base)/.test(lowMessage)) {
-    return 'notion-agent';
+    return 'ami';
   }
   
   // Google Workspace patterns

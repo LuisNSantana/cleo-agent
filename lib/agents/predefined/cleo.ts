@@ -24,6 +24,7 @@ export const CLEO_AGENT: AgentConfig = {
     'delegate_to_apu', // Financial/market research
     'delegate_to_wex', // Web automation
     'delegate_to_nora', // Social media/Twitter
+    'webSearch', // General web search
     'getCurrentDateTime', // Time/timezone
     'weatherInfo', // Weather data
     'randomFact', // Fun facts

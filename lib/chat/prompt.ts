@@ -93,9 +93,28 @@ function buildInternalDelegationHint(userMessage?: string, recommended?: { name:
   // Fallback to provided recommendation
   if (recommended) {
     console.log(`📋 [DELEGATION] Using router recommendation:`, recommended)
-    const toolPart = recommended.toolName ? ` Prefer tool: ${recommended.toolName}.` : ''
+    // Map leaf tool hints (e.g., Gmail list/get) to actual delegate tools available to Cleo
+    const leafToDelegateMap: Record<string, string> = {
+      // Gmail triage → Ami delegate
+      listGmailMessages: 'delegate_to_ami',
+      getGmailMessage: 'delegate_to_ami',
+      modifyGmailLabels: 'delegate_to_ami',
+      trashGmailMessage: 'delegate_to_ami',
+      // Gmail compose/send → Astra delegate
+      sendGmailMessage: 'delegate_to_astra',
+    }
+    let mappedTool = recommended.toolName && leafToDelegateMap[recommended.toolName]
+    // Fallback by agent name if tool not provided
+    if (!mappedTool && /ami/i.test(recommended.name || '')) mappedTool = 'delegate_to_ami'
+    if (!mappedTool && /astra/i.test(recommended.name || '')) mappedTool = 'delegate_to_astra'
+
+    const toolPart = (mappedTool || recommended.toolName)
+      ? ` Prefer tool: ${mappedTool || recommended.toolName}.`
+      : ''
     const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
-    return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}`
+    // Encourage immediate action to avoid "direct_or_clarify" fallthroughs
+    const actionPart = mappedTool ? ' Action: Call this tool now; do not answer directly.' : ''
+    return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${reasonPart}${actionPart}`
   }
   
   console.log(`🔄 [DELEGATION] No delegation hints available`)
@@ -117,7 +136,7 @@ const CLEO_IDENTITY_HEADER = `CLEO IDENTITY (TOP PRIORITY)
 
 // Compact, model-agnostic directive to standardize agent behavior for reliability and speed
 const AGENT_WORKFLOW_DIRECTIVE = `AGENT WORKFLOW (RELIABILITY & SPEED)
-- Routing: If an internal router hint is present, prefer that tool/agent (time→time, weather→weather, email triage→Gmail list/read, email compose→delegate_to_astra, Google Workspace→delegate_to_peter, Notion→delegate_to_notion_agent).
+- Routing: If an internal router hint is present, you MUST delegate via the matching delegate tool instead of answering directly. Examples: email triage→delegate_to_ami (which will use Gmail list/read), email compose→delegate_to_astra, Google Workspace→delegate_to_peter, Notion→delegate_to_notion_agent.
 - Plan-then-act (brief): Form a short plan internally (1–2 steps). Do NOT reveal chain-of-thought; output only final answers and tool results.
 - Tool-first: Prefer a single correct tool call. Use at most 3 calls per turn. Stop early when sufficient.
 - Safety/timeouts: Keep calls quick; if a tool stalls or partial data is enough, stop and summarize. Ask one concise follow-up only if truly needed.
