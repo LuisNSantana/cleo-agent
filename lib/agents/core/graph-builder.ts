@@ -489,6 +489,11 @@ export class GraphBuilder {
             : 'Listo. He completado la acción solicitada.'
         }
 
+        // Ensure we always have non-empty final text content
+        if (!textContent || !String(textContent).trim()) {
+          textContent = 'Task completed successfully.'
+        }
+
         // Emit completion and log the assistant response for observability
         logger.info('[GraphBuilder] Agent node completed', { agentId: agentConfig.id, executionId: state.metadata?.executionId, responseSnippet: String(textContent).slice(0, 500) })
         this.eventEmitter.emit('node.completed', {
@@ -968,17 +973,22 @@ export class GraphBuilder {
 
   // Log final response for observability (legacy buildGraph path)
   logger.info('[GraphBuilder] buildGraph final response', { agentId: agentConfig.id, responseSnippet: String(response.content).slice(0, 500) })
+        // Ensure we have non-empty content before returning
+        const finalContent = response?.content && String(response.content).trim() 
+          ? String(response.content).trim()
+          : 'Task completed successfully.'
+
         this.eventEmitter.emit('node.completed', {
           nodeId: 'execute',
           agentId: agentConfig.id,
-          response: response.content
+          response: finalContent
         })
 
         return {
           messages: [
             ...filteredStateMessages,  // Use filtered messages instead of raw state.messages
             new AIMessage({
-              content: response.content,
+              content: finalContent,
               additional_kwargs: { sender: agentConfig.id }
             })
           ]

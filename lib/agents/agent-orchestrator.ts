@@ -189,10 +189,26 @@ function createAndRunExecution(
 	})
 	
 	Promise.race([executionPromise, timeoutPromise]).then(res => {
+		logger.info('🔍 [LEGACY DEBUG] Execution completed, processing result:', {
+			executionId: exec.id,
+			agentId: target.id,
+			hasResult: !!res,
+			resultType: typeof res,
+			resultContent: res && (res as any).content ? String((res as any).content).slice(0, 200) : 'NO_CONTENT',
+			resultMetadata: (res as any)?.metadata || {}
+		})
+		
 		exec.status = 'completed'
 		exec.endTime = new Date()
 		const content = (res && (res as any).content) || ''
 		exec.messages = exec.messages || []
+		
+		logger.debug('🔍 [LEGACY DEBUG] Pre-push state:', {
+			executionId: exec.id,
+			messagesArrayLength: exec.messages.length,
+			extractedContent: String(content).slice(0, 200),
+			contentLength: String(content).length
+		})
 		
 		// CRITICAL FIX: Use the actual delegated agent from result metadata, not the original target
 		const actualSender = (res && (res as any).metadata?.sender) || target.id
@@ -217,6 +233,15 @@ function createAndRunExecution(
 				timestamp: new Date(), 
 				metadata: { sender: actualSender, source: 'core' },
 				toolCalls: finalToolCalls
+			})
+			
+			logger.info('🔍 [LEGACY DEBUG] Final message pushed to execution:', {
+				executionId: exec.id,
+				messageId: `${exec.id}_final`,
+				contentLength: String(content).length,
+				actualSender,
+				toolCallsCount: finalToolCalls.length,
+				totalMessagesNow: exec.messages.length
 			})
 			
 			// Update metrics with tool call count
