@@ -214,38 +214,79 @@ function createAndRunExecution(
 		const actualSender = (res && (res as any).metadata?.sender) || target.id
 		
 		try {
-			// Extract toolCalls from the result if available, or use captured tools
-			const resultToolCalls = (res && (res as any).toolCalls) ? (res as any).toolCalls.map((tc: any) => ({
-				id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-				name: tc.name || 'unknown',
-				args: tc.args || {},
-				result: tc.result,
-				error: tc.error
-			})) : []
-			
-			// Use captured tool calls if result doesn't have them
-			const finalToolCalls = resultToolCalls.length > 0 ? resultToolCalls : toolCallsUsed
-			
-			exec.messages.push({ 
-				id: `${exec.id}_final`, 
-				type: 'ai', 
-				content: String(content), 
-				timestamp: new Date(), 
-				metadata: { sender: actualSender, source: 'core' },
-				toolCalls: finalToolCalls
-			})
+			// CRITICAL FIX: Use messages from ExecutionResult if available (from graph execution)
+			// This preserves the full conversation state instead of just the final message
+			if ((res as any)?.messages && Array.isArray((res as any).messages)) {
+				console.log('🔵 [LEGACY DEBUG] Using messages from ExecutionResult:', {
+					executionId: exec.id,
+					resultMessagesCount: (res as any).messages.length,
+					resultMessages: (res as any).messages.map((m: any) => ({
+						type: m.constructor?.name,
+						content: String(m.content || '').slice(0, 100)
+					}))
+				})
+				
+				// Convert LangChain messages to execution message format
+				exec.messages = (res as any).messages.map((msg: any, index: number) => {
+					const isAI = msg.constructor?.name === 'AIMessage' || msg.type === 'ai'
+					const isUser = msg.constructor?.name === 'HumanMessage' || msg.type === 'user' || msg.type === 'human'
+					const isSystem = msg.constructor?.name === 'SystemMessage' || msg.type === 'system'
+					
+					return {
+						id: `${exec.id}_msg_${index}`,
+						type: isAI ? 'ai' : (isUser ? 'user' : (isSystem ? 'system' : 'ai')),
+						content: String(msg.content || ''),
+						timestamp: new Date(),
+						metadata: { 
+							sender: (msg as any)?.additional_kwargs?.sender || actualSender,
+							source: 'graph_execution'
+						},
+						toolCalls: (msg as any)?.tool_calls || []
+					}
+				})
+				
+				console.log('🔵 [LEGACY DEBUG] Converted messages:', {
+					executionId: exec.id,
+					convertedCount: exec.messages.length,
+					finalMessagePreview: exec.messages[exec.messages.length - 1]
+				})
+			} else {
+				// Fallback: single message from content (legacy behavior)
+				console.log('🔵 [LEGACY DEBUG] Using fallback single message approach')
+				
+				// Extract toolCalls from the result if available, or use captured tools
+				const resultToolCalls = (res && (res as any).toolCalls) ? (res as any).toolCalls.map((tc: any) => ({
+					id: tc.id || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+					name: tc.name || 'unknown',
+					args: tc.args || {},
+					result: tc.result,
+					error: tc.error
+				})) : []
+				
+				// Use captured tool calls if result doesn't have them
+				const finalToolCalls = resultToolCalls.length > 0 ? resultToolCalls : toolCallsUsed
+				
+				exec.messages.push({ 
+					id: `${exec.id}_final`, 
+					type: 'ai', 
+					content: String(content), 
+					timestamp: new Date(), 
+					metadata: { sender: actualSender, source: 'core' },
+					toolCalls: finalToolCalls
+				})
+			}
 			
 			logger.info('🔍 [LEGACY DEBUG] Final message pushed to execution:', {
 				executionId: exec.id,
-				messageId: `${exec.id}_final`,
-				contentLength: String(content).length,
+				messageId: exec.messages[exec.messages.length - 1]?.id,
+				contentLength: exec.messages[exec.messages.length - 1]?.content?.length || 0,
 				actualSender,
-				toolCallsCount: finalToolCalls.length,
+				toolCallsCount: exec.messages.reduce((count, msg) => count + (msg.toolCalls?.length || 0), 0),
 				totalMessagesNow: exec.messages.length
 			})
 			
-			// Update metrics with tool call count
-			exec.metrics.toolCallsCount = finalToolCalls.length
+			// Update metrics with tool call count from all messages
+			exec.metrics.toolCallsCount = exec.messages.reduce((count, msg) => count + (msg.toolCalls?.length || 0), 0)
 			
 			// Clean up listeners
 			core.off?.('tool.executing', toolExecutingListener)

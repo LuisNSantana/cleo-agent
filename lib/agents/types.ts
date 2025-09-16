@@ -261,6 +261,7 @@ export interface ExecutionResult {
   toolCalls?: ToolCall[]
   executionTime?: number
   tokensUsed?: number
+  messages?: any[] // Add messages array to preserve full conversation
 }
 
 // Agent state for LangGraph

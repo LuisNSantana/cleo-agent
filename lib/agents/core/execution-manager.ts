@@ -110,7 +110,8 @@ export class ExecutionManager {
         },
         toolCalls: lastMessage?.tool_calls || [],
         executionTime: Date.now() - startTime,
-        tokensUsed: this.estimateTokens(finalMessages)
+        tokensUsed: this.estimateTokens(finalMessages),
+        messages: finalMessages // Include all messages from graph execution
       }
 
       // Update execution metrics
