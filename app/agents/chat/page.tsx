@@ -502,27 +502,26 @@ export default function AgentsChatPage() {
   }, [selectedAgent, forceSupervised]) // Re-load when mode changes
 
   // Refresh messages when execution completes to ensure DB persistence
-  // TEMPORARILY DISABLED to prevent race condition with execution message processing
-  /*
+  // This ensures a reply shows even if execution.messages are not populated by the orchestrator
   useEffect(() => {
     const refreshMessagesAfterExecution = async () => {
       if (!currentExecution || currentExecution.status !== 'completed' || !selectedAgent) return
-      
-      // Wait a bit for the message to be persisted
+
+      // Wait a bit for server-side persistence to commit
       setTimeout(async () => {
         try {
           const threadKey = `${selectedAgent.id}_${forceSupervised ? 'supervised' : 'direct'}`
           const params = new URLSearchParams({ agentKey: threadKey, limit: '1' })
           const res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
           if (!res.ok) return
-          
+
           const data = await res.json()
           const thread = data?.threads?.[0]
           if (!thread?.id) return
-          
+
           const mr = await fetch(`/api/agents/threads/${thread.id}/messages?limit=200`, { credentials: 'same-origin' })
           if (!mr.ok) return
-          
+
           const md = await mr.json()
           const mapped: ChatMessage[] = (md?.messages || []).map((m: any) => ({
             id: String(m.id),
@@ -534,20 +533,19 @@ export default function AgentsChatPage() {
             isDelegated: m.metadata?.isDelegated || false,
             delegatedFrom: m.metadata?.delegatedFrom || null,
             metadata: m.metadata || {},
-            toolCalls: m.tool_calls || [], // Include toolCalls from database
+            toolCalls: m.tool_calls || [],
           }))
-          
+
           console.log('🔄 [CHAT DEBUG] Refreshed messages after execution completion:', mapped.length)
           setMessages(mapped)
         } catch (e) {
           console.warn('Failed to refresh messages after execution:', e)
         }
-      }, 2000) // Wait 2 seconds for DB persistence
+      }, 1500)
     }
-    
+
     refreshMessagesAfterExecution()
   }, [currentExecution?.status, currentExecution?.id, selectedAgent, forceSupervised])
-  */
 
   
   // Effective agent will be computed after lastDelegation is defined below

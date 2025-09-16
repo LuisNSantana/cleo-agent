@@ -202,7 +202,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     },
 
   executeAgent: async (input: string, agentId?: string, forceSupervised?: boolean) => {
-      set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null })
 
       try {
         // Helper: read CSRF token from cookie if present
@@ -222,6 +222,36 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     const effectiveAgentId = agentId || 'cleo-supervisor'
     const key = `${effectiveAgentId}_${forceSupervised ? 'supervised' : 'direct'}`
     const threadId = map[key]
+
+        // Create a provisional running execution immediately to drive UI progress
+        const pendingId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        const pendingExec = {
+          id: pendingId,
+          agentId: effectiveAgentId,
+          threadId: threadId || 'pending',
+          userId: 'unknown',
+          status: 'running' as const,
+          startTime: new Date(),
+          messages: [],
+          metrics: {
+            totalTokens: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            executionTime: 0,
+            executionTimeMs: 0,
+            tokensUsed: 0,
+            toolCallsCount: 0,
+            handoffsCount: 0,
+            errorCount: 0,
+            retryCount: 0,
+            cost: 0
+          }
+        }
+        set((state) => ({
+          executions: [...state.executions, pendingExec as any],
+          currentExecution: pendingExec as any,
+          _lastUpdate: Date.now()
+        }))
         // Call API with dual-mode support
         const response = await fetch('/api/agents/execute', {
           method: 'POST',
@@ -244,20 +274,23 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
-        const data = await response.json()
+  const data = await response.json()
         
         if (!data.success) {
           throw new Error(data.error || 'Execution failed')
         }
 
-        // Force explicit state update to guarantee re-render
+        // Replace provisional execution with real one (or append if not found)
         set((state) => {
           const newExecution = { ...data.execution }
+          const idx = state.executions.findIndex(e => e.id === pendingId)
+          const nextExecutions = idx >= 0
+            ? state.executions.map(e => (e.id === pendingId ? newExecution : e))
+            : [...state.executions, newExecution]
           return {
-            executions: [...state.executions, newExecution],
+            executions: nextExecutions,
             currentExecution: newExecution,
-            isLoading: false,
-            // Force timestamp to trigger subscribers
+            isLoading: newExecution.status === 'running',
             _lastUpdate: Date.now()
           }
         })
@@ -294,10 +327,14 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           : (error instanceof TypeError && /Failed to fetch/i.test(error.message))
             ? 'Network error: Failed to fetch'
             : (error instanceof Error ? error.message : 'Unknown error occurred')
-        set({ 
+        // Mark provisional pending execution as failed to clear UI state
+        set((state) => ({
+          executions: state.executions.map(e => e.id.startsWith('pending_') ? { ...e, status: 'failed' as const, endTime: new Date() } : e),
+          currentExecution: null,
           error: message,
-          isLoading: false 
-        })
+          isLoading: false,
+          _lastUpdate: Date.now()
+        }))
       }
     },
 
