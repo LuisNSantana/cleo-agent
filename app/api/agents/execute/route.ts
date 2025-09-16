@@ -91,29 +91,46 @@ export async function POST(request: NextRequest) {
             effectiveThreadId = (data as any)?.id || null
           }
           
-          // Save the user message to thread
+          // Save the user message to thread (with deduplication check)
           if (effectiveThreadId) {
-            await (supabase as any).from('agent_messages').insert({
-              thread_id: effectiveThreadId,
-              user_id: authedUserId,
-              role: 'user',
-              content: input,
-              metadata: { 
-                agentId: agentId || 'cleo-supervisor', 
-                context: context || null,
-                isDelegated: agentId && agentId !== 'cleo-supervisor',
-                delegatedFrom: agentId && agentId !== 'cleo-supervisor' ? 'cleo-supervisor' : null,
-                conversation_mode: forceSupervised ? 'supervised' : 'direct',
-                composite_agent_key: compositeAgentKey
-              }
-            })
+            // Check if this exact message already exists to prevent double submission
+            const { data: existingUserMsg } = await (supabase as any)
+              .from('agent_messages')
+              .select('id, created_at')
+              .eq('thread_id', effectiveThreadId)
+              .eq('user_id', authedUserId)
+              .eq('role', 'user')
+              .eq('content', input)
+              .gte('created_at', new Date(Date.now() - 10000).toISOString()) // Last 10 seconds
+              .order('created_at', { ascending: false })
+              .limit(1)
+            
+            if (!existingUserMsg || existingUserMsg.length === 0) {
+              console.log(`[API/execute] Inserting user message: "${input.substring(0, 50)}..."`)
+              await (supabase as any).from('agent_messages').insert({
+                thread_id: effectiveThreadId,
+                user_id: authedUserId,
+                role: 'user',
+                content: input,
+                metadata: { 
+                  agentId: agentId || 'cleo-supervisor', 
+                  context: context || null,
+                  isDelegated: agentId && agentId !== 'cleo-supervisor',
+                  delegatedFrom: agentId && agentId !== 'cleo-supervisor' ? 'cleo-supervisor' : null,
+                  conversation_mode: forceSupervised ? 'supervised' : 'direct',
+                  composite_agent_key: compositeAgentKey
+                }
+              })
+            } else {
+              console.log(`[API/execute] SKIP: User message already exists (created ${existingUserMsg[0].created_at})`)
+            }
           }
         } catch (e) {
           console.warn('[API/execute] Could not persist agent thread/message:', e)
         }
       }
 
-      // Build prior messages context from thread (EXCLUDE current message to avoid duplication)
+      // Build prior messages context from thread (with robust deduplication)
       let priorMessages: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }> = []
       if (effectiveThreadId && authedUserId && supabase) {
         try {
@@ -123,11 +140,21 @@ export async function POST(request: NextRequest) {
             .eq('thread_id', effectiveThreadId)
             .eq('user_id', authedUserId)
             .order('created_at', { ascending: true })
-            .limit(26) // Get one extra to exclude the last (current) message
+            .limit(50) // Get more to deduplicate properly
           if (Array.isArray(msgs)) {
-            // Exclude the last message (current user input) to avoid duplication
-            const priorMsgs = msgs.slice(0, -1) // Remove last message
-            priorMessages = priorMsgs.map((m: any) => ({
+            // Deduplicate by content + role (keep the first occurrence)
+            const seen = new Set<string>()
+            const deduped = msgs.filter((m: any) => {
+              const key = `${m.role}:${(m.content || '').trim()}`
+              if (seen.has(key)) {
+                console.log(`[API/execute] DEDUP: Skipping duplicate message ${m.role}: "${(m.content || '').substring(0, 30)}..."`)
+                return false
+              }
+              seen.add(key)
+              return true
+            })
+            
+            priorMessages = deduped.map((m: any) => ({
               role: m.role,
               content: m.content || '',
               metadata: {
@@ -204,19 +231,21 @@ export async function POST(request: NextRequest) {
           const aiMessages = (finalExecution.messages || []).filter((m: any) => m.type === 'ai' && (m.content || '').trim().length > 0)
           const last = aiMessages[aiMessages.length - 1]
           if (last) {
-            // Check if this execution's final message already exists (by metadata.executionId)
+            // Check if this execution's final message already exists (by content + timeframe)
             let exists = false
             try {
               const { data: existing, error: existErr } = await (supabase as any)
                 .from('agent_messages')
-                .select('id')
+                .select('id, content, created_at')
                 .eq('thread_id', effectiveThreadId)
                 .eq('user_id', authedUserId)
                 .eq('role', 'assistant')
-                .contains('metadata', { executionId: finalExecution.id })
+                .eq('content', (last.content || '').trim())
+                .gte('created_at', new Date(Date.now() - 60000).toISOString()) // Last 60 seconds
                 .limit(1)
               if (!existErr && Array.isArray(existing) && existing.length > 0) {
                 exists = true
+                console.log(`[API/execute] SKIP: Assistant message already persisted (${existing[0].id})`)
               }
             } catch (e) {
               // Non-fatal: proceed to try insert
