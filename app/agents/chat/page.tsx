@@ -536,8 +536,24 @@ export default function AgentsChatPage() {
             toolCalls: m.tool_calls || [],
           }))
 
-          console.log('🔄 [CHAT DEBUG] Refreshed messages after execution completion:', mapped.length)
-          setMessages(mapped)
+          // Deduplicate messages by content + type before setting
+          const seen = new Set<string>()
+          const deduped = mapped.filter(m => {
+            const key = `${m.type}:${m.content.trim()}`
+            if (seen.has(key)) {
+              console.log('🔄 [CHAT DEBUG] DEDUP: Skipping duplicate message:', m.type, m.content.slice(0, 50))
+              return false
+            }
+            seen.add(key)
+            return true
+          })
+
+          console.log('🔄 [CHAT DEBUG] Refreshed messages after execution completion:', {
+            original: mapped.length,
+            deduped: deduped.length,
+            removed: mapped.length - deduped.length
+          })
+          setMessages(deduped)
         } catch (e) {
           console.warn('Failed to refresh messages after execution:', e)
         }
