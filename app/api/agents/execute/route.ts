@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Build prior messages context from thread (last ~25 messages) so confirms carry state
+      // Build prior messages context from thread (EXCLUDE current message to avoid duplication)
       let priorMessages: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }> = []
       if (effectiveThreadId && authedUserId && supabase) {
         try {
@@ -123,9 +123,11 @@ export async function POST(request: NextRequest) {
             .eq('thread_id', effectiveThreadId)
             .eq('user_id', authedUserId)
             .order('created_at', { ascending: true })
-            .limit(25)
+            .limit(26) // Get one extra to exclude the last (current) message
           if (Array.isArray(msgs)) {
-            priorMessages = msgs.map((m: any) => ({
+            // Exclude the last message (current user input) to avoid duplication
+            const priorMsgs = msgs.slice(0, -1) // Remove last message
+            priorMessages = priorMsgs.map((m: any) => ({
               role: m.role,
               content: m.content || '',
               metadata: {
