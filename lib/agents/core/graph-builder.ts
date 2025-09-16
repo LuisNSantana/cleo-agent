@@ -978,13 +978,20 @@ export class GraphBuilder {
           ? String(response.content).trim()
           : 'Task completed successfully.'
 
+        console.log('🔴 [GRAPH CRITICAL] Final content being returned:', {
+          agentId: agentConfig.id,
+          originalContent: response?.content,
+          finalContent,
+          willReturnMessage: true
+        })
+
         this.eventEmitter.emit('node.completed', {
           nodeId: 'execute',
           agentId: agentConfig.id,
           response: finalContent
         })
 
-        return {
+        const finalReturn = {
           messages: [
             ...filteredStateMessages,  // Use filtered messages instead of raw state.messages
             new AIMessage({
@@ -993,6 +1000,14 @@ export class GraphBuilder {
             })
           ]
         }
+        
+        console.log('🔴 [GRAPH CRITICAL] Returning state with messages:', {
+          agentId: agentConfig.id,
+          messageCount: finalReturn.messages.length,
+          lastMessageContent: finalReturn.messages[finalReturn.messages.length - 1]?.content
+        })
+        
+        return finalReturn
       } catch (error) {
         this.eventEmitter.emit('node.error', {
           nodeId: 'execute',
