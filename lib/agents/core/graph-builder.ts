@@ -242,6 +242,7 @@ export class GraphBuilder {
 
       try {
         // Get model for this agent
+        logger.debug('[GraphBuilder] Requesting model from ModelFactory', { agentId: agentConfig.id, model: agentConfig.model })
         const baseModel = await this.modelFactory.getModel(agentConfig.model, {
           temperature: agentConfig.temperature,
           maxTokens: agentConfig.maxTokens
@@ -447,7 +448,7 @@ export class GraphBuilder {
           response = await model.invoke(messages)
         }
 
-        // FINAL SAFEGUARD: Ensure we always produce a user-visible message
+  // FINAL SAFEGUARD: Ensure we always produce a user-visible message
         const toText = (v: any) => (typeof v === 'string' ? v : (v?.toString?.() ?? ''))
         let textContent = toText(response?.content ?? '')
         if (!textContent || !String(textContent).trim()) {
@@ -488,6 +489,8 @@ export class GraphBuilder {
             : 'Listo. He completado la acción solicitada.'
         }
 
+        // Emit completion and log the assistant response for observability
+        logger.info('[GraphBuilder] Agent node completed', { agentId: agentConfig.id, executionId: state.metadata?.executionId, responseSnippet: String(textContent).slice(0, 500) })
         this.eventEmitter.emit('node.completed', {
           nodeId: agentConfig.id,
           agentId: agentConfig.id,
@@ -507,6 +510,7 @@ export class GraphBuilder {
           ]
         }
       } catch (error) {
+        logger.error('[GraphBuilder] Agent node error', { agentId: agentConfig.id, error })
         this.eventEmitter.emit('node.error', {
           nodeId: agentConfig.id,
           agentId: agentConfig.id,
@@ -962,6 +966,8 @@ export class GraphBuilder {
   logger.debug('🔍 [DEBUG] BuildGraph - Final response type:', typeof response.content)
   logger.debug('🔍 [DEBUG] BuildGraph - Final response length:', response.content?.length || 0)
 
+  // Log final response for observability (legacy buildGraph path)
+  logger.info('[GraphBuilder] buildGraph final response', { agentId: agentConfig.id, responseSnippet: String(response.content).slice(0, 500) })
         this.eventEmitter.emit('node.completed', {
           nodeId: 'execute',
           agentId: agentConfig.id,

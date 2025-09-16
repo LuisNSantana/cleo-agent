@@ -107,13 +107,16 @@ export class ModelFactory {
 
   async getModel(modelName: string, config: ModelConfig = {}): Promise<BaseChatModel> {
     const cacheKey = `${modelName}_${JSON.stringify(config)}`
-    
+    logger.debug(`[ModelFactory] getModel called`, { modelName, config, cacheKey })
+
     if (this.modelCache.has(cacheKey)) {
+      logger.info(`[ModelFactory] Cache hit`, { modelName, cacheKey })
       return this.modelCache.get(cacheKey)!
     }
 
     try {
       const model = await this.createModelWithFallback(modelName, config)
+      logger.info(`[ModelFactory] Model created`, { modelName, cacheKey, modelClass: (model as any)?.constructor?.name })
       this.modelCache.set(cacheKey, model)
       return model
     } catch (error) {
@@ -122,9 +125,10 @@ export class ModelFactory {
       // Try fallback model if available
       const fallbackModelName = getFallbackModel(modelName)
       if (fallbackModelName) {
-        logger.info(`[ModelFactory] Attempting fallback model: ${fallbackModelName}`)
+        logger.info(`[ModelFactory] Attempting fallback model`, { requested: modelName, fallback: fallbackModelName })
         try {
           const fallbackModel = this.createModel(fallbackModelName, config)
+          logger.info(`[ModelFactory] Fallback model instantiated`, { fallbackModelName, modelClass: (fallbackModel as any)?.constructor?.name })
           this.modelCache.set(cacheKey, fallbackModel)
           return fallbackModel
         } catch (fallbackError) {
@@ -161,10 +165,13 @@ export class ModelFactory {
     // Apply provider-safe clamp for output tokens
     const safeMax = clampMaxOutputTokens(cleanModelName, maxTokens)
 
+    logger.debug(`[ModelFactory] createModel dispatch`, { modelName, temperature, maxTokens, streaming })
+
     // OpenRouter models via OpenAI-compatible API (function/tool calling supported)
     if (cleanModelName.startsWith('openrouter:')) {
       const resolved = cleanModelName.replace('openrouter:', '')
       const safeMax = clampMaxOutputTokens(resolved, maxTokens)
+      logger.info(`[ModelFactory] Instantiating OpenRouter/OpenAI-compatible model`, { resolved, safeMax })
       return new ChatOpenAI({
         apiKey: process.env.OPENROUTER_API_KEY,
         modelName: resolved,
@@ -189,6 +196,7 @@ export class ModelFactory {
           ? 'openai/gpt-oss-120b'
           : cleanModelName
       
+      logger.info(`[ModelFactory] Instantiating Groq model`, { resolvedModelName, safeMax })
       return new ChatGroq({
         model: resolvedModelName,
         temperature,
@@ -201,6 +209,7 @@ export class ModelFactory {
     // Mistral models
     if (cleanModelName.startsWith('mistral-') || cleanModelName.includes('mistral')) {
       // Use LangChain's official ChatMistralAI wrapper (2025 best practice)
+      logger.info(`[ModelFactory] Instantiating Mistral model`, { cleanModelName, safeMax })
       return new ChatMistralAI({
         model: cleanModelName,
         temperature,
@@ -217,6 +226,7 @@ export class ModelFactory {
       })
       
       const model = xai(cleanModelName.replace('xai/', ''))
+  logger.info(`[ModelFactory] Instantiating xAI/AISDK model`, { cleanModelName })
   return new AISdkChatModel(model, cleanModelName, temperature, safeMax)
     }
 
@@ -233,12 +243,14 @@ export class ModelFactory {
       if (typeof temperature === 'number') {
         opts.temperature = temperature
       }
+      logger.info(`[ModelFactory] Instantiating OpenAI model`, { resolved, opts })
       return new ChatOpenAI(opts)
     }
 
     // Anthropic models (Claude) - including claude-3-5-haiku-latest and claude-3-5-sonnet-latest
     if (cleanModelName.startsWith('claude-') || cleanModelName.includes('anthropic')) {
       // Clamp to recommended Anthropic limits when known
+      logger.info(`[ModelFactory] Instantiating Anthropic model`, { cleanModelName, safeMax })
       return new ChatAnthropic({
         modelName: cleanModelName.replace('anthropic/', ''),
         temperature,
@@ -250,6 +262,7 @@ export class ModelFactory {
 
     // Ollama models (local)
     if (cleanModelName.includes('ollama/') || cleanModelName.includes('local/')) {
+      logger.info(`[ModelFactory] Instantiating Ollama/local model`, { cleanModelName })
       return new ChatOllama({
         model: cleanModelName.replace('ollama/', '').replace('local/', ''),
         temperature,
@@ -259,6 +272,7 @@ export class ModelFactory {
 
     // Default to OpenAI GPT-4o-mini (cost-effective fallback)
   logger.warn(`[ModelFactory] Unknown model ${cleanModelName}, defaulting to GPT-4o-mini`)
+    logger.info(`[ModelFactory] Instantiating final fallback GPT-4o-mini`, { cleanModelName, safeMax })
     return new ChatOpenAI({
       modelName: 'gpt-4o-mini',
       temperature,
