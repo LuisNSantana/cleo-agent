@@ -168,11 +168,32 @@ function createAndRunExecution(
 	]
 	const target = allAgents.find(a => a.id === (agentId || 'cleo-supervisor')) || allAgents.find(a => a.id === 'cleo-supervisor')!
 
+	const baseMessages = toBaseMessages(prior || [])
+	
+	// Check if the current input is already the last message in prior messages
+	// to avoid duplication (happens when we persist user message then load it back)
+	const lastPriorMessage = (prior || []).slice(-1)[0]
+	const inputAlreadyInHistory = lastPriorMessage && 
+		lastPriorMessage.role === 'user' && 
+		lastPriorMessage.content.trim() === input.trim()
+	
+	const messageHistory = inputAlreadyInHistory 
+		? baseMessages  // Don't add input again if it's already the last message
+		: [...baseMessages, new HumanMessage(input)]  // Add input if not already present
+	
+	logger.debug(`🔍 [LEGACY DEBUG] Message history construction:`, {
+		executionId,
+		priorCount: (prior || []).length,
+		inputAlreadyInHistory,
+		finalHistoryCount: messageHistory.length,
+		lastMessage: messageHistory[messageHistory.length - 1]?.content?.slice(0, 50)
+	})
+
 	const ctx: ExecutionContext = {
 		threadId: exec.threadId,
 		userId: exec.userId,
 		agentId: exec.agentId,
-		messageHistory: [...toBaseMessages(prior || []), new HumanMessage(input)],
+		messageHistory,
 		metadata: { source: 'legacy-orchestrator', executionId }
 	}
 
