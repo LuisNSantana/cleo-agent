@@ -132,14 +132,33 @@ export function getAgentOrchestrator() {
           if (e) {
             try {
               const legacyE = legacyOrch.getExecution(executionId)
+              console.log('🟡 [ENHANCED ADAPTER] Merging core with legacy:', {
+                executionId,
+                coreHasSteps: !!(e.steps && e.steps.length > 0),
+                legacyExists: !!legacyE,
+                legacyMessagesCount: legacyE?.messages?.length || 0,
+                legacyStatus: legacyE?.status,
+                coreStatus: e.status
+              })
+              
               if (legacyE && legacyE.messages) {
-                return {
+                const merged = {
                   ...e,
                   messages: legacyE.messages,
                   status: legacyE.status || e.status
                 } as AgentExecution
+                
+                console.log('🟡 [ENHANCED ADAPTER] Returning merged execution:', {
+                  executionId,
+                  finalMessagesCount: merged.messages?.length || 0,
+                  finalStatus: merged.status
+                })
+                
+                return merged
               }
-            } catch {}
+            } catch (mergeError) {
+              console.error('🟡 [ENHANCED ADAPTER] Merge failed:', mergeError)
+            }
             return e as AgentExecution
           }
         }
