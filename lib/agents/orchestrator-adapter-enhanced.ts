@@ -116,13 +116,34 @@ export function getAgentOrchestrator() {
     },
     // Execution getters - combine legacy and core
     getExecution(executionId: string) {
+      console.log('🔍 [ENHANCED ADAPTER] getExecution called:', {
+        executionId,
+        registrySize: execRegistry.length,
+        registryIds: execRegistry.map(e => e.id),
+        globalOrchestratorExists: !!(globalThis as any).__cleoOrchestrator
+      })
+      
       // Try core orchestrator first (where delegation steps are stored)
       try {
         const legacyOrch = (globalThis as any).__cleoOrchestrator
         const coreInstance = legacyOrch?.core // Access core directly
         
+        console.log('🔍 [ENHANCED ADAPTER] Checking core orchestrator:', {
+          executionId,
+          legacyOrchExists: !!legacyOrch,
+          coreInstanceExists: !!coreInstance,
+          hasGetExecutionStatus: !!(coreInstance && typeof coreInstance.getExecutionStatus === 'function')
+        })
+        
         if (coreInstance && typeof coreInstance.getExecutionStatus === 'function') {
           const e = coreInstance.getExecutionStatus(executionId)
+          
+          console.log('🔍 [ENHANCED ADAPTER] Core result:', {
+            executionId,
+            coreExecutionExists: !!e,
+            hasSteps: !!(e && e.steps && e.steps.length > 0),
+            coreStatus: e?.status
+          })
           
           // If found in core AND has steps, return it
           if (e && e.steps && e.steps.length > 0) {
