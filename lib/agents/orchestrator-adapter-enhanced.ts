@@ -145,11 +145,7 @@ export function getAgentOrchestrator() {
             coreStatus: e?.status
           })
           
-          // If found in core AND has steps, return it
-          if (e && e.steps && e.steps.length > 0) {
-            return e as AgentExecution
-          }
-          // If found in core but no steps, merge with legacy for messages
+          // Always try to merge with legacy for messages, regardless of steps
           if (e) {
             try {
               const legacyE = legacyOrch.getExecution(executionId)
@@ -162,7 +158,7 @@ export function getAgentOrchestrator() {
                 coreStatus: e.status
               })
               
-              if (legacyE && legacyE.messages) {
+              if (legacyE && legacyE.messages && legacyE.messages.length > 0) {
                 const merged = {
                   ...e,
                   messages: legacyE.messages,
@@ -180,6 +176,9 @@ export function getAgentOrchestrator() {
             } catch (mergeError) {
               console.error('🟡 [ENHANCED ADAPTER] Merge failed:', mergeError)
             }
+            
+            // If no legacy messages, return core as-is
+            console.log('🟡 [ENHANCED ADAPTER] No legacy messages, returning core execution')
             return e as AgentExecution
           }
         }
