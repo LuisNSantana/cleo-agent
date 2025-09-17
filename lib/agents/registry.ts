@@ -152,12 +152,24 @@ export class AgentRegistry {
     const agent = await this.getAgent(agentId)
     if (!agent) return null
 
-    // Get sub-agents for this agent
-    const subAgents = await this.getSubAgents(agentId, userId)
-    
-    // Generate delegation tools for sub-agents
-    const delegationTools = await generateDelegationTools(agent, subAgents)
-    
+    // Obtener todos los agentes activos del usuario (excepto Cleo y sub-agentes)
+    await this.syncDatabaseAgents(userId)
+    const userAgents: AgentConfig[] = []
+    for (const entry of this.registryMap.values()) {
+      const a = entry.agent
+      if (
+        a.userId === userId &&
+        a.id !== agentId &&
+        !a.isSubAgent &&
+        a.name !== 'Cleo'
+      ) {
+        userAgents.push(a)
+      }
+    }
+
+    // Generar herramientas de delegación para todos los agentes activos del usuario
+    const delegationTools = await generateDelegationTools(agent, userAgents)
+
     // Update agent's tools to include delegation tools
     const updatedAgent: AgentConfig = {
       ...agent,
