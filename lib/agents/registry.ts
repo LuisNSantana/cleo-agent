@@ -179,6 +179,28 @@ export class AgentRegistry {
       ]
     }
 
+    // Persist tools in DB si es agente de base de datos
+    try {
+      // Lazy import para evitar dependencias circulares
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      
+      if (supabaseUrl && supabaseKey && agent.userId) {
+        const supabase = createClient(supabaseUrl, supabaseKey)
+        const { error } = await supabase
+          .from('agents')
+          .update({ tools: updatedAgent.tools })
+          .eq('id', agentId)
+        
+        if (error) {
+          console.error('Error actualizando tools en la base de datos:', error)
+        }
+      }
+    } catch (err) {
+      console.error('Error conectando con Supabase para actualizar tools:', err)
+    }
+
     // Update registry
     const entry = this.registryMap.get(agentId)
     if (entry) {

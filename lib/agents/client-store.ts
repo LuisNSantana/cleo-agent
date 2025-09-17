@@ -70,6 +70,7 @@ interface ClientAgentStore {
   // Actions
   initializeAgents: () => Promise<void>
   syncAgents: () => Promise<void>
+  refreshCleoDelegation: () => Promise<void>
   executeAgent: (input: string, agentId?: string, forceSupervised?: boolean) => Promise<void>
   selectAgent: (agent: AgentConfig | null) => void
   updateGraphData: () => void
@@ -192,12 +193,32 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         console.log('📋 Synced agents from database:', agents.length)
         set({ agents, parentCandidates })
         get().updateGraphData()
+        
+        // Actualizar delegación de Cleo después del sync
+        await get().refreshCleoDelegation()
       } catch (err) {
         console.warn('Agent sync failed:', err)
         // Fallback to built-ins only if API fails
         const builtIns = await getAllAgents()
   set({ agents: builtIns, parentCandidates: [] })
         get().updateGraphData()
+      }
+    },
+
+    refreshCleoDelegation: async () => {
+      try {
+        const response = await fetch('/api/agents/refresh-delegation', {
+          method: 'POST',
+          credentials: 'same-origin'
+        })
+        
+        if (!response.ok) {
+          console.warn('Failed to refresh Cleo delegation:', response.statusText)
+        } else {
+          console.log('✅ Cleo delegation refreshed successfully')
+        }
+      } catch (error) {
+        console.error('Error refreshing Cleo delegation:', error)
       }
     },
 
