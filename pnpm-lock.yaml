@@ -288,7 +288,7 @@ importers:
       openai:
         specifier: ^5.12.2
         version: 5.12.2(ws@8.18.3)(zod@3.25.76)
-      pdf-parse:
+      pdf-parse-debugging-disabled:
         specifier: ^1.1.1
         version: 1.1.1
       perfect-freehand:
@@ -5450,6 +5450,10 @@ packages:
   path-to-regexp@8.2.0:
     resolution: {integrity: sha512-TdrF7fW9Rphjq4RjrW0Kp2AW0Ahwu9sRGTkS6bvDi0SCwZlEZYmcfDbEsTz8RVk0EHIS/Vd1bv3JhG+1xZuAyQ==}
     engines: {node: '>=16'}
+
+  pdf-parse-debugging-disabled@1.1.1:
+    resolution: {integrity: sha512-pTPktRvyvLSj9zIS9DcOKYKcR7qeTqqyMkWjgYV7YglBmA9yrDJ1/rATOpXQoT5QcXKDYjEt4BSmZkJBcP1JDw==}
+    engines: {node: '>=6.8.1'}
 
   pdf-parse@1.1.1:
     resolution: {integrity: sha512-v6ZJ/efsBpGrGGknjtq9J/oC8tZWq0KWL5vQrk2GlzLEQPUDB1ex+13Rmidl1neNN358Jn9EHZw5y07FFtaC7A==}
@@ -12239,12 +12243,20 @@ snapshots:
 
   path-to-regexp@8.2.0: {}
 
+  pdf-parse-debugging-disabled@1.1.1:
+    dependencies:
+      debug: 3.2.7
+      node-ensure: 0.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   pdf-parse@1.1.1:
     dependencies:
       debug: 3.2.7
       node-ensure: 0.0.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   peek-readable@4.1.0: {}
 

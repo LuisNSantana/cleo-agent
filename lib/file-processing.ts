@@ -1,4 +1,4 @@
-import pdf from "pdf-parse"
+import pdf from "pdf-parse-debugging-disabled"
 
 /**
  * Extract text content from PDF buffer with size limits and cleanup
