@@ -29,7 +29,7 @@ const geistMono = Geist_Mono({
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
   (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined) ||
-  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
+  "https://www.imcleo.com"
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -50,6 +50,9 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Huminary Labs" }],
   category: "productivity",
+  verification: {
+    google: "google-site-verification-placeholder", // Reemplazar con el código real de Google Search Console
+  },
   icons: {
     icon: [
       { url: "/favicon.ico?v=2", type: "image/x-icon" },

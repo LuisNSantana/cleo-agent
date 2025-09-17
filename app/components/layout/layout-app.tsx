@@ -183,6 +183,26 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
       
       {/* Interactive Drawing Canvas */}
       <InteractiveCanvasEntry />
+      
+      {/* Footer for Google verification compliance */}
+      <footer className="fixed bottom-2 left-2 z-40 text-xs text-muted-foreground space-x-3">
+        <a 
+          href="/privacy" 
+          className="hover:text-foreground transition-colors underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Privacy Policy
+        </a>
+        <a 
+          href="/terms" 
+          className="hover:text-foreground transition-colors underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Terms of Service
+        </a>
+      </footer>
     </div>
   )
 }
