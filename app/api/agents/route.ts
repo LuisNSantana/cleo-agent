@@ -10,6 +10,7 @@ import { ensureDelegationToolForAgent } from '@/lib/tools'
 import { APU_AGENT, WEX_AGENT, PETER_AGENT } from '@/lib/agents/config'
 import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import { AgentRegistry } from '@/lib/agents/registry'
+import { triggerAgentCreated, triggerAgentUpdated } from '@/lib/agents/auto-sync'
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
       for (const agent of userAgents) {
         // Skip user agents that have the same name as predefined agents
         if (predefinedNames.has((agent as any).name?.toLowerCase())) {
-          console.log(`Skipping duplicate user agent: ${(agent as any).name}`)
+          logger.debug('AGENT-API', `Skipping duplicate user agent: ${(agent as any).name}`)
           continue
         }
         
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
 
       if (userSubsError) {
-        console.error('Error fetching user sub-agents:', userSubsError)
+        logger.error('AGENT-API', 'Error fetching user sub-agents', userSubsError)
       } else if (userSubs && userSubs.length > 0) {
         for (const agent of userSubs) {
           enrichedAgents.push({
@@ -349,6 +350,15 @@ export async function POST(request: NextRequest) {
     }
 
   logger.info('Created new user agent:', transformedAgent.name, 'ID:', transformedAgent.id)
+
+    // 🚀 TRIGGER AUTO-SYNC: Automatically update delegation tools for all agents
+    await triggerAgentCreated(
+      transformedAgent.id,
+      user.id,
+      transformedAgent.name,
+      transformedAgent.isSubAgent,
+      transformedAgent.parentAgentId || undefined
+    )
 
     return NextResponse.json({ agent: transformedAgent }, { status: 201 })
 

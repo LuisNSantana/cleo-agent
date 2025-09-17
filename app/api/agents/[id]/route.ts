@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { triggerAgentUpdated, triggerAgentDeleted } from '@/lib/agents/auto-sync'
 
 // PUT /api/agents/:id - Update an agent (partial)
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -95,6 +96,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       console.warn('safe_setup_agent_delegation failed after update:', e)
     }
 
+    // 🚀 TRIGGER AUTO-SYNC: Update delegation tools after agent modification
+    await triggerAgentUpdated(id, user.id, (updated as any)?.name || 'Unknown Agent')
+
     return NextResponse.json({ agent: updated })
   } catch (e) {
     console.error('PUT /api/agents/:id error:', e)
@@ -139,6 +143,9 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
       console.error('Delete agent error:', error)
       return NextResponse.json({ error: 'Failed to delete agent' }, { status: 500 })
     }
+
+    // 🚀 TRIGGER AUTO-SYNC: Update delegation tools after agent deletion
+    await triggerAgentDeleted(id, user.id, 'Deleted Agent')
 
     return NextResponse.json({ success: true })
   } catch (e) {

@@ -7,19 +7,68 @@
 import { AgentConfig } from '../types'
 
 /**
+ * Get Supabase admin client for server-side operations
+ */
+function getSupabaseAdmin() {
+  const { createClient } = require('@supabase/supabase-js')
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase configuration')
+  }
+  
+  return createClient(supabaseUrl, supabaseKey)
+}
+
+/**
  * Fetch user agents from database
- * TODO: Implement actual database integration
  */
 export async function getUserAgents(userId?: string): Promise<AgentConfig[]> {
-  // Placeholder implementation
-  // In real implementation, this would query the database
-  try {
-    // TODO: Replace with actual database query
-    // const response = await fetch(`/api/agents?userId=${userId}`)
-    // return response.json()
-    
-    // For now, return empty array
+  if (!userId) {
     return []
+  }
+
+  try {
+    const supabase = getSupabaseAdmin()
+    
+    const { data: dbAgents, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching user agents:', error)
+      return []
+    }
+
+    // Transform DB agents to AgentConfig
+    const userAgents: AgentConfig[] = (dbAgents || []).map((agent: any) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description || '',
+      role: agent.role,
+      model: agent.model,
+      temperature: agent.temperature,
+      maxTokens: agent.max_tokens,
+      color: agent.color,
+      icon: agent.icon,
+      tags: Array.isArray(agent.tags) ? agent.tags : [],
+      prompt: agent.system_prompt,
+      tools: Array.isArray(agent.tools) ? agent.tools : [],
+      isDefault: false,
+      priority: agent.priority,
+      parentAgentId: agent.parent_agent_id,
+      isSubAgent: !!agent.is_sub_agent,
+      predefined: false,
+      immutable: false,
+      dynamic: true,
+      userId: agent.user_id
+    }))
+
+    return userAgents
   } catch (error) {
     console.error('Failed to fetch user agents:', error)
     return []
@@ -30,13 +79,52 @@ export async function getUserAgents(userId?: string): Promise<AgentConfig[]> {
  * Get sub-agents for a specific parent agent
  */
 export async function getSubAgentsForParent(parentAgentId: string, userId?: string): Promise<AgentConfig[]> {
-  try {
-    // TODO: Replace with actual database query
-    // const response = await fetch(`/api/agents/sub-agents?parentId=${parentAgentId}&userId=${userId}`)
-    // return response.json()
-    
-    // For now, return empty array
+  if (!userId || !parentAgentId) {
     return []
+  }
+
+  try {
+    const supabase = getSupabaseAdmin()
+    
+    const { data: dbAgents, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('parent_agent_id', parentAgentId)
+      .eq('is_sub_agent', true)
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching sub-agents:', error)
+      return []
+    }
+
+    // Transform DB agents to AgentConfig
+    const subAgents: AgentConfig[] = (dbAgents || []).map((agent: any) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description || '',
+      role: agent.role,
+      model: agent.model,
+      temperature: agent.temperature,
+      maxTokens: agent.max_tokens,
+      color: agent.color,
+      icon: agent.icon,
+      tags: Array.isArray(agent.tags) ? agent.tags : [],
+      prompt: agent.system_prompt,
+      tools: Array.isArray(agent.tools) ? agent.tools : [],
+      isDefault: false,
+      priority: agent.priority,
+      parentAgentId: agent.parent_agent_id,
+      isSubAgent: true,
+      predefined: false,
+      immutable: false,
+      dynamic: true,
+      userId: agent.user_id
+    }))
+
+    return subAgents
   } catch (error) {
     console.error('Failed to fetch sub-agents:', error)
     return []

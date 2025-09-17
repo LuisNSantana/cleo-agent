@@ -5,31 +5,38 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       return NextResponse.json(
         { error: 'Supabase configuration missing' },
         { status: 500 }
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
     // Obtener el usuario actual desde las cookies de sesión
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const supabaseAuth = await createServerClient()
+    if (!supabaseAuth) {
+      return NextResponse.json({ error: 'Failed to create auth client' }, { status: 500 })
+    }
+    
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = user.id
 
+    // Usar el service role client para operaciones de base de datos
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
     // 1. Buscar el agente Cleo del usuario
-    const { data: cleoAgent, error: cleoError } = await supabase
+    const { data: cleoAgent, error: cleoError } = await supabaseAdmin
       .from('agents')
       .select('id, name, tools, user_id')
       .eq('user_id', userId)
@@ -45,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Buscar todos los agentes activos del usuario (excluyendo Cleo y sub-agentes)
-    const { data: userAgents, error: userAgentsError } = await supabase
+    const { data: userAgents, error: userAgentsError } = await supabaseAdmin
       .from('agents')
       .select('id, name, description, tags, user_id')
       .eq('user_id', userId)
@@ -88,7 +95,7 @@ export async function POST(request: NextRequest) {
     ]
 
     // 5. Actualizar Cleo con las nuevas herramientas en la base de datos
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('agents')
       .update({ tools: updatedTools })
       .eq('id', cleoAgent.id)
@@ -105,8 +112,7 @@ export async function POST(request: NextRequest) {
       message: 'Herramientas de delegación de Cleo actualizadas exitosamente',
       cleoId: cleoAgent.id,
       totalTools: updatedTools.length,
-      userDelegationTools: userDelegationTools.length,
-      updatedTools
+      userDelegationTools: userDelegationTools.length
     })
 
   } catch (error) {

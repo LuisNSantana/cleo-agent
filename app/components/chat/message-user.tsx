@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils"
 import { Check, Copy, Trash, File, FileText, FilePdf } from "@phosphor-icons/react"
 import Image from "next/image"
 import { useRef, useState } from "react"
+import { AttachmentPreview } from "@/components/chat/attachment-preview"
+import { useAttachmentProcessing } from "@/hooks/use-attachment-processing"
 
 
 
@@ -55,6 +57,7 @@ export function MessageUser({
   className,
 }: MessageUserProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const processedAttachments = useAttachmentProcessing(attachments)
 
   // Extract text content from multimodal or string content
   const getTextContent = (content: typeof children): string => {
@@ -109,63 +112,54 @@ export function MessageUser({
         className
       )}
     >
-      {attachments?.map((attachment: Attachment, index: number) => (
-        <div
-          className="flex flex-row gap-2"
-          key={`${attachment.name}-${index}`}
-        >
-          {attachment.contentType?.startsWith("image") ? (
-            <MorphingDialog
-              transition={{
-                type: "spring",
-                stiffness: 280,
-                damping: 18,
-                mass: 0.3,
-              }}
-            >
-              <MorphingDialogTrigger className="z-10">
-                <Image
-                  className="mb-1 w-40 rounded-md"
-                  key={attachment.name}
-                  src={attachment.url}
-                  alt={attachment.name || "Attachment"}
-                  width={160}
-                  height={120}
-                />
-              </MorphingDialogTrigger>
-              <MorphingDialogContainer>
-                <MorphingDialogContent className="relative rounded-lg">
-                  <MorphingDialogImage
+      {processedAttachments?.map((attachment, index) => {
+        const processedAttachment = processedAttachments[index]
+        
+        return (
+          <div
+            className="flex flex-row gap-2"
+            key={`${attachment.name}-${index}`}
+          >
+            {attachment.contentType?.startsWith("image") ? (
+              <MorphingDialog
+                transition={{
+                  type: "spring",
+                  stiffness: 280,
+                  damping: 18,
+                  mass: 0.3,
+                }}
+              >
+                <MorphingDialogTrigger className="z-10">
+                  <Image
+                    className="mb-1 w-40 rounded-md"
+                    key={attachment.name}
                     src={attachment.url}
-                    alt={attachment.name || ""}
-                    className="max-h-[90vh] max-w-[90vw] object-contain"
+                    alt={attachment.name || "Attachment"}
+                    width={160}
+                    height={120}
                   />
-                </MorphingDialogContent>
-                <MorphingDialogClose className="text-primary" />
-              </MorphingDialogContainer>
-            </MorphingDialog>
-          ) : (
-            // Display document with appropriate icon and name
-            <div className="mb-3 flex h-16 w-40 items-center gap-2 rounded-md border p-2 text-xs">
-              <div className="flex-shrink-0">
-                {attachment.contentType?.includes('pdf') ? (
-                  <FilePdf className="size-6 text-red-500" />
-                ) : attachment.contentType?.startsWith('text') ? (
-                  <FileText className="size-6 text-blue-500" />
-                ) : (
-                  <File className="size-6 text-gray-500" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{attachment.name}</div>
-                <div className="text-muted-foreground text-xs">
-                  {attachment.contentType?.split('/')[1]?.toUpperCase() || 'FILE'}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+                </MorphingDialogTrigger>
+                <MorphingDialogContainer>
+                  <MorphingDialogContent className="relative rounded-lg">
+                    <MorphingDialogImage
+                      src={attachment.url}
+                      alt={attachment.name || ""}
+                      className="max-h-[90vh] max-w-[90vw] object-contain"
+                    />
+                  </MorphingDialogContent>
+                  <MorphingDialogClose className="text-primary" />
+                </MorphingDialogContainer>
+              </MorphingDialog>
+            ) : (
+              // Use the new AttachmentPreview component for documents
+              <AttachmentPreview
+                attachment={attachment}
+                processedContent={processedAttachment?.processedContent}
+              />
+            )}
+          </div>
+        )
+      })}
       {isEditing ? (
         <div
           className="bg-accent relative flex min-w-[180px] flex-col gap-2 rounded-3xl px-5 py-2.5"

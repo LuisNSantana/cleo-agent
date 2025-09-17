@@ -9,6 +9,7 @@ import { AgentConfig } from './types'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import { getUserAgents, getSubAgentsForParent } from './dynamic'
 import { generateDelegationTools } from './delegation'
+import { logger } from '@/lib/logger'
 
 export interface AgentRegistryEntry {
   agent: AgentConfig
@@ -141,7 +142,7 @@ export class AgentRegistry {
       this.lastSync = new Date()
       this.notifySubscribers()
     } catch (error) {
-      console.error('Failed to sync database agents:', error)
+      logger.error('REGISTRY', 'Failed to sync database agents', error)
     }
   }
 
@@ -152,7 +153,7 @@ export class AgentRegistry {
     const agent = await this.getAgent(agentId)
     if (!agent) return null
 
-    // Obtener todos los agentes activos del usuario (excepto Cleo y sub-agentes)
+    // Obtener todos los agentes activos del usuario para delegación (excepto el agente actual y sub-agentes)
     await this.syncDatabaseAgents(userId)
     const userAgents: AgentConfig[] = []
     for (const entry of this.registryMap.values()) {
@@ -160,8 +161,7 @@ export class AgentRegistry {
       if (
         a.userId === userId &&
         a.id !== agentId &&
-        !a.isSubAgent &&
-        a.name !== 'Cleo'
+        !a.isSubAgent
       ) {
         userAgents.push(a)
       }
@@ -194,11 +194,11 @@ export class AgentRegistry {
           .eq('id', agentId)
         
         if (error) {
-          console.error('Error actualizando tools en la base de datos:', error)
+          logger.error('REGISTRY', 'Error actualizando tools en la base de datos', error)
         }
       }
     } catch (err) {
-      console.error('Error conectando con Supabase para actualizar tools:', err)
+      logger.error('REGISTRY', 'Error conectando con Supabase para actualizar tools', err)
     }
 
     // Update registry
