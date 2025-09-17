@@ -5,9 +5,17 @@
 const AGENT_DELEGATION_RULES = {
   // === MAIN SPECIALISTS ===
   Ami: {
-    keywords: ["email", "correo", "mail", "inbox", "review", "revisar", "check", "triage", "organizar", "organize", "schedule", "calendar", "calendario", "agenda", "meeting", "reunión", "task", "tarea", "productivity", "productividad", "assistant", "asistente", "administrative", "admin"],
-    description: "email triage/review, calendar management, task coordination, productivity, administrative support",
-    role: "Executive Assistant: Review emails, manage calendar, coordinate tasks and productivity workflows."
+    keywords: [
+      "email", "correo", "mail", "inbox", "review", "revisar", "check", "triage", "organizar", "organize",
+      "schedule", "calendar", "calendario", "agenda", "meeting", "reunión", "task", "tarea",
+      "productivity", "productividad", "assistant", "asistente", "administrative", "admin",
+      // Finance & budgeting orchestration signals
+      "budget", "presupuesto", "finanzas", "finanzas personales", "gastos", "ahorro", "dinero", "spending", "expenses", "savings", "personal finance", "money management",
+      // Explicit Notion orchestration signals
+      "notion", "workspace", "page", "database"
+    ],
+    description: "email triage/review, calendar management, task coordination, productivity, administrative support; orchestrates budgeting and personal finance via Khipu; and Notion orchestration (delegates to Notion Agent)",
+    role: "Executive Assistant & Orchestrator: Review emails, manage calendar, coordinate tasks, budgets, and productivity workflows. When a Notion/Workspace intent is detected, delegate to the sub‑agent ‘Notion Agent’ and return the final Notion URL. For budgeting/finanzas personales, orchestrate Khipu (Google Sheets) and return the sheet URL when applicable."
   },
   Astra: {
     keywords: ["write", "escribir", "send", "enviar", "draft", "borrador", "compose", "redactar", "reply", "responder", "forward", "reenviar", "email writing", "correspondence", "comunicación", "professional communication"],
@@ -30,7 +38,7 @@ const AGENT_DELEGATION_RULES = {
     role: "E-commerce Manager: Analyze and optimize store operations for sales growth."
   },
   Apu: {
-    keywords: ["research", "analyze", "investigate", "trends", "data", "market", "news", "intelligence", "study", "investigar", "analizar", "investigación", "mercado", "noticias", "buscar", "search"],
+    keywords: ["research", "analyze", "investigate", "trends", "data", "market", "news", "intelligence", "study", "investigar", "analizar", "investigación", "mercado", "noticias", "buscar", "search","crypto","cryptocurrency","blockchain"],
     description: "web research, news/finance analysis, intelligence, competitive analysis, market trends, general research",
     role: "Research Analyst: Provide data-driven insights from reliable sources and comprehensive research."
   },
@@ -52,9 +60,9 @@ const AGENT_DELEGATION_RULES = {
     role: "Financial Markets Analyst: Real-time market data and investment insights (sub-agent of Apu)."
   },
   Khipu: {
-    keywords: ["sheets", "hojas", "spreadsheet", "budget", "presupuesto", "formula", "fórmula", "calculation", "cálculo", "finance", "finanzas", "google sheets"],
-    description: "Google Sheets operations, budgets, formulas, financial calculations, spreadsheet management",
-    role: "Spreadsheet Specialist: Finance and Google Sheets expert for budgets and calculations (sub-agent of Ami)."
+    keywords: ["sheets", "hojas", "spreadsheet", "budget", "presupuesto", "formula", "fórmula", "calculation", "cálculo", "finance", "finanzas", "finanzas personales", "gastos", "ahorro", "google sheets", "personal finance", "expenses", "savings"],
+    description: "Google Sheets operations for personal finance: budgets, expense tracking, savings planning, formulas, financial calculations, spreadsheet management",
+    role: "Spreadsheet Specialist: Personal finance (presupuestos, control de gastos, ahorros) y Google Sheets (sub-agent of Ami)."
   },
   "Notion Agent": {
     keywords: ["notion", "knowledge base", "base de conocimiento", "database", "base de datos", "workspace", "organization", "organización", "notes", "notas", "wiki"],
@@ -151,10 +159,26 @@ HEURISTICS:
 
 // Strict delegation heuristics including Toby/Notion ambiguity handling
 const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
-- For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
-- Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby).
-- If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
-- Always include minimal context in handoff: goal, constraints, success criteria.`;
+ - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
+ - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
+ - For social media via Nora: content creation/copy (tweets, captions, reels scripts, ideas) → Luna; analytics/KPIs/reportes/insights de audiencia → Zara. If campaign/account context is missing, ask ONE clarifying question (e.g., plataforma/objetivo/periodo) then delegate.
+ - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
+ - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Khipu via Ami; "escribe 5 tweets" → Luna via Nora; "reporte de métricas del mes" → Zara via Nora).
+ - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
+ - Always include minimal context in handoff: goal, constraints, success criteria.`;
+
+// Explicit orchestration chains to bias routing consistently
+const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
+- Notion intent → Ami orchestrates → delegate_to_notion_agent (Notion Agent executes)
+- Email triage → Ami; email compose/send → delegate_to_astra
+- Google Workspace creation (Docs/Sheets/Drive/Calendar) → Peter
+ - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
+ - Social content creation/copywriting → Nora orchestrates → Luna executes
+ - Social analytics/metrics/reporting/insights → Nora orchestrates → Zara executes
+ - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
+Notes:
+- When Notion credentials exist, do NOT ask the user to connect. Proceed to Notion Agent and return the real URL.
+- Only ask for Notion authentication if credential resolution fails (no token or 401/403).`;
 
 // Notion output validation & auth fallback policy
 const NOTION_OUTPUT_VALIDATION = `NOTION OUTPUT VALIDATION:
@@ -207,6 +231,24 @@ const OUTPUT_REMINDERS = `OUTPUT FORMAT:
 - No JSON/tool syntax; natural integration.
 - Sources: Compact list (e.g., "Sources: [Domain/Link]").
 - Validate: Empathetic? Actionable? Natural?`;
+
+// Reporting and visuals guidance for markets (Apu/Apu-Markets) and social analytics (Zara)
+const REPORTING_AND_VISUALS = `REPORTING & VISUALS:
+MARKETS (Apu → Apu-Markets):
+- Prefer charts for volatility/trend: include PNG/image or a link (if generated). If charts are unavailable, provide a compact table (Date, Close, Return %, Volatility) and explain how to interpret.
+- Clarify missing details once: tickers, period (e.g., 1m/3m/1y), timeframe (daily/weekly), benchmark (e.g., SPY).
+- Output: brief executive summary + visual(s)/table + 2–3 insights + next steps.
+
+SOCIAL REPORTING (Nora → Zara):
+- Plantilla breve y útil:
+  1) Resumen ejecutivo (3–5 bullets)
+  2) KPIs clave (alcance, impresiones, engagement rate, CTR, crecimiento)
+  3) Tendencias & Top contenido (top 3–5 posts con métricas)
+  4) Audiencia (crecimiento, demografía si disponible)
+  5) Recomendaciones (acciones concretas)
+  6) Próximos pasos (1–3 tareas)
+- Visuales recomendados: serie temporal de engagement/alcance; barras para top posts; pastel o barras para formatos. Si no hay gráficos, usar tablas claras y describir cómo replicarlos.
+`;
 
 // QA logging policy and user notification on failures
 const QA_AND_LOGGING_POLICY = `QA & LOGGING:
@@ -266,7 +308,9 @@ ${SPECIALISTS_AWARENESS}
 
 TOOLS & VALIDATION
 ${TOOLS_INTEGRATION}
+${ORCHESTRATION_CHAINS}
 ${NOTION_OUTPUT_VALIDATION}
+${REPORTING_AND_VISUALS}
 
 CONSTRAINTS & SAFETY
 ${ENGAGEMENT_AND_COMPLETENESS}

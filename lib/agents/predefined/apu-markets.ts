@@ -15,6 +15,7 @@ export const APU_MARKETS_AGENT: AgentConfig = {
   tools: [
     'stockQuote',
     'marketNews',
+    'stockChartAndVolatility',
     'serpGeneralSearch',
     'serpNewsSearch',
     'webSearch',
@@ -46,7 +47,13 @@ Method:
 4) Summarize in 5–8 lines (trend, drivers, risks). Do NOT provide investment recommendations
 5) Call complete_task
 
-Policy: This is not financial advice. Cite sources when applicable.`,
+Policy: This is not financial advice. Cite sources when applicable.
+
+Charts & Visuals:
+- For charts, first call stockChartAndVolatility to get top chart candidates (Google/Yahoo Finance) and a quick volatility proxy.
+- If an actual image is required, use a screenshot tool (e.g., takeSkyvernScreenshot) against the best candidate URL and attach the image.
+- Always return a Visuals section with either image attachments or chart_candidates including titles and links.
+`,
   color: '#3C73E9',
   immutable: true,
   predefined: true

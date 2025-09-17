@@ -330,6 +330,84 @@ export const marketNewsTool = tool({
 	}
 })
 
+// STOCK CHART CANDIDATES & VOLATILITY (best-effort via SerpAPI) -----------
+export const stockChartAndVolatilityTool = tool({
+	description: 'Get chart candidates (Google/Yahoo Finance links, thumbnails) and a best-effort volatility proxy using SerpAPI results. Useful for rendering a chart (via screenshot or external chart service) and quick context.',
+	inputSchema: z.object({
+		symbol: z.string().min(1).describe('Ticker symbol, e.g., AAPL, MSFT, TSLA'),
+		period: z.enum(['1d','5d','1m','3m','6m','ytd','1y','5y','max']).default('1m').describe('Desired chart period (target view only; data not fetched).'),
+		timeframe: z.enum(['intraday','daily','weekly']).default('daily').describe('Desired timeframe granularity (target view only).'),
+		hl: z.string().optional(),
+		gl: z.string().optional()
+	}),
+	execute: async ({ symbol, period, timeframe, hl, gl }) => {
+		const userId = getCurrentUserId()
+		const key = await resolveSerpapiKey(userId)
+		if (!key) return { success: false, error: 'No SerpAPI key configured.' }
+		checkLimit(userId || 'anon')
+		try {
+			const q = `${symbol} stock price`
+			const json = await serpFetch({ engine: 'google', q, hl, gl, num: 10 }, key)
+					const organic = (json.organic_results || []).slice(0, 10)
+					type ChartCandidate = {
+						title: string
+						link: string
+						snippet?: string
+						domain?: string
+						thumbnail?: string
+					}
+			// Prefer common finance sites
+			const preferredDomains = ['finance.yahoo.com', 'google.com/finance', 'www.marketwatch.com', 'www.investing.com', 'www.bloomberg.com']
+					const candidates: ChartCandidate[] = organic
+						.map((r: any): ChartCandidate => ({
+					title: r.title || r.heading || 'Untitled',
+					link: r.link || r.url || '',
+					snippet: r.snippet || r.snippet_highlighted_words?.join(' '),
+					domain: (r.link || r.url || '').split('/').slice(0,3).join('/'),
+							thumbnail: (r.thumbnail || r.richtitle_data?.image?.src) || undefined
+				}))
+						.filter((c: ChartCandidate) => c.link)
+						.sort((a: ChartCandidate, b: ChartCandidate) => {
+					const aPref = preferredDomains.some(d => (a.link || '').includes(d)) ? 1 : 0
+					const bPref = preferredDomains.some(d => (b.link || '').includes(d)) ? 1 : 0
+					return bPref - aPref
+				})
+				.slice(0, 6)
+
+			// Try to extract quick finance context & a crude intraday volatility proxy if possible
+			const kg: any = (json as any).knowledge_graph || {}
+			const ab: any = (json as any).answer_box || {}
+			const price = ab.price || kg.price || null
+			const currency = ab.currency || kg.currency || null
+			const open = ab?.open || kg?.open || null
+			const dayHigh = ab?.high || kg?.high || null
+			const dayLow = ab?.low || kg?.low || null
+			let volatility_proxy: number | null = null
+			if (open && dayHigh && dayLow) {
+				const o = Number(String(open).replace(/[^0-9.\-]/g, ''))
+				const hi = Number(String(dayHigh).replace(/[^0-9.\-]/g, ''))
+				const lo = Number(String(dayLow).replace(/[^0-9.\-]/g, ''))
+				if (o > 0 && hi && lo) volatility_proxy = (hi - lo) / o
+			}
+
+			const as_of = ab.datetime || kg.date || json.search_metadata?.created_at || null
+
+			return {
+				success: true,
+				symbol,
+				period,
+				timeframe,
+				chart_candidates: candidates,
+				finance_summary: { price, currency, as_of },
+				volatility_proxy,
+				notes: volatility_proxy === null ? 'Volatility proxy needs intraday high/low/open; if unavailable, consider generating a chart or using table fallback.' : undefined
+			}
+		} catch (e) {
+			return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
+		}
+	}
+})
+
 // GOOGLE TRENDS SEARCH -----------------------------------------------------
 export const serpTrendsSearchTool = tool({
 	description: 'SerpAPI Google Trends search for trending topics, interest over time, and related queries.',
@@ -456,7 +534,8 @@ export const serpapiTools = {
 	serpTrendingNow: serpTrendingNowTool,
 	// Markets
 	stockQuote: stockQuoteTool,
-	marketNews: marketNewsTool
+	marketNews: marketNewsTool,
+	stockChartAndVolatility: stockChartAndVolatilityTool
 }
 
 export type SerpapiToolNames = keyof typeof serpapiTools
