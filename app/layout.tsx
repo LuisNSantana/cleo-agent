@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   authors: [{ name: "Huminary Labs" }],
   category: "productivity",
   verification: {
-    google: "google-site-verification-placeholder", // Reemplazar con el código real de Google Search Console
+    google: "OXgtx8i5hp6cd3djciZSnVlPzvQDcEE_PnWMQh4iLhQ",
   },
   icons: {
     icon: [
