@@ -161,9 +161,12 @@ export async function updateNotionKey(userId: string, id: string, updates: Parti
  */
 export async function getActiveNotionKey(userId: string): Promise<string | null> {
   try {
+    console.log('[Notion][getActiveNotionKey] Called with userId:', userId)
     const supabase = await createClient()
-    if (!supabase) return null
-    
+    if (!supabase) {
+      console.warn('[Notion][getActiveNotionKey] Supabase client not available')
+      return null
+    }
     const { data, error } = await supabase
       .from('user_service_connections')
       .select('access_token')
@@ -172,26 +175,22 @@ export async function getActiveNotionKey(userId: string): Promise<string | null>
       .eq('connected', true)
       .limit(1)
       .single()
-    
-    if (error || !data?.access_token) return null
-    
-    // Stored format should be "encrypted:authTag:iv" based on encryptKey implementation
+    if (error || !data?.access_token) {
+      console.warn('[Notion][getActiveNotionKey] No token found or error:', error)
+      return null
+    }
     const raw = String(data.access_token)
     const parts = raw.split(':')
-    
+    console.log('[Notion][getActiveNotionKey] Raw token parts:', parts.length)
     if (parts.length === 3) {
       const [encryptedText, authTag, iv] = parts
       const encryptedWithTag = `${encryptedText}:${authTag}`
       return decryptKey(encryptedWithTag, iv)
     }
-    
     if (parts.length === 2) {
-      // Backward compatibility: if value already combined as encryptedWithTag:iv
       const [encryptedWithTag, iv] = parts
       return decryptKey(encryptedWithTag, iv)
     }
-    
-    // Defensive: if more than 3 parts, assume last is iv, previous is tag, rest is encrypted
     if (parts.length > 3) {
       const iv = parts.pop() as string
       const authTag = parts.pop() as string
@@ -199,9 +198,9 @@ export async function getActiveNotionKey(userId: string): Promise<string | null>
       const encryptedWithTag = `${encryptedText}:${authTag}`
       return decryptKey(encryptedWithTag, iv)
     }
-    
     return null
-  } catch {
+  } catch (err) {
+    console.error('[Notion][getActiveNotionKey] Exception:', err)
     return null
   }
 }
@@ -246,9 +245,14 @@ export async function testNotionKey(apiKey: string) {
  * Helper to resolve effective key: user active key > env fallback
  */
 export async function resolveNotionKey(userId?: string) {
+  console.log('[Notion][resolveNotionKey] Called with userId:', userId)
   if (userId) {
     const k = await getActiveNotionKey(userId)
-    if (k) return k
+    if (k) {
+      console.log('[Notion][resolveNotionKey] Found user token')
+      return k
+    }
+    console.warn('[Notion][resolveNotionKey] No user token found, falling back to env')
   }
   return process.env.NOTION_API_KEY || ''
 }

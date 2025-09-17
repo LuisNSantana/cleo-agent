@@ -153,9 +153,12 @@ export class ExecutionManager {
           // Best-effort credential resolution (no throw)
           try {
             const userId = (globalThis as any).__currentUserId || agentConfig.userId
+            console.log('[Notion][ToolExec] Checking credentials for userId:', userId)
             const key = await resolveNotionKey(userId)
             notionCredentialPresent = !!key
-          } catch {
+            console.log('[Notion][ToolExec] notionCredentialPresent:', notionCredentialPresent)
+          } catch (err) {
+            console.error('[Notion][ToolExec] Error resolving Notion key:', err)
             notionCredentialPresent = false
           }
         }
