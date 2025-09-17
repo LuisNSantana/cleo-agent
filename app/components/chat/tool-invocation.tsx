@@ -17,6 +17,9 @@ import { DocumentToolDisplay } from "@/components/chat/document-tool-display"
 import { OpenDocumentToolDisplay } from "@/components/chat/open-document-tool-display"
 import { GmailMessages, type GmailListItem } from "@/app/components/chat/gmail-messages"
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
+import dynamic from "next/dynamic"
+
+const StockChartViewer = dynamic(() => import("@/components/markets/stock-chart-viewer"), { ssr: false })
 
 // Define the tool invocation types based on how they're used in the codebase
 interface ToolInvocation {
@@ -327,6 +330,23 @@ function SingleToolCard({
   // Render generic results based on their structure
   const renderResults = () => {
     if (!parsedResult) return "No result data available"
+
+    // Special-case: stockChartAndVolatility → render chart viewer
+    if (toolName === "stockChartAndVolatility" && parsedResult && typeof parsedResult === 'object') {
+      const pr: any = parsedResult
+      return (
+        <div className="space-y-3">
+          <StockChartViewer
+            symbol={pr.symbol}
+            period={pr.period}
+            timeframe={pr.timeframe}
+            finance_summary={pr.finance_summary}
+            volatility_proxy={pr.volatility_proxy}
+            chart_candidates={pr.chart_candidates}
+          />
+        </div>
+      )
+    }
 
     // Handle createDocumentTool specifically
     if (toolName === "createDocument" && parsedResult) {
