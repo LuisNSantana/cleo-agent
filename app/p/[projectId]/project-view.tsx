@@ -420,6 +420,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   // Header CTA: hidden file input change handler (auto-upload)
   const onHeaderFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // capture element reference before async boundaries to avoid null currentTarget
+    const inputEl = e.currentTarget
     const picked = Array.from(e.target.files || [])
     if (picked.length === 0) return
     // stage files into uploader state
@@ -433,8 +435,13 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     await handleFileUploads(uid, cid)
     await refetchDocs()
     toast({ title: 'Documentos añadidos', status: 'success' })
-    // allow re-selecting same file
-    e.currentTarget.value = ''
+    // allow re-selecting same file (guard against nullified currentTarget)
+    if (inputEl) {
+      inputEl.value = ''
+    } else {
+      const fallback = document.querySelector<HTMLInputElement>(`#project-file-input-${projectId}`)
+      if (fallback) fallback.value = ''
+    }
   }, [handleFileUpload, user?.id, ensureChatExists, handleFileUploads, refetchDocs])
 
   const handleReload = useCallback(async () => {
