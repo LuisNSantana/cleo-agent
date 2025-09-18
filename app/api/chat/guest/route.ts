@@ -3,6 +3,24 @@ import { getCleoPrompt } from "@/lib/prompts"
 
 export const runtime = 'nodejs'
 
+// Remove model-specific control tokens from streamed text
+function sanitizeModelText(text: string): string {
+  if (!text) return text
+  let out = text
+  // Common special tokens seen in some OpenRouter/DeepSeek streams
+  out = out.replace(/<\s*\|\s*begin__?of__?sentence\s*\|\s*>/gi, "")
+  out = out.replace(/<\s*\|\s*end__?of__?sentence\s*\|\s*>/gi, "")
+  out = out.replace(/<\s*\|\s*begin__?of__?text\s*\|\s*>/gi, "")
+  out = out.replace(/<\s*\|\s*end__?of__?text\s*\|\s*>/gi, "")
+  out = out.replace(/<\s*\|\s*(?:start|end)_header_id\s*\|\s*>/gi, "")
+  out = out.replace(/<\s*\|\s*(?:eot_id|eom_id|eos)\s*\|\s*>/gi, "")
+  // Some models leak thinking tags
+  out = out.replace(/<\s*think\s*>[\s\S]*?<\s*\/\s*think\s*>/gi, "")
+  // Collapse excessive spaces introduced by token removal
+  out = out.replace(/[ \t]{2,}/g, " ")
+  return out
+}
+
 // Implementación simple y directa para guest mode usando OpenRouter API
 // NO usa LangChain, agentes, pipeline, ni delegation - solo chat directo
 export async function POST(req: NextRequest) {
@@ -85,9 +103,10 @@ export async function POST(req: NextRequest) {
                 const content = data.choices?.[0]?.delta?.content
                 
                 if (content) {
+                  const cleaned = sanitizeModelText(content)
                   // El cliente espera texto plano que falle el JSON.parse 
                   // para ser tratado como contenido directo
-                  const responseChunk = `data: ${content}\n\n`
+                  const responseChunk = `data: ${cleaned}\n\n`
                   controller.enqueue(new TextEncoder().encode(responseChunk))
                 }
               }

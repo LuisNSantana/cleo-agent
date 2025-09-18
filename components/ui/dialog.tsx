@@ -13,7 +13,14 @@ function Dialog({
   children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const id = React.useId()
+  // Use useId but with hydration-safe approach
+  const [id, setId] = React.useState<string | null>(null)
+  
+  React.useLayoutEffect(() => {
+    // Only set the ID after hydration to avoid mismatch
+    setId(`dialog-${Math.random().toString(36).substr(2, 9)}`)
+  }, [])
+
   return (
     <DialogIdContext.Provider value={id}>
       <DialogPrimitive.Root data-slot="dialog" {...props}>

@@ -8,6 +8,7 @@ import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage as MessageAISDK } from "ai"
 import { ArrowClockwiseIcon, CheckIcon, CopyIcon } from "@phosphor-icons/react"
+import { useState, useCallback } from "react"
 import { getSources } from "./get-sources"
 import { Reasoning } from "./reasoning"
 import { SearchImages } from "./search-images"
@@ -40,7 +41,7 @@ export function MessageAssistant({
   children,
   isLast,
   hasScrollAnchor,
-  copied,
+  // copied, // Ignore this prop, manage state locally
   copyToClipboardAction,
   onReloadAction,
   parts,
@@ -48,8 +49,18 @@ export function MessageAssistant({
   className,
   userMessage,
 }: MessageAssistantProps) {
+  const [copied, setCopied] = useState(false) // Local state
   const { preferences } = useUserPreferences()
   const sources = getSources(parts)
+  
+  // Local copy function that manages its own state
+  const handleCopyToClipboard = useCallback(() => {
+    if (copyToClipboardAction) {
+      copyToClipboardAction() // Call the original function
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 500)
+  }, [copyToClipboardAction])
   
   const toolInvocationParts = parts?.filter(
     (part: any) => {
@@ -306,7 +317,7 @@ export function MessageAssistant({
               <button
                 className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
                 aria-label="Copy text"
-                onClick={copyToClipboardAction}
+                onClick={handleCopyToClipboard}
                 type="button"
               >
                 {copied ? (

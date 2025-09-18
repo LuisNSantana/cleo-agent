@@ -232,11 +232,12 @@ export function useChatCore({
   const { preferences } = useUserPreferences()
 
   // 🎯 Performance: Track re-renders
+  // Track performance metrics - only update when needed
   useEffect(() => {
     performanceRef.current.rerenders++
     const now = performance.now()
     performanceRef.current.lastRender = now
-  })
+  }, []) // Add empty dependency array to prevent infinite re-renders
   
   // Generate dynamic system prompt with current model info and personality settings
     const systemPrompt = useMemo(() => {
@@ -967,10 +968,12 @@ export function useChatCore({
   // Also, only sync if the chatId has changed to avoid conflicts during message streaming
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
+    // Remove messages.length from dependencies to prevent infinite loop (React Error #185)
+    // Instead, check if initialMessages is different from current messages
     if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
       setMessages(initialMessages as ChatMessage[])
     }
-  }, [initialMessages, isSubmitting, chatId, messages.length])
+  }, [initialMessages, isSubmitting, chatId]) // Removed messages.length to fix infinite loop
 
   // Reset messages when navigating from a chat to home
   if (

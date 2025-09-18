@@ -2,7 +2,7 @@
 
 import type { UIMessage as MessageType } from "ai"
 import type { Attachment } from "@/lib/file-handling"
-import React, { useState } from "react"
+import React, { useCallback } from "react"
 import { MessageAssistant } from "./message-assistant"
 import { MessageUser } from "./message-user"
 
@@ -36,18 +36,15 @@ export function Message({
   status,
   className,
 }: MessageProps) {
-  const [copied, setCopied] = useState(false)
-
-  const copyToClipboard = () => {
+  // Remove copied state from here - let each component handle it locally
+  const copyToClipboard = useCallback(() => {
     navigator.clipboard.writeText(children)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 500)
-  }
+  }, [children])
 
   if (variant === "user") {
     return (
       <MessageUser
-  copied={copied}
+  copied={false} // Always false, let MessageUser handle its own state
   copyToClipboardAction={copyToClipboard}
   onReloadAction={onReloadAction}
   onEditAction={onEditAction}
@@ -65,7 +62,7 @@ export function Message({
   if (variant === "assistant") {
     return (
       <MessageAssistant
-  copied={copied}
+  copied={false} // Always false, let MessageAssistant handle its own state
   copyToClipboardAction={copyToClipboard}
   onReloadAction={onReloadAction}
         isLast={isLast}

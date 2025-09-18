@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 
 import { Check, Copy, Trash, File, FileText, FilePdf } from "@phosphor-icons/react"
 import Image from "next/image"
-import { useRef, useState } from "react"
+import { useRef, useState, useCallback } from "react"
 import { AttachmentPreview } from "@/components/chat/attachment-preview"
 import { useAttachmentProcessing } from "@/hooks/use-attachment-processing"
 
@@ -35,7 +35,7 @@ export type MessageUserProps = {
   hasScrollAnchor?: boolean
   attachments?: Attachment[]
   children: string | Array<{ type: string; text?: string; mediaType?: string; url?: string }>
-  copied: boolean
+  copied: boolean // Keep for compatibility but will be ignored
   copyToClipboardAction: () => void
   onEditAction: (id: string, newText: string) => void
   onReloadAction: () => void
@@ -48,7 +48,7 @@ export function MessageUser({
   hasScrollAnchor,
   attachments,
   children,
-  copied,
+  // copied, // Ignore this prop, manage state locally
   copyToClipboardAction,
   onEditAction,
   onReloadAction,
@@ -57,6 +57,7 @@ export function MessageUser({
   className,
 }: MessageUserProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [copied, setCopied] = useState(false) // Local state
   const processedAttachments = useAttachmentProcessing(attachments)
 
   // Extract text content from multimodal or string content
@@ -87,6 +88,13 @@ export function MessageUser({
   const [editInput, setEditInput] = useState(textContent)
   const contentRef = useRef<HTMLDivElement>(null)
 
+  // Local copy function that manages its own state
+  const handleCopyToClipboard = useCallback(() => {
+    copyToClipboardAction() // Call the original function
+    setCopied(true)
+    setTimeout(() => setCopied(false), 500)
+  }, [copyToClipboardAction])
+
   const handleEditCancel = () => {
     setIsEditing(false)
     setEditInput(textContent)
@@ -100,9 +108,9 @@ export function MessageUser({
     setIsEditing(false)
   }
 
-  const handleDelete = () => {
-  onDeleteAction(id)
-  }
+  const handleDelete = useCallback(() => {
+    onDeleteAction(id)
+  }, [onDeleteAction, id])
 
   return (
     <MessageContainer
@@ -241,11 +249,12 @@ export function MessageUser({
         </>
       )}
       <MessageActions className="flex gap-0 opacity-0 transition-opacity duration-0 group-hover:opacity-100">
+        {/* TEMPORARILY DISABLED TO TEST ERROR
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
             className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
             aria-label="Copy text"
-            onClick={copyToClipboardAction}
+            onClick={handleCopyToClipboard}
             type="button"
           >
             {copied ? (
@@ -255,6 +264,7 @@ export function MessageUser({
             )}
           </button>
         </MessageAction>
+        */}
         {/* @todo: add when ready */}
         {/* <MessageAction
           tooltip={isEditing ? "Save" : "Edit"}

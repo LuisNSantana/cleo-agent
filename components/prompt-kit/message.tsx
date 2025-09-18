@@ -3,6 +3,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  TooltipProvider,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import dynamic from "next/dynamic"
@@ -88,12 +89,14 @@ const MessageActions = ({
   className,
   ...props
 }: MessageActionsProps) => (
-  <div
-    className={cn("text-muted-foreground flex items-center gap-2", className)}
-    {...props}
-  >
-    {children}
-  </div>
+  <TooltipProvider>
+    <div
+      className={cn("text-muted-foreground flex items-center gap-2", className)}
+      {...props}
+    >
+      {children}
+    </div>
+  </TooltipProvider>
 )
 
 export type MessageActionProps = {

@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { logger } from '@/lib/logger'
 import type { Attachment } from '@/lib/file-handling'
 
@@ -19,7 +19,21 @@ interface ProcessedAttachment extends Attachment {
 export function useAttachmentProcessing(attachments: Attachment[] = []) {
   const [processedAttachments, setProcessedAttachments] = useState<ProcessedAttachment[]>([])
 
+  // Create a stable signature of attachments so effect doesn't retrigger on referential changes
+  const signature = useMemo(() => {
+    if (!attachments || attachments.length === 0) return ""
+    try {
+      return JSON.stringify(
+        attachments.map((a) => ({ n: a.name, c: a.contentType, u: a.url }))
+      )
+    } catch {
+      // Fallback to length if unexpected values
+      return `len:${attachments.length}`
+    }
+  }, [attachments])
+
   useEffect(() => {
+    let cancelled = false
     const processAttachments = async () => {
       const processed = await Promise.all(
         attachments.map(async (attachment) => {
@@ -65,19 +79,24 @@ export function useAttachmentProcessing(attachments: Attachment[] = []) {
         })
       )
 
-      setProcessedAttachments(processed)
+      if (!cancelled) {
+        setProcessedAttachments(processed)
+      }
     }
 
     if (attachments.length > 0) {
       // Set initial state with processing flags
       setProcessedAttachments(
-        attachments.map(att => ({ ...att, isProcessing: true }))
+        attachments.map((att) => ({ ...att, isProcessing: true }))
       )
       processAttachments()
     } else {
       setProcessedAttachments([])
     }
-  }, [attachments])
+    return () => {
+      cancelled = true
+    }
+  }, [signature])
 
   return processedAttachments
 }
