@@ -28,10 +28,12 @@ import type { Chat } from "@/lib/chat-store/types"
 type Project = {
   id: string
   name: string
-  user_id: string
+  user_id: string | null
   created_at: string
   description?: string | null
   notes?: string | null
+  _auth_failed?: boolean
+  _error?: boolean
 }
 
 type ProjectViewProps = {
@@ -63,6 +65,8 @@ function extractTextFromParts(parts: any[]): string {
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
+  console.log(`[ProjectView] Rendering for project ${projectId}`)
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [enableSearch, setEnableSearch] = useState(false)
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
@@ -70,6 +74,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const { createNewChat, bumpChat } = useChats()
   const { cacheAndAddMessage } = useMessages()
   const pathname = usePathname()
+  
+  console.log(`[ProjectView] User state:`, { userId: user?.id, pathname })
+  
   const {
     files,
     setFiles,
@@ -81,15 +88,36 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   } = useFileUpload()
 
   // Fetch project details
-  const { data: project } = useQuery<Project>({
-    queryKey: ["project", projectId],
+  const { data: project, refetch: refetchProject, isLoading: projectLoading, error: projectError } = useQuery<Project>({
+    queryKey: ["project", projectId, user?.id],
     queryFn: async () => {
+      console.log(`[ProjectView] Fetching project ${projectId}, user: ${user?.id || 'none'}`)
       const response = await fetch(`/api/projects/${projectId}`)
       if (!response.ok) {
         throw new Error("Failed to fetch project")
       }
-      return response.json()
+      const data = await response.json()
+      
+      console.log(`[ProjectView] Project data received:`, { 
+        id: data.id, 
+        name: data.name, 
+        _auth_failed: data._auth_failed, 
+        _error: data._error 
+      })
+      
+      // If auth failed and we now have a user, refetch in a moment
+      if (data._auth_failed && user?.id) {
+        console.log(`[ProjectView] Auth failed but user available, scheduling refetch`)
+        setTimeout(() => refetchProject(), 100)
+      }
+      
+      return data
     },
+    enabled: !!projectId,
+    retry: (failureCount, error) => {
+      console.log(`[ProjectView] Query failed (attempt ${failureCount}):`, error)
+      return failureCount < 3
+    }
   })
 
   // Local editable fields for project meta
@@ -102,12 +130,20 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   // Hydrate local state from fetched project (safe effect)
   useEffect(() => {
-    if (project) {
+    if (project && !project._auth_failed && !project._error) {
       setName(project.name || "")
       setDesc(project.description || "")
       setNotes(project.notes || "")
     }
-  }, [project?.id])
+  }, [project?.id, project?._auth_failed, project?._error])
+
+  // Refetch project when user becomes available
+  useEffect(() => {
+    if (user?.id && project?._auth_failed) {
+      console.log(`[ProjectView] User now available, refetching project`)
+      refetchProject()
+    }
+  }, [user?.id, project?._auth_failed, refetchProject])
 
   const saveProjectMeta = useCallback(async () => {
     if (!project) return
@@ -608,6 +644,34 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   // Always show onboarding when on project page, regardless of messages
   const showOnboarding = pathname === `/p/${projectId}`
 
+  // Early return for critical loading/error states
+  if (projectLoading && !project) {
+    return (
+      <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-x-hidden bg-[--background] pt-[calc(var(--spacing-app-header)+28px)] md:pt-[calc(var(--spacing-app-header)+8px)]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando proyecto...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (projectError && !project) {
+    return (
+      <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-x-hidden bg-[--background] pt-[calc(var(--spacing-app-header)+28px)] md:pt-[calc(var(--spacing-app-header)+8px)]">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Error cargando proyecto</p>
+          <button 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            onClick={() => refetchProject()}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -656,7 +720,15 @@ export function ProjectView({ projectId }: ProjectViewProps) {
                   </>
                 ) : (
                   <>
-                    <h1 className="truncate text-xl md:text-2xl font-semibold">{name || 'Proyecto'}</h1>
+                    <h1 className="truncate text-xl md:text-2xl font-semibold">
+                      {name || 'Proyecto'}
+                      {project?._auth_failed && (
+                        <span className="ml-2 text-xs text-yellow-500 font-normal">(Reautenticando...)</span>
+                      )}
+                      {project?._error && (
+                        <span className="ml-2 text-xs text-red-400 font-normal">(Error de carga)</span>
+                      )}
+                    </h1>
                     <button
                       className="inline-flex items-center justify-center rounded-md border divider-subtle p-1.5 text-xs hover:bg-white/5"
                       onClick={() => setEditingName(true)}
