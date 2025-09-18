@@ -15,8 +15,17 @@ export async function middleware(request: NextRequest) {
 
   const response = await updateSession(request)
 
-  // CSRF protection for state-changing requests
-  if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
+  // CSRF protection for state-changing requests (skip Next.js/Vercel internals and static assets)
+  const path = request.nextUrl.pathname
+  const isInternal =
+    path.startsWith("/_next/") ||
+    path.startsWith("/__nextjs_original-stack-frame") ||
+    path.startsWith("/__nextjs_live") ||
+    path.startsWith("/favicon.ico") ||
+    path.startsWith("/vercel") ||
+    path.startsWith("/_vercel/")
+
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method) && !isInternal) {
     // Only enforce CSRF for same-site navigations or credentialed requests
     const csrfCookie = request.cookies.get("csrf_token")?.value
     const headerToken = request.headers.get("x-csrf-token") || undefined
@@ -40,7 +49,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set(
     "Content-Security-Policy",
     isDev
-      ? `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://assets.onedollarstats.com https://va.vercel-scripts.com https://vercel.live; frame-src 'self' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: https://unavatar.io https://www.google.com; connect-src 'self' wss: https://api.openai.com https://api.mistral.ai https://api.supabase.com ${supabaseDomain} https://api.github.com https://collector.onedollarstats.com https://vitals.vercel-analytics.com;`
+  ? `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://assets.onedollarstats.com https://va.vercel-scripts.com https://vercel.live; frame-src 'self' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: https://unavatar.io https://www.google.com; connect-src 'self' ws: wss: https://api.openai.com https://api.mistral.ai https://api.supabase.com ${supabaseDomain} https://api.github.com https://collector.onedollarstats.com https://vitals.vercel-analytics.com;`
       : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://analytics.umami.is https://vercel.live https://assets.onedollarstats.com https://va.vercel-scripts.com; frame-src 'self' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: https://unavatar.io https://www.google.com; connect-src 'self' wss: https://api.openai.com https://api.mistral.ai https://api.supabase.com ${supabaseDomain} https://api-gateway.umami.dev https://api.github.com https://collector.onedollarstats.com https://vitals.vercel-analytics.com;`
   )
 
@@ -49,8 +58,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-  // Exclude API, Next internals, and common assets; allow /src and /_next/src so we can silence them above
-  "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  // Exclude API, all Next internals, and common assets; allow /src and /_next/src so we can silence them above
+  "/((?!api|_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
   runtime: "nodejs",
 }
