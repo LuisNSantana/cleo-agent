@@ -1,9 +1,9 @@
 import { LayoutApp } from "@/app/components/layout/layout-app"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
-import dynamic from "next/dynamic"
+import NextDynamic from "next/dynamic"
 
 // Force client-side rendering to prevent SSR hydration mismatches in production
-const ProjectView = dynamic(() => import("./project-view").then(mod => ({ default: mod.ProjectView })), {
+const ProjectView = NextDynamic(() => import("./project-view").then(mod => ({ default: mod.ProjectView })), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center p-8">
@@ -12,12 +12,15 @@ const ProjectView = dynamic(() => import("./project-view").then(mod => ({ defaul
   )
 })
 
+// Ensure this page is always rendered dynamically (no static caching in prod)
+export const dynamic = "force-dynamic"
+
 type Props = {
-  params: Promise<{ projectId: string }>
+  params: { projectId: string }
 }
 
-export default async function Page({ params }: Props) {
-  const { projectId } = await params
+export default function Page({ params }: Props) {
+  const { projectId } = params
 
   console.log(`[Page] Rendering project page for ID: ${projectId}`)
 
