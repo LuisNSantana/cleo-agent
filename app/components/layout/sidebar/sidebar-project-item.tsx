@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { Check, FolderIcon, X } from "@phosphor-icons/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SidebarProjectMenu } from "./sidebar-project-menu"
 
@@ -31,6 +31,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   const isMobile = useBreakpoint(768)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
+  const router = useRouter()
   const queryClient = useQueryClient()
 
   if (!isEditing && lastProjectNameRef.current !== project.name) {
@@ -172,11 +173,20 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
 
   const handleContainerClick = useCallback(
     (e: React.MouseEvent) => {
-      if (isEditing) {
+      // If editing or menu is open, do not navigate
+      if (isEditing || isMenuOpen) {
         e.stopPropagation()
+        return
       }
+      // If click originated from interactive elements, respect their handlers
+      const target = e.target as HTMLElement
+      const interactive = target.closest("button, a, input, textarea, [role='menu'], [data-interactive='true']")
+      if (interactive) return
+
+      // Navigate to the project page on container click
+      router.push(`/p/${project.id}`)
     },
-    [isEditing]
+    [isEditing, isMenuOpen, router, project.id]
   )
 
   const handleSaveClick = useCallback(

@@ -4,11 +4,13 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 
 const STORAGE_KEY = "cleo-onboarding-tips-dismissed"
 
 export function TipOnboarding({ className }: { className?: string }) {
   const [dismissed, setDismissed] = useState(true)
+  const isMobile = useBreakpoint(768)
 
   useEffect(() => {
     try {
@@ -24,7 +26,8 @@ export function TipOnboarding({ className }: { className?: string }) {
     setDismissed(true)
   }
 
-  if (dismissed) return null
+  // On small screens, suppress the quick tip to avoid overlay/UX issues
+  if (dismissed || isMobile) return null
 
   return (
     <div

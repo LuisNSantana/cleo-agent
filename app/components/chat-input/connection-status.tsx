@@ -120,17 +120,13 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
     try {
       const statusPromises = services.map(async (service) => {
         try {
-          console.log(`[CONNECTION STATUS] Fetching status for ${service.id}...`)
           const response = await fetchClient(`/api/connections/${service.id}/status`)
-          console.log(`[CONNECTION STATUS] Response for ${service.id}:`, response.status, response.statusText)
           
           if (response.ok) {
             const contentType = response.headers.get('content-type')
-            console.log(`[CONNECTION STATUS] Content-Type for ${service.id}:`, contentType)
             
             if (contentType && contentType.includes('application/json')) {
               const data = await response.json()
-              console.log(`[CONNECTION STATUS] Data for ${service.id}:`, data)
               return {
                 serviceId: service.id,
                 connected: data.connected,
@@ -138,14 +134,11 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
               }
             } else {
               const text = await response.text()
-              console.error(`[CONNECTION STATUS] Non-JSON response for ${service.id}:`, text.substring(0, 200))
             }
           } else {
             const text = await response.text()
-            console.error(`[CONNECTION STATUS] Error response for ${service.id}:`, response.status, text.substring(0, 200))
           }
         } catch (error) {
-          console.error(`Error checking ${service.id} status:`, error)
         }
         return {
           serviceId: service.id,
@@ -167,7 +160,7 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
         })
       )
     } catch (error) {
-      console.error("Error checking connection status:", error)
+      // silently ignore; UI toasts will communicate when needed
     }
   }
 
@@ -209,7 +202,6 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
               try {
                 authWindow.close()
               } catch (e) {
-                console.warn('Could not close auth window:', e)
               }
               
               if (event.data.success) {
@@ -267,7 +259,6 @@ export function ConnectionStatus({ asPanel = false }: { asPanel?: boolean }) {
         throw new Error("Failed to initiate connection")
       }
     } catch (error) {
-      console.error("Error connecting service:", error)
       setServices(prevServices =>
         prevServices.map(service =>
           service.id === serviceId ? { ...service, status: "disconnected" } : service
