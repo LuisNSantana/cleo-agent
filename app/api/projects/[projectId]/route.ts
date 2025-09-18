@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 // Structured logging helper (kept minimal to avoid dependency)
 function logProjectAPI(message: string, meta: Record<string, any> = {}) {
@@ -12,14 +12,14 @@ function logProjectAPI(message: string, meta: Record<string, any> = {}) {
 }
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { projectId: string } }
 ) {
   try {
     const { projectId } = params
     const started = Date.now()
     const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
-    if (debug) logProjectAPI('GET start', { projectId, url: request.nextUrl.pathname })
+  if (debug) logProjectAPI('GET start', { projectId })
     const supabase = await createClient()
 
     if (!supabase) {
@@ -81,7 +81,7 @@ export async function GET(
 }
 
 export async function PUT(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { projectId: string } }
 ) {
   try {
@@ -150,7 +150,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { projectId: string } }
 ) {
   try {
