@@ -1079,14 +1079,28 @@ export function useChatCore({
           }
         }
 
-        // Combine file attachments with Supabase attachments
+        // Combine attachments with de-duplication logic:
+        // - Prefer Supabase URLs for documents (server stored)
+        // - Keep data URLs for images (we don't upload images to Supabase here)
+        const supaSet = new Set(
+          supabaseAttachments.map((att) => `${att.name}|${att.contentType}`)
+        )
+        const supaMapped = supabaseAttachments.map((att) => ({
+          name: att.name,
+          contentType: att.contentType,
+          url: att.url,
+        }))
+
+        const filteredLocal = fileAttachments.filter((att) => {
+          const key = `${att.name}|${att.contentType}`
+          const isImage = att.contentType?.startsWith('image/')
+          // Keep images; for non-images, only keep if there's no Supabase entry
+          return isImage || !supaSet.has(key)
+        })
+
         const allAttachments = [
-          ...fileAttachments,
-          ...supabaseAttachments.map((att) => ({
-            name: att.name,
-            contentType: att.contentType,
-            url: att.url,
-          }))
+          ...supaMapped,
+          ...filteredLocal,
         ]
 
   // Send message with attachments

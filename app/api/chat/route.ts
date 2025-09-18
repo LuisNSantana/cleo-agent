@@ -906,6 +906,18 @@ export async function POST(req: Request) {
       if (typeof maxTokens === 'number') (additionalParams as any).maxTokens = maxTokens
     }
 
+    // OpenAI Responses API: some GPT-5 variants (e.g., gpt-5-mini-2025-08-07) reject 'temperature'/'top_p'.
+    // When using Smarter (gpt-5-mini-2025-08-07), strip these params to avoid 400 invalid_request_error.
+    if (normalizedModel === 'gpt-5-mini-2025-08-07') {
+      if ('temperature' in additionalParams) {
+        delete (additionalParams as any).temperature
+      }
+      if ('topP' in additionalParams) {
+        delete (additionalParams as any).topP
+      }
+      console.log('[GPT-5-mini] Stripped temperature/topP for Responses API compatibility')
+    }
+
   // Clamp max output tokens to provider-safe limits using the original model id (includes provider prefixes)
   additionalParams.maxTokens = clampMaxOutputTokens(originalModel, additionalParams.maxTokens)
     
