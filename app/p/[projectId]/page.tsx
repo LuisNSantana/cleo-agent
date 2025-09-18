@@ -7,8 +7,8 @@ import { ProjectView } from "./project-view"
 // Force dynamic behavior (avoid static optimization in prod environments)
 export const dynamic = "force-dynamic"
 
-export default function ProjectPage({ params }: { params: { projectId: string } }) {
-  const { projectId } = params
+export default function ProjectPage(props: any) {
+  const projectId = props?.params?.projectId as string
 
   return (
     <MessagesProvider>

@@ -468,6 +468,35 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
     : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
 
+    // -------------------------------------------------------------
+    // Lightweight language detection & {{user_lang}} substitution
+    // -------------------------------------------------------------
+    let detectedLang = 'en'
+    try {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user')
+      const sampleText = typeof lastUser?.content === 'string'
+        ? lastUser?.content
+        : Array.isArray(lastUser?.content)
+          ? lastUser?.content.map((p: any) => (p?.type === 'text' ? p.text || p.content || '' : '')).join(' ') : ''
+      if (sampleText) {
+        // Very lightweight heuristics; avoids adding a dependency
+        const text = sampleText.toLowerCase()
+        const spanishSignals = [/\b(el|la|los|las|un|una|para|con|sobre|desde|cuando|donde)\b/, /\b(?:qué|por qué|cómo|cuándo|dónde|porque|gracias)\b/, /[áéíóúñ]/]
+        const portugueseSignals = [/\b(para|como|onde|obrigado|você|não)\b/, /[ãõç]/]
+        const frenchSignals = [/\b(le|la|les|des|une|est|pourquoi|merci|avec)\b/]
+        if (spanishSignals.some(r => r.test(text))) detectedLang = 'es'
+        else if (portugueseSignals.some(r => r.test(text))) detectedLang = 'pt'
+        else if (frenchSignals.some(r => r.test(text))) detectedLang = 'fr'
+        else if (/\b(danke|bitte|und|nicht|warum)\b/.test(text)) detectedLang = 'de'
+        else if (/\b(grazie|perché|come|dove|ciao)\b/.test(text)) detectedLang = 'it'
+      }
+    } catch (e) {
+      // Fallback silently to 'en'
+    }
+
+    selectedBasePrompt = selectedBasePrompt.replace(/\{\{user_lang\}\}/g, detectedLang)
+    ragSystemAddon = ragSystemAddon.replace(/\{\{user_lang\}\}/g, detectedLang)
+
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
 }
 
