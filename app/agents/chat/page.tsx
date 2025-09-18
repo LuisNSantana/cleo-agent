@@ -1413,7 +1413,7 @@ export default function AgentsChatPage() {
                                 {message.type === 'agent' && avatarSrc ? (
                                   <AvatarImage src={avatarSrc!} alt={displayAgent?.name || 'Agent'} />
                                 ) : null}
-                                <AvatarFallback className={message.type === 'user' ? 'bg-blue-600' : 'bg-violet-600'}>
+                                <AvatarFallback className="bg-muted text-foreground">
                                   {message.type === 'user' ? (
                                     <UserIcon className="w-4 h-4 text-white" />
                                   ) : (
@@ -1424,8 +1424,8 @@ export default function AgentsChatPage() {
                               <div 
                                 className={`max-w-[90%] sm:max-w-[75%] lg:max-w-3xl px-3 sm:px-4 py-2 rounded-2xl ${
                                   message.type === 'user' 
-                                    ? 'bg-blue-600 text-white' 
-                                    : 'bg-slate-700 text-white'
+                                    ? 'surface-3 text-foreground' 
+                                    : 'surface-2 text-foreground'
                                 }`}
                               >
                                 {/* Delegation chip inline (first agent message after latest delegation) */}
@@ -1434,14 +1434,14 @@ export default function AgentsChatPage() {
                                 {/* Agent Identity Chip - Always show for agent messages */}
                                 {message.type === 'agent' && (
                                   <div className="mb-2 flex items-center gap-2">
-                                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border bg-violet-500/15 border-violet-500/30 text-violet-300">
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border bg-muted/60 border-border text-muted-foreground">
                                       {displayAgent ? (
                                         <>
                                           <Avatar className="w-3 h-3">
                                             {getAgentAvatar(displayAgent) ? (
                                               <AvatarImage src={getAgentAvatar(displayAgent)!} alt={displayAgent.name} />
                                             ) : null}
-                                            <AvatarFallback className="bg-violet-600 text-[8px]">
+                                            <AvatarFallback className="bg-muted text-[8px]">
                                               {displayAgent.name?.[0] || 'A'}
                                             </AvatarFallback>
                                           </Avatar>
@@ -1515,7 +1515,7 @@ export default function AgentsChatPage() {
                   </div>
 
                   {/* Input Area */}
-                  <div className="sticky bottom-0 border-t border-slate-700 p-2 sm:p-4 pb-[env(safe-area-inset-bottom)] bg-slate-800/80 backdrop-blur supports-[backdrop-filter]:bg-slate-800/60">
+                  <div className="sticky bottom-0 border-t divider-subtle p-2 sm:p-4 pb-[env(safe-area-inset-bottom)] bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                     {/* Assignment hint if routing to a different agent than selected */}
                     {effectiveAgent && selectedAgent && effectiveAgent.id !== selectedAgent.id && (
                       <div className="mb-2 text-[11px] text-violet-200/80">
@@ -1556,25 +1556,25 @@ export default function AgentsChatPage() {
                         ) : currentDelegationId ? (
                           <DelegationStatus className="mb-0" />
                         ) : (
-                          <div className="flex items-center gap-3 px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border border-border rounded-lg">
+                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"></div>
                             <Avatar className="w-6 h-6">
                               {selectedAgent && getAgentAvatar(selectedAgent) ? (
                                 <AvatarImage src={getAgentAvatar(selectedAgent)!} alt={selectedAgent.name} />
                               ) : null}
-                              <AvatarFallback className="bg-violet-600 text-[10px]">
+                              <AvatarFallback className="bg-muted text-[10px] text-foreground">
                                 {selectedAgent?.name?.[0] || 'A'}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
-                              <div className="text-sm text-slate-200">
+                              <div className="text-sm text-foreground/90">
                                 <span className="font-medium">{selectedAgent?.name || 'Agent'}</span> is working...
                               </div>
                             </div>
                             <div className="flex gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.2s]"></span>
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.1s]"></span>
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.2s]"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.1s]"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"></span>
                             </div>
                           </div>
                         )}
@@ -1585,14 +1585,14 @@ export default function AgentsChatPage() {
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         placeholder={`Type a message for ${effectiveAgent?.name || selectedAgent.name}...`}
-                        className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 h-10 sm:h-11"
+                        className="flex-1 bg-background border-border text-foreground placeholder:text-muted-foreground h-10 sm:h-11"
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                         disabled={isLoading}
                       />
                       <Button
                         onClick={handleSendMessage}
                         disabled={!inputMessage.trim() || isLoading}
-                        className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 h-10 sm:h-11"
+                        className="h-10 sm:h-11 bg-foreground text-background hover:bg-foreground/90"
                       >
                         <PaperPlaneIcon className="w-4 h-4" />
                       </Button>
@@ -1602,9 +1602,9 @@ export default function AgentsChatPage() {
               ) : (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <ChatCircleIcon className="w-16 h-16 mx-auto text-slate-600 mb-4" />
-                    <h3 className="text-xl font-semibold text-slate-300 mb-2">Select an agent</h3>
-                    <p className="text-slate-500 mb-3">Choose an agent from the list to start chatting</p>
+                    <ChatCircleIcon className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Select an agent</h3>
+                    <p className="text-muted-foreground mb-3">Choose an agent from the list to start chatting</p>
                     <div className="lg:hidden">
                       <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>Choose agent</Button>
                     </div>
@@ -1618,27 +1618,27 @@ export default function AgentsChatPage() {
 
       {/* Mobile Agent Picker */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent side="left" className="bg-slate-900 border-slate-800 w-[88%] sm:w-3/4">
+        <SheetContent side="left" className="bg-background border-border w-[88%] sm:w-3/4">
           <SheetHeader className="p-3">
-            <SheetTitle className="text-white">Select Agent</SheetTitle>
+            <SheetTitle className="text-foreground">Select Agent</SheetTitle>
           </SheetHeader>
           <div className="p-3 space-y-3 overflow-y-auto scrollbar-hide">
             {agents.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-sm">No agents available</div>
+              <div className="text-center py-8 text-muted-foreground text-sm">No agents available</div>
             ) : (
               agents.map((agent) => (
                 <Card 
                   key={agent.id}
                   className={`cursor-pointer transition-all duration-200 ${
                     selectedAgent?.id === agent.id 
-                      ? 'bg-violet-600/20 border-violet-500/50 shadow-lg' 
-                      : 'bg-slate-700/30 border-slate-600/50 hover:border-violet-500/30'
+                      ? 'bg-muted/70 border-border shadow-lg' 
+                      : 'bg-background border-border hover:bg-muted/40'
                   }`}
                   onClick={() => { setSelectedAgent(agent); setPickerOpen(false) }}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-11 w-11 ring-1 ring-slate-600/50">
+                      <Avatar className="h-11 w-11">
                         {getAgentAvatar(agent) ? (
                           <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover" />
                         ) : null}
@@ -1647,8 +1647,8 @@ export default function AgentsChatPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-white truncate">{agent.name}</div>
-                        <div className="text-xs text-slate-400 truncate">{agent.description}</div>
+                        <div className="text-sm font-medium text-foreground truncate">{agent.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{agent.description}</div>
                       </div>
                     </div>
                   </CardContent>

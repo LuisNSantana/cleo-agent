@@ -17,6 +17,7 @@ import dynamic from "next/dynamic"
 import { redirect } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { useChatCore } from "./use-chat-core"
+import { TipOnboarding } from "../onboarding/tip-onboarding"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
 
@@ -242,7 +243,7 @@ export function Chat() {
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
+            className="mx-auto max-w-[50rem] md:relative"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -259,30 +260,38 @@ export function Chat() {
               <CleoMascot />
             </div>
             <h1
-              className="hidden md:block mb-6 mt-4 text-4xl font-semibold tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-indigo-700 dark:from-white dark:to-indigo-300 drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
+              className="hidden md:block mb-6 mt-4 text-4xl font-extrabold tracking-tight leading-tight relative text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
               aria-label="Let cleo be with you."
             >
-              Let cleo be with you.
+              <span className="relative inline-block book-reveal-text bg-inherit">Let cleo be with you.</span>
             </h1>
 
             {/* Mobile hero (replicates desktop message + mini video) */}
-            <div className="md:hidden flex flex-col items-center justify-center px-4 pt-6 pb-24">
-              <div className="scale-75">
+            <div
+              className="md:hidden flex flex-col items-center justify-center px-4"
+              style={{
+                // Respect notches and browser bars and ensure content centers in the visible viewport above the input area
+                paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+                minHeight: 'calc(100dvh - var(--chat-input-height) - var(--spacing-app-header) - env(safe-area-inset-bottom) - 24px)'
+              }}
+            >
+              <div className="scale-90 -translate-y-1">
                 <CleoMascot />
               </div>
               <h2
-                className="mt-2 text-2xl font-semibold tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-indigo-700 dark:from-white dark:to-indigo-300 text-center"
+                className="mt-3 text-2xl font-bold tracking-tight leading-tight text-center relative text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400"
                 aria-label="Let cleo be with you."
               >
-                Let cleo be with you.
+                <span className="relative inline-block book-reveal-text bg-inherit">Let cleo be with you.</span>
               </h2>
+            </div>
+            {/* First-run tips */}
+            <div className="mt-4 flex justify-center">
+              <TipOnboarding />
             </div>
           </motion.div>
         ) : (
-          <Conversation
-            key="conversation"
-            {...conversationProps}
-          />
+          <Conversation key="conversation" {...conversationProps} />
         )}
       </AnimatePresence>
 

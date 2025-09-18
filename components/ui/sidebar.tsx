@@ -89,7 +89,16 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+    // Determine mobile at the moment of interaction to avoid stale/undefined initial value on first tap
+    let mobileNow = isMobile
+    try {
+      if (typeof window !== "undefined") {
+        mobileNow = window.matchMedia(`(max-width: ${768 - 1}px)`).matches
+      }
+    } catch {}
+    return mobileNow
+      ? setOpenMobile((open) => !open)
+      : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
@@ -258,7 +267,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar()
 
   return (
     <Button
@@ -267,10 +276,17 @@ function SidebarTrigger({
       variant="ghost"
       size="icon"
       className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
+      onPointerDown={(event) => {
+        onClick?.(event as any)
+        // Only primary mouse button or touch/pen
+        if ((event as any).pointerType === "mouse" && (event as any).button !== 0) return
         toggleSidebar()
       }}
+      onClick={(e) => {
+        // Prevent duplicate toggle after pointerdown
+        e.preventDefault()
+      }}
+      aria-expanded={isMobile ? openMobile : open}
       {...props}
     >
       <PanelLeftIcon />

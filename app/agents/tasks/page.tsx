@@ -187,15 +187,15 @@ export default function AgentsTasksPage() {
 
   const renderResultPreview = (result: any) => {
     if (result == null) return null
-    if (typeof result === 'string') return <pre className="whitespace-pre-wrap text-slate-200 text-sm">{result}</pre>
+    if (typeof result === 'string') return <pre className="whitespace-pre-wrap text-foreground text-sm">{result}</pre>
     try {
       return (
-        <pre className="whitespace-pre-wrap text-slate-200 text-xs bg-slate-900/50 p-3 rounded border border-slate-700 overflow-x-auto">
+        <pre className="whitespace-pre-wrap text-foreground text-xs bg-background/50 p-3 rounded border border-border overflow-x-auto">
           {JSON.stringify(result, null, 2)}
         </pre>
       )
     } catch {
-      return <pre className="whitespace-pre-wrap text-slate-200 text-sm">{String(result)}</pre>
+      return <pre className="whitespace-pre-wrap text-foreground text-sm">{String(result)}</pre>
     }
   }
 
@@ -494,7 +494,7 @@ export default function AgentsTasksPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <motion.div
@@ -504,12 +504,12 @@ export default function AgentsTasksPage() {
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/30">
-                <ListChecksIcon className="w-8 h-8 text-purple-400" />
+              <div className="p-3 bg-muted/60 rounded-xl border border-border">
+                <ListChecksIcon className="w-8 h-8 text-muted-foreground" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Agent Task Center</h1>
-                <p className="text-slate-300 mt-1">Manage and monitor your intelligent agents</p>
+                <h1 className="text-3xl font-bold text-foreground">Agent Task Center</h1>
+                <p className="text-muted-foreground mt-1">Manage and monitor your intelligent agents</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -520,12 +520,12 @@ export default function AgentsTasksPage() {
                   fetchTasks()
                   if (activeTab === 'inbox') fetchNotifications()
                 }}
-                className="gap-2 border-slate-600 hover:bg-slate-700"
+                className="gap-2 border-border hover:bg-muted"
               >
                 <ArrowClockwiseIcon className="w-4 h-4" />
                 Refresh
               </Button>
-              <Badge variant="secondary" className="gap-2 bg-slate-700 text-slate-200">
+              <Badge variant="secondary" className="gap-2 bg-muted text-foreground/90">
                 <ListChecksIcon className="w-4 h-4" />
                 {filtered.length} tasks
               </Badge>
@@ -534,22 +534,22 @@ export default function AgentsTasksPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-800 border border-slate-600">
+            <TabsList className="grid w-full grid-cols-2 max-w-md bg-muted border border-border">
               <TabsTrigger 
                 value="tasks" 
-                className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+                className="flex items-center gap-2 text-muted-foreground data-[state=active]:bg-muted/70 data-[state=active]:text-foreground"
               >
                 <ListChecksIcon className="w-4 h-4" />
                 Tasks
               </TabsTrigger>
               <TabsTrigger 
                 value="inbox" 
-                className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+                className="flex items-center gap-2 text-muted-foreground data-[state=active]:bg-muted/70 data-[state=active]:text-foreground"
               >
                 <Inbox className="w-4 h-4" />
                 Inbox
                 {unreadNotificationsCount > 0 && (
-                  <Badge className="ml-1 bg-red-500 text-white text-xs px-1 min-w-5 h-5">
+                  <Badge className="ml-1 bg-foreground text-background text-xs px-1 min-w-5 h-5">
                     {unreadNotificationsCount}
                   </Badge>
                 )}
@@ -564,13 +564,13 @@ export default function AgentsTasksPage() {
                     placeholder="Search tasks..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-72 bg-slate-800 border-slate-600 placeholder:text-slate-400"
+                    className="w-72 bg-background border-border placeholder:text-muted-foreground"
                   />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-48 bg-slate-800 border-slate-600">
+                    <SelectTrigger className="w-48 bg-background border-border">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-600">
+                    <SelectContent className="bg-background border-border">
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
@@ -582,7 +582,7 @@ export default function AgentsTasksPage() {
                   </Select>
                   <Button
                     onClick={() => setFormOpen(true)}
-                    className="bg-purple-600 hover:bg-purple-700 border-purple-500"
+                    className="bg-foreground text-background hover:bg-foreground/90"
                   >
                     Create Task
                   </Button>
@@ -592,8 +592,8 @@ export default function AgentsTasksPage() {
               {/* Tasks Grid */}
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-                  <p className="text-slate-300 mt-4">Loading tasks...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muted-foreground mx-auto"></div>
+                  <p className="text-muted-foreground mt-4">Loading tasks...</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <motion.div
@@ -601,9 +601,9 @@ export default function AgentsTasksPage() {
                   animate={{ opacity: 1 }}
                   className="text-center py-12"
                 >
-                  <ListChecksIcon className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-200 mb-2">No tasks found</h3>
-                  <p className="text-slate-400">
+                  <ListChecksIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2">No tasks found</h3>
+                  <p className="text-muted-foreground">
                     {searchTerm || statusFilter !== 'all'
                       ? 'Try adjusting your search or filters'
                       : 'Create your first agent task to get started'
@@ -619,11 +619,11 @@ export default function AgentsTasksPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
                     >
-                      <Card className="h-full bg-slate-800/50 border-slate-600 hover:border-slate-500 transition-all duration-200">
+                      <Card className="h-full bg-background border-border hover:bg-muted/40 transition-colors duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg font-semibold mb-2 truncate text-white">
+                              <CardTitle className="text-lg font-semibold mb-2 truncate text-foreground">
                                 {task.title}
                               </CardTitle>
                               <Badge className={`gap-1 ${getStatusColor(task.status)}`}>
@@ -637,7 +637,7 @@ export default function AgentsTasksPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRetryTask(task.task_id)}
-                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                  className="text-muted-foreground hover:text-foreground hover:bg-muted"
                                   title="Retry task"
                                 >
                                   <ArrowClockwiseIcon className="w-4 h-4" />
@@ -647,7 +647,7 @@ export default function AgentsTasksPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteTask(task.task_id)}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                className="text-muted-foreground hover:text-foreground hover:bg-muted"
                               >
                                 <TrashIcon className="w-4 h-4" />
                               </Button>
@@ -656,32 +656,32 @@ export default function AgentsTasksPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <div>
-                            <p className="text-sm text-slate-300 line-clamp-3">
+                            <p className="text-sm text-muted-foreground line-clamp-3">
                               {task.description}
                             </p>
                           </div>
 
                           <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-slate-400">
+                            <div className="flex items-center gap-2 text-muted-foreground">
                               <img
                                 src={getAgentAvatarUrl(task.agent_name, task.agent_avatar)}
                                 alt={task.agent_name}
-                                className="w-5 h-5 rounded-full border border-slate-600 object-cover"
+                                className="w-5 h-5 rounded-full border border-border object-cover"
                               />
                               <span className="truncate">{task.agent_name}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-slate-400">
+                            <div className="flex items-center gap-2 text-muted-foreground">
                               <CalendarIcon className="w-4 h-4" />
                               <span>{formatDate(task.created_at)}</span>
                             </div>
                             {task.completed_at && (
-                              <div className="flex items-center gap-2 text-slate-400">
+                              <div className="flex items-center gap-2 text-muted-foreground">
                                 <CheckCircleIcon className="w-4 h-4" />
                                 <span>Completed: {formatDate(task.completed_at)}</span>
                               </div>
                             )}
                             {task.scheduled_at && (
-                              <div className="flex items-center gap-2 text-slate-400">
+                              <div className="flex items-center gap-2 text-muted-foreground">
                                 <ClockIcon className="w-4 h-4" />
                                 <span>Scheduled: {formatDate(task.scheduled_at, (task as any).timezone || 'UTC')}</span>
                               </div>
@@ -689,7 +689,7 @@ export default function AgentsTasksPage() {
                           </div>
 
                           {task.error_message && (
-                            <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-300">
+                            <div className="p-2 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
                               {task.error_message}
                             </div>
                           )}
@@ -697,11 +697,11 @@ export default function AgentsTasksPage() {
                           {task.status === 'completed' && task.result_data !== undefined && (
                             <div className="mt-2">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm text-slate-300">Result</span>
+                                <span className="text-sm text-foreground">Result</span>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-7 px-2 py-1 text-xs border-slate-600 hover:bg-slate-700"
+                                  className="h-7 px-2 py-1 text-xs border-border hover:bg-muted"
                                   onClick={() => setOpenResults(prev => ({ ...prev, [task.task_id]: !prev[task.task_id] }))}
                                 >
                                   {openResults[task.task_id] ? 'Hide' : 'View'}
@@ -713,12 +713,12 @@ export default function AgentsTasksPage() {
                                 </div>
                               )}
                               {typeof task.execution_time_ms === 'number' && (
-                                <div className="mt-2 text-xs text-slate-400">Duration: {task.execution_time_ms} ms</div>
+                                <div className="mt-2 text-xs text-muted-foreground">Duration: {task.execution_time_ms} ms</div>
                               )}
                               <div className="mt-3 flex items-center gap-2">
                                 <Button
                                   onClick={() => continueChatWithTask(task)}
-                                  className="bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2"
+                                  className="bg-foreground text-background hover:bg-foreground/90 gap-2"
                                   size="sm"
                                 >
                                   <ChatCircleIcon className="w-4 h-4" />
@@ -731,7 +731,7 @@ export default function AgentsTasksPage() {
                           {task.tags && task.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {task.tags.map((tag, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs border-slate-500 text-slate-300">
+                                <Badge key={idx} variant="outline" className="text-xs border-border text-muted-foreground">
                                   {tag}
                                 </Badge>
                               ))}
@@ -747,13 +747,13 @@ export default function AgentsTasksPage() {
 
             <TabsContent value="inbox" className="mt-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white">Notification Inbox</h2>
+                <h2 className="text-xl font-semibold text-foreground">Notification Inbox</h2>
                 {unreadNotificationsCount > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={markAllNotificationsAsRead}
-                    className="border-slate-600 hover:bg-slate-700"
+                    className="border-border hover:bg-muted"
                   >
                     Mark All Read
                   </Button>
@@ -762,8 +762,8 @@ export default function AgentsTasksPage() {
 
               {notificationsLoading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-                  <p className="text-slate-300 mt-4">Loading notifications...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-muted-foreground mx-auto"></div>
+                  <p className="text-muted-foreground mt-4">Loading notifications...</p>
                 </div>
               ) : notifications.length === 0 ? (
                 <motion.div
@@ -771,9 +771,9 @@ export default function AgentsTasksPage() {
                   animate={{ opacity: 1 }}
                   className="text-center py-12"
                 >
-                  <Bell className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-200 mb-2">No notifications</h3>
-                  <p className="text-slate-400">You're all caught up!</p>
+                  <Bell className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2">No notifications</h3>
+                  <p className="text-muted-foreground">You're all caught up!</p>
                 </motion.div>
               ) : (
                 <div className="space-y-4">
@@ -787,8 +787,8 @@ export default function AgentsTasksPage() {
                       <Card 
                         className={`cursor-pointer transition-all duration-200 ${
                           notification.read 
-                            ? 'bg-slate-800/30 border-slate-700' 
-                            : 'bg-slate-800/70 border-slate-600 shadow-lg'
+                            ? 'bg-background border-border' 
+                            : 'bg-muted/70 border-border shadow-lg'
                         }`}
                         onClick={() => openDetails(notification)}
                       >
@@ -797,35 +797,35 @@ export default function AgentsTasksPage() {
                             <img
                               src={getAgentAvatarUrl(notification.agent_name, notification.agent_avatar)}
                               alt={notification.agent_name}
-                              className="w-10 h-10 rounded-full border border-slate-600 object-cover flex-shrink-0"
+                              className="w-10 h-10 rounded-full border border-border object-cover flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <h4 className="font-semibold text-white truncate">
+                                <h4 className="font-semibold text-foreground truncate">
                                   {notification.title}
                                 </h4>
-                                <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
+                                <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
                                   {formatTimeAgo(notification.created_at)}
                                 </span>
                               </div>
-                              <div className="text-sm text-slate-300 mt-1 prose prose-invert prose-sm max-w-none line-clamp-3">
+                              <div className="text-sm text-muted-foreground mt-1 prose prose-invert prose-sm max-w-none line-clamp-3">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {notification.message}
                                 </ReactMarkdown>
                               </div>
                               {notification.notification_type === 'task_scheduled' && (notification as any).metadata?.scheduled_for && (
-                                <div className="mt-2 text-xs text-slate-400">
+                                <div className="mt-2 text-xs text-muted-foreground">
                                   Scheduled: {formatDate((notification as any).metadata.scheduled_for, (notification as any).metadata.timezone || 'UTC')}
                                 </div>
                               )}
                               {notification.notification_type === 'task_completed' && (notification as any).task_result && (
-                                <div className="mt-2 text-xs text-slate-300">
+                                <div className="mt-2 text-xs text-foreground">
                                   {(() => {
                                     const tr = (notification as any).task_result
                                     const summary = typeof tr === 'object' && tr?.summary ? tr.summary : null
                                     return (
                                       <div>
-                                        <span className="text-slate-400 block mb-1">Summary:</span>
+                                        <span className="text-muted-foreground block mb-1">Summary:</span>
                                         <div className="prose prose-invert prose-sm max-w-none line-clamp-4">
                                           {summary ? (
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -843,12 +843,12 @@ export default function AgentsTasksPage() {
                               <div className="flex items-center gap-2 mt-2">
                                 <Badge 
                                   variant="secondary" 
-                                  className="text-xs bg-slate-700 text-slate-300"
+                                  className="text-xs bg-muted text-muted-foreground"
                                 >
                                   {notification.agent_name}
                                 </Badge>
                                 {!notification.read && (
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <div className="w-2 h-2 bg-foreground rounded-full"></div>
                                 )}
                                 <Button
                                   size="sm"
@@ -861,7 +861,7 @@ export default function AgentsTasksPage() {
                                 {notification.notification_type === 'task_completed' && (
                                   <Button
                                     size="sm"
-                                    className="ml-2 bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2"
+                                    className="ml-2 bg-foreground text-background hover:bg-foreground/90 gap-2"
                                     onClick={(e) => { e.stopPropagation(); continueChatFromNotification(notification) }}
                                   >
                                     <ChatCircleIcon className="w-4 h-4" />
@@ -887,17 +887,17 @@ export default function AgentsTasksPage() {
             {selectedNotification && (
               <div className="flex flex-col max-h-[80vh]">
                 {/* Header */}
-                <div className="px-5 pt-5 pb-3 border-b border-slate-700/60 bg-slate-900/60 backdrop-blur-sm">
+                <div className="px-5 pt-5 pb-3 border-b border-border bg-background/60 backdrop-blur-sm">
                   <div className="flex items-center gap-3">
                     <img
                       src={getAgentAvatarUrl(selectedNotification.agent_name, selectedNotification.agent_avatar)}
                       alt={selectedNotification.agent_name}
-                      className="w-10 h-10 rounded-full border border-slate-600 object-cover"
+                      className="w-10 h-10 rounded-full border border-border object-cover"
                     />
                     <div className="min-w-0">
                       <DialogTitle className="truncate">{selectedNotification.title}</DialogTitle>
                       <DialogDescription asChild>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <span>{formatTimeAgo(selectedNotification.created_at)}</span>
                           <span>•</span>
                           <span>{selectedNotification.agent_name}</span>
@@ -922,7 +922,7 @@ export default function AgentsTasksPage() {
                   {(selectedNotification as any).task_result && (
                     <div className="mt-5">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-slate-200">Task Result</h4>
+                        <h4 className="font-semibold text-foreground">Task Result</h4>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -970,7 +970,7 @@ export default function AgentsTasksPage() {
                           )
                         }
                         return (
-                          <div className="max-h-[50vh] overflow-auto rounded border border-slate-700/60 bg-slate-900/50 p-3">
+                          <div className="max-h-[50vh] overflow-auto rounded border border-border bg-background/50 p-3">
                             {renderResultPreview(tr)}
                           </div>
                         )
@@ -980,11 +980,11 @@ export default function AgentsTasksPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-3 border-t border-slate-700/60 bg-slate-900/60 backdrop-blur-sm sticky bottom-0">
+                <div className="px-5 py-3 border-t border-border bg-background/60 backdrop-blur-sm sticky bottom-0">
                   <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end">
                     <Button variant="outline" onClick={() => setDetailsOpen(false)} className="sm:min-w-[110px]">Close</Button>
                     {selectedNotification.notification_type === 'task_completed' && (
-                      <Button className="bg-violet-600 hover:bg-violet-700 border-violet-500/60 gap-2 sm:min-w-[140px]" onClick={() => { continueChatFromNotification(selectedNotification); setDetailsOpen(false) }}>
+                      <Button className="bg-foreground text-background hover:bg-foreground/90 gap-2 sm:min-w-[140px]" onClick={() => { continueChatFromNotification(selectedNotification); setDetailsOpen(false) }}>
                         <ChatCircleIcon className="w-4 h-4" /> Open Chat
                       </Button>
                     )}
@@ -1001,18 +1001,18 @@ export default function AgentsTasksPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-slate-800 border border-slate-600 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-background border border-border rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             >
-              <h2 className="text-xl font-semibold text-white mb-4">Create Agent Task</h2>
+              <h2 className="text-xl font-semibold text-foreground mb-4">Create Agent Task</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Agent</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Agent</label>
                   <Select value={formAgentId} onValueChange={setFormAgentId}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600">
+                    <SelectTrigger className="bg-background border-border">
                       <SelectValue placeholder="Select an agent" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-600">
+                    <SelectContent className="bg-background border-border">
                       {agents.map(agent => (
                         <SelectItem key={agent.id} value={agent.id}>
                           {agent.name}
@@ -1023,34 +1023,34 @@ export default function AgentsTasksPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Title</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Title</label>
                   <Input
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Task title"
-                    className="bg-slate-700 border-slate-600"
+                    className="bg-background border-border"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Description</label>
                   <Textarea
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     placeholder="Detailed task description"
                     rows={3}
-                    className="bg-slate-700 border-slate-600"
+                    className="bg-background border-border"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Task Type</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Task Type</label>
                     <Select value={formTaskType} onValueChange={(value: any) => setFormTaskType(value)}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600">
+                      <SelectTrigger className="bg-background border-border">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-600">
+                      <SelectContent className="bg-background border-border">
                         <SelectItem value="manual">Manual</SelectItem>
                         <SelectItem value="scheduled">Scheduled</SelectItem>
                         <SelectItem value="recurring">Recurring</SelectItem>
@@ -1059,14 +1059,14 @@ export default function AgentsTasksPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Priority (1-10)</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Priority (1-10)</label>
                     <Input
                       type="number"
                       min="1"
                       max="10"
                       value={formPriority}
                       onChange={(e) => setFormPriority(parseInt(e.target.value) || 5)}
-                      className="bg-slate-700 border-slate-600"
+                      className="bg-background border-border"
                     />
                   </div>
                 </div>
@@ -1074,21 +1074,21 @@ export default function AgentsTasksPage() {
                 {formTaskType === 'scheduled' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Scheduled At</label>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">Scheduled At</label>
                       <Input
                         type="datetime-local"
                         value={formScheduledAt}
                         onChange={(e) => setFormScheduledAt(e.target.value)}
-                        className="bg-slate-700 border-slate-600"
+                        className="bg-background border-border"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Timezone</label>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">Timezone</label>
                       <Select value={formTimezone} onValueChange={setFormTimezone}>
-                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                        <SelectTrigger className="bg-background border-border">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-600">
+                        <SelectContent className="bg-background border-border">
                           <SelectItem value="UTC">UTC</SelectItem>
                           <SelectItem value="America/New_York">Eastern Time</SelectItem>
                           <SelectItem value="America/Chicago">Central Time</SelectItem>
@@ -1104,23 +1104,23 @@ export default function AgentsTasksPage() {
 
                 {formTaskType === 'recurring' && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Cron Expression</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Cron Expression</label>
                     <Input
                       value={formCron}
                       onChange={(e) => setFormCron(e.target.value)}
                       placeholder="0 9 * * *"
-                      className="bg-slate-700 border-slate-600"
+                      className="bg-background border-border"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Tags (comma-separated)</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Tags (comma-separated)</label>
                   <Input
                     value={formTags}
                     onChange={(e) => setFormTags(e.target.value)}
                     placeholder="automation, web-scraping, daily"
-                    className="bg-slate-700 border-slate-600"
+                    className="bg-background border-border"
                   />
                 </div>
               </div>
@@ -1129,14 +1129,14 @@ export default function AgentsTasksPage() {
                 <Button
                   variant="outline"
                   onClick={() => setFormOpen(false)}
-                  className="border-slate-600 hover:bg-slate-700"
+                  className="border-border hover:bg-muted"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={submitCreate}
                   disabled={creating || !formAgentId || !formTitle || !formDescription}
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="bg-foreground text-background hover:bg-foreground/90"
                 >
                   {creating ? 'Creating...' : 'Create Task'}
                 </Button>

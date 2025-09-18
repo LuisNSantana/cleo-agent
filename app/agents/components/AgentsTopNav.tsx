@@ -24,25 +24,41 @@ export function AgentsTopNav() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl">
-  <div className="w-full flex h-16 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6">
+    <header className="sticky top-0 z-40 w-full border-b divider-subtle bg-background/70 toolbar-blur">
+      <div className="w-full flex h-16 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6">
         {/* Left: brand + back to app home */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link href="/" className="group inline-flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-100/60 dark:hover:bg-slate-800/60">
+          <Link href="/" className="group inline-flex items-center gap-2 radius-md px-2 py-1 hover:bg-muted/40">
             <img src="/img/agents/logocleo4.png" alt="Cleo" className="h-8 w-8 rounded-md object-contain" />
-            <span className="hidden sm:block text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-slate-800 dark:group-hover:text-white">Cleo</span>
+            <span className="hidden sm:block text-sm font-semibold text-foreground group-hover:text-foreground">Cleo</span>
           </Link>
-          <Separator orientation="vertical" className="mx-1 h-6 bg-slate-300/60 dark:bg-slate-700/60" />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Agent Control Center</span>
+          <Separator orientation="vertical" className="mx-1 h-6 divider-subtle" />
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-foreground">Agent Control Center</span>
+            <span className="text-muted-foreground">•</span>
+            {/* Breadcrumbs */}
+            <nav aria-label="Breadcrumb" className="breadcrumb hidden sm:block">
+              {(() => {
+                const current = navItems.find(n => n.href === pathname) || navItems.find(n => pathname.startsWith(n.href))
+                return (
+                  <span className="inline-flex items-center gap-1">
+                    <Link href="/agents">Agents</Link>
+                    <span aria-hidden>›</span>
+                    <span className="text-foreground">{current?.label || 'Overview'}</span>
+                  </span>
+                )
+              })()}
+            </nav>
+          </div>
         </div>
 
         {/* Center: navigation (horizontal on md+, compact on mobile) */}
-        <nav className="hidden md:flex items-center gap-1 rounded-xl bg-slate-100/60 dark:bg-slate-800/60 p-1">
+        <nav className="hidden md:flex items-center gap-1 radius-lg bg-muted/40 p-1">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href
             return (
-              <Link key={item.href} href={item.href} className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', active ? 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-700/40')}> 
+              <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn('radius-md px-3 py-2 text-sm font-medium transition-colors', active ? 'bg-muted/70 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}> 
                 <span className="inline-flex items-center gap-2">
                   <Icon className="h-4 w-4" />
                   {item.label}
@@ -62,7 +78,7 @@ export function AgentsTopNav() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/">
-                  <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                     <House className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -76,13 +92,13 @@ export function AgentsTopNav() {
       </div>
 
       {/* Mobile nav buttons */}
-      <div className="md:hidden border-t border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/70">
+      <div className="md:hidden border-t divider-subtle bg-background/70">
         <div className="mx-auto grid grid-cols-5 gap-1 px-1 py-2 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href
             return (
-              <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-1 rounded-lg px-1 py-1 text-[11px] font-medium transition', active ? 'bg-slate-200/70 dark:bg-slate-800/70 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50')}>
+              <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-1 radius-md px-1 py-1 text-[11px] font-medium transition-colors', active ? 'bg-muted/70 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
                 <Icon className="h-5 w-5" />
                 <span>{item.label}</span>
               </Link>

@@ -811,12 +811,12 @@ const AgentForm: React.FC<AgentFormProps> = ({
         {/* Mobile toolbar: preview toggle */}
         {!isDesktop && (
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Preview</span>
+            <span className="text-xs text-muted-foreground">Preview</span>
             <button
               type="button"
               onClick={() => setShowPreview(v => !v)}
               aria-expanded={showPreview}
-              className={`text-xs px-2 py-1 rounded border ${showPreview ? 'border-violet-500/40 text-violet-200 bg-violet-500/10' : 'border-white/10 text-slate-300 bg-white/5'}`}
+              className={`text-xs px-2 py-1 rounded border transition-colors ${showPreview ? 'border-border text-foreground bg-muted/20' : 'border-border text-foreground bg-transparent hover:bg-muted/10'}`}
             >
               {showPreview ? 'Hide' : 'Show'}
             </button>
@@ -865,7 +865,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
                       {isEmojiIcon && (<span className="text-lg" aria-hidden>{iconVal}</span>)}
                       {isUrlIcon && (<Image src={iconVal} alt="icon" width={16} height={16} className="rounded" />)}
                       <span className="text-white font-medium">{formData.name || 'New Agent'}</span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-500/10 text-violet-300 border-violet-500/30">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-muted/20 text-foreground border-border">
                         {formData.role}
                       </span>
                     </div>
@@ -985,7 +985,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
           {formData.role === 'specialist' && (
             <div className="space-y-2">
               <Label>Specialization</Label>
-              <div className="text-xs text-slate-400">Choose the primary focus of this specialist agent.</div>
+              <div className="text-xs text-muted-foreground">Choose the primary focus of this specialist agent.</div>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'technical', label: 'Technical', icon: '⚙️', tags: ['technical','análisis','datos'] },
@@ -1006,7 +1006,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
                           handleInputChange('tags', newTags)
                         }
                       }}
-                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${active ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}
+                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${active ? 'bg-muted/30 text-foreground border-border' : 'bg-transparent text-foreground/80 border-border hover:bg-muted/10'}`}
                     >
                       <span className="mr-1">{opt.icon}</span>{opt.label}
                     </button>
@@ -1048,7 +1048,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
             ))}
             <input id="tags" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} onBlur={() => addTag(tagInput)} placeholder={(formData.tags?.length ?? 0) === 0 ? 'Add tag and press Enter' : 'Add another tag'} className="flex-1 min-w-[120px] bg-transparent outline-none text-sm text-slate-100 placeholder:text-slate-400" />
           </div>
-          <div className="text-[11px] text-slate-500">Tip: Press Enter or comma to add a tag. Backspace removes last.</div>
+          <div className="text-[11px] text-muted-foreground">Tip: Press Enter or comma to add a tag. Backspace removes last.</div>
         </div>
       </TabsContent>
 
@@ -1068,7 +1068,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
         {/* Category filter */}
         <div className="flex flex-wrap gap-2">
           {allCategories.map((cat) => (
-            <button key={cat} type="button" onClick={() => setToolCategory(cat)} className={`px-2 py-1 rounded-full text-xs border transition-colors ${toolCategory === cat ? 'bg-violet-500/20 text-violet-200 border-violet-500/40' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'}`}>
+            <button key={cat} type="button" onClick={() => setToolCategory(cat)} className={`px-2 py-1 rounded-full text-xs border transition-colors ${toolCategory === cat ? 'bg-muted/30 text-foreground border-border' : 'bg-transparent text-foreground/80 border-border hover:bg-muted/10'}`}>
               {cat}
             </button>
           ))}
@@ -1101,7 +1101,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
                       handleInputChange('tools', Array.from(next))
                     }
                   }}
-                  className={`rounded-lg px-3 py-2 sm:px-4 sm:py-3 border transition-colors outline-none focus:ring-2 focus:ring-violet-400/40 ${enabled ? 'border-violet-500/40 bg-violet-500/5' : 'border-white/10 bg-white/5 hover:bg-white/8'}`}
+                  className={`rounded-lg px-3 py-2 sm:px-4 sm:py-3 border transition-colors outline-none focus:ring-2 focus:ring-[color-mix(in_oklch,var(--ring),transparent_40%)] ${enabled ? 'border-border bg-muted/15' : 'border-border bg-transparent hover:bg-muted/10'}`}
                 >
                   <div className="flex items-center justify-between gap-3 sm:gap-4">
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -1148,8 +1148,8 @@ const AgentForm: React.FC<AgentFormProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="relative">
                 <Textarea id="prompt" value={formData.prompt} onChange={handleTextInputChange('prompt')} onCompositionStart={() => { isComposingRef.current = true }} onCompositionEnd={() => { isComposingRef.current = false }} placeholder="You are a specialized assistant in..." className="bg-white/10 border-white/20 min-h-[120px] max-h-[45vh] overflow-y-auto no-scrollbar resize-none" />
-                <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-800/90 to-transparent" />
-                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-800/90 to-transparent" />
+                <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-background/90 to-transparent" />
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-background/90 to-transparent" />
               </div>
               <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-lg p-3 lg:p-4">
                 <div className="text-xs text-slate-400 mb-2">Preview (Markdown)</div>
@@ -1552,10 +1552,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-semibold text-foreground">
             Agent Control Center
           </h2>
-          <p className="text-slate-400 mt-1">Manage and configure your AI agents</p>
+          <p className="text-muted-foreground mt-1">Manage and configure your AI agents</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -1564,7 +1564,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
             disabled={isRefreshing}
             variant="outline"
             size="sm"
-            className="border-slate-600 text-slate-300 hover:text-white hover:border-blue-500 hover:bg-blue-500/10 transition-all duration-200"
+            className="border-border text-foreground hover:bg-muted/20 transition-all duration-200"
           >
             <ArrowClockwise className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Syncing...' : 'Refresh'}
@@ -1573,7 +1573,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
           <Button
             onClick={() => { resetForm(); setEditingAgent(null); setIsCreateDialogOpen(true) }}
             variant="outline"
-            className="border-slate-600 text-slate-300 hover:text-white hover:border-violet-500 hover:bg-violet-500/10 transition-all duration-200"
+            className="border-border text-foreground hover:bg-muted/20 transition-all duration-200"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
             Create Agent
@@ -1627,16 +1627,16 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     exit={{ opacity: 0, scale: 0.8 }}
                   >
                     <Card 
-                      className="h-full bg-slate-800/50 border-slate-700/50 hover:border-violet-500/50 transition-all duration-300 group hover:shadow-xl hover:shadow-violet-500/10 relative overflow-hidden cursor-pointer"
+                      className="h-full surface-1 border-border transition-all duration-300 group relative overflow-hidden cursor-pointer"
                       onClick={() => setDetailsAgent(agent)}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                      {/* Removed colored hover overlay for neutral look */}
                       <div className="relative z-10">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="relative group">
-                              <Avatar className="h-16 w-16 rounded-xl ring-2 ring-slate-600/50 group-hover:ring-violet-400/50 transition-all duration-300 group-hover:scale-105">
+                              <Avatar className="h-16 w-16 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105">
                                 {getAgentAvatar(agent) ? (
                                   <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover rounded-xl" />
                                 ) : null}
@@ -1685,10 +1685,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                           </div>
                           
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20" title="Copy agent">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-white/10" title="Copy agent">
                               <CopyIcon className="w-3 h-3" />
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-violet-500/20">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-white/10">
                               <PencilIcon className="w-3 h-3" />
                             </Button>
                             {/* Hide delete for default agents */}

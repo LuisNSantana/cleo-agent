@@ -109,7 +109,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
         <ChatBackground overlayOpacity={0.9} />
       </div>
       {/* Foreground app chrome */}
-      {hasSidebar && (
+      {(hasSidebar || isMobile) && (
         <div className="relative z-10">
           <AppSidebar />
         </div>

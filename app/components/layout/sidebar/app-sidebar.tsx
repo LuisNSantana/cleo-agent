@@ -18,11 +18,28 @@ import {
   NotePencilIcon,
   X,
 } from "@phosphor-icons/react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, usePathname } from "next/navigation"
 import { useMemo } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { SidebarList } from "./sidebar-list"
 import { SidebarProject } from "./sidebar-project"
+import Link from "next/link"
+import { ThemeToggle } from "@/app/components/layout/theme-toggle"
+import {
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarSeparator,
+} from "@/components/ui/sidebar"
+import {
+  House as HouseIcon,
+  TreeStructure as AgentsIcon,
+  CheckSquare as TasksIcon,
+  FileText as DocsIcon,
+  ChartBar as DashboardIcon,
+} from "@phosphor-icons/react"
 
 export function AppSidebar() {
   const isMobile = useBreakpoint(768)
@@ -30,6 +47,7 @@ export function AppSidebar() {
   const { chats, isLoading } = useChats()
   const params = useParams<{ chatId: string }>()
   const currentChatId = params.chatId
+  const pathname = usePathname()
 
   const groupedChats = useMemo(() => {
     const result = groupChatsByDate(chats, "")
@@ -37,6 +55,14 @@ export function AppSidebar() {
   }, [chats])
   const hasChats = chats.length > 0
   const router = useRouter()
+
+  const primaryNav = [
+    { href: "/", label: "Home", icon: HouseIcon },
+    { href: "/agents/manage", label: "Agents", icon: AgentsIcon },
+    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon },
+    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
+    { href: "/docs", label: "Docs", icon: DocsIcon },
+  ] as const
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
@@ -46,7 +72,7 @@ export function AppSidebar() {
             <button
               type="button"
               onClick={() => setOpenMobile(false)}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center radius-md bg-transparent transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <X size={24} />
             </button>
@@ -57,9 +83,32 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="mask-t-from-98% mask-t-to-100% mask-b-from-98% mask-b-to-100% px-3">
         <ScrollArea className="flex h-full [&>div>div]:!block">
+          {/* Primary minimal navigation */}
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs text-muted-foreground/80">Navigation</SidebarGroupLabel>
+            <SidebarMenu>
+              {primaryNav.map(({ href, label, icon: Icon }) => {
+                const isActive = href === "/"
+                  ? pathname === "/"
+                  : pathname === href || pathname.startsWith(href + "/")
+                return (
+                  <SidebarMenuItem key={href}>
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+                      <Link href={href} aria-label={label}>
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+          <SidebarSeparator />
+
           <div className="mt-3 mb-5 flex w-full flex-col items-start gap-0">
             <button
-              className="hover:bg-accent/80 hover:text-foreground text-primary group/new-chat relative inline-flex w-full items-center rounded-md bg-transparent px-2 py-2 text-sm transition-colors"
+              className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-2 py-2 text-sm transition-colors"
               type="button"
               onClick={() => router.push("/")}
             >
@@ -73,7 +122,7 @@ export function AppSidebar() {
             </button>
             <HistoryTrigger
               hasSidebar={false}
-              classNameTrigger="bg-transparent hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors group/search"
+              classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-2 py-2 text-sm transition-colors group/search"
               icon={<MagnifyingGlass size={24} className="mr-2" />}
               label={
                 <div className="flex w-full items-center gap-2">
@@ -115,9 +164,13 @@ export function AppSidebar() {
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter className="mb-2 p-3">
+        {/* Theme toggle inside sidebar for quick access */}
+        <div className="mb-2">
+          <ThemeToggle />
+        </div>
         <a
           href="https://github.com/ibelick/zola"
-          className="hover:bg-muted flex items-center gap-2 rounded-md p-2"
+          className="hover:bg-muted flex items-center gap-2 radius-md p-2"
           target="_blank"
           aria-label="Star the repo on GitHub"
         >

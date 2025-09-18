@@ -23,6 +23,12 @@ export default function AgentsManagePage() {
 
   return (
     <div className="py-6">
+      {/* Section Header */}
+      <div className="mb-6">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Manage Agents</h1>
+        <p className="text-sm text-muted-foreground mt-1">Create, edit, and organize your specialized agents. Keep things simple and focused.</p>
+      </div>
+
       {/* Main Content */}
       <div className="space-y-8">
         {/* Agent Management Section */}
@@ -30,6 +36,7 @@ export default function AgentsManagePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="panel p-4 sm:p-6"
         >
           <AgentCRUDPanel 
             agents={agents}
@@ -181,11 +188,11 @@ export default function AgentsManagePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="space-y-6"
+          className="panel p-4 sm:p-6 space-y-6"
         >
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-foreground">Agent Credentials</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-xl font-semibold text-foreground">Agent Credentials</h2>
+            <p className="text-sm text-muted-foreground">
               Manage API keys and credentials for your specialized agents. Each agent requires specific credentials to access external services.
             </p>
           </div>
@@ -214,16 +221,16 @@ export default function AgentsManagePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="flex flex-col items-center justify-center py-24"
+            className="panel flex flex-col items-center justify-center py-16"
           >
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-border flex items-center justify-center mb-6">
-              <RobotIcon className="w-12 h-12 text-muted-foreground" />
+            <div className="w-20 h-20 radius-lg bg-muted/30 border border-border flex items-center justify-center mb-6">
+              <RobotIcon className="w-10 h-10 text-muted-foreground" />
             </div>
-            <h3 className="text-2xl font-bold text-foreground mb-2">Create your first agent</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-8">Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.</p>
+            <h3 className="text-lg font-semibold text-foreground mb-1">Create your first agent</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-md mb-6">Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.</p>
             <Button
               size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >
               <PlusIcon className="w-5 h-5 mr-2" />
               Create my first agent

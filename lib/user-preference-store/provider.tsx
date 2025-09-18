@@ -166,11 +166,12 @@ export function UserPreferencesProvider({
       try {
         return await updateUserPreferences(update)
       } catch (error) {
-        // Be quiet in console; degrade gracefully to local storage
-        console.warn(
-          "Updating preferences in DB failed; using localStorage fallback.",
-          (error as Error)?.message
-        )
+        // Degrade gracefully to local storage, specifically handling schema-cache errors like PGRST204
+        const msg = (error as Error)?.message || ""
+        const isSchemaCacheMissingColumn = msg.includes("PGRST204") || msg.includes("Could not find the 'layout' column")
+        if (!isSchemaCacheMissingColumn) {
+          console.warn("Updating preferences in DB failed; using localStorage fallback.", msg)
+        }
         saveToLocalStorage(updated)
         return updated
       }
