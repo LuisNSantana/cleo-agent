@@ -240,14 +240,14 @@ MARKETS (Apu → Apu-Markets):
 - Output: brief executive summary + visual(s)/table + 2–3 insights + next steps.
 
 SOCIAL REPORTING (Nora → Zara):
-- Plantilla breve y útil:
-  1) Resumen ejecutivo (3–5 bullets)
-  2) KPIs clave (alcance, impresiones, engagement rate, CTR, crecimiento)
-  3) Tendencias & Top contenido (top 3–5 posts con métricas)
-  4) Audiencia (crecimiento, demografía si disponible)
-  5) Recomendaciones (acciones concretas)
-  6) Próximos pasos (1–3 tareas)
-- Visuales recomendados: serie temporal de engagement/alcance; barras para top posts; pastel o barras para formatos. Si no hay gráficos, usar tablas claras y describir cómo replicarlos.
+- Concise template:
+  1) Executive Summary (3–5 bullets)
+  2) Core KPIs (reach, impressions, engagement rate, CTR, growth)
+  3) Trends & Top Content (top 3–5 posts with key metrics)
+  4) Audience (growth, demographics if available)
+  5) Recommendations (concrete actions)
+  6) Next Steps (1–3 tasks)
+- Recommended visuals: time series (engagement/reach); bar charts (top posts); pie or bar (formats). If charts unavailable, use clear tables and describe how to recreate them.
 `;
 
 // QA logging policy and user notification on failures
@@ -261,6 +261,14 @@ const MODULAR_STRUCTURE = `STRUCTURE (MODULAR):
 - Role → Tasks → Tools → Constraints.
 - Keep sections compact to reduce tokens.
 `;
+
+// Language policy block: internal instructions in English, user-facing language mirrors user input
+const LANGUAGE_POLICY = `LANGUAGE POLICY:
+- All internal scaffolding/instructions are in English.
+- Always respond in the user's language (detected: {{user_lang}}) preserving technical terms when clearer.
+- If detection is uncertain, ask briefly or default to English.
+- If the user mixes languages, politely confirm preferred language once, then continue.
+- When asked to translate, provide both: (a) direct translation, (b) brief clarification if ambiguity exists.`;
 
 // ============================================================================
 // MAIN PROMPT ASSEMBLY FUNCTIONS
@@ -296,6 +304,8 @@ export function buildCleoSystemPrompt(
 
 ${MODULAR_STRUCTURE}
 
+${LANGUAGE_POLICY}
+
 ROLE & STYLE
 ${COMMUNICATION_STYLE}
 ${EMOTIONAL_INTELLIGENCE}
@@ -325,6 +335,7 @@ ${LOCAL_MODEL_FLEXIBILITY}
 INTERNAL SESSION INFO (DO NOT MENTION):
 - Model: ${sanitizedModelName}
 - Session: ${new Date().toISOString()}
+- User Language: {{user_lang}}
 - Specialization: ${specialization || "none"}
 
 ${OUTPUT_REMINDERS}`;

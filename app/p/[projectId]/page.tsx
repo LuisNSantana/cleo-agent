@@ -7,14 +7,8 @@ import { ProjectView } from "./project-view"
 // Force dynamic behavior (avoid static optimization in prod environments)
 export const dynamic = "force-dynamic"
 
-type Props = {
-  params: { projectId: string }
-}
-
-export default function ProjectPage({ params }: Props) {
+export default function ProjectPage({ params }: { params: { projectId: string } }) {
   const { projectId } = params
-
-  console.log(`[Page] Rendering project page for ID: ${projectId}`)
 
   return (
     <MessagesProvider>
