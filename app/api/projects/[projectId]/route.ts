@@ -55,7 +55,7 @@ export async function PUT(
 ) {
   try {
     const { projectId } = await params
-    const { name } = await request.json()
+    const { name, description, notes } = await request.json()
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -81,7 +81,11 @@ export async function PUT(
 
     const { data, error } = await supabase
       .from("projects")
-      .update({ name: name.trim() })
+      .update({ 
+        name: name.trim(),
+        description: typeof description === 'string' ? description : null,
+        notes: typeof notes === 'string' ? notes : null,
+      })
       .eq("id", projectId)
       .eq("user_id", authData.user.id)
       .select()

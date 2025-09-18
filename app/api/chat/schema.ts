@@ -11,6 +11,7 @@ export type ChatRequest = {
   enableSearch: boolean
   message_group_id?: string
   documentId?: string
+  projectId?: string
   debugRag?: boolean
 }
 
@@ -24,5 +25,6 @@ export const ChatRequestSchema = z.object({
   enableSearch: z.boolean().optional().default(false),
   message_group_id: z.string().optional(),
   documentId: z.string().optional(),
+  projectId: z.string().optional(),
   debugRag: z.boolean().optional(),
 })

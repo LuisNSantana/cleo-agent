@@ -42,7 +42,7 @@ export async function indexDocument(documentId: string, opts: IndexOptions = {})
       embeddings.push(...vectors)
     }
 
-    // Prepare rows
+    // Prepare rows (ensure project/chat scoping metadata)
     const rows = chunks.map((c, i) => ({
       document_id: documentId,
       user_id: userId,
@@ -55,6 +55,9 @@ export async function indexDocument(documentId: string, opts: IndexOptions = {})
         embedding_model: defaultEmbeddingProvider.modelId,
         embedding_dim: defaultEmbeddingProvider.dimension,
         source: 'markdown',
+        // Important for project-scoped retrieval
+        project_id: doc.project_id || null,
+        chat_id: doc.chat_id || null,
       },
     }))
 

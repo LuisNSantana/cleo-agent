@@ -123,7 +123,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           }}
         >
           <Header hasSidebar={hasSidebar} />
-          <div className="h-full overflow-y-auto">
+          <div className="h-full">
             {children}
           </div>
         </main>

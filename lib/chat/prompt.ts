@@ -162,6 +162,7 @@ export type BuildPromptParams = {
   realUserId: string | null
   enableSearch: boolean
   documentId?: string
+  projectId?: string
   debugRag?: boolean
 }
 
@@ -174,6 +175,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     realUserId,
     enableSearch,
     documentId,
+    projectId,
     debugRag,
   } = params
 
@@ -258,6 +260,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           query: userPlain,
           topK,
           documentId,
+          projectId,
           useHybrid: true,
           useReranking: true,
         })
@@ -289,6 +292,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                   userId: realUserId!,
                   query: userPlain,
                   topK,
+                  projectId,
                   useHybrid: true,
                   useReranking: true,
                 })
@@ -308,6 +312,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                 query: profileQuery,
     topK,
                 documentId,
+                projectId,
                 useHybrid: true,
                 useReranking: true,
               })

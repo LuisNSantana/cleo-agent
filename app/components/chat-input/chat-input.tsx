@@ -45,6 +45,7 @@ type ChatInputProps = {
   placeholder?: string
   onClearPlaceholderAction?: () => void
   onShowPlaceholderAction?: (placeholder: string) => void
+  hideModelSelector?: boolean
 }
 
 export function ChatInput({
@@ -67,6 +68,7 @@ export function ChatInput({
   placeholder,
   onClearPlaceholderAction,
   onShowPlaceholderAction,
+  hideModelSelector = false,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -305,11 +307,13 @@ export function ChatInput({
                 model={selectedModel}
               />
               {isUserAuthenticated && <div className="hidden sm:block"><ConnectionStatus /></div>}
-              <ModelSelector
-                selectedModelId={selectedModel}
-                setSelectedModelIdAction={onSelectModelAction}
-                isUserAuthenticated={isUserAuthenticated}
-              />
+              {!hideModelSelector && (
+                <ModelSelector
+                  selectedModelId={selectedModel}
+                  setSelectedModelIdAction={onSelectModelAction}
+                  isUserAuthenticated={isUserAuthenticated}
+                />
+              )}
               {/* Mobile Draw Button - DISABLED TEMPORARILY */}
               {/* {isMobile && (
                 <Button

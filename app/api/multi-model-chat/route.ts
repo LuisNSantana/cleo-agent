@@ -70,6 +70,7 @@ const LangChainRequestSchema = z.object({
 			originalModel: z.string().optional(),
 			message_group_id: z.string().optional(),
 			documentId: z.string().optional(),
+			projectId: z.string().optional(),
 			debugRag: z.boolean().optional(),
 			useRAG: z.boolean().optional(),
 			maxContextChars: z.number().optional(),
@@ -210,6 +211,7 @@ export async function POST(req: NextRequest) {
 					realUserId,
 					enableSearch: options.enableSearch ?? false,
 					documentId: metadata.documentId,
+					projectId: metadata.projectId,
 					debugRag: metadata.debugRag,
 				})
 			).finalSystemPrompt

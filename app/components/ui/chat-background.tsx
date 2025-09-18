@@ -24,9 +24,9 @@ export function ChatBackground({ className, overlayOpacity = 1 }: ChatBackground
       {/* Base gradient (neutral, slightly darker; Apple-like deference) */}
       <div className="absolute inset-0 bg-gradient-to-b from-neutral-100 to-neutral-200 dark:from-neutral-950 dark:to-neutral-900" />
 
-      {/* Neutral-cool tint (reduced purple, subtle blue-gray) */}
+      {/* Neutral tint only (remove blue/purple cast for premium black) */}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-slate-500/5 to-indigo-500/10 dark:from-slate-300/10 dark:via-indigo-300/8 dark:to-sky-300/10"
+        className="absolute inset-0 bg-gradient-to-br from-neutral-200/10 via-neutral-300/5 to-neutral-100/10 dark:from-neutral-900/20 dark:via-neutral-900/10 dark:to-neutral-900/20"
         style={{ opacity: overlayOpacity }}
       />
 

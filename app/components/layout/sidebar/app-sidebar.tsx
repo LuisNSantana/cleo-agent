@@ -168,6 +168,19 @@ export function AppSidebar() {
         <div className="mb-2">
           <ThemeToggle />
         </div>
+        {/* Huminary Labs brand (subtle, premium avatar style) */}
+        <div className="mb-2 flex items-center gap-1.5 rounded-md p-2">
+          <span className="inline-flex size-6 items-center justify-center rounded-full border border-border/40 bg-background/60 backdrop-blur-sm">
+            <img
+              src="/img/logo_huminarylabs.png"
+              alt="Huminary Labs"
+              className="h-3 w-3 opacity-80"
+              loading="lazy"
+              aria-hidden="true"
+            />
+          </span>
+          <span className="text-sidebar-foreground/70 text-xs">Huminary Labs</span>
+        </div>
         <a
           href="https://github.com/ibelick/zola"
           className="hover:bg-muted flex items-center gap-2 radius-md p-2"

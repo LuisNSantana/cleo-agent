@@ -21,7 +21,7 @@ export default async function Image() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0b1020 0%, #121a35 100%)",
+          background: "linear-gradient(135deg, #0a0a0c 0%, #0d0d10 100%)",
           color: "white",
           fontSize: 56,
           fontWeight: 600,

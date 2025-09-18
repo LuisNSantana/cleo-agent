@@ -39,6 +39,13 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                 <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
                   Cleo
                 </span>
+                <span
+                  aria-label="Beta"
+                  title="Cleo is in Beta"
+                  className="mt-1 hidden select-none items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-foreground/80 sm:inline-flex bg-secondary/70 border-border/60 backdrop-blur-sm"
+                >
+                  BETA
+                </span>
               </Link>
               {hasSidebar && isMobile && <HeaderSidebarTrigger />}
             </div>

@@ -66,7 +66,7 @@ export function wrapPrintHtml(title: string, bodyHtml: string): string {
   h1,h2,h3,h4,h5,h6 { margin: 1.2em 0 0.5em; }
   p { margin: 0.6em 0; }
   blockquote { margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #999; background: rgba(0,0,0,0.03); }
-  .code-block { background: #0b1020; color: #e6edf3; padding: 12px; border-radius: 8px; overflow: auto; }
+  .code-block { background: #0a0a0c; color: #e6edf3; padding: 12px; border-radius: 8px; overflow: auto; }
   code.inline-code { background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; }
   ul, ol { margin: 0.4em 0 0.4em 1.2em; }
   hr { border: none; border-top: 1px solid #ccc; margin: 1.2em 0; }

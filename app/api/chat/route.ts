@@ -54,6 +54,7 @@ export async function POST(req: Request) {
       enableSearch,
       message_group_id,
       documentId,
+      projectId,
       debugRag,
     } = parsed.data as ChatRequest
 
@@ -289,6 +290,7 @@ export async function POST(req: Request) {
         realUserId,
         enableSearch,
         documentId,
+        projectId,
         debugRag,
       })
 
@@ -514,6 +516,7 @@ export async function POST(req: Request) {
             originalModel: originalModel,
             message_group_id,
             documentId,
+            projectId,
             debugRag,
             // Ensure RAG toggle is respected by multi-model endpoint
             useRAG: enableSearch,
