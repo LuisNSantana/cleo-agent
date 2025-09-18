@@ -21,6 +21,8 @@ import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { usePathname } from "next/navigation"
 import { useCallback, useMemo, useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { uploadFile, validateFile } from "@/lib/file-handling"
 import type { Chat } from "@/lib/chat-store/types"
 
 type Project = {
@@ -214,18 +216,22 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   }, [])
 
   const chatHelpers = useChat({
-    id: `project-${projectId}-${currentChatId}`,
+    // Use a stable id to avoid resetting the hook between first and subsequent messages
+    id: `project-${projectId}`,
     onFinish: (message: any) => cacheAndAddMessage(convertToMessageAISDK(message)),
     onError: handleError,
   })
   const messages = (chatHelpers as any).messages as any[]
-  const input = (chatHelpers as any).input as string
+  // In project context we manage a local input to avoid relying on chatHelpers.setInput (which may be undefined)
+  const [localInput, setLocalInput] = useState<string>("")
   const handleSubmit = (chatHelpers as any).handleSubmit as (e?: any, options?: any) => void
   const status = (chatHelpers as any).status as any
   const reload = (chatHelpers as any).reload as (options?: any) => void
   const stop = (chatHelpers as any).stop as () => void
   const setMessages = (chatHelpers as any).setMessages as (updater: any) => void
-  const setInput = (chatHelpers as any).setInput as (value: string | ((prev: string) => string)) => void
+  const setInputMaybe = (chatHelpers as any).setInput as
+    | ((value: string | ((prev: string) => string)) => void)
+    | undefined
 
   const { selectedModel, handleModelChange } = useModel({
     currentChat: null,
@@ -242,51 +248,46 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         return currentChatId
       }
 
-      // Only create a new chat if we haven't started one yet
-      if (messages.length === 0) {
+      // Create a new chat if none exists yet (even if there are optimistic messages)
+      try {
+        const newChat = await createNewChat(
+          userId,
+          localInput,
+          selectedModel,
+          true, // Always authenticated in this context
+          SYSTEM_PROMPT_DEFAULT,
+          projectId
+        )
+
+        if (!newChat) return null
+
+        setCurrentChatId(newChat.id)
+        // Redirect to the chat page as expected
+        window.history.pushState(null, "", `/c/${newChat.id}`)
+        return newChat.id
+      } catch (err: unknown) {
+        let errorMessage = "Something went wrong."
         try {
-          const newChat = await createNewChat(
-            userId,
-            input,
-            selectedModel,
-            true, // Always authenticated in this context
-            SYSTEM_PROMPT_DEFAULT,
-            projectId
-          )
-
-          if (!newChat) return null
-
-          setCurrentChatId(newChat.id)
-          // Redirect to the chat page as expected
-          window.history.pushState(null, "", `/c/${newChat.id}`)
-          return newChat.id
-        } catch (err: unknown) {
-          let errorMessage = "Something went wrong."
-          try {
-            const errorObj = err as { message?: string }
-            if (errorObj.message) {
-              const parsed = JSON.parse(errorObj.message)
-              errorMessage = parsed.error || errorMessage
-            }
-          } catch {
-            const errorObj = err as { message?: string }
-            errorMessage = errorObj.message || errorMessage
+          const errorObj = err as { message?: string }
+          if (errorObj.message) {
+            const parsed = JSON.parse(errorObj.message)
+            errorMessage = parsed.error || errorMessage
           }
-          toast({
-            title: errorMessage,
-            status: "error",
-          })
-          return null
+        } catch {
+          const errorObj = err as { message?: string }
+          errorMessage = errorObj.message || errorMessage
         }
+        toast({
+          title: errorMessage,
+          status: "error",
+        })
+        return null
       }
-
-      return currentChatId
     },
     [
       currentChatId,
-      messages.length,
       createNewChat,
-      input,
+      localInput,
       selectedModel,
       projectId,
     ]
@@ -301,15 +302,19 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     createNewChat,
     setHasDialogAuth: () => {}, // Not used in project context
     setMessages,
-    setInput,
+    setInput: () => {},
   })
 
   // Simple input change handler for project context (no draft saving needed)
   const handleInputChange = useCallback(
     (value: string) => {
-      setInput(value)
+      setLocalInput(value)
+      // Best-effort: if chatHelpers exposes setInput, keep it in sync
+      if (typeof setInputMaybe === 'function') {
+        try { setInputMaybe(value) } catch {}
+      }
     },
-    [setInput]
+    [setInputMaybe]
   )
 
   const submit = useCallback(async () => {
@@ -324,11 +329,12 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     const uid = user.id as string
 
     const optimisticId = `optimistic-${Date.now().toString()}`
+    const textToSend = localInput
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
     const optimisticMessage = {
       id: optimisticId,
-      content: input,
+      content: textToSend,
       role: "user" as const,
       createdAt: new Date(),
       experimental_attachments:
@@ -336,20 +342,19 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     }
 
   setMessages((prev: any[]) => [...prev, optimisticMessage])
-    setInput("")
 
     const submittedFiles = [...files]
     setFiles([])
 
     try {
-      const currentChatId = await ensureChatExists(uid)
-      if (!currentChatId) {
+      const ensuredChatId = await ensureChatExists(uid)
+      if (!ensuredChatId) {
   setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
         cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
         return
       }
 
-      if (input.length > MESSAGE_MAX_LENGTH) {
+      if (textToSend.length > MESSAGE_MAX_LENGTH) {
         toast({
           title: `The message you submitted was too long, please submit something shorter. (Max ${MESSAGE_MAX_LENGTH} characters)`,
           status: "error",
@@ -361,7 +366,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
       let attachments: Attachment[] | null = []
       if (submittedFiles.length > 0) {
-        attachments = await handleFileUploads(uid, currentChatId)
+        attachments = await handleFileUploads(uid, ensuredChatId)
         if (attachments === null) {
           setMessages((prev: any[]) => prev.filter((m: any) => m.id !== optimisticId))
           cleanupOptimisticAttachments(
@@ -371,26 +376,38 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         }
       }
 
+      // Ensure the chat hook has the input text when it relies on internal state
+      if (typeof setInputMaybe === 'function') {
+        try { setInputMaybe(textToSend) } catch {}
+      }
+
       const options = {
         body: {
-          chatId: currentChatId,
+          chatId: ensuredChatId,
           userId: uid,
           model: selectedModel,
           isAuthenticated: true,
           systemPrompt: SYSTEM_PROMPT_DEFAULT,
           enableSearch,
+          // Explicitly pass the text for the first message to avoid race conditions
+          text: textToSend,
         },
         experimental_attachments: attachments || undefined,
       }
 
       handleSubmit(undefined, options)
+      // Clear inputs after submit has been dispatched
+      setLocalInput("")
+      if (typeof setInputMaybe === 'function') {
+        try { setInputMaybe("") } catch {}
+      }
   setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
       cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
       cacheAndAddMessage(convertToMessageAISDK(optimisticMessage))
 
       // Bump existing chats to top (non-blocking, after submit)
       if (messages.length > 0) {
-        bumpChat(currentChatId)
+        bumpChat(ensuredChatId)
       }
     } catch {
   setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
@@ -403,9 +420,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     user,
     files,
     createOptimisticAttachments,
-    input,
+    localInput,
     setMessages,
-    setInput,
+    setLocalInput,
     setFiles,
     cleanupOptimisticAttachments,
     ensureChatExists,
@@ -419,22 +436,90 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   ])
 
   // Header CTA: hidden file input change handler (auto-upload)
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false)
+  const [pendingProjectDocs, setPendingProjectDocs] = useState<
+    { id: string; name: string; status: 'uploading' | 'processing' | 'error' }[]
+  >([])
+
+  const uploadProjectDocuments = useCallback(async (pickedFiles: File[]) => {
+    if (!pickedFiles || pickedFiles.length === 0) return
+    if (!user?.id) {
+      toast({ title: 'Inicia sesión para subir documentos', status: 'error' })
+      return
+    }
+    setIsUploadingDocs(true)
+    try {
+      const supabase = createClient()
+      if (!supabase) {
+        toast({ title: 'Subidas no disponibles en esta instalación', status: 'error' })
+        return
+      }
+
+      for (const file of pickedFiles) {
+        const validation = await validateFile(file)
+        if (!validation.isValid) {
+          toast({ title: 'Archivo no soportado', description: validation.error, status: 'error' })
+          continue
+        }
+
+        // Add to pending list
+        const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+        setPendingProjectDocs(prev => [...prev, { id: tempId, name: file.name, status: 'uploading' }])
+
+        // 1) Subir a almacenamiento para obtener URL pública
+        const publicUrl = await uploadFile(supabase as any, file)
+
+        // Update status to processing (server-side content extraction)
+        setPendingProjectDocs(prev => prev.map(p => p.id === tempId ? { ...p, status: 'processing' } : p))
+
+        // 2) Procesar contenido (pdf/doc/txt) en el servidor
+        let contentMd = ''
+        try {
+          const proc = await fetch('/api/process-attachment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: publicUrl, contentType: file.type || 'application/octet-stream', name: file.name })
+          })
+          if (proc.ok) {
+            const data = await proc.json()
+            contentMd = data?.content || ''
+          }
+        } catch {}
+
+        // 3) Crear documento del proyecto (no del chat)
+        const create = await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, title: file.name, content_md: contentMd, project_id: projectId })
+        })
+        if (!create.ok) {
+          const errTxt = await create.text().catch(() => '')
+          // Mark as error but continue to next files
+          setPendingProjectDocs(prev => prev.map(p => p.id === tempId ? { ...p, status: 'error' } : p))
+          toast({ title: 'No se pudo crear el documento', description: errTxt || undefined, status: 'error' })
+        } else {
+          // Remove from pending once created
+          setPendingProjectDocs(prev => prev.filter(p => p.id !== tempId))
+        }
+      }
+
+      await refetchDocs()
+      toast({ title: 'Documentos añadidos', status: 'success' })
+    } catch (e) {
+      toast({ title: 'No se pudo subir documentos', status: 'error' })
+    } finally {
+      setIsUploadingDocs(false)
+      setFiles([])
+    }
+  }, [user?.id, projectId, setFiles, refetchDocs])
+
   const onHeaderFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     // capture element reference before async boundaries to avoid null currentTarget
     const inputEl = e.currentTarget
     const picked = Array.from(e.target.files || [])
     if (picked.length === 0) return
-    // stage files into uploader state
-    picked.forEach((f) => handleFileUpload([f]))
-
-    // auto-upload for fast flow
-    if (!user?.id) return
-    const uid = user.id as string
-    const cid = await ensureChatExists(uid)
-    if (!cid) return
-    await handleFileUploads(uid, cid)
-    await refetchDocs()
-    toast({ title: 'Documentos añadidos', status: 'success' })
+    // Auto-upload to project documents (do not attach to chat UI)
+    await uploadProjectDocuments(picked)
     // allow re-selecting same file (guard against nullified currentTarget)
     if (inputEl) {
       inputEl.value = ''
@@ -442,7 +527,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       const fallback = document.querySelector<HTMLInputElement>(`#project-file-input-${projectId}`)
       if (fallback) fallback.value = ''
     }
-  }, [handleFileUpload, user?.id, ensureChatExists, handleFileUploads, refetchDocs])
+  }, [uploadProjectDocuments, projectId])
 
   const handleReload = useCallback(async () => {
     if (!user?.id) {
@@ -485,7 +570,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-      value: input,
+    value: localInput,
   onSuggestionAction: () => {},
   onValueChangeAction: handleInputChange,
   onSendAction: submit,
@@ -503,7 +588,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       enableSearch,
     }),
     [
-      input,
+    localInput,
       handleInputChange,
       submit,
       isSubmitting,
@@ -656,12 +741,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
             <button
               className="rounded-md bg-primary text-primary-foreground px-3 py-2 disabled:opacity-50 shadow-sm hover:opacity-90 transition"
               onClick={async () => {
-                if (!user?.id) return
-                const cid = await ensureChatExists(user.id)
-                if (!cid) return
-                await handleFileUploads(user.id, cid)
-                toast({ title: 'Documentos añadidos', status: 'success' })
-                await refetchDocs()
+                if (files.length === 0) return
+                await uploadProjectDocuments(files)
               }}
               disabled={files.length === 0}
             >
@@ -676,10 +757,37 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         {/* Documents list */}
   <div className="radius-lg bg-[--background] border divider-subtle p-4">
           <h3 className="text-base font-medium mb-3">Documentos del proyecto</h3>
-          {projectDocs.length === 0 ? (
+          {projectDocs.length === 0 && pendingProjectDocs.length === 0 ? (
             <div className="text-sm text-muted-foreground">Aún no hay documentos. Sube algunos arriba para alimentar el contexto del proyecto.</div>
           ) : (
             <ul className="divide-y">
+              {pendingProjectDocs.map(p => (
+                <li key={p.id} className="py-3 flex items-center justify-between gap-3 opacity-80">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full border divider-subtle bg-[--surface-1] px-2 py-0.5">
+                        {p.status === 'uploading' ? 'Subiendo…' : p.status === 'processing' ? 'Procesando…' : 'Error'}
+                      </span>
+                      {isUploadingDocs && <span className="text-muted-foreground">(en curso)</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      className="rounded-md border divider-subtle px-2 py-1 text-sm opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      Reindexar
+                    </button>
+                    <button
+                      className="rounded-md border divider-subtle px-2 py-1 text-sm text-red-400 opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </li>
+              ))}
               {projectDocs.map(doc => (
                 <li key={doc.id} className="py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
