@@ -1,15 +1,29 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
+// Structured logging helper (kept minimal to avoid dependency)
+function logProjectAPI(message: string, meta: Record<string, any> = {}) {
+  try {
+    const line = `[ProjectAPI] ${message} :: ${JSON.stringify(meta)}`
+    console.log(line)
+  } catch {
+    console.log(`[ProjectAPI] ${message}`)
+  }
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params }: { params: { projectId: string } }
 ) {
   try {
-    const { projectId } = await params
+    const { projectId } = params
+    const started = Date.now()
+    const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
+    if (debug) logProjectAPI('GET start', { projectId, url: request.nextUrl.pathname })
     const supabase = await createClient()
 
     if (!supabase) {
+      logProjectAPI('Supabase client unavailable', { projectId })
       return new Response(
         JSON.stringify({ error: "Supabase not available in this deployment." }),
         { status: 200 }
@@ -20,7 +34,7 @@ export async function GET(
 
     // If auth fails, return a placeholder project to allow client-side auth
     if (authError || !authData?.user?.id) {
-      console.log("Project API: Auth failed, returning placeholder for client-side auth")
+      if (debug) logProjectAPI('Auth failed – returning placeholder', { projectId, authError: authError?.message })
       return NextResponse.json({
         id: projectId,
         name: "Loading...",
@@ -40,18 +54,20 @@ export async function GET(
       .single()
 
     if (error) {
+      logProjectAPI('Query error', { projectId, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     if (!data) {
+      logProjectAPI('Not found', { projectId })
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
-
+    if (debug) logProjectAPI('GET success', { projectId, durationMs: Date.now() - started })
     return NextResponse.json(data)
   } catch (err: unknown) {
     console.error("Error in project endpoint:", err)
     // Return placeholder on error to prevent UI breaking
-    const { projectId } = await params
+    const { projectId } = params
     return NextResponse.json({
       id: projectId,
       name: "Error loading project",
@@ -66,10 +82,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params }: { params: { projectId: string } }
 ) {
   try {
-    const { projectId } = await params
+    const { projectId } = params
+    const started = Date.now()
+    const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
+    if (debug) logProjectAPI('PUT start', { projectId })
     const { name, description, notes } = await request.json()
 
     if (!name?.trim()) {
@@ -82,6 +101,7 @@ export async function PUT(
     const supabase = await createClient()
 
     if (!supabase) {
+      logProjectAPI('Supabase client unavailable (PUT)', { projectId })
       return new Response(
         JSON.stringify({ error: "Supabase not available in this deployment." }),
         { status: 200 }
@@ -91,6 +111,7 @@ export async function PUT(
     const { data: authData } = await supabase.auth.getUser()
 
     if (!authData?.user?.id) {
+      logProjectAPI('Unauthorized PUT', { projectId })
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -107,13 +128,15 @@ export async function PUT(
       .single()
 
     if (error) {
+      logProjectAPI('Update error', { projectId, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     if (!data) {
+      logProjectAPI('Update not found', { projectId })
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
-
+    if (debug) logProjectAPI('PUT success', { projectId, durationMs: Date.now() - started })
     return NextResponse.json(data)
   } catch (err: unknown) {
     console.error("Error updating project:", err)
@@ -128,13 +151,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params }: { params: { projectId: string } }
 ) {
   try {
-    const { projectId } = await params
+    const { projectId } = params
+    const started = Date.now()
+    const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
+    if (debug) logProjectAPI('DELETE start', { projectId })
     const supabase = await createClient()
 
     if (!supabase) {
+      logProjectAPI('Supabase client unavailable (DELETE)', { projectId })
       return new Response(
         JSON.stringify({ error: "Supabase not available in this deployment." }),
         { status: 200 }
@@ -144,6 +171,7 @@ export async function DELETE(
     const { data: authData } = await supabase.auth.getUser()
 
     if (!authData?.user?.id) {
+      logProjectAPI('Unauthorized DELETE', { projectId })
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -156,6 +184,7 @@ export async function DELETE(
       .single()
 
     if (fetchError || !project) {
+      logProjectAPI('Delete not found', { projectId })
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
 
@@ -167,9 +196,10 @@ export async function DELETE(
       .eq("user_id", authData.user.id)
 
     if (error) {
+      logProjectAPI('Delete error', { projectId, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
+    if (debug) logProjectAPI('DELETE success', { projectId, durationMs: Date.now() - started })
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     console.error("Error deleting project:", err)
