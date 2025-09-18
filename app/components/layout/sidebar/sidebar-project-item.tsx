@@ -183,10 +183,42 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
       const interactive = target.closest("button, a, input, textarea, [role='menu'], [data-interactive='true']")
       if (interactive) return
 
+      e.preventDefault()
+      e.stopPropagation()
+
       // Navigate to the project page on container click
-      router.push(`/p/${project.id}`)
+      console.log(`[SidebarProjectItem] Navigating to project ${project.id}`)
+      console.log(`[SidebarProjectItem] Current pathname: ${pathname}`)
+      console.log(`[SidebarProjectItem] Target path: /p/${project.id}`)
+      
+      const targetPath = `/p/${project.id}`
+      
+      // Try multiple navigation methods for production debugging
+      try {
+        console.log(`[SidebarProjectItem] Attempting router.push...`)
+        router.push(targetPath)
+        
+        // Fallback: direct window navigation if router fails
+        setTimeout(() => {
+          if (window.location.pathname !== targetPath) {
+            console.warn(`[SidebarProjectItem] Router.push failed, using window.location`)
+            window.location.href = targetPath
+          }
+        }, 150)
+        
+      } catch (error) {
+        console.error(`[SidebarProjectItem] Navigation error:`, error)
+        // Direct fallback
+        window.location.href = targetPath
+      }
+      
+      // Debug: Check if navigation actually happened after a short delay
+      setTimeout(() => {
+        console.log(`[SidebarProjectItem] Navigation check - Current pathname: ${window.location.pathname}`)
+        console.log(`[SidebarProjectItem] Expected pathname: ${targetPath}`)
+      }, 100)
     },
-    [isEditing, isMenuOpen, router, project.id]
+    [isEditing, isMenuOpen, router, project.id, pathname]
   )
 
   const handleSaveClick = useCallback(

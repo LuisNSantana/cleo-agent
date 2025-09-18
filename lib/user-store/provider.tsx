@@ -27,8 +27,26 @@ export function UserProvider({
   children: React.ReactNode
   initialUser: UserProfile | null
 }) {
-  const [user, setUser] = useState<UserProfile | null>(initialUser)
-  const [isLoading, setIsLoading] = useState(false)
+  const [user, setUser] = useState<UserProfile | null>(null) // Start with null to avoid hydration mismatch
+  const [isLoading, setIsLoading] = useState(true) // Start loading to fetch user on client
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Initialize user on client side to avoid SSR hydration mismatch
+  useEffect(() => {
+    if (isInitialized) return
+    
+    setIsInitialized(true)
+    
+    if (initialUser) {
+      console.log("[UserProvider] Setting initial user:", initialUser.id)
+      setUser(initialUser)
+      setIsLoading(false)
+    } else {
+      console.log("[UserProvider] No initial user, will be handled by auth flow")
+      setUser(null)
+      setIsLoading(false)
+    }
+  }, [initialUser, isInitialized])
 
   const refreshUser = async () => {
     if (!user?.id) return

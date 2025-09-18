@@ -1,6 +1,16 @@
 import { LayoutApp } from "@/app/components/layout/layout-app"
-import { ProjectView } from "@/app/p/[projectId]/project-view"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
+import dynamic from "next/dynamic"
+
+// Force client-side rendering to prevent SSR hydration mismatches in production
+const ProjectView = dynamic(() => import("./project-view").then(mod => ({ default: mod.ProjectView })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="text-muted-foreground animate-pulse">Loading project...</div>
+    </div>
+  )
+})
 
 type Props = {
   params: Promise<{ projectId: string }>
@@ -9,13 +19,14 @@ type Props = {
 export default async function Page({ params }: Props) {
   const { projectId } = await params
 
-  // Remove auth checks that cause silent redirects in production
-  // The ProjectView component will handle auth and project access internally
+  console.log(`[Page] Rendering project page for ID: ${projectId}`)
 
   return (
     <MessagesProvider>
       <LayoutApp>
-        <ProjectView projectId={projectId} key={projectId} />
+        <div data-project-page={projectId} data-testid="project-page">
+          <ProjectView projectId={projectId} key={projectId} />
+        </div>
       </LayoutApp>
     </MessagesProvider>
   )
