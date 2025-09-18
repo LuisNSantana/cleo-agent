@@ -11,12 +11,25 @@ function logProjectAPI(message: string, meta: Record<string, any> = {}) {
   }
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { projectId: string } }
-) {
+function extractProjectId(request: Request): string | null {
   try {
-    const { projectId } = params
+    const url = new URL(request.url)
+    const segments = url.pathname.split('/').filter(Boolean)
+    const idx = segments.findIndex(s => s === 'projects')
+    if (idx !== -1 && segments[idx + 1]) return segments[idx + 1]
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const projectId = extractProjectId(request)
+    if (!projectId) {
+      logProjectAPI('Missing projectId in path (GET)')
+      return NextResponse.json({ error: 'Invalid project path' }, { status: 400 })
+    }
     const started = Date.now()
     const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
   if (debug) logProjectAPI('GET start', { projectId })
@@ -67,7 +80,7 @@ export async function GET(
   } catch (err: unknown) {
     console.error("Error in project endpoint:", err)
     // Return placeholder on error to prevent UI breaking
-    const { projectId } = params
+    const projectId = extractProjectId(request)
     return NextResponse.json({
       id: projectId,
       name: "Error loading project",
@@ -80,12 +93,13 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { projectId: string } }
-) {
+export async function PUT(request: Request) {
   try {
-    const { projectId } = params
+    const projectId = extractProjectId(request)
+    if (!projectId) {
+      logProjectAPI('Missing projectId in path (PUT)')
+      return NextResponse.json({ error: 'Invalid project path' }, { status: 400 })
+    }
     const started = Date.now()
     const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
     if (debug) logProjectAPI('PUT start', { projectId })
@@ -149,12 +163,13 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { projectId: string } }
-) {
+export async function DELETE(request: Request) {
   try {
-    const { projectId } = params
+    const projectId = extractProjectId(request)
+    if (!projectId) {
+      logProjectAPI('Missing projectId in path (DELETE)')
+      return NextResponse.json({ error: 'Invalid project path' }, { status: 400 })
+    }
     const started = Date.now()
     const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
     if (debug) logProjectAPI('DELETE start', { projectId })
