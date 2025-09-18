@@ -33,9 +33,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that this is a supported file type
-    if (!contentType.includes('pdf') && !contentType.startsWith('text')) {
+    const isPdf = contentType.includes('pdf')
+    const isText = contentType.startsWith('text')
+    const isDocx = contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    const isDoc = contentType === 'application/msword'
+    if (!isPdf && !isText && !isDocx && !isDoc) {
       return NextResponse.json({ 
-        error: 'Unsupported file type. Only PDF and text files are supported.' 
+        error: 'Unsupported file type. Supported: PDF, text, and Word (.docx/.doc).' 
       }, { status: 400 })
     }
 
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
       const base64 = Buffer.from(buffer).toString('base64')
       const dataUrl = `data:${contentType};base64,${base64}`
 
-      // Process the file content
+  // Process the file content (supports: images (passthrough), text, pdf, docx/doc)
       const result = await processFileContent(dataUrl, name, contentType)
 
       return NextResponse.json({

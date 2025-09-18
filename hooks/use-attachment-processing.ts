@@ -38,9 +38,11 @@ export function useAttachmentProcessing(attachments: Attachment[] = []) {
       const processed = await Promise.all(
         attachments.map(async (attachment) => {
           // Skip if already processed or not a supported type
-          if (!attachment.url || 
-              (!attachment.contentType?.includes('pdf') && 
-               !attachment.contentType?.startsWith('text'))) {
+          const isPdf = !!attachment.contentType?.includes('pdf')
+          const isText = !!attachment.contentType?.startsWith('text')
+          const isDocx = attachment.contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          const isDoc = attachment.contentType === 'application/msword'
+          if (!attachment.url || (!isPdf && !isText && !isDocx && !isDoc)) {
             return { ...attachment }
           }
 

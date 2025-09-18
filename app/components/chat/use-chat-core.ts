@@ -53,7 +53,9 @@ function validateFiles(files: File[]): { isValid: boolean; errors: string[] } {
     const isValidType = isImageFile(file) || 
       file.type.startsWith('text/') || 
       file.type === 'application/pdf' ||
-      file.type === 'application/json'
+      file.type === 'application/json' ||
+      file.type === 'application/msword' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     
     if (!isValidType) {
       errors.push(`File "${file.name}" has unsupported type: ${file.type}`)

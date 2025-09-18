@@ -1,4 +1,5 @@
 import pdf from "pdf-parse-debugging-disabled"
+import * as mammoth from "mammoth"
 
 /**
  * Extract text content from PDF buffer with size limits and cleanup
@@ -120,6 +121,36 @@ export async function processFileContent(
         content: extractedText,
         type: "text",
         summary: summary,
+      }
+    }
+
+    // Handle Word documents (.docx/.doc) using mammoth
+    if (
+      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      mimeType === "application/msword"
+    ) {
+      try {
+        const buffer = Buffer.from(base64Data, "base64")
+        // mammoth works best with .docx; for .doc we still try (may need conversion client-side)
+        const result = await mammoth.extractRawText({ buffer })
+        let extracted = (result.value || "").trim()
+        if (!extracted) {
+          extracted = "[El documento Word no contiene texto extraíble o está vacío]"
+        }
+        // Limit length similar to PDFs/text
+        const maxLength = 30000
+        if (extracted.length > maxLength) {
+          extracted = `${extracted.substring(0, maxLength)}\n\n[... DOCUMENTO TRUNCADO POR TAMAÑO ...]`
+        }
+        const summary = createFileSummary(fileName, mimeType, extracted)
+        return {
+          content: extracted,
+          type: "text",
+          summary,
+        }
+      } catch (e) {
+        // Fall through to generic fallback
+        console.error('DOCX extraction failed:', e)
       }
     }
 
