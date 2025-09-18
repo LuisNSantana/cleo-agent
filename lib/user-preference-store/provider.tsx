@@ -49,10 +49,18 @@ async function fetchUserPreferences(): Promise<UserPreferences> {
 async function updateUserPreferences(
   update: Partial<UserPreferences>
 ): Promise<UserPreferences> {
+  // Include CSRF token if present (double-submit cookie pattern)
+  let csrf: string | undefined
+  try {
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)
+    csrf = match ? decodeURIComponent(match[1]) : undefined
+  } catch {}
+
   const response = await fetch("/api/user-preferences", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      ...(csrf ? { "x-csrf-token": csrf } : {}),
     },
     body: JSON.stringify(convertToApiFormat(update)),
   })
