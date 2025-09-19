@@ -9,6 +9,7 @@ import { useCanvasEditorStore } from "@/lib/canvas-editor/store"
 import { CanvasEditorShell } from "@/components/canvas-editor/canvas-editor-shell"
 import { ChatBackground } from "@/app/components/ui/chat-background"
 import { useState, useEffect, useCallback } from "react"
+import React from "react"
 import { PencilSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import dynamic from "next/dynamic"
@@ -68,7 +69,15 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
 
   // LOG: LayoutApp render (debug en desarrollo)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('[LayoutApp] Path:', pathname);
+    console.log('[LayoutApp] ==> RENDER <==');
+    console.log('[LayoutApp] Current pathname:', pathname);
+    console.log('[LayoutApp] Children type:', typeof children);
+    console.log('[LayoutApp] Children:', React.Children.count(children), 'child(ren)');
+    
+    // Log cuando estamos en una ruta de proyecto
+    if (pathname.startsWith('/p/')) {
+      console.log('[LayoutApp] 🎯 PROJECT ROUTE DETECTED:', pathname);
+    }
   }
 
   // Mouse event handlers for the middle divider

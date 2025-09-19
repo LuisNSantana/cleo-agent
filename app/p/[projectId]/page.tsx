@@ -1,10 +1,12 @@
 "use client"
 
-
 import { Suspense } from "react"
 import { ProjectView } from "./project-view"
 import { useParams } from "next/navigation"
 import React from "react"
+
+// Add a marker to ensure this file is being loaded
+console.log("[ProjectPage] 🔥 MODULE LOADED - This file is being executed");
 
 // Simple error boundary for runtime errors
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
