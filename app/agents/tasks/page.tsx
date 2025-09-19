@@ -140,13 +140,13 @@ export default function AgentsTasksPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-500/20 text-green-300 border-green-500/40'
-      case 'failed': return 'bg-red-500/20 text-red-300 border-red-500/40'
-      case 'cancelled': return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
-      case 'running': return 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-      case 'scheduled': return 'bg-orange-500/20 text-orange-300 border-orange-500/40'
-      case 'pending': return 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-      default: return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+      case 'completed': return 'bg-green-500/20 text-green-200 border-green-500/40'
+      case 'failed': return 'bg-red-500/20 text-red-200 border-red-500/40'
+      case 'cancelled': return 'bg-slate-500/20 text-slate-200 border-slate-500/40'
+      case 'running': return 'bg-blue-500/20 text-blue-200 border-blue-500/40'
+      case 'scheduled': return 'bg-orange-500/20 text-orange-200 border-orange-500/40'
+      case 'pending': return 'bg-purple-500/20 text-purple-200 border-purple-500/40'
+      default: return 'bg-slate-500/20 text-slate-200 border-slate-500/40'
     }
   }
 
@@ -781,26 +781,26 @@ export default function AgentsTasksPage() {
                           </div>
 
                           <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center gap-2">
                               <img
                                 src={getAgentAvatarUrl(task.agent_name, task.agent_avatar)}
                                 alt={task.agent_name}
                                 className="w-5 h-5 rounded-full border border-border object-cover"
                               />
-                              <span className="truncate">{task.agent_name}</span>
+                              <span className="truncate text-foreground font-medium">{task.agent_name}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center gap-2 text-foreground/70">
                               <CalendarIcon className="w-4 h-4" />
                               <span>{formatDate(task.created_at)}</span>
                             </div>
                             {task.completed_at && (
-                              <div className="flex items-center gap-2 text-muted-foreground">
+                              <div className="flex items-center gap-2 text-foreground/70">
                                 <CheckCircleIcon className="w-4 h-4" />
                                 <span>Completed: {formatDate(task.completed_at)}</span>
                               </div>
                             )}
                             {task.scheduled_at && (
-                              <div className="flex items-center gap-2 text-muted-foreground">
+                              <div className="flex items-center gap-2 text-foreground/70">
                                 <ClockIcon className="w-4 h-4" />
                                 <span>Scheduled: {formatDate(task.scheduled_at, (task as any).timezone || 'UTC')}</span>
                               </div>
@@ -923,11 +923,11 @@ export default function AgentsTasksPage() {
                                 <h4 className="font-semibold text-foreground truncate">
                                   {notification.title}
                                 </h4>
-                                <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                                <span className="text-xs text-foreground/60 flex-shrink-0 ml-2">
                                   {formatTimeAgo(notification.created_at)}
                                 </span>
                               </div>
-                              <div className="text-sm text-muted-foreground mt-1 prose prose-invert prose-sm max-w-none line-clamp-3">
+                              <div className="text-sm text-foreground/70 mt-1 prose prose-invert prose-sm max-w-none line-clamp-3">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {notification.message}
                                 </ReactMarkdown>
@@ -962,7 +962,7 @@ export default function AgentsTasksPage() {
                               <div className="flex items-center gap-2 mt-2">
                                 <Badge 
                                   variant="secondary" 
-                                  className="text-xs bg-muted text-muted-foreground"
+                                  className="text-xs bg-muted text-foreground/80 font-medium"
                                 >
                                   {notification.agent_name}
                                 </Badge>
@@ -1016,10 +1016,10 @@ export default function AgentsTasksPage() {
                     <div className="min-w-0">
                       <DialogTitle className="truncate">{selectedNotification.title}</DialogTitle>
                       <DialogDescription asChild>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-foreground/70">
                           <span>{formatTimeAgo(selectedNotification.created_at)}</span>
                           <span>•</span>
-                          <span>{selectedNotification.agent_name}</span>
+                          <span className="font-medium text-foreground/90">{selectedNotification.agent_name}</span>
                           <span>•</span>
                           <Badge variant="outline" className="h-5 px-2 text-[10px]">
                             {selectedNotification.priority}
