@@ -106,7 +106,7 @@ export function AppSidebar() {
                           <span>{label}</span>
                         </div>
                         {badge && (
-                          <span className="ml-auto px-2 py-0.5 text-[10px] font-medium bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full animate-pulse">
+                          <span className="ml-auto px-1 py-px text-[8px] font-normal bg-foreground/8 text-foreground/60 rounded tracking-wider uppercase">
                             {badge}
                           </span>
                         )}
