@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
 import { Trash2, Edit2, Plus, Eye, EyeOff, Key, Settings, CheckCircle, AlertCircle, HelpCircle, ExternalLink, Copy, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SkyvernSetupGuide } from '@/components/skyvern/skyvern-setup-guide';
+import { NotionSetupGuide } from '@/components/notion/notion-setup-guide';
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -850,6 +852,18 @@ export default function CredentialsManager({ serviceType, className = '' }: Cred
             </div>
           </div>
         </CardHeader>
+        
+        {/* Setup Guides */}
+        {serviceType === 'skyvern' && (
+          <div className="px-6 pb-0">
+            <SkyvernSetupGuide />
+          </div>
+        )}
+        {serviceType === 'notion' && (
+          <div className="px-6 pb-0">
+            <NotionSetupGuide />
+          </div>
+        )}
         
         <CardContent className="pt-0">
           {loading ? (

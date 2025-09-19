@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast'
 import { Key, CheckCircle, AlertCircle, Trash2 } from 'lucide-react'
+import { SerpAPISetupGuide } from './serpapi-setup-guide'
 
 interface SerpKeyMeta { id: string; label: string; is_active: boolean; created_at: string }
 
@@ -81,6 +82,7 @@ export function SerpapiCredentialsManager(){
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <SerpAPISetupGuide />
         <div className="grid gap-2">
           <Label htmlFor="serpapi-key">API Key</Label>
           <Input id="serpapi-key" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="serpapi_api_key" type="password" />

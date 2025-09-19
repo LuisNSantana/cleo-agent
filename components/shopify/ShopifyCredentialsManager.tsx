@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from '@/components/ui/toast';
 import { Trash2, Edit2, Plus, Store, Eye, EyeOff } from 'lucide-react';
+import { ShopifySetupGuide } from './shopify-setup-guide';
 
 interface ShopifyCredential {
   id: string;
@@ -405,6 +406,9 @@ export default function ShopifyCredentialsManager() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Setup Guide */}
+        <ShopifySetupGuide />
 
         {/* Credentials List */}
         {credentials.length === 0 ? (

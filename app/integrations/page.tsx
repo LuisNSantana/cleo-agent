@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import CredentialsManager from "@/components/common/CredentialsManager"
+import { TwitterCredentialsManager } from "@/components/twitter/twitter-credentials-manager"
+import { SerpapiCredentialsManager } from "@/components/serpapi/serpapi-credentials-manager"
 import {
   Store,
   Globe,
@@ -20,8 +22,8 @@ import {
 } from "lucide-react"
 
 // Tipos de integración disponibles
-type IntegrationType = 'shopify' | 'skyvern' | 'notion' | 'gmail' | 'calendar' | 'drive' | 'serpapi'
-type CredentialType = 'shopify' | 'skyvern' | 'notion'
+type IntegrationType = 'google-workspace' | 'twitter' | 'serpapi' | 'shopify' | 'skyvern' | 'notion'
+type CredentialType = 'twitter' | 'serpapi' | 'shopify' | 'skyvern' | 'notion'
 
 interface Integration {
   id: IntegrationType
@@ -29,46 +31,37 @@ interface Integration {
   description: string
   icon: React.ReactNode
   status: 'connected' | 'disconnected' | 'configuring'
-  category: 'productivity' | 'ecommerce' | 'automation' | 'search'
+  category: 'productivity' | 'ecommerce' | 'automation' | 'search' | 'social'
   features: string[]
 }
 
 const integrations: Integration[] = [
   {
-    id: 'gmail',
-    name: 'Gmail',
-    description: 'Email management and organization',
+    id: 'google-workspace',
+    name: 'Google Workspace',
+    description: 'Gmail, Calendar, Drive, Docs, Sheets - Full productivity suite',
     icon: <Mail className="w-8 h-8" />,
-    status: 'disconnected',
+    status: 'connected',
     category: 'productivity',
-    features: ['Read emails', 'Send emails', 'Organize inbox', 'Extract action items']
+    features: ['Gmail integration', 'Calendar management', 'Drive file access', 'Docs & Sheets creation', 'Real-time collaboration']
   },
   {
-    id: 'calendar',
-    name: 'Google Calendar',
-    description: 'Meeting scheduling and calendar management',
-    icon: <Calendar className="w-8 h-8" />,
+    id: 'twitter',
+    name: 'Twitter / X',
+    description: 'Social media management and content posting',
+    icon: <Globe className="w-8 h-8" />,
     status: 'disconnected',
-    category: 'productivity',
-    features: ['Schedule meetings', 'View events', 'Meeting preparation', 'Resource booking']
+    category: 'social',
+    features: ['Tweet posting', 'Timeline reading', 'DM management', 'Analytics tracking']
   },
   {
-    id: 'drive',
-    name: 'Google Drive',
-    description: 'File storage and document management',
-    icon: <HardDrive className="w-8 h-8" />,
+    id: 'serpapi',
+    name: 'SerpAPI',
+    description: 'Advanced web search and data retrieval',
+    icon: <Search className="w-8 h-8" />,
     status: 'disconnected',
-    category: 'productivity',
-    features: ['File organization', 'Document sharing', 'Collaborative folders', 'File search']
-  },
-  {
-    id: 'notion',
-    name: 'Notion',
-    description: 'Workspace management and content organization',
-    icon: <FileText className="w-8 h-8" />,
-    status: 'disconnected',
-    category: 'productivity',
-    features: ['Create pages', 'Manage databases', 'Organize content', 'Collaborate']
+    category: 'search',
+    features: ['Web search', 'Local search', 'News search', 'Scholar search', 'Maps integration']
   },
   {
     id: 'shopify',
@@ -89,13 +82,13 @@ const integrations: Integration[] = [
     features: ['Web scraping', 'Form filling', 'Data extraction', 'Workflow automation']
   },
   {
-    id: 'serpapi',
-    name: 'Google Search API',
-    description: 'Advanced web search and data retrieval',
-    icon: <Search className="w-8 h-8" />,
+    id: 'notion',
+    name: 'Notion',
+    description: 'Workspace management and content organization',
+    icon: <FileText className="w-8 h-8" />,
     status: 'disconnected',
-    category: 'search',
-    features: ['Web search', 'Local search', 'News search', 'Image search']
+    category: 'productivity',
+    features: ['Create pages', 'Manage databases', 'Organize content', 'Team collaboration']
   }
 ]
 
@@ -134,13 +127,15 @@ export default function IntegrationsPage() {
         return 'bg-purple-100 text-purple-800'
       case 'search':
         return 'bg-orange-100 text-orange-800'
+      case 'social':
+        return 'bg-pink-100 text-pink-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
   // Integraciones que tienen CredentialsManager disponible
-  const availableIntegrations = ['shopify', 'skyvern', 'notion'] as IntegrationType[]
+  const availableIntegrations = ['twitter', 'serpapi', 'shopify', 'skyvern', 'notion'] as IntegrationType[]
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-7xl">
@@ -198,14 +193,44 @@ export default function IntegrationsPage() {
                     </ul>
                   </div>
 
-                  {availableIntegrations.includes(integration.id) ? (
-                    <Button
-                      onClick={() => setSelectedIntegration(integration.id as CredentialType)}
-                      className="w-full"
-                      variant={integration.status === 'connected' ? 'outline' : 'default'}
-                    >
-                      {integration.status === 'connected' ? 'Administrar' : 'Configurar'}
-                    </Button>
+                  {integration.id === 'google-workspace' ? (
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => window.open('/api/connections/google-workspace/connect', '_blank')}
+                        className="w-full"
+                        variant={integration.status === 'connected' ? 'outline' : 'default'}
+                      >
+                        {integration.status === 'connected' ? '✓ Conectado' : 'Conectar cuenta'}
+                      </Button>
+                    </div>
+                  ) : availableIntegrations.includes(integration.id) ? (
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => setSelectedIntegration(integration.id as CredentialType)}
+                        className="w-full"
+                        variant={integration.status === 'connected' ? 'outline' : 'default'}
+                      >
+                        {integration.status === 'connected' ? 'Administrar API Key' : 'Configurar API Key'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const docsMap = {
+                            'twitter': '/docs/integrations/twitter-x-setup.md',
+                            'notion': '/docs/integrations/notion-setup.md'
+                          };
+                          const docUrl = docsMap[integration.id as keyof typeof docsMap];
+                          if (docUrl) {
+                            window.open(docUrl, '_blank');
+                          }
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        disabled={!['twitter', 'notion'].includes(integration.id)}
+                      >
+                        📖 Guía de configuración
+                      </Button>
+                    </div>
                   ) : (
                     <Button disabled className="w-full" variant="outline">
                       Próximamente
@@ -233,7 +258,10 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <CredentialsManager serviceType={selectedIntegration} />
+                  {selectedIntegration === 'twitter' && <TwitterCredentialsManager />}
+                  {selectedIntegration === 'serpapi' && <SerpapiCredentialsManager />}
+                  {(selectedIntegration === 'shopify' || selectedIntegration === 'skyvern' || selectedIntegration === 'notion') && 
+                    <CredentialsManager serviceType={selectedIntegration} />}
                 </div>
               </div>
             </div>

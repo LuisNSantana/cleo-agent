@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Trash2, TestTube, Plus, Eye, EyeOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { XTwitterIcon } from '@/components/icons/tool-icons'
 import { toast } from '@/components/ui/toast'
+import { TwitterSetupGuide } from './twitter-setup-guide'
 
 interface TwitterCredential {
   id: string
@@ -251,25 +252,7 @@ export function TwitterCredentialsManager() {
       </div>
 
       {/* Instructions */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              You'll need Twitter API v2 credentials from the{' '}
-              <a 
-                href="https://developer.twitter.com/en/portal/dashboard" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Twitter Developer Portal
-              </a>
-              . Required: API Key, API Secret, Access Token, Access Token Secret. Optional: Bearer Token for enhanced features.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TwitterSetupGuide />
 
       {/* Add Credentials Form */}
   {showAddForm && credentials.length < 3 && (
