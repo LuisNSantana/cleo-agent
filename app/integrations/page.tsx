@@ -111,7 +111,7 @@ const integrations: Integration[] = [
     description: 'Workspace management and content organization',
     icon: (
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-700 to-black flex items-center justify-center shadow-lg">
-        <img src="/icons/notion.png" alt="Notion" className="w-5 h-5" />
+        <img src="/icons/notion-icon.svg" alt="Notion" className="w-5 h-5" />
       </div>
     ),
     status: 'disconnected',
@@ -172,86 +172,163 @@ export default function IntegrationsPage() {
               <Settings className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-4xl font-bold text-foreground mb-4 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text">
-              Integraciones
+              Integrations
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Conecta tus cuentas y servicios favoritos para potenciar las capacidades de Cleo Agent con herramientas de productividad, e-commerce y automatización
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
+              Connect your favorite accounts and services to supercharge Cleo Agent's capabilities with productivity, e-commerce, and automation tools
             </p>
+            
+            {/* Stats de integraciones */}
+            <div className="flex justify-center space-x-8 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                <span className="text-muted-foreground">
+                  {integrations.filter(i => i.status === 'connected').length} Connected
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                <span className="text-muted-foreground">
+                  {integrations.filter(i => i.status === 'disconnected').length} Available
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Grid de integraciones */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">
             {integrations.map((integration) => (
-              <Card key={integration.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-background to-muted/20 hover:scale-[1.03] relative overflow-hidden">
+              <Card 
+                key={integration.id} 
+                className={`group transition-all duration-500 border-0 bg-gradient-to-br from-background to-muted/20 relative overflow-hidden ${
+                  integration.status === 'connected' 
+                    ? 'shadow-lg shadow-emerald-100 border-2 border-emerald-200 hover:shadow-xl hover:shadow-emerald-200' 
+                    : 'hover:shadow-2xl hover:scale-[1.03] shadow-md'
+                }`}
+              >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                {integration.status === 'connected' && (
+                  <div className="absolute top-3 right-3 w-3 h-3 bg-emerald-500 rounded-full shadow-lg animate-pulse"></div>
+                )}
                 <CardHeader className="pb-4 relative z-10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {integration.icon}
                       <div>
-                        <CardTitle className="text-lg group-hover:text-primary transition-colors">{integration.name}</CardTitle>
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs mt-1 ${getCategoryColor(integration.category)}`}
-                        >
-                          {integration.category}
-                        </Badge>
+                        <CardTitle className="text-lg group-hover:text-primary transition-colors flex items-center space-x-2">
+                          <span>{integration.name}</span>
+                          {integration.status === 'connected' && (
+                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                          )}
+                        </CardTitle>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs border ${getCategoryColor(integration.category)}`}
+                          >
+                            {integration.category}
+                          </Badge>
+                          {integration.id === 'google-workspace' && (
+                            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                              Direct connection
+                            </Badge>
+                          )}
+                          {integration.id !== 'google-workspace' && (
+                            <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">
+                              Requires API key
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className={`flex items-center space-x-1 px-3 py-1.5 rounded-full border-2 transition-all ${getStatusColor(integration.status)}`}>
+                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-full border-2 transition-all ${getStatusColor(integration.status)}`}>
                       {getStatusIcon(integration.status)}
-                      <span className="text-xs font-medium capitalize">
-                        {integration.status === 'connected' ? 'Conectado' :
-                         integration.status === 'configuring' ? 'Configurando' : 'Desconectado'}
+                      <span className="text-xs font-semibold capitalize">
+                        {integration.status === 'connected' ? 'Connected' :
+                         integration.status === 'configuring' ? 'Configuring' : 'Disconnected'}
                       </span>
                     </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="relative z-10">
-                  <CardDescription className="mb-6 text-base leading-relaxed">
+                  <CardDescription className="mb-6 text-base leading-relaxed text-muted-foreground">
                     {integration.description}
                   </CardDescription>
 
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center">
                       <Zap className="w-4 h-4 mr-2 text-primary" />
-                      Características principales:
+                      What you can do:
                     </h4>
                     <ul className="text-sm text-muted-foreground space-y-2">
-                      {integration.features.slice(0, 3).map((feature, index) => (
-                        <li key={index} className="flex items-center space-x-3">
-                          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-primary/60"></div>
+                      {integration.features.slice(0, 4).map((feature, index) => (
+                        <li key={index} className="flex items-start space-x-3">
+                          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-primary/60 mt-2 flex-shrink-0"></div>
                           <span className="leading-relaxed">{feature}</span>
                         </li>
                       ))}
+                      {integration.features.length > 4 && (
+                        <li className="flex items-center space-x-3 text-primary text-xs font-medium">
+                          <div className="w-2 h-2 rounded-full bg-primary/30"></div>
+                          <span>And {integration.features.length - 4} more features...</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
 
-                  {integration.id === 'google-workspace' ? (
-                    <div className="space-y-2">
+                                    {integration.id === 'google-workspace' ? (
+                    <div className="space-y-3">
                       <Button
                         onClick={() => window.open('/api/connections/google-workspace/connect', '_blank')}
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                         variant={integration.status === 'connected' ? 'outline' : 'default'}
                       >
-                        {integration.status === 'connected' ? '✓ Conectado' : 'Conectar cuenta'}
+                        {integration.status === 'connected' ? (
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4" />
+                            <span>Connected</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <Settings className="w-4 h-4" />
+                            <span>Connect Account</span>
+                          </div>
+                        )}
                       </Button>
                     </div>
                   ) : availableIntegrations.includes(integration.id) ? (
                     <div className="space-y-3">
                       <Button
                         onClick={() => setSelectedIntegration(integration.id as CredentialType)}
-                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-900 hover:to-black text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                         variant={integration.status === 'connected' ? 'outline' : 'default'}
                       >
-                        {integration.status === 'connected' ? 'Administrar API Key' : 'Configurar API Key'}
+                        {integration.status === 'connected' ? (
+                          <div className="flex items-center space-x-2">
+                            <Settings className="w-4 h-4" />
+                            <span>Manage API Key</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <Zap className="w-4 h-4" />
+                            <span>Configure API Key</span>
+                          </div>
+                        )}
                       </Button>
                     </div>
                   ) : (
-                    <Button disabled className="w-full" variant="outline">
-                      Próximamente
-                    </Button>
+                    <div className="text-center py-6 space-y-3">
+                      <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">
+                          Integration not available
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          This integration will be available soon
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
