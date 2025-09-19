@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
   CheckCircle,
   AlertCircle,
   Settings,
+  RefreshCw,
   Zap,
   Bot,
   ShoppingBag,
@@ -49,7 +50,7 @@ const integrations: Integration[] = [
         <img src="/icons/google.png" alt="Google" className="w-5 h-5" />
       </div>
     ),
-    status: 'connected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'productivity',
     features: ['Gmail integration', 'Calendar management', 'Drive file access', 'Docs & Sheets creation', 'Real-time collaboration']
   },
@@ -62,7 +63,7 @@ const integrations: Integration[] = [
         <img src="/icons/x_twitter.png" alt="Twitter/X" className="w-5 h-5" />
       </div>
     ),
-    status: 'disconnected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'social',
     features: ['Tweet posting', 'Timeline reading', 'DM management', 'Analytics tracking']
   },
@@ -75,7 +76,7 @@ const integrations: Integration[] = [
         <Search className="w-5 h-5 text-white" />
       </div>
     ),
-    status: 'disconnected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'search',
     features: ['Web search', 'Local search', 'News search', 'Scholar search', 'Maps integration']
   },
@@ -88,7 +89,7 @@ const integrations: Integration[] = [
         <img src="/icons/shopify.png" alt="Shopify" className="w-5 h-5" />
       </div>
     ),
-    status: 'disconnected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'ecommerce',
     features: ['Store analytics', 'Order management', 'Product updates', 'Customer insights']
   },
@@ -101,7 +102,7 @@ const integrations: Integration[] = [
         <Bot className="w-5 h-5 text-white" />
       </div>
     ),
-    status: 'disconnected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'automation',
     features: ['Web scraping', 'Form filling', 'Data extraction', 'Workflow automation']
   },
@@ -114,7 +115,7 @@ const integrations: Integration[] = [
         <img src="/icons/notion-icon.svg" alt="Notion" className="w-5 h-5" />
       </div>
     ),
-    status: 'disconnected',
+    status: 'disconnected', // Will be overridden by dynamic status
     category: 'productivity',
     features: ['Create pages', 'Manage databases', 'Organize content', 'Team collaboration']
   }
@@ -122,15 +123,119 @@ const integrations: Integration[] = [
 
 export default function IntegrationsPage() {
   const [selectedIntegration, setSelectedIntegration] = useState<CredentialType | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [integrationStatuses, setIntegrationStatuses] = useState<Record<string, Integration['status']>>({
+    'google-workspace': 'connected', // Google Workspace siempre conectado
+    'twitter': 'disconnected',
+    'serpapi': 'disconnected', 
+    'shopify': 'disconnected',
+    'skyvern': 'disconnected',
+    'notion': 'disconnected'
+  })
+
+  // Función para verificar el estado de las credenciales
+  const checkCredentialStatus = async (serviceType: string): Promise<Integration['status']> => {
+    try {
+      const response = await fetch(`/api/${serviceType}/credentials`)
+      if (!response.ok) return 'disconnected'
+      
+      const data = await response.json()
+      if (data.success && data.credentials && data.credentials.length > 0) {
+        // Verificar si hay al menos una credencial activa
+        const hasActiveCredential = data.credentials.some((cred: any) => cred.is_active || cred.active)
+        return hasActiveCredential ? 'connected' : 'disconnected'
+      }
+      return 'disconnected'
+    } catch (error) {
+      console.error(`Error checking ${serviceType} credentials:`, error)
+      return 'disconnected'
+    }
+  }
+
+  // Verificar estado de Google Workspace
+  const checkGoogleWorkspaceStatus = async (): Promise<Integration['status']> => {
+    try {
+      const response = await fetch('/api/connections/google-workspace/status')
+      if (!response.ok) return 'disconnected'
+      
+      const data = await response.json()
+      return data.connected ? 'connected' : 'disconnected'
+    } catch (error) {
+      console.error('Error checking Google Workspace status:', error)
+      return 'disconnected'
+    }
+  }
+
+  // Cargar estados reales al montar el componente
+  useEffect(() => {
+    const loadIntegrationStatuses = async () => {
+      const newStatuses: Record<string, Integration['status']> = {}
+      
+      // Verificar Google Workspace
+      newStatuses['google-workspace'] = await checkGoogleWorkspaceStatus()
+      
+      // Verificar servicios con API keys
+      const services = ['twitter', 'serpapi', 'shopify', 'skyvern', 'notion']
+      await Promise.all(
+        services.map(async (service) => {
+          newStatuses[service] = await checkCredentialStatus(service)
+        })
+      )
+      
+      setIntegrationStatuses(newStatuses)
+    }
+
+    loadIntegrationStatuses()
+  }, [])
+
+  // Función para actualizar el estado de una integración específica
+  const updateIntegrationStatus = async (integrationId: string) => {
+    let newStatus: Integration['status']
+    
+    if (integrationId === 'google-workspace') {
+      newStatus = await checkGoogleWorkspaceStatus()
+    } else {
+      newStatus = await checkCredentialStatus(integrationId)
+    }
+    
+    setIntegrationStatuses(prev => ({
+      ...prev,
+      [integrationId]: newStatus
+    }))
+  }
+
+  // Función para refrescar todos los estados
+  const refreshAllStatuses = async () => {
+    setIsRefreshing(true)
+    
+    try {
+      const newStatuses: Record<string, Integration['status']> = {}
+      
+      // Verificar Google Workspace
+      newStatuses['google-workspace'] = await checkGoogleWorkspaceStatus()
+      
+      // Verificar servicios con API keys
+      const services = ['twitter', 'serpapi', 'shopify', 'skyvern', 'notion']
+      await Promise.all(
+        services.map(async (service) => {
+          newStatuses[service] = await checkCredentialStatus(service)
+        })
+      )
+      
+      setIntegrationStatuses(newStatuses)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const getStatusColor = (status: Integration['status']) => {
     switch (status) {
       case 'connected':
-        return 'text-emerald-700 bg-emerald-50 border-emerald-200 shadow-sm'
+        return 'text-emerald-700 bg-emerald-50 border-emerald-200 shadow-sm dark:text-emerald-400 dark:bg-emerald-900/40 dark:border-emerald-600/60'
       case 'configuring':
-        return 'text-amber-700 bg-amber-50 border-amber-200 shadow-sm'
+        return 'text-amber-700 bg-amber-50 border-amber-200 shadow-sm dark:text-amber-400 dark:bg-amber-900/40 dark:border-amber-600/60'
       default:
-        return 'text-slate-600 bg-slate-50 border-slate-200 shadow-sm'
+        return 'text-slate-600 bg-slate-50 border-slate-200 shadow-sm dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-600/60'
     }
   }
 
@@ -148,22 +253,28 @@ export default function IntegrationsPage() {
   const getCategoryColor = (category: Integration['category']) => {
     switch (category) {
       case 'productivity':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
+        return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700/60'
       case 'ecommerce':
-        return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/60'
       case 'automation':
-        return 'bg-purple-100 text-purple-700 border-purple-200'
+        return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/60'
       case 'search':
-        return 'bg-amber-100 text-amber-700 border-amber-200'
+        return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/60'
       case 'social':
-        return 'bg-pink-100 text-pink-700 border-pink-200'
+        return 'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/40 dark:text-pink-300 dark:border-pink-700/60'
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200'
+        return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-600/60'
     }
   }
 
   // Integraciones que tienen CredentialsManager disponible
   const availableIntegrations = ['twitter', 'serpapi', 'shopify', 'skyvern', 'notion'] as IntegrationType[]
+
+  // Combinar las integraciones base con los estados dinámicos
+  const integrationsWithDynamicStatus = integrations.map(integration => ({
+    ...integration,
+    status: integrationStatuses[integration.id] || integration.status
+  }))
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-7xl">
@@ -179,32 +290,48 @@ export default function IntegrationsPage() {
             </p>
             
             {/* Stats de integraciones */}
-            <div className="flex justify-center space-x-8 text-sm">
+            <div className="flex justify-center space-x-8 text-sm mb-6">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
                 <span className="text-muted-foreground">
-                  {integrations.filter(i => i.status === 'connected').length} Connected
+                  {integrationsWithDynamicStatus.filter(i => i.status === 'connected').length} Connected
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 rounded-full bg-slate-400"></div>
                 <span className="text-muted-foreground">
-                  {integrations.filter(i => i.status === 'disconnected').length} Available
+                  {integrationsWithDynamicStatus.filter(i => i.status === 'disconnected').length} Available
                 </span>
               </div>
+            </div>
+
+            {/* Botón de refresh */}
+            <div className="flex justify-center mb-8">
+              <Button
+                onClick={refreshAllStatuses}
+                disabled={isRefreshing}
+                variant="outline"
+                size="sm"
+                className="text-sm"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh Status'}
+              </Button>
             </div>
           </div>
 
           {/* Grid de integraciones */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">
-            {integrations.map((integration) => (
+            {integrationsWithDynamicStatus.map((integration) => (
               <Card 
                 key={integration.id} 
-                className={`group transition-all duration-500 border-0 bg-gradient-to-br from-background to-muted/20 relative overflow-hidden ${
-                  integration.status === 'connected' 
-                    ? 'shadow-lg shadow-emerald-100 border-2 border-emerald-200 hover:shadow-xl hover:shadow-emerald-200' 
-                    : 'hover:shadow-2xl hover:scale-[1.03] shadow-md'
-                }`}
+                className={`group transition-all duration-500 border-0 relative overflow-hidden
+                  bg-gradient-to-br from-background to-muted/20 
+                  dark:from-slate-800/90 dark:to-slate-900/50 dark:border dark:border-slate-700/50
+                  ${integration.status === 'connected' 
+                    ? 'shadow-lg shadow-emerald-100 dark:shadow-emerald-500/20 border-2 border-emerald-200 dark:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-200 dark:hover:shadow-emerald-500/30' 
+                    : 'hover:shadow-2xl hover:scale-[1.03] shadow-md dark:shadow-slate-900/50 dark:hover:shadow-slate-800/50'
+                  }`}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 {integration.status === 'connected' && (
@@ -224,17 +351,17 @@ export default function IntegrationsPage() {
                         <div className="flex items-center space-x-2 mt-1">
                           <Badge
                             variant="secondary"
-                            className={`text-xs border ${getCategoryColor(integration.category)}`}
+                            className={`text-xs border ${getCategoryColor(integration.category)} dark:bg-slate-700/60 dark:border-slate-600/60`}
                           >
                             {integration.category}
                           </Badge>
                           {integration.id === 'google-workspace' && (
-                            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/60 dark:text-blue-300 dark:border-blue-700/60">
                               Direct connection
                             </Badge>
                           )}
                           {integration.id !== 'google-workspace' && (
-                            <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">
+                            <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-300 dark:border-amber-700/60">
                               Requires API key
                             </Badge>
                           )}
@@ -341,11 +468,17 @@ export default function IntegrationsPage() {
               <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
                 <div className="p-6 border-b">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">Configurar Integración</h2>
+                    <h2 className="text-xl font-semibold">Configure Integration</h2>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedIntegration(null)}
+                      onClick={() => {
+                        // Actualizar estado antes de cerrar el modal
+                        if (selectedIntegration) {
+                          updateIntegrationStatus(selectedIntegration)
+                        }
+                        setSelectedIntegration(null)
+                      }}
                     >
                       ✕
                     </Button>
@@ -362,35 +495,35 @@ export default function IntegrationsPage() {
           )}
 
           {/* Información adicional */}
-          <div className="mt-12 p-6 bg-muted/50 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4">¿Por qué conectar integraciones?</h3>
+          <div className="mt-12 p-6 bg-muted/50 dark:bg-slate-800/60 rounded-lg border border-border dark:border-slate-700/50">
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Why connect integrations?</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-medium mb-2">🤖 Automatización Inteligente</h4>
+                <h4 className="font-medium mb-2">🤖 Smart Automation</h4>
                 <p className="text-sm text-muted-foreground">
-                  Permite a Cleo Agent interactuar directamente con tus herramientas favoritas,
-                  automatizando tareas repetitivas y flujos de trabajo complejos.
+                  Enable Cleo Agent to interact directly with your favorite tools,
+                  automating repetitive tasks and complex workflows.
                 </p>
               </div>
               <div>
-                <h4 className="font-medium mb-2">🔒 Seguridad Garantizada</h4>
+                <h4 className="font-medium mb-2">🔒 Guaranteed Security</h4>
                 <p className="text-sm text-muted-foreground">
-                  Todas las credenciales se almacenan de forma segura y encriptada.
-                  Nunca compartimos tus datos con terceros.
+                  All credentials are stored securely and encrypted.
+                  We never share your data with third parties.
                 </p>
               </div>
               <div>
-                <h4 className="font-medium mb-2">⚡ Eficiencia Mejorada</h4>
+                <h4 className="font-medium mb-2">⚡ Enhanced Efficiency</h4>
                 <p className="text-sm text-muted-foreground">
-                  Reduce el tiempo dedicado a tareas manuales y aumenta tu productividad
-                  con integraciones inteligentes y contextuales.
+                  Reduce time spent on manual tasks and increase your productivity
+                  with smart and contextual integrations.
                 </p>
               </div>
               <div>
-                <h4 className="font-medium mb-2">🔧 Configuración Simple</h4>
+                <h4 className="font-medium mb-2">🔧 Simple Setup</h4>
                 <p className="text-sm text-muted-foreground">
-                  Proceso de configuración guiado con instrucciones paso a paso
-                  para cada servicio integrado.
+                  Guided configuration process with step-by-step instructions
+                  for each integrated service.
                 </p>
               </div>
             </div>

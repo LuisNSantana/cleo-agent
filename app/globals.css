@@ -159,54 +159,52 @@
 }
 
 .dark {
-  /* Neutral modern dark: reduce blue tint, increase contrast */
-  /* Use a neutral deep blue-gray background to avoid brownish tint */
-  /* Premium neutral black (desktop = mobile) */
-  --background: #0a0a0c;
-  --foreground: oklch(0.96 0.01 260);
-  --card: #0a0a0c;
-  --card-foreground: oklch(0.96 0.01 260);
-  --popover: #0a0a0c;
-  --popover-foreground: oklch(0.96 0.01 260);
-  --primary: oklch(0.92 0.03 260);
-  --primary-foreground: oklch(0.20 0.02 260);
-  --secondary: oklch(0.28 0.02 260);
-  --secondary-foreground: oklch(0.96 0.01 260);
-  --muted: oklch(0.26 0.015 260);
-  --muted-foreground: oklch(0.70 0.02 260);
-  --accent: oklch(0.34 0.025 260);
-  --accent-foreground: oklch(0.96 0.01 260);
-  --destructive: oklch(0.60 0.18 25);
-  --destructive-foreground: oklch(0.95 0.01 20);
-  --border: oklch(0.30 0.02 260);
-  --input: oklch(0.30 0.02 260);
-  --ring: oklch(0.52 0.045 260);
-  /* Charts: keep varied hues but slightly desaturated for dark bg */
-  --chart-1: oklch(0.52 0.20 264);
-  --chart-2: oklch(0.66 0.14 162);
-  --chart-3: oklch(0.72 0.16 70);
-  --chart-4: oklch(0.58 0.22 304);
-  --chart-5: oklch(0.60 0.20 16);
-  /* Sidebar surfaces aligned with elevations */
-  /* Sidebar surfaces aligned closely with the background */
-  --sidebar: #0a0a0c;
-  --sidebar-foreground: oklch(0.96 0.01 260);
-  --sidebar-primary: oklch(0.22 0.02 260);
-  --sidebar-primary-foreground: oklch(0.96 0.01 260);
-  --sidebar-accent: oklch(0.28 0.02 260);
-  --sidebar-accent-foreground: oklch(0.96 0.01 260);
-  --sidebar-border: oklch(0.26 0.02 260);
-  --sidebar-ring: oklch(0.52 0.045 260);
+  /* Modern dark theme with better contrast - avoiding pure black */
+  /* Use warmer, softer grays for better visual hierarchy */
+  --background: #111827; /* slate-900 - softer than pure black */
+  --foreground: #f8fafc; /* slate-50 - high contrast white */
+  --card: #1e293b; /* slate-800 - elevated from background */
+  --card-foreground: #f1f5f9; /* slate-100 - softer white for cards */
+  --popover: #1e293b; /* slate-800 - consistent with cards */
+  --popover-foreground: #f1f5f9; /* slate-100 */
+  --primary: #3b82f6; /* blue-500 - vibrant but not overwhelming */
+  --primary-foreground: #ffffff; /* pure white for primary text */
+  --secondary: #334155; /* slate-700 - lighter than card for hierarchy */
+  --secondary-foreground: #e2e8f0; /* slate-200 */
+  --muted: #475569; /* slate-600 - mid-tone for subtle elements */
+  --muted-foreground: #94a3b8; /* slate-400 - readable muted text */
+  --accent: #3730a3; /* indigo-700 - accent color */
+  --accent-foreground: #f1f5f9; /* slate-100 */
+  --destructive: #ef4444; /* red-500 - clear error indication */
+  --destructive-foreground: #ffffff; /* pure white */
+  --border: #374151; /* gray-700 - visible but not harsh borders */
+  --input: #374151; /* gray-700 - consistent with borders */
+  --ring: #3b82f6; /* blue-500 - focus rings */
+  /* Charts: vibrant but harmonious colors */
+  --chart-1: #3b82f6; /* blue-500 */
+  --chart-2: #10b981; /* emerald-500 */
+  --chart-3: #f59e0b; /* amber-500 */
+  --chart-4: #8b5cf6; /* violet-500 */
+  --chart-5: #ef4444; /* red-500 */
+  /* Sidebar: slightly different from main for hierarchy */
+  --sidebar: #1f2937; /* gray-800 - between background and card */
+  --sidebar-foreground: #f9fafb; /* gray-50 */
+  --sidebar-primary: #3b82f6; /* blue-500 */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #374151; /* gray-700 */
+  --sidebar-accent-foreground: #e5e7eb; /* gray-200 */
+  --sidebar-border: #4b5563; /* gray-600 - more visible sidebar borders */
+  --sidebar-ring: #3b82f6; /* blue-500 */
 
-  /* Elevation surfaces (dark theme tuned) */
-  --surface-1: color-mix(in oklch, var(--background), white 3%);
-  --surface-2: color-mix(in oklch, var(--background), white 6%);
-  --surface-3: color-mix(in oklch, var(--background), white 9%);
+  /* Elevation surfaces (better contrast in dark mode) */
+  --surface-1: #1f2937; /* gray-800 */
+  --surface-2: #374151; /* gray-700 */
+  --surface-3: #4b5563; /* gray-600 */
 
-  /* Shadows (subtle spread for dark) */
-  --shadow-1: 0 1px 2px rgba(0,0,0,0.35);
-  --shadow-2: 0 6px 18px rgba(0,0,0,0.45);
-  --shadow-3: 0 14px 40px rgba(0,0,0,0.55);
+  /* Shadows (more visible in dark mode) */
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-2: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.6);
 }
 
 @layer base {
