@@ -11,12 +11,13 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ListChecksIcon, CalendarIcon, ClockIcon, CheckCircleIcon, CircleIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, TrashIcon, ChatCircleIcon } from '@phosphor-icons/react'
+import { ListChecksIcon, CalendarIcon, ClockIcon, CheckCircleIcon, CircleIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, TrashIcon, ChatCircleIcon, PencilIcon } from '@phosphor-icons/react'
 import { Inbox, Bell } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { DateTime } from 'luxon'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { useUserTimezone } from '@/app/hooks/use-user-timezone'
 
 type AgentSummary = {
   id: string
@@ -76,6 +77,9 @@ type TaskNotification = {
 }
 
 export default function AgentsTasksPage() {
+  // Hook para detectar timezone automáticamente
+  const { timezone: userTimezone, isLoading: timezoneLoading, getTimezoneDisplayName, formatInUserTimezone } = useUserTimezone()
+  
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState('tasks')
   const [tasks, setTasks] = useState<AgentTask[]>([])
@@ -98,13 +102,32 @@ export default function AgentsTasksPage() {
   const [formPriority, setFormPriority] = useState(5)
   const [formScheduledAt, setFormScheduledAt] = useState('')
   const [formCron, setFormCron] = useState('')
-  const [formTimezone, setFormTimezone] = useState('UTC')
+  const [formTimezone, setFormTimezone] = useState('UTC') // Se actualizará automáticamente
   const [formTags, setFormTags] = useState('')
   const [notifyOnCompletion, setNotifyOnCompletion] = useState(true)
   const [notifyOnFailure, setNotifyOnFailure] = useState(true)
+  
+  // Estados para edición de tasks
+  const [editingTask, setEditingTask] = useState<AgentTask | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<TaskNotification | null>(null)
   const [showRawResult, setShowRawResult] = useState(false)
+
+  // Actualizar timezone automáticamente cuando se detecte
+  useEffect(() => {
+    if (!timezoneLoading && userTimezone) {
+      setFormTimezone(userTimezone)
+      console.log('🌍 Timezone automático configurado:', userTimezone, 'Display:', getTimezoneDisplayName())
+    }
+  }, [userTimezone, timezoneLoading, getTimezoneDisplayName])
+
+  // Mostrar toast informativo cuando se detecte el timezone
+  useEffect(() => {
+    if (!timezoneLoading && userTimezone && userTimezone !== 'UTC') {
+      console.log('ℹ️ Timezone detectado automáticamente:', getTimezoneDisplayName())
+    }
+  }, [userTimezone, timezoneLoading, getTimezoneDisplayName])
 
   const openDetails = (n: TaskNotification) => {
     setSelectedNotification(n)
@@ -161,6 +184,8 @@ export default function AgentsTasksPage() {
   const formatDate = (dateString?: string, timezone?: string) => {
     if (!dateString) return '-'
     const date = new Date(dateString)
+    const effectiveTimezone = timezone || userTimezone || 'UTC'
+    
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
@@ -168,7 +193,7 @@ export default function AgentsTasksPage() {
       hour: '2-digit',
       minute: '2-digit',
       timeZoneName: 'short',
-      timeZone: timezone || 'UTC'
+      timeZone: effectiveTimezone
     }).format(date)
   }
 
@@ -395,11 +420,80 @@ export default function AgentsTasksPage() {
       setFormPriority(5)
       setFormScheduledAt('')
       setFormCron('')
-      setFormTimezone('UTC')
+      setFormTimezone(userTimezone) // Usar timezone del usuario
       setFormTags('')
       await fetchTasks()
     } catch (e) {
       console.error('Create task error', e)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  // Funciones para edición de tasks
+  const openEditDialog = (task: AgentTask) => {
+    setEditingTask(task)
+    setFormTitle(task.title)
+    setFormDescription(task.description)
+    setFormTaskType(task.task_type as 'manual' | 'scheduled' | 'recurring')
+    setFormPriority(task.priority || 5)
+    setFormScheduledAt(task.scheduled_at ? new Date(task.scheduled_at).toISOString().slice(0, 16) : '')
+    setFormCron(task.task_config?.cron || '')
+    setFormTimezone((task as any).timezone || userTimezone)
+    setFormTags(task.tags?.join(', ') || '')
+    setEditOpen(true)
+  }
+
+  const saveEditedTask = async () => {
+    if (!editingTask) return
+    
+    setCreating(true)
+    try {
+      let scheduledAtISO = null
+      if (formTaskType === 'scheduled' && formScheduledAt) {
+        const zoned = DateTime.fromISO(formScheduledAt, { zone: formTimezone || userTimezone })
+        scheduledAtISO = zoned.toUTC().toISO()
+      }
+
+      const res = await fetch(`/api/agents/tasks/${editingTask.task_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formTitle,
+          description: formDescription,
+          task_type: formTaskType,
+          priority: formPriority,
+          scheduled_at: scheduledAtISO,
+          task_config: {
+            cron: formTaskType === 'recurring' ? formCron : undefined,
+            notify_on_completion: notifyOnCompletion,
+            notify_on_failure: notifyOnFailure,
+          },
+          timezone: formTimezone,
+          tags: formTags.split(',').map(t => t.trim()).filter(Boolean)
+        })
+      })
+      
+      const data = await res.json()
+      if (!data.success) {
+        console.error('Failed to update task:', data.error)
+        return
+      }
+      
+      // Reset and refresh
+      setEditOpen(false)
+      setEditingTask(null)
+      setFormTitle('')
+      setFormDescription('')
+      setFormTaskType('manual')
+      setFormPriority(5)
+      setFormScheduledAt('')
+      setFormCron('')
+      setFormTimezone(userTimezone)
+      setFormTags('')
+      await fetchTasks()
+    } catch (e) {
+      console.error('Update task error', e)
     } finally {
       setCreating(false)
     }
@@ -557,6 +651,18 @@ export default function AgentsTasksPage() {
             </TabsList>
 
             <TabsContent value="tasks" className="mt-6">
+              {/* Timezone Info */}
+              {!timezoneLoading && userTimezone && userTimezone !== 'UTC' && (
+                <div className="mb-4 p-3 bg-muted/30 border border-border rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>🌍</span>
+                    <span>
+                      Times are shown in your timezone: <strong className="text-foreground">{getTimezoneDisplayName()}</strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               {/* Task Controls */}
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6">
                 <div className="flex gap-3 flex-wrap">
@@ -632,6 +738,18 @@ export default function AgentsTasksPage() {
                               </Badge>
                             </div>
                             <div className="flex items-center gap-1">
+                              {/* Botón de editar - solo para tasks que no están completed */}
+                              {task.status !== 'completed' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(task)}
+                                  className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                                  title="Edit task"
+                                >
+                                  <PencilIcon className="w-4 h-4" />
+                                </Button>
+                              )}
                               {(task.status === 'failed' || task.status === 'cancelled') && (
                                 <Button
                                   variant="ghost"
@@ -648,6 +766,7 @@ export default function AgentsTasksPage() {
                                 size="sm"
                                 onClick={() => handleDeleteTask(task.task_id)}
                                 className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                                title="Delete task"
                               >
                                 <TrashIcon className="w-4 h-4" />
                               </Button>
@@ -1083,12 +1202,23 @@ export default function AgentsTasksPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-2">Timezone</label>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
+                        Timezone {!timezoneLoading && (
+                          <span className="text-xs text-green-400 ml-1">
+                            (Auto: {getTimezoneDisplayName().split('(')[0].trim()})
+                          </span>
+                        )}
+                      </label>
                       <Select value={formTimezone} onValueChange={setFormTimezone}>
                         <SelectTrigger className="bg-background border-border">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-background border-border">
+                          {!timezoneLoading && userTimezone !== 'UTC' && (
+                            <SelectItem value={userTimezone}>
+                              🌍 {getTimezoneDisplayName()} (Auto)
+                            </SelectItem>
+                          )}
                           <SelectItem value="UTC">UTC</SelectItem>
                           <SelectItem value="America/New_York">Eastern Time</SelectItem>
                           <SelectItem value="America/Chicago">Central Time</SelectItem>
@@ -1139,6 +1269,154 @@ export default function AgentsTasksPage() {
                   className="bg-foreground text-background hover:bg-foreground/90"
                 >
                   {creating ? 'Creating...' : 'Create Task'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Edit Task Modal */}
+        {editOpen && editingTask && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-background border border-border rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <h2 className="text-xl font-semibold text-foreground mb-4">Edit Task: {editingTask.title}</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Title</label>
+                  <Input
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="Task title"
+                    className="bg-background border-border"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Description</label>
+                  <Textarea
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Detailed task description"
+                    rows={3}
+                    className="bg-background border-border"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Task Type</label>
+                    <Select value={formTaskType} onValueChange={(value: 'manual' | 'scheduled' | 'recurring') => setFormTaskType(value)}>
+                      <SelectTrigger className="bg-background border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border-border">
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="recurring">Recurring</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Priority (1-10)</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={formPriority}
+                      onChange={(e) => setFormPriority(parseInt(e.target.value) || 5)}
+                      className="bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                {formTaskType === 'scheduled' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">Scheduled At</label>
+                      <Input
+                        type="datetime-local"
+                        value={formScheduledAt}
+                        onChange={(e) => setFormScheduledAt(e.target.value)}
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
+                        Timezone {!timezoneLoading && (
+                          <span className="text-xs text-green-400 ml-1">
+                            (Auto: {getTimezoneDisplayName().split('(')[0].trim()})
+                          </span>
+                        )}
+                      </label>
+                      <Select value={formTimezone} onValueChange={setFormTimezone}>
+                        <SelectTrigger className="bg-background border-border">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border-border">
+                          {!timezoneLoading && userTimezone !== 'UTC' && (
+                            <SelectItem value={userTimezone}>
+                              🌍 {getTimezoneDisplayName()} (Auto)
+                            </SelectItem>
+                          )}
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                          <SelectItem value="America/Chicago">Central Time</SelectItem>
+                          <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                          <SelectItem value="Europe/London">London</SelectItem>
+                          <SelectItem value="Europe/Madrid">Madrid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {formTaskType === 'recurring' && (
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Cron Expression</label>
+                    <Input
+                      value={formCron}
+                      onChange={(e) => setFormCron(e.target.value)}
+                      placeholder="0 9 * * 1-5 (weekdays at 9 AM)"
+                      className="bg-background border-border"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Tags (comma-separated)</label>
+                  <Input
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    placeholder="urgent, backend, api"
+                    className="bg-background border-border"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditOpen(false)
+                    setEditingTask(null)
+                  }}
+                  className="border-border text-muted-foreground hover:bg-muted"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveEditedTask}
+                  disabled={creating || !formTitle || !formDescription}
+                  className="bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {creating ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </motion.div>
