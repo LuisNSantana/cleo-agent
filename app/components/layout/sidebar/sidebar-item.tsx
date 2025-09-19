@@ -127,7 +127,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/chat relative w-full rounded-md transition-colors",
+        "hover:bg-accent/30 hover:text-foreground group/chat relative w-full rounded-md transition-colors",
         isActive && "bg-accent hover:bg-accent text-foreground"
       ),
     [isActive]
