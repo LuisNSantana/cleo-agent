@@ -8,6 +8,7 @@ import { llamaModels } from "./data/llama"
 import { ModelConfig } from "./types"
 import { openrouterModels } from "./data/openrouter"
 import { geminiModels } from "./data/gemini"
+import { openaiModels } from "./data/openai"
 
 /**
  * Cleo Agent Models - Optimized 3-Tier System
@@ -60,6 +61,9 @@ const extraProviderModels: ModelConfig[] = [
   ]),
   // Re-enable Mistral Medium in selector
   ...pickById(mistralModels, ["mistral-medium-2508"]),
+  // Add economical models for user variety
+  ...pickById(geminiModels, ["gemini-2.5-flash-lite"]),
+  ...pickById(openaiModels, ["gpt-5-nano"]),
 ]
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([

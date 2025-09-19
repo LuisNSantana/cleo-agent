@@ -34,6 +34,9 @@ export const FREE_MODELS_IDS = [
   "openrouter:deepseek/deepseek-chat-v3.1:free",
   // High-end free options
   // paid Nemotron is excluded from FREE list
+  // Economical models for user variety
+  "gemini-2.5-flash-lite",
+  "gpt-5-nano",
   // Emergency fallback
   "gpt-4o-mini",
 ]
