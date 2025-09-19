@@ -268,7 +268,6 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   return (
     <div
       className={containerClassName}
-      onClick={handleContainerClick}
       ref={containerRef}
     >
       {isEditing ? (
@@ -301,19 +300,21 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
         </div>
       ) : (
         <>
-          <Link
-            href={`/p/${project.id}`}
-            className="block w-full"
-            prefetch
+          <button
+            className="block w-full text-left"
+            onClick={() => {
+              console.log(`[SidebarProjectItem] Navigating to project ${project.id}`);
+              router.push(`/p/${project.id}`);
+            }}
           >
             <div
-              className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
+              className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap hover:bg-accent/80 hover:text-foreground transition-colors rounded-md"
               title={displayName}
             >
               <FolderIcon size={20} />
               {displayName}
             </div>
-          </Link>
+          </button>
 
           <div className={menuClassName} key={project.id}>
             <SidebarProjectMenu

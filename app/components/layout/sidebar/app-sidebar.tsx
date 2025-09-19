@@ -66,11 +66,6 @@ export function AppSidebar() {
     { href: "/docs", label: "Docs", icon: DocsIcon },
   ] as const
 
-  const handleNavClick = useCallback((href: string) => {
-    console.log(`[AppSidebar] Navigating to: ${href}`)
-    router.push(href)
-  }, [router])
-
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
       <SidebarHeader className="h-14 pl-3">
@@ -101,12 +96,14 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={href}>
                     <SidebarMenuButton 
+                      asChild
                       isActive={isActive} 
                       tooltip={label}
-                      onClick={() => handleNavClick(href)}
                     >
-                      <Icon className="size-4" />
-                      <span>{label}</span>
+                      <Link href={href} prefetch>
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -116,10 +113,10 @@ export function AppSidebar() {
           <SidebarSeparator />
 
           <div className="mt-3 mb-5 flex w-full flex-col items-start gap-0">
-            <button
+            <Link
+              href="/"
               className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-2 py-2 text-sm transition-colors"
-              type="button"
-              onClick={() => handleNavClick("/")}
+              prefetch
             >
               <div className="flex items-center gap-2">
                 <NotePencilIcon size={20} />
@@ -128,7 +125,7 @@ export function AppSidebar() {
               <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/new-chat:opacity-100">
                 ⌘⇧U
               </div>
-            </button>
+            </Link>
             <HistoryTrigger
               hasSidebar={false}
               classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-2 py-2 text-sm transition-colors group/search"

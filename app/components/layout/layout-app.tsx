@@ -66,15 +66,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   const calculatedEditorWidth = Math.floor(screenWidth * 0.7) // 70% of screen
   const actualEditorWidth = editorCollapsed ? 60 : (editorWidth || calculatedEditorWidth)
 
-  // Wrapper key basado en pathname para forzar remount de contenido interno
-  // Usar una combinación de pathname y timestamp para asegurar remount único
-  const contentKey = `${pathname}-${Date.now()}`
-
-  // LOG: LayoutApp render and children
-  if (typeof window !== 'undefined') {
-    console.log('[LayoutApp] Rendered. Path:', window.location.pathname);
-    console.log('[LayoutApp] Content key:', contentKey);
-    console.log('[LayoutApp] Children type:', typeof children);
+  // LOG: LayoutApp render (debug en desarrollo)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('[LayoutApp] Path:', pathname);
   }
 
   // Mouse event handlers for the middle divider
@@ -138,7 +132,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           }}
         >
           <Header hasSidebar={hasSidebar} />
-          <div className="h-full" key={contentKey}>
+          <div className="h-full">
             {children}
           </div>
         </main>

@@ -92,10 +92,15 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   // Add an effect to track when pathname changes
   useEffect(() => {
-    console.log(`[ProjectView] Pathname changed to: ${pathname}`)
-    console.log(`[ProjectView] Should be showing project: ${projectId}`)
+    console.log(`[ProjectView] ==> PATHNAME CHANGE DETECTED <==`)
+    console.log(`[ProjectView] Previous pathname: ${pathname}`)
+    console.log(`[ProjectView] Expected project: ${projectId}`)
+    console.log(`[ProjectView] URL pathname should be: /p/${projectId}`)
+    
     if (!pathname.includes(`/p/${projectId}`)) {
-      console.warn(`[ProjectView] Pathname mismatch! Expected /p/${projectId}, got ${pathname}`)
+      console.warn(`[ProjectView] ⚠️  PATHNAME MISMATCH! Expected /p/${projectId}, got ${pathname}`)
+    } else {
+      console.log(`[ProjectView] ✅ Pathname matches expected project route`)
     }
   }, [pathname, projectId])
 
@@ -649,6 +654,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   // Always show onboarding when on project page, regardless of messages
   const showOnboarding = pathname === `/p/${projectId}`
+  
+  // Debug logging for showOnboarding
+  console.log(`[ProjectView] Debug - pathname: '${pathname}', expected: '/p/${projectId}', showOnboarding: ${showOnboarding}`);
 
   // Early return for critical loading/error states
   if (projectLoading && !project) {

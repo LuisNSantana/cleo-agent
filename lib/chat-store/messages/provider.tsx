@@ -42,7 +42,9 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
   // Reset messages when pathname changes (navigation between routes)
   useEffect(() => {
-    console.log(`[MessagesProvider] Pathname changed to: ${pathname}, resetting messages`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[MessagesProvider] Pathname changed to: ${pathname}`)
+    }
     setMessages([])
     setIsLoading(false)
   }, [pathname])

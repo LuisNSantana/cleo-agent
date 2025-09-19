@@ -35,9 +35,11 @@ export function ChatSessionProvider({
     return null
   }, [pathname])
 
-  // Log para debugging
+  // Log para debugging (solo en desarrollo)
   useEffect(() => {
-    console.log(`[ChatSessionProvider] Pathname: ${pathname}, ChatId: ${chatId}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[ChatSessionProvider] Pathname: ${pathname}, ChatId: ${chatId}`)
+    }
   }, [pathname, chatId])
 
   return (
