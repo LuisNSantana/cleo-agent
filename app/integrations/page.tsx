@@ -126,11 +126,11 @@ export default function IntegrationsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [integrationStatuses, setIntegrationStatuses] = useState<Record<string, Integration['status']>>({
     'google-workspace': 'connected', // Google Workspace siempre conectado
-    'twitter': 'disconnected',
-    'serpapi': 'disconnected', 
-    'shopify': 'disconnected',
-    'skyvern': 'disconnected',
-    'notion': 'disconnected'
+    'twitter': 'configuring', // Se verificará automáticamente al cargar
+    'serpapi': 'configuring', 
+    'shopify': 'configuring',
+    'skyvern': 'configuring',
+    'notion': 'configuring'
   })
 
   // Función para verificar el estado de las credenciales
@@ -147,7 +147,10 @@ export default function IntegrationsPage() {
       
       if (data.success && data.credentials && data.credentials.length > 0) {
         // Verificar si hay al menos una credencial activa
-        const hasActiveCredential = data.credentials.some((cred: any) => cred.is_active || cred.active)
+        // Twitter usa 'connected', otros servicios pueden usar 'is_active' o 'active'
+        const hasActiveCredential = data.credentials.some((cred: any) => 
+          cred.is_active || cred.active || cred.connected
+        )
         console.log(`[${serviceType}] Has active credential:`, hasActiveCredential)
         return hasActiveCredential ? 'connected' : 'disconnected'
       }

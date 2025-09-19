@@ -44,7 +44,10 @@ export async function GET(request: NextRequest) {
   const userId = await resolveUserId()
     if (!userId) {
       // Return empty credentials array when no user is authenticated
-      return NextResponse.json({ credentials: [] })
+      return NextResponse.json({ 
+        success: true,
+        credentials: [] 
+      })
     }
 
     const result = await listTwitterCredentials(userId)
@@ -55,7 +58,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    return NextResponse.json({ credentials: result.data })
+    return NextResponse.json({ 
+      success: true,
+      credentials: result.data 
+    })
   } catch (error) {
     console.error('Error fetching Twitter credentials:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
