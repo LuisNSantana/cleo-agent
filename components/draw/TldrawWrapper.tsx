@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import html2canvas from "html2canvas";
+import { useDeviceCapabilities } from "@/app/hooks/use-device-capabilities";
 
 const Tldraw = dynamic(() => import("@tldraw/tldraw").then((m) => m.Tldraw), {
   ssr: false,
@@ -20,7 +21,7 @@ export default function TldrawWrapper({
   const appRef = useRef<any>(null);
   const [docState, setDocState] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  // Note: we avoid UA-based mobile detection; Tldraw handles pointer events.
+  const deviceCapabilities = useDeviceCapabilities();
 
   // onMount handler from tldraw
   function handleMount(editor: any) {
@@ -96,18 +97,83 @@ export default function TldrawWrapper({
     return () => clearTimeout(id);
   }, [docState, autosave, autosaveDebounce]);
 
-  // Ensure the container accepts pointer/touch events on mobile
+  // Enhanced touch support with Apple Pencil optimization
   useEffect(() => {
     const el = containerRef.current as HTMLDivElement | null;
     if (!el) return;
     
-    // Apply styles to ensure touch works properly
+    // Apply styles to ensure touch works properly across all devices
     el.style.touchAction = "none";
     el.style.width = "100%";
     el.style.height = "100%";
+    el.style.userSelect = "none";
+    el.style.webkitUserSelect = "none";
     
-    console.log('[TldrawWrapper] Container configured for touch');
-  }, []);
+    // Específico para iOS y Apple Pencil usando setProperty para propiedades no estándar
+    (el.style as any).webkitTouchCallout = "none";
+    (el.style as any).webkitTapHighlightColor = "transparent";
+    (el.style as any).msUserSelect = "none";
+    (el.style as any).msTouchAction = "none";
+    
+    // Optimizaciones específicas para Apple Pencil
+    if (deviceCapabilities.supportsPencil) {
+      // Mejorar precisión para Apple Pencil
+      el.style.cursor = "crosshair";
+      // Permitir eventos de pointer para mejor detección de presión
+      (el.style as any).touchAction = "none";
+    }
+    
+    // Prevenir zoom accidental en móvil (excepto cuando se usa pinch específicamente para zoom)
+    const preventDefault = (e: TouchEvent) => {
+      // Permitir zoom intencional pero prevenir zoom accidental
+      if (e.touches.length > 1) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.hypot(
+          touch1.clientX - touch2.clientX,
+          touch1.clientY - touch2.clientY
+        );
+        
+        // Solo prevenir si no es un gesto de zoom claro
+        if (distance < 100) {
+          e.preventDefault();
+        }
+      }
+    };
+    
+    // Event listeners optimizados
+    const options = { passive: false };
+    el.addEventListener('touchstart', preventDefault, options);
+    el.addEventListener('touchmove', preventDefault, options);
+    
+    // Soporte mejorado para Apple Pencil (pointer events)
+    if (deviceCapabilities.supportsPencil && window.PointerEvent) {
+      const handlePointerMove = (e: PointerEvent) => {
+        // Apple Pencil tiene pointerType === 'pen'
+        if (e.pointerType === 'pen') {
+          // Optimizaciones específicas para Apple Pencil
+          e.stopPropagation();
+        }
+      };
+      
+      el.addEventListener('pointermove', handlePointerMove, { passive: true });
+      
+      console.log('[TldrawWrapper] Apple Pencil support enabled');
+      
+      return () => {
+        el.removeEventListener('touchstart', preventDefault);
+        el.removeEventListener('touchmove', preventDefault);
+        el.removeEventListener('pointermove', handlePointerMove);
+      };
+    }
+    
+    console.log('[TldrawWrapper] Enhanced mobile/touch configuration applied');
+    
+    return () => {
+      el.removeEventListener('touchstart', preventDefault);
+      el.removeEventListener('touchmove', preventDefault);
+    };
+  }, [deviceCapabilities]);
 
   // Listen for external export requests (allow parent to trigger PNG/JSON analysis)
   useEffect(() => {
@@ -126,48 +192,63 @@ export default function TldrawWrapper({
   }, [docState]);
 
   return (
-    <div className="tldraw-wrapper" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ display: "flex", gap: 8, padding: 8, alignItems: "center" }}>
-        <button
-          onClick={() => {
-            if (docState) void sendDocJSON(docState);
-          }}
-          className="btn"
-        >
-          Export JSON / Analyze
-        </button>
-
-        <button
-          onClick={() => {
-            void sendPNGThumbnail();
-          }}
-          className="btn"
-        >
-          Capture PNG / Analyze
-        </button>
-
-        <div style={{ marginLeft: "auto" }}>{saving ? "Saving..." : ""}</div>
-      </div>
-
-  <div ref={containerRef} data-vaul-drawer-ignore style={{ 
-        flex: 1, 
-        position: "relative", 
-        minHeight: 400, 
-        display: 'flex', 
-        flexDirection: 'column',
-        touchAction: 'none',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none'
-      }}>
-        <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+    <div className="tldraw-wrapper" style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+      {/* Canvas principal - sin toolbar extra */}
+      <div 
+        ref={containerRef} 
+        data-vaul-drawer-ignore 
+        style={{ 
+          flex: 1, 
+          position: "relative", 
+          minHeight: 300,
+          width: '100%',
+          height: '100%',
+          display: 'flex', 
+          flexDirection: 'column',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          // Optimizaciones específicas para móvil y Apple Pencil
+          msTouchAction: 'none',
+          msUserSelect: 'none'
+        }}
+      >
+        <div style={{ 
+          flex: 1, 
+          position: 'relative', 
+          width: '100%', 
+          height: '100%',
+          overflow: 'hidden' // Evita scroll accidental
+        }}>
           <Tldraw
             onMount={handleMount}
             onChange={handleChange}
-            // Ensure the tldraw component takes all available space and receives pointer events
-            style={{ width: '100%', height: '100%', touchAction: 'none' }}
-            // eslint-disable-next-line react/jsx-no-bind
-            // ...you can pass more props here to customize behavior
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              touchAction: 'none',
+              userSelect: 'none'
+            }}
+            // Configuraciones optimizadas según capacidades del dispositivo
+            options={{
+              maxPages: 1, // Simplicidad para móvil
+              // Configuraciones específicas para dispositivos táctiles
+              ...(deviceCapabilities.isMobile && {
+                // Optimizaciones para móvil
+                gridSize: deviceCapabilities.supportsPencil ? 8 : 16, // Grid más fino para Apple Pencil
+              })
+            }}
+            // Props adicionales para mejor experiencia táctil
+            {...(deviceCapabilities.supportsPencil && {
+              // Configuraciones específicas para Apple Pencil
+              inferDarkMode: true,
+            })}
+            {...(deviceCapabilities.supportsTouch && {
+              // Configuraciones para dispositivos táctiles
+              forceDarkMode: undefined, // Permitir detección automática
+            })}
           />
         </div>
       </div>

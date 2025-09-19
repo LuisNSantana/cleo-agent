@@ -14,9 +14,16 @@ export function DrawDrawer({ open, onOpenChange, onSendToChat }: {
   const [busy, setBusy] = useState(false)
   const [autoAnalyze, setAutoAnalyze] = useState(true)
   const [analysis, setAnalysis] = useState<{ summary: string; details?: any } | null>(null)
-  const [panelOpen, setPanelOpen] = useState(true)
+  // Panel cerrado por defecto en móvil para maximizar espacio de dibujo
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const [lastPng, setLastPng] = useState<string | null>(null)
+
+  // Detectar si es móvil para ajustar UI inicial
+  useEffect(() => {
+    const isMobile = window.innerWidth <= 768
+    setPanelOpen(!isMobile) // Solo abierto por defecto en desktop
+  }, [open])
 
   // Listen for analysis results emitted by the Tldraw wrapper
   useEffect(() => {
@@ -45,53 +52,112 @@ export function DrawDrawer({ open, onOpenChange, onSendToChat }: {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="p-0 h-[85vh]">
-        <DrawerHeader className="flex items-center justify-between pr-3">
-          <DrawerTitle>✏️ Dibuja tu idea</DrawerTitle>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Auto-IA</span>
-              <Switch checked={autoAnalyze} onCheckedChange={setAutoAnalyze} />
+      <DrawerContent className="p-0 h-[90vh] md:h-[85vh]">
+        {/* Header minimalista para móvil */}
+        <DrawerHeader className="flex items-center justify-between px-3 py-2 min-h-[48px] border-b bg-background/95 backdrop-blur">
+          <DrawerTitle className="text-lg font-medium">✏️ Dibuja</DrawerTitle>
+          <div className="flex items-center gap-2">
+            {/* Toggle panel visibility - solo visible en desktop */}
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setPanelOpen(!panelOpen)}
+              className="hidden md:flex h-8 px-2 text-xs"
+            >
+              {panelOpen ? '📱' : '📋'}
+            </Button>
+            {/* Auto-analyze toggle */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground hidden sm:inline">Auto</span>
+              <Switch checked={autoAnalyze} onCheckedChange={setAutoAnalyze} className="scale-75" />
             </div>
-            <Button size="sm" variant="outline" onClick={triggerExportJson} disabled={busy}>{busy ? "Analizando…" : "Analizar ahora"}</Button>
-            <Button size="sm" variant="outline" onClick={triggerExportPng} disabled={busy}>{busy ? "Analizando…" : "Analizar (PNG)"}</Button>
+            {/* Analyze button - más compacto */}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={triggerExportJson} 
+              disabled={busy}
+              className="h-8 px-2 text-xs"
+            >
+              {busy ? "⏳" : "🔍"}
+            </Button>
             <DrawerClose asChild>
-              <Button size="sm" variant="ghost">Cerrar</Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">×</Button>
             </DrawerClose>
           </div>
         </DrawerHeader>
-        <div className="h-[calc(85vh-56px)] grid grid-cols-1 md:grid-cols-2">
-          <div className="relative border-r">
-            {/* Modern editor */}
-            <div className="p-3 h-full" data-vaul-drawer-ignore style={{ touchAction: 'none', WebkitUserSelect: 'none', msTouchAction: 'none' }}>
-              <div style={{ width: '100%', height: '100%', touchAction: 'none' }}>
-                <TldrawWrapper autosave={autoAnalyze} autosaveDebounce={1200} />
-              </div>
+        <div className="h-[calc(90vh-48px)] md:h-[calc(85vh-48px)] flex flex-col md:grid md:grid-cols-1 lg:grid-cols-2 relative">
+          {/* Canvas area - maximizada en móvil */}
+          <div className="relative flex-1 md:border-r">
+            <div className="absolute inset-0" data-vaul-drawer-ignore style={{ 
+              touchAction: 'none', 
+              WebkitUserSelect: 'none', 
+              msTouchAction: 'none',
+              userSelect: 'none',
+              WebkitTouchCallout: 'none'
+            }}>
+              <TldrawWrapper autosave={autoAnalyze} autosaveDebounce={1200} />
             </div>
+            
+            {/* Botón flotante para mostrar panel en móvil */}
+            {!panelOpen && (
+              <Button
+                onClick={() => setPanelOpen(true)}
+                className="absolute bottom-4 right-4 md:hidden h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 p-0"
+                size="sm"
+              >
+                📋
+              </Button>
+            )}
           </div>
-          {/* Right panel */}
-          <div className={`flex flex-col ${panelOpen ? '' : 'hidden md:flex'} bg-muted/20`}>
-            <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
-              <div className="font-medium">Respuesta del agente</div>
+          
+          {/* Panel derecho - colapsable y optimizado */}
+          <div className={`${panelOpen ? 'flex' : 'hidden'} ${panelOpen ? 'h-32 md:h-auto' : ''} flex-col bg-background/50 backdrop-blur border-t md:border-t-0`}>
+            {/* Panel header - más compacto */}
+            <div className="flex items-center justify-between border-b px-3 py-1.5 min-h-[36px]">
+              <div className="text-sm font-medium text-foreground/90">Análisis</div>
               <button
-                onClick={() => setPanelOpen((v) => !v)}
-                className="text-xs rounded border px-2 py-1 hover:bg-accent"
-              >{panelOpen ? 'Ocultar' : 'Mostrar'}</button>
+                onClick={() => setPanelOpen(false)}
+                className="md:hidden text-xs rounded p-1 hover:bg-accent transition-colors"
+              >
+                ✕
+              </button>
             </div>
-            <div className="flex-1 overflow-auto p-3 space-y-3">
+            
+            {/* Panel content - scrolleable */}
+            <div className="flex-1 overflow-auto p-3 space-y-2 min-h-0">
               {!analysis && (
-                <div className="text-xs text-muted-foreground">Dibuja algo y espera la respuesta del agente aquí.</div>
-              )}
-              {lastPng && (
-                <img src={lastPng} alt="boceto" className="max-h-40 rounded border bg-background" />
-              )}
-              {analysis?.summary && (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="whitespace-pre-wrap">{analysis.summary}</p>
+                <div className="text-xs text-muted-foreground/80">
+                  🎨 Dibuja algo para ver el análisis
                 </div>
               )}
+              
+              {lastPng && (
+                <div className="relative">
+                  <img 
+                    src={lastPng} 
+                    alt="boceto" 
+                    className="max-h-24 md:max-h-32 w-full object-contain rounded border bg-background/80" 
+                  />
+                </div>
+              )}
+              
+              {analysis?.summary && (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{analysis.summary}</p>
+                </div>
+              )}
+              
+              {/* Details minimizados */}
               {analysis?.details && (
-                <pre className="text-[11px] bg-background border rounded p-2 overflow-auto max-h-48">{JSON.stringify(analysis.details, null, 2)}</pre>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    Detalles técnicos
+                  </summary>
+                  <pre className="mt-2 text-[10px] bg-background/80 border rounded p-2 overflow-auto max-h-24">
+                    {JSON.stringify(analysis.details, null, 2)}
+                  </pre>
+                </details>
               )}
             </div>
           </div>
