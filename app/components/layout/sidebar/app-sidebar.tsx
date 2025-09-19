@@ -59,12 +59,12 @@ export function AppSidebar() {
 
   const primaryNav = [
     { href: "/", label: "Home", icon: HouseIcon },
-    { href: "/agents/manage", label: "Agents", icon: AgentsIcon },
-    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon },
-    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon },
+    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, badge: "New" },
+    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, badge: "New" },
+    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, badge: "New" },
     { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
     { href: "/docs", label: "Docs", icon: DocsIcon },
-  ] as const
+  ]
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
@@ -89,7 +89,7 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel className="text-xs text-muted-foreground/80">Navigation</SidebarGroupLabel>
             <SidebarMenu>
-              {primaryNav.map(({ href, label, icon: Icon }) => {
+              {primaryNav.map(({ href, label, icon: Icon, badge }) => {
                 const isActive = href === "/"
                   ? pathname === "/"
                   : pathname === href || pathname.startsWith(href + "/")
@@ -100,9 +100,16 @@ export function AppSidebar() {
                       isActive={isActive} 
                       tooltip={label}
                     >
-                      <Link href={href} prefetch>
-                        <Icon className="size-4" />
-                        <span>{label}</span>
+                      <Link href={href} prefetch className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Icon className="size-4" />
+                          <span>{label}</span>
+                        </div>
+                        {badge && (
+                          <span className="ml-auto px-2 py-0.5 text-[10px] font-medium bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full animate-pulse">
+                            {badge}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

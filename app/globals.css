@@ -167,19 +167,19 @@
   --card-foreground: #e6edf3; /* Soft white for card content */
   --popover: #161b22; /* Consistent with cards */
   --popover-foreground: #e6edf3;
-  --primary: #238636; /* GitHub green - neutral accent */
+  --primary: #6b7280; /* Modern neutral gray - trending 2025 */
   --primary-foreground: #ffffff;
   --secondary: #21262d; /* Warm dark gray */
   --secondary-foreground: #c9d1d9; /* Muted light gray */
   --muted: #30363d; /* Mid-tone neutral */
   --muted-foreground: #7d8590; /* Subtle text color */
-  --accent: #1f2937; /* Dark accent without blue tint */
-  --accent-foreground: #d0d7de;
+  --accent: #f8fafc; /* Soft white pastel accent */
+  --accent-foreground: #1f2937;
   --destructive: #f85149; /* Soft red */
   --destructive-foreground: #ffffff;
   --border: #30363d; /* Subtle but visible borders */
   --input: #21262d; /* Input background */
-  --ring: #238636; /* Focus ring matches primary */
+  --ring: #6b7280; /* Focus ring matches primary */
   /* Charts: neutral but distinguishable colors */
   --chart-1: #79c0ff; /* Light blue */
   --chart-2: #56d364; /* Green */
@@ -189,12 +189,12 @@
   /* Sidebar: slightly different from main for hierarchy */
   --sidebar: #0d1117; /* Same as background for cohesion */
   --sidebar-foreground: #f0f6fc;
-  --sidebar-primary: #238636;
+  --sidebar-primary: #6b7280;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #21262d;
   --sidebar-accent-foreground: #c9d1d9;
   --sidebar-border: #30363d;
-  --sidebar-ring: #238636;
+  --sidebar-ring: #6b7280;
 
   /* Elevation surfaces (neutral warm grays) */
   --surface-1: #161b22; /* Slight elevation */
