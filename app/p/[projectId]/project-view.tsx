@@ -65,19 +65,20 @@ function extractTextFromParts(parts: any[]): string {
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
-  console.log(`[ProjectView] Rendering for project ${projectId}`)
-  console.log(`[ProjectView] Window location:`, typeof window !== 'undefined' ? window.location.href : 'SSR')
-  
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [enableSearch, setEnableSearch] = useState(false)
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-  const { user } = useUser()
-  const { createNewChat, bumpChat } = useChats()
-  const { cacheAndAddMessage } = useMessages()
-  const pathname = usePathname()
-  
-  console.log(`[ProjectView] User state:`, { userId: user?.id, pathname })
-  console.log(`[ProjectView] Expected pathname: /p/${projectId}, Actual pathname: ${pathname}`)
+  console.log(`[ProjectView] MOUNTED with projectId:`, projectId);
+  if (typeof window !== 'undefined') {
+    console.log(`[ProjectView] window.location.pathname:`, window.location.pathname);
+  }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [enableSearch, setEnableSearch] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const { user } = useUser();
+  const { createNewChat, bumpChat } = useChats();
+  const { cacheAndAddMessage } = useMessages();
+  const pathname = usePathname();
+  console.log(`[ProjectView] User:`, user);
+  console.log(`[ProjectView] Pathname:`, pathname);
+  console.log(`[ProjectView] Prop projectId:`, projectId);
   
   const {
     files,

@@ -7,11 +7,18 @@ import { ProjectView } from "./project-view"
 import { useParams } from "next/navigation"
 
 export default function ProjectPage() {
-  const params = useParams()
-  const projectId = typeof params?.projectId === "string" ? params.projectId : Array.isArray(params?.projectId) ? params.projectId[0] : undefined
+  const params = useParams();
+  const projectId = typeof params?.projectId === "string" ? params.projectId : Array.isArray(params?.projectId) ? params.projectId[0] : undefined;
+
+  console.log("[ProjectPage] useParams:", params);
+  console.log("[ProjectPage] projectId:", projectId);
+  if (typeof window !== "undefined") {
+    // Log current pathname for debugging
+    console.log("[ProjectPage] window.location.pathname:", window.location.pathname);
+  }
 
   if (!projectId) {
-    return <div className="p-4 text-sm opacity-70">Loading project...</div>
+    return <div className="p-4 text-sm opacity-70">Loading project... (projectId missing)</div>;
   }
   return (
     <MessagesProvider>
@@ -23,5 +30,5 @@ export default function ProjectPage() {
         </Suspense>
       </LayoutApp>
     </MessagesProvider>
-  )
+  );
 }
