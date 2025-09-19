@@ -39,6 +39,7 @@ import {
   CheckSquare as TasksIcon,
   FileText as DocsIcon,
   ChartBar as DashboardIcon,
+  Plugs as IntegrationsIcon,
 } from "@phosphor-icons/react"
 
 export function AppSidebar() {
@@ -60,6 +61,7 @@ export function AppSidebar() {
     { href: "/", label: "Home", icon: HouseIcon },
     { href: "/agents/manage", label: "Agents", icon: AgentsIcon },
     { href: "/agents/tasks", label: "Tasks", icon: TasksIcon },
+    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon },
     { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
     { href: "/docs", label: "Docs", icon: DocsIcon },
   ] as const

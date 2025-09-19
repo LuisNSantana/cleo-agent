@@ -21,9 +21,10 @@ export function ChatSessionProvider({
     
     // Reset explícito al estar en Home u otras rutas que no son de chat
     if (pathname === '/' || pathname === '/dashboard' || pathname === '/docs' || 
-        pathname.startsWith('/agents/') || pathname.startsWith('/p/') || 
-        pathname.startsWith('/auth/') || pathname === '/privacy' || 
-        pathname === '/terms' || pathname.startsWith('/share/')) {
+        pathname === '/integrations' || pathname.startsWith('/agents/') || 
+        pathname.startsWith('/p/') || pathname.startsWith('/auth/') || 
+        pathname === '/privacy' || pathname === '/terms' || 
+        pathname.startsWith('/share/')) {
       return null
     }
     
