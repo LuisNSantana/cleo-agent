@@ -31,8 +31,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
+import { usePathname } from "next/navigation"
+
 export default function ProjectPage() {
   const params = useParams();
+  const pathname = usePathname();
   const projectId = typeof params?.projectId === "string" ? params.projectId : Array.isArray(params?.projectId) ? params.projectId[0] : undefined;
 
   console.log("[ProjectPage] useParams:", params);
@@ -50,9 +53,10 @@ export default function ProjectPage() {
   if (!projectId) {
     return <div className="p-4 text-sm opacity-70">Loading project... (projectId missing)</div>;
   }
+  // Forzar remount de LayoutApp usando key=pathname
   return (
     <MessagesProvider>
-      <LayoutApp>
+      <LayoutApp key={pathname}>
         <ErrorBoundary>
           <Suspense fallback={<div className="p-4 text-sm opacity-70">Loading project view… (Suspense fallback, check for errors in production)</div>}>
             <div data-project-page={projectId} data-testid="project-page">
