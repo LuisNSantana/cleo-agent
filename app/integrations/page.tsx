@@ -18,7 +18,11 @@ import {
   CheckCircle,
   AlertCircle,
   Settings,
-  Zap
+  Zap,
+  Bot,
+  ShoppingBag,
+  MessageSquare,
+  Database
 } from "lucide-react"
 
 // Tipos de integración disponibles
@@ -40,7 +44,11 @@ const integrations: Integration[] = [
     id: 'google-workspace',
     name: 'Google Workspace',
     description: 'Gmail, Calendar, Drive, Docs, Sheets - Full productivity suite',
-    icon: <Mail className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center shadow-lg">
+        <Mail className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'connected',
     category: 'productivity',
     features: ['Gmail integration', 'Calendar management', 'Drive file access', 'Docs & Sheets creation', 'Real-time collaboration']
@@ -49,7 +57,11 @@ const integrations: Integration[] = [
     id: 'twitter',
     name: 'Twitter / X',
     description: 'Social media management and content posting',
-    icon: <Globe className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-black to-gray-800 flex items-center justify-center shadow-lg">
+        <MessageSquare className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'disconnected',
     category: 'social',
     features: ['Tweet posting', 'Timeline reading', 'DM management', 'Analytics tracking']
@@ -58,7 +70,11 @@ const integrations: Integration[] = [
     id: 'serpapi',
     name: 'SerpAPI',
     description: 'Advanced web search and data retrieval',
-    icon: <Search className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+        <Search className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'disconnected',
     category: 'search',
     features: ['Web search', 'Local search', 'News search', 'Scholar search', 'Maps integration']
@@ -67,7 +83,11 @@ const integrations: Integration[] = [
     id: 'shopify',
     name: 'Shopify',
     description: 'E-commerce store management and analytics',
-    icon: <Store className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+        <ShoppingBag className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'disconnected',
     category: 'ecommerce',
     features: ['Store analytics', 'Order management', 'Product updates', 'Customer insights']
@@ -76,7 +96,11 @@ const integrations: Integration[] = [
     id: 'skyvern',
     name: 'Skyvern',
     description: 'AI-powered web automation and browser interactions',
-    icon: <Globe className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+        <Bot className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'disconnected',
     category: 'automation',
     features: ['Web scraping', 'Form filling', 'Data extraction', 'Workflow automation']
@@ -85,7 +109,11 @@ const integrations: Integration[] = [
     id: 'notion',
     name: 'Notion',
     description: 'Workspace management and content organization',
-    icon: <FileText className="w-8 h-8" />,
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-700 to-black flex items-center justify-center shadow-lg">
+        <Database className="w-5 h-5 text-white" />
+      </div>
+    ),
     status: 'disconnected',
     category: 'productivity',
     features: ['Create pages', 'Manage databases', 'Organize content', 'Team collaboration']
@@ -98,11 +126,11 @@ export default function IntegrationsPage() {
   const getStatusColor = (status: Integration['status']) => {
     switch (status) {
       case 'connected':
-        return 'text-green-600 bg-green-50 border-green-200'
+        return 'text-emerald-700 bg-emerald-50 border-emerald-200 shadow-sm'
       case 'configuring':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+        return 'text-amber-700 bg-amber-50 border-amber-200 shadow-sm'
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200'
+        return 'text-slate-600 bg-slate-50 border-slate-200 shadow-sm'
     }
   }
 
@@ -120,17 +148,17 @@ export default function IntegrationsPage() {
   const getCategoryColor = (category: Integration['category']) => {
     switch (category) {
       case 'productivity':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-700 border-blue-200'
       case 'ecommerce':
-        return 'bg-green-100 text-green-800'
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200'
       case 'automation':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-purple-100 text-purple-700 border-purple-200'
       case 'search':
-        return 'bg-orange-100 text-orange-800'
+        return 'bg-amber-100 text-amber-700 border-amber-200'
       case 'social':
-        return 'bg-pink-100 text-pink-800'
+        return 'bg-pink-100 text-pink-700 border-pink-200'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-slate-100 text-slate-700 border-slate-200'
     }
   }
 
@@ -139,34 +167,38 @@ export default function IntegrationsPage() {
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-7xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Integraciones</h1>
-            <p className="text-muted-foreground">
-              Conecta tus cuentas y servicios para potenciar las capacidades de Cleo Agent
+          <div className="mb-12 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 mb-6">
+              <Settings className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-4xl font-bold text-foreground mb-4 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text">
+              Integraciones
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Conecta tus cuentas y servicios favoritos para potenciar las capacidades de Cleo Agent con herramientas de productividad, e-commerce y automatización
             </p>
           </div>
 
           {/* Grid de integraciones */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">
             {integrations.map((integration) => (
-              <Card key={integration.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-4">
+              <Card key={integration.id} className="group hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-background to-muted/20 hover:scale-[1.03] relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <CardHeader className="pb-4 relative z-10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        {integration.icon}
-                      </div>
+                      {integration.icon}
                       <div>
-                        <CardTitle className="text-lg">{integration.name}</CardTitle>
+                        <CardTitle className="text-lg group-hover:text-primary transition-colors">{integration.name}</CardTitle>
                         <Badge
                           variant="secondary"
-                          className={`text-xs ${getCategoryColor(integration.category)}`}
+                          className={`text-xs mt-1 ${getCategoryColor(integration.category)}`}
                         >
                           {integration.category}
                         </Badge>
                       </div>
                     </div>
-                    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full border ${getStatusColor(integration.status)}`}>
+                    <div className={`flex items-center space-x-1 px-3 py-1.5 rounded-full border-2 transition-all ${getStatusColor(integration.status)}`}>
                       {getStatusIcon(integration.status)}
                       <span className="text-xs font-medium capitalize">
                         {integration.status === 'connected' ? 'Conectado' :
@@ -176,18 +208,21 @@ export default function IntegrationsPage() {
                   </div>
                 </CardHeader>
 
-                <CardContent>
-                  <CardDescription className="mb-4">
+                <CardContent className="relative z-10">
+                  <CardDescription className="mb-6 text-base leading-relaxed">
                     {integration.description}
                   </CardDescription>
 
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-foreground mb-2">Características:</h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+                      <Zap className="w-4 h-4 mr-2 text-primary" />
+                      Características principales:
+                    </h4>
+                    <ul className="text-sm text-muted-foreground space-y-2">
                       {integration.features.slice(0, 3).map((feature, index) => (
-                        <li key={index} className="flex items-center space-x-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-                          <span>{feature}</span>
+                        <li key={index} className="flex items-center space-x-3">
+                          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-primary/60"></div>
+                          <span className="leading-relaxed">{feature}</span>
                         </li>
                       ))}
                     </ul>
@@ -197,38 +232,20 @@ export default function IntegrationsPage() {
                     <div className="space-y-2">
                       <Button
                         onClick={() => window.open('/api/connections/google-workspace/connect', '_blank')}
-                        className="w-full"
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
                         variant={integration.status === 'connected' ? 'outline' : 'default'}
                       >
                         {integration.status === 'connected' ? '✓ Conectado' : 'Conectar cuenta'}
                       </Button>
                     </div>
                   ) : availableIntegrations.includes(integration.id) ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Button
                         onClick={() => setSelectedIntegration(integration.id as CredentialType)}
-                        className="w-full"
+                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
                         variant={integration.status === 'connected' ? 'outline' : 'default'}
                       >
                         {integration.status === 'connected' ? 'Administrar API Key' : 'Configurar API Key'}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const docsMap = {
-                            'twitter': '/docs/integrations/twitter-x-setup.md',
-                            'notion': '/docs/integrations/notion-setup.md'
-                          };
-                          const docUrl = docsMap[integration.id as keyof typeof docsMap];
-                          if (docUrl) {
-                            window.open(docUrl, '_blank');
-                          }
-                        }}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full"
-                        disabled={!['twitter', 'notion'].includes(integration.id)}
-                      >
-                        📖 Guía de configuración
                       </Button>
                     </div>
                   ) : (
