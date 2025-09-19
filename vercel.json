@@ -4,11 +4,5 @@
     "app/api/*/*/route.ts": { "maxDuration": 300 },
     "app/api/*/*/*/route.ts": { "maxDuration": 300 },
     "app/api/*/*/*/*/route.ts": { "maxDuration": 300 }
-  },
-  "rewrites": [
-    {
-      "source": "/((?!api/|_next/|favicon.ico|robots.txt|sitemap.xml|manifest.json|assets/).*)",
-      "destination": "/"
-    }
-  ]
+  }
 }
