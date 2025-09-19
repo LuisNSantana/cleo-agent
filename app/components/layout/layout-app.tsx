@@ -67,19 +67,6 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   const calculatedEditorWidth = Math.floor(screenWidth * 0.7) // 70% of screen
   const actualEditorWidth = editorCollapsed ? 60 : (editorWidth || calculatedEditorWidth)
 
-  // LOG: LayoutApp render (debug en desarrollo)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('[LayoutApp] ==> RENDER <==');
-    console.log('[LayoutApp] Current pathname:', pathname);
-    console.log('[LayoutApp] Children type:', typeof children);
-    console.log('[LayoutApp] Children:', React.Children.count(children), 'child(ren)');
-    
-    // Log cuando estamos en una ruta de proyecto
-    if (pathname.startsWith('/p/')) {
-      console.log('[LayoutApp] 🎯 PROJECT ROUTE DETECTED:', pathname);
-    }
-  }
-
   // Mouse event handlers for the middle divider
   const startDividerResize = useCallback((e: React.MouseEvent) => {
     if (isMobile || !isOpen) return

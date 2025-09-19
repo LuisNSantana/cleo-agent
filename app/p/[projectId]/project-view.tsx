@@ -65,10 +65,6 @@ function extractTextFromParts(parts: any[]): string {
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
-  console.log(`[ProjectView] MOUNTED with projectId:`, projectId);
-  if (typeof window !== 'undefined') {
-    console.log(`[ProjectView] window.location.pathname:`, window.location.pathname);
-  }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enableSearch, setEnableSearch] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -76,9 +72,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const { createNewChat, bumpChat } = useChats();
   const { cacheAndAddMessage } = useMessages();
   const pathname = usePathname();
-  console.log(`[ProjectView] User:`, user);
-  console.log(`[ProjectView] Pathname:`, pathname);
-  console.log(`[ProjectView] Prop projectId:`, projectId);
   
   const {
     files,
@@ -90,43 +83,19 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     handleFileRemove,
   } = useFileUpload()
 
-  // Add an effect to track when pathname changes
-  useEffect(() => {
-    console.log(`[ProjectView] ==> PATHNAME CHANGE DETECTED <==`)
-    console.log(`[ProjectView] Previous pathname: ${pathname}`)
-    console.log(`[ProjectView] Expected project: ${projectId}`)
-    console.log(`[ProjectView] URL pathname should be: /p/${projectId}`)
-    
-    if (!pathname.includes(`/p/${projectId}`)) {
-      console.warn(`[ProjectView] ⚠️  PATHNAME MISMATCH! Expected /p/${projectId}, got ${pathname}`)
-    } else {
-      console.log(`[ProjectView] ✅ Pathname matches expected project route`)
-    }
-  }, [pathname, projectId])
-
   // Fetch project details
   const { data: project, refetch: refetchProject, isLoading: projectLoading, error: projectError } = useQuery<Project>({
     queryKey: ["project", projectId],
     queryFn: async () => {
-      console.log(`[ProjectView] Fetching project ${projectId}`)
       const response = await fetch(`/api/projects/${projectId}`)
       if (!response.ok) {
         throw new Error("Failed to fetch project")
       }
       const data = await response.json()
-      
-      console.log(`[ProjectView] Project data received:`, { 
-        id: data.id, 
-        name: data.name, 
-        _auth_failed: data._auth_failed, 
-        _error: data._error 
-      })
-      
       return data
     },
     enabled: !!projectId,
     retry: (failureCount, error) => {
-      console.log(`[ProjectView] Query failed (attempt ${failureCount}):`, error)
       return failureCount < 3
     }
   })
@@ -654,9 +623,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
   // Always show onboarding when on project page, regardless of messages
   const showOnboarding = pathname === `/p/${projectId}`
-  
-  // Debug logging for showOnboarding
-  console.log(`[ProjectView] Debug - pathname: '${pathname}', expected: '/p/${projectId}', showOnboarding: ${showOnboarding}`);
 
   // Early return for critical loading/error states
   if (projectLoading && !project) {
@@ -700,23 +666,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       data-pathname={pathname}
       data-testid={`project-view-${projectId}`}
     >
-      {/* Debug info - remove after fixing */}
-      {process.env.NODE_ENV !== 'production' && (
-        <div className="fixed top-20 right-4 z-50 bg-red-500 text-white p-2 text-xs rounded">
-          Project: {projectId}<br/>
-          Path: {pathname}<br/>
-          User: {user?.id || 'none'}<br/>
-          Project loaded: {project ? 'yes' : 'no'}
-        </div>
-      )}
-      
-      {/* Always visible marker for debugging */}
-      <div 
-        className="fixed top-16 left-4 z-50 bg-blue-500 text-white px-2 py-1 text-xs rounded"
-        style={{ fontSize: '10px' }}
-      >
-        ProjectView:{projectId}
-      </div>
       {/* Project Overview Panel */}
       <div className="w-full max-w-3xl p-4">
   <div className="radius-lg bg-[--background] border divider-subtle p-4 mb-4">
