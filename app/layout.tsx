@@ -15,6 +15,7 @@ import { ThemeProvider } from "next-themes"
 import Script from "next/script"
 import { LayoutClient } from "./layout-client"
 import { LayoutApp } from "./components/layout/layout-app"
+import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 import { Analytics } from "@vercel/analytics/next"
 
 const geistSans = Geist({
@@ -142,30 +143,32 @@ export default async function RootLayout({
             <ModelProvider>
               <ChatsProvider userId={userProfile?.id}>
                 <ChatSessionProvider>
-                  <UserPreferencesProvider
-                    userId={userProfile?.id}
-                    initialPreferences={userProfile?.preferences}
-                  >
-                    <TooltipProvider
-                      delayDuration={200}
-                      skipDelayDuration={500}
+                  <MessagesProvider>
+                    <UserPreferencesProvider
+                      userId={userProfile?.id}
+                      initialPreferences={userProfile?.preferences}
                     >
-                      <ThemeProvider
-                        attribute="class"
-                        defaultTheme="dark"
-                        enableSystem={false}
-                        disableTransitionOnChange
+                      <TooltipProvider
+                        delayDuration={200}
+                        skipDelayDuration={500}
                       >
-                        <SidebarProvider defaultOpen>
-                          <Toaster position="top-center" />
-                          <LayoutApp>
-                            {children}
-                          </LayoutApp>
-                          <Analytics />
-                        </SidebarProvider>
-                      </ThemeProvider>
-                    </TooltipProvider>
-                  </UserPreferencesProvider>
+                        <ThemeProvider
+                          attribute="class"
+                          defaultTheme="dark"
+                          enableSystem={false}
+                          disableTransitionOnChange
+                        >
+                          <SidebarProvider defaultOpen>
+                            <Toaster position="top-center" />
+                            <LayoutApp>
+                              {children}
+                            </LayoutApp>
+                            <Analytics />
+                          </SidebarProvider>
+                        </ThemeProvider>
+                      </TooltipProvider>
+                    </UserPreferencesProvider>
+                  </MessagesProvider>
                 </ChatSessionProvider>
               </ChatsProvider>
             </ModelProvider>

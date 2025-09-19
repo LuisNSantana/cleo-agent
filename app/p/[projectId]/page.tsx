@@ -2,7 +2,6 @@
 
 
 import { Suspense } from "react"
-import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 import { ProjectView } from "./project-view"
 import { useParams } from "next/navigation"
 import React from "react"
@@ -54,14 +53,12 @@ export default function ProjectPage() {
   }
   // Forzar remount de LayoutApp usando key=pathname
   return (
-    <MessagesProvider>
-      <ErrorBoundary>
-        <Suspense fallback={<div className="p-4 text-sm opacity-70">Loading project view… (Suspense fallback, check for errors in production)</div>}>
-          <div data-project-page={projectId} data-testid="project-page">
-            <ProjectView projectId={projectId} key={projectId} />
-          </div>
-        </Suspense>
-      </ErrorBoundary>
-    </MessagesProvider>
+    <ErrorBoundary>
+      <Suspense fallback={<div className="p-4 text-sm opacity-70">Loading project view… (Suspense fallback, check for errors in production)</div>}>
+        <div data-project-page={projectId} data-testid="project-page">
+          <ProjectView projectId={projectId} key={projectId} />
+        </div>
+      </Suspense>
+    </ErrorBoundary>
   );
 }

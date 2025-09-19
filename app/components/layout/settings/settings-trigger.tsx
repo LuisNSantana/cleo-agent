@@ -15,7 +15,6 @@ import { GearSix } from "@phosphor-icons/react"
 import type React from "react"
 import { useState } from "react"
 import { SettingsContent } from "./settings-content"
-import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 
 type SettingsTriggerProps = {
   onOpenChangeAction: (open: boolean) => void
@@ -52,13 +51,10 @@ export function SettingsTrigger({ onOpenChangeAction, withinDropdown = false }: 
       <Drawer open={open} onOpenChange={handleOpenChange}>
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
         <DrawerContent>
-          {/* Accessibility: DrawerContent requires a DrawerTitle. Hide visually but keep for screen readers. */}
           <DrawerHeader className="sr-only">
             <DrawerTitle>Settings</DrawerTitle>
           </DrawerHeader>
-          <MessagesProvider>
-            <SettingsContent isDrawer />
-          </MessagesProvider>
+          <SettingsContent isDrawer />
         </DrawerContent>
       </Drawer>
     )
@@ -71,9 +67,7 @@ export function SettingsTrigger({ onOpenChangeAction, withinDropdown = false }: 
         <DialogHeader className="border-border border-b px-6 py-5">
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
-        <MessagesProvider>
-          <SettingsContent />
-        </MessagesProvider>
+        <SettingsContent />
       </DialogContent>
     </Dialog>
   )
