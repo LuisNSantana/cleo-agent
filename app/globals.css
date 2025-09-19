@@ -159,52 +159,52 @@
 }
 
 .dark {
-  /* Modern dark theme with better contrast - avoiding pure black */
-  /* Use warmer, softer grays for better visual hierarchy */
-  --background: #111827; /* slate-900 - softer than pure black */
-  --foreground: #f8fafc; /* slate-50 - high contrast white */
-  --card: #1e293b; /* slate-800 - elevated from background */
-  --card-foreground: #f1f5f9; /* slate-100 - softer white for cards */
-  --popover: #1e293b; /* slate-800 - consistent with cards */
-  --popover-foreground: #f1f5f9; /* slate-100 */
-  --primary: #3b82f6; /* blue-500 - vibrant but not overwhelming */
-  --primary-foreground: #ffffff; /* pure white for primary text */
-  --secondary: #334155; /* slate-700 - lighter than card for hierarchy */
-  --secondary-foreground: #e2e8f0; /* slate-200 */
-  --muted: #475569; /* slate-600 - mid-tone for subtle elements */
-  --muted-foreground: #94a3b8; /* slate-400 - readable muted text */
-  --accent: #3730a3; /* indigo-700 - accent color */
-  --accent-foreground: #f1f5f9; /* slate-100 */
-  --destructive: #ef4444; /* red-500 - clear error indication */
-  --destructive-foreground: #ffffff; /* pure white */
-  --border: #374151; /* gray-700 - visible but not harsh borders */
-  --input: #374151; /* gray-700 - consistent with borders */
-  --ring: #3b82f6; /* blue-500 - focus rings */
-  /* Charts: vibrant but harmonious colors */
-  --chart-1: #3b82f6; /* blue-500 */
-  --chart-2: #10b981; /* emerald-500 */
-  --chart-3: #f59e0b; /* amber-500 */
-  --chart-4: #8b5cf6; /* violet-500 */
-  --chart-5: #ef4444; /* red-500 */
+  /* Modern neutral dark theme - warm grays instead of cool blues */
+  /* Based on best practices from Discord, GitHub, VS Code */
+  --background: #0d1117; /* GitHub-inspired neutral dark */
+  --foreground: #f0f6fc; /* Clean white with slight warmth */
+  --card: #161b22; /* Slightly elevated neutral gray */
+  --card-foreground: #e6edf3; /* Soft white for card content */
+  --popover: #161b22; /* Consistent with cards */
+  --popover-foreground: #e6edf3;
+  --primary: #238636; /* GitHub green - neutral accent */
+  --primary-foreground: #ffffff;
+  --secondary: #21262d; /* Warm dark gray */
+  --secondary-foreground: #c9d1d9; /* Muted light gray */
+  --muted: #30363d; /* Mid-tone neutral */
+  --muted-foreground: #7d8590; /* Subtle text color */
+  --accent: #1f2937; /* Dark accent without blue tint */
+  --accent-foreground: #d0d7de;
+  --destructive: #f85149; /* Soft red */
+  --destructive-foreground: #ffffff;
+  --border: #30363d; /* Subtle but visible borders */
+  --input: #21262d; /* Input background */
+  --ring: #238636; /* Focus ring matches primary */
+  /* Charts: neutral but distinguishable colors */
+  --chart-1: #79c0ff; /* Light blue */
+  --chart-2: #56d364; /* Green */
+  --chart-3: #e3b341; /* Yellow */
+  --chart-4: #a5a5a5; /* Gray */
+  --chart-5: #ff7b72; /* Red */
   /* Sidebar: slightly different from main for hierarchy */
-  --sidebar: #1f2937; /* gray-800 - between background and card */
-  --sidebar-foreground: #f9fafb; /* gray-50 */
-  --sidebar-primary: #3b82f6; /* blue-500 */
+  --sidebar: #0d1117; /* Same as background for cohesion */
+  --sidebar-foreground: #f0f6fc;
+  --sidebar-primary: #238636;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #374151; /* gray-700 */
-  --sidebar-accent-foreground: #e5e7eb; /* gray-200 */
-  --sidebar-border: #4b5563; /* gray-600 - more visible sidebar borders */
-  --sidebar-ring: #3b82f6; /* blue-500 */
+  --sidebar-accent: #21262d;
+  --sidebar-accent-foreground: #c9d1d9;
+  --sidebar-border: #30363d;
+  --sidebar-ring: #238636;
 
-  /* Elevation surfaces (better contrast in dark mode) */
-  --surface-1: #1f2937; /* gray-800 */
-  --surface-2: #374151; /* gray-700 */
-  --surface-3: #4b5563; /* gray-600 */
+  /* Elevation surfaces (neutral warm grays) */
+  --surface-1: #161b22; /* Slight elevation */
+  --surface-2: #21262d; /* Medium elevation */
+  --surface-3: #30363d; /* High elevation */
 
-  /* Shadows (more visible in dark mode) */
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.5);
-  --shadow-2: 0 4px 16px rgba(0,0,0,0.4);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.6);
+  /* Shadows (subtle for dark mode) */
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-2: 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.5);
 }
 
 @layer base {
