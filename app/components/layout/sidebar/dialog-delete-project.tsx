@@ -22,13 +22,13 @@ type Project = {
 
 type DialogDeleteProjectProps = {
   isOpen: boolean
-  setIsOpen: (isOpen: boolean) => void
+  setIsOpenAction: (isOpen: boolean) => void
   project: Project
 }
 
 export function DialogDeleteProject({
   isOpen,
-  setIsOpen,
+  setIsOpenAction,
   project,
 }: DialogDeleteProjectProps) {
   const queryClient = useQueryClient()
@@ -51,7 +51,7 @@ export function DialogDeleteProject({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] })
       queryClient.invalidateQueries({ queryKey: ["chats"] })
-      setIsOpen(false)
+      setIsOpenAction(false)
 
       // If we're currently viewing this project, redirect to home
       if (pathname.startsWith(`/p/${project.id}`)) {
@@ -65,7 +65,7 @@ export function DialogDeleteProject({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpenAction}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Project</DialogTitle>
@@ -79,7 +79,7 @@ export function DialogDeleteProject({
           <Button
             type="button"
             variant="outline"
-            onClick={() => setIsOpen(false)}
+            onClick={() => setIsOpenAction(false)}
             disabled={deleteProjectMutation.isPending}
           >
             Cancel

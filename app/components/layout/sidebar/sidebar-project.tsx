@@ -11,6 +11,9 @@ type Project = {
   name: string
   user_id: string
   created_at: string
+  color?: string | null
+  description?: string | null
+  notes?: string | null
 }
 
 export function SidebarProject() {
@@ -48,7 +51,7 @@ export function SidebarProject() {
         </div>
       )}
 
-      <DialogCreateProject isOpen={isDialogOpen} setIsOpen={setIsDialogOpen} />
+      <DialogCreateProject isOpen={isDialogOpen} setIsOpenAction={setIsDialogOpen} />
     </div>
   )
 }

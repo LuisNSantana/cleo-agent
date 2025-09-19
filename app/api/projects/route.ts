@@ -22,11 +22,15 @@ export async function POST(request: Request) {
 
     const userId = authData.user.id
 
-    const { name } = await request.json()
+    const { name, color } = await request.json()
 
     const { data, error } = await supabase
       .from("projects")
-      .insert({ name, user_id: userId })
+      .insert({ 
+        name, 
+        user_id: userId,
+        color: color || '#6b7280' // Default gray if no color provided
+      })
       .select()
       .single()
 

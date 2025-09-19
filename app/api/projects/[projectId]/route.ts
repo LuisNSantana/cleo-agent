@@ -103,7 +103,7 @@ export async function PUT(request: Request) {
     const started = Date.now()
     const debug = request.headers.get('x-debug-project') === '1' || process.env.PROJECT_DEBUG === '1'
     if (debug) logProjectAPI('PUT start', { projectId })
-    const { name, description, notes } = await request.json()
+    const { name, description, notes, color } = await request.json()
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -135,6 +135,7 @@ export async function PUT(request: Request) {
         name: name.trim(),
         description: typeof description === 'string' ? description : null,
         notes: typeof notes === 'string' ? notes : null,
+        color: typeof color === 'string' ? color : null,
       })
       .eq("id", projectId)
       .eq("user_id", authData.user.id)

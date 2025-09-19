@@ -16,6 +16,9 @@ type Project = {
   name: string
   user_id: string
   created_at: string
+  color?: string | null
+  description?: string | null
+  notes?: string | null
 }
 
 type SidebarProjectItemProps = {
@@ -247,6 +250,11 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
     [project.name]
   )
 
+  const folderColor = useMemo(
+    () => project.color || '#6b7280',
+    [project.color]
+  )
+
   const containerClassName = useMemo(
     () =>
       cn(
@@ -272,7 +280,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
     >
       {isEditing ? (
         <div className="bg-accent flex items-center rounded-md py-1 pr-1 pl-2">
-          <FolderIcon size={20} className="text-primary mr-2 flex-shrink-0" />
+          <FolderIcon size={20} className="mr-2 flex-shrink-0" style={{ color: folderColor }} />
           <input
             ref={inputRef}
             value={editName}
@@ -309,7 +317,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
               className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap hover:bg-accent/80 hover:text-foreground transition-colors rounded-md"
               title={displayName}
             >
-              <FolderIcon size={20} />
+              <FolderIcon size={20} style={{ color: folderColor }} />
               {displayName}
             </div>
           </Link>
@@ -317,8 +325,8 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
           <div className={menuClassName} key={project.id}>
             <SidebarProjectMenu
               project={project}
-              onStartEditing={handleStartEditing}
-              onMenuOpenChange={handleMenuOpenChange}
+              onStartEditingAction={handleStartEditing}
+              onMenuOpenChangeAction={handleMenuOpenChange}
             />
           </div>
         </>

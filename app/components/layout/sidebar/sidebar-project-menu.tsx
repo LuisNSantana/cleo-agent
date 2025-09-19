@@ -1,6 +1,7 @@
 "use client"
 
 import { DialogDeleteProject } from "@/app/components/layout/sidebar/dialog-delete-project"
+import { DialogProjectColor } from "@/app/components/layout/sidebar/dialog-project-color"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import {
   DropdownMenu,
@@ -8,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { DotsThree, PencilSimple, Trash } from "@phosphor-icons/react"
+import { DotsThree, PencilSimple, Trash, Palette } from "@phosphor-icons/react"
 import { useState } from "react"
 
 type Project = {
@@ -16,20 +17,24 @@ type Project = {
   name: string
   user_id: string
   created_at: string
+  color?: string | null
+  description?: string | null
+  notes?: string | null
 }
 
 type SidebarProjectMenuProps = {
   project: Project
-  onStartEditing: () => void
-  onMenuOpenChange?: (open: boolean) => void
+  onStartEditingAction: () => void
+  onMenuOpenChangeAction?: (open: boolean) => void
 }
 
 export function SidebarProjectMenu({
   project,
-  onStartEditing,
-  onMenuOpenChange,
+  onStartEditingAction,
+  onMenuOpenChangeAction,
 }: SidebarProjectMenuProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isColorDialogOpen, setIsColorDialogOpen] = useState(false)
   const isMobile = useBreakpoint(768)
 
   return (
@@ -37,7 +42,7 @@ export function SidebarProjectMenu({
       <DropdownMenu
         // shadcn/ui / radix pointer-events-none issue
         modal={isMobile ? true : false}
-        onOpenChange={onMenuOpenChange}
+        onOpenChange={onMenuOpenChangeAction}
       >
         <DropdownMenuTrigger asChild>
           <button
@@ -47,17 +52,28 @@ export function SidebarProjectMenu({
             <DotsThree size={18} className="text-primary" weight="bold" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              onStartEditing()
+              onStartEditingAction()
             }}
           >
             <PencilSimple size={16} className="mr-2" />
             Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsColorDialogOpen(true)
+            }}
+          >
+            <Palette size={16} className="mr-2" />
+            Change Color
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive"
@@ -76,7 +92,13 @@ export function SidebarProjectMenu({
 
       <DialogDeleteProject
         isOpen={isDeleteDialogOpen}
-        setIsOpen={setIsDeleteDialogOpen}
+        setIsOpenAction={setIsDeleteDialogOpen}
+        project={project}
+      />
+      
+      <DialogProjectColor
+        isOpen={isColorDialogOpen}
+        onOpenChangeAction={setIsColorDialogOpen}
         project={project}
       />
     </>

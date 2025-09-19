@@ -74,9 +74,9 @@ export type Database = {
         Relationships: [{ foreignKeyName: "model_usage_analytics_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] }]
       }
       projects: {
-        Row: { created_at: string | null; id: string; name: string; user_id: string }
-        Insert: { created_at?: string | null; id?: string; name: string; user_id: string }
-        Update: { created_at?: string | null; id?: string; name?: string; user_id?: string }
+        Row: { color: string | null; created_at: string | null; description: string | null; id: string; name: string; notes: string | null; user_id: string }
+        Insert: { color?: string | null; created_at?: string | null; description?: string | null; id?: string; name: string; notes?: string | null; user_id: string }
+        Update: { color?: string | null; created_at?: string | null; description?: string | null; id?: string; name?: string; notes?: string | null; user_id?: string }
         Relationships: [{ foreignKeyName: "projects_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] }]
       }
       tool_usage_analytics: {
