@@ -27,16 +27,24 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     
-    // Extraer el último mensaje del usuario
+    // Extraer mensajes del historial (para memoria) y último mensaje del usuario
+    let conversationHistory: Array<{role: string, content: string}> = []
     let userMessage = ''
     
     if (Array.isArray(body.messages) && body.messages.length > 0) {
+      // Usar historial completo de mensajes para contexto
+      conversationHistory = body.messages.map((m: any) => ({
+        role: m.role,
+        content: m.content || ''
+      })).filter((m: any) => m.content.trim()) // Filtrar mensajes vacíos
+
       const lastUserMsg = [...body.messages].reverse().find((m: any) => m.role === 'user')
       if (lastUserMsg) {
         userMessage = lastUserMsg.content || ''
       }
     } else if (body.message) {
       userMessage = typeof body.message === 'string' ? body.message : (body.message.content || '')
+      conversationHistory = [{ role: 'user', content: userMessage }]
     }
 
     if (!userMessage) {
@@ -49,6 +57,7 @@ export async function POST(req: NextRequest) {
     
     console.log('🔥 GUEST MODE DEBUG:', {
       userMessage: userMessage.substring(0, 50) + '...',
+      conversationLength: conversationHistory.length,
       selectedModel: guestModel,
       selectedModelId: guestModelId,
       hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
@@ -56,6 +65,15 @@ export async function POST(req: NextRequest) {
     })
     
     const systemPrompt = getCleoPrompt(guestModelId, 'guest')
+
+    // Construir mensajes con historial para mantener contexto
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      ...conversationHistory // Incluir todo el historial de la conversación
+    ]
 
     // Llamada directa a OpenRouter API
     const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -68,16 +86,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: guestModel,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user', 
-            content: userMessage
-          }
-        ],
+        messages,
         stream: true,
         temperature: 0.7,
         max_tokens: 2048

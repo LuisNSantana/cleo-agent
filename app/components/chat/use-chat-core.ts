@@ -15,6 +15,7 @@ import type { UIMessage } from "ai"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue, useTransition } from "react"
 import { debounce } from "lodash"
+import { useGuestMemory } from "@/app/hooks/use-guest-memory"
 
 // 🔧 Performance & Robustness Utilities
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -211,6 +212,9 @@ export function useChatCore({
     lastRender: performance.now()
   })
 
+  // Guest memory for non-authenticated users
+  const guestMemory = useGuestMemory()
+
   // State management - AI SDK v5 requires manual input management
   const [input, setInput] = useState(draftValue || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -348,6 +352,22 @@ export function useChatCore({
   }, [status])
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Load guest memory for non-authenticated users
+  useEffect(() => {
+    if (!isAuthenticated && guestMemory.hasMemory && messages.length === 0) {
+      // Convert guest memory to chat messages for display
+      const guestMessagesAsChat = guestMemory.guestMessages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.createdAt || new Date(),
+        parts: [{ type: "text" as const, text: msg.content }]
+      })) as ChatMessage[]
+      
+      setMessages(guestMessagesAsChat)
+    }
+  }, [isAuthenticated, guestMemory.hasMemory, guestMemory.guestMessages, messages.length])
+
   // Error state for UI consumers
   const [error, setError] = useState<Error | null>(null)
 
@@ -416,6 +436,31 @@ export function useChatCore({
     console.warn(`[ChatAPI] Invalid model requested: ${selectedModel}. Falling back to ${resolvedModel}`)
   }
 
+  // Prepare messages for request
+  let messagesToSend: ChatMessage[]
+  if (isAuthenticated) {
+    // For authenticated users, use current session messages
+    messagesToSend = [...messages, userMessage]
+  } else {
+    // For guests, use memory + current message
+    const guestMessagesFormatted = guestMemory.guestMessages.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt || new Date()
+    })) as ChatMessage[]
+    
+    messagesToSend = [...guestMessagesFormatted, userMessage]
+    
+    // Add user message to guest memory
+    guestMemory.addMessage({
+      id: userMessage.id,
+      role: userMessage.role,
+      content: userMessage.content,
+      createdAt: userMessage.createdAt
+    } as MessageAISDK)
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -426,7 +471,7 @@ export function useChatCore({
       isAuthenticated,
       systemPrompt,
       enableSearch,
-      messages: [...messages, userMessage].map(convertToMessageAISDK),
+      messages: messagesToSend.map(convertToMessageAISDK),
     }),
     signal: abortControllerRef.current.signal,
   })
@@ -874,10 +919,18 @@ export function useChatCore({
         }
 
         // Cache final assistant message
-        cacheAndAddMessage(convertToMessageAISDK({
+        const finalAssistantMessage = convertToMessageAISDK({
           ...assistantMessageObj,
           parts: assistantMessageObj.parts,
-        } as UIMessage))
+        } as UIMessage)
+        
+        if (isAuthenticated) {
+          cacheAndAddMessage(finalAssistantMessage)
+        } else {
+          // For guest users, add to guest memory
+          guestMemory.addMessage(finalAssistantMessage)
+        }
+        
         setStatus("ready")
       } catch (err) {
         const error = err as Error
