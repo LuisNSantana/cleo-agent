@@ -46,7 +46,7 @@ const integrations: Integration[] = [
     description: 'Gmail, Calendar, Drive, Docs, Sheets - Full productivity suite',
     icon: (
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center shadow-lg">
-        <Mail className="w-5 h-5 text-white" />
+        <img src="/icons/google.png" alt="Google" className="w-5 h-5" />
       </div>
     ),
     status: 'connected',
@@ -59,7 +59,7 @@ const integrations: Integration[] = [
     description: 'Social media management and content posting',
     icon: (
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-black to-gray-800 flex items-center justify-center shadow-lg">
-        <MessageSquare className="w-5 h-5 text-white" />
+        <img src="/icons/x_twitter.png" alt="Twitter/X" className="w-5 h-5" />
       </div>
     ),
     status: 'disconnected',
@@ -85,7 +85,7 @@ const integrations: Integration[] = [
     description: 'E-commerce store management and analytics',
     icon: (
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-        <ShoppingBag className="w-5 h-5 text-white" />
+        <img src="/icons/shopify.png" alt="Shopify" className="w-5 h-5" />
       </div>
     ),
     status: 'disconnected',
@@ -111,7 +111,7 @@ const integrations: Integration[] = [
     description: 'Workspace management and content organization',
     icon: (
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-700 to-black flex items-center justify-center shadow-lg">
-        <Database className="w-5 h-5 text-white" />
+        <img src="/icons/notion.png" alt="Notion" className="w-5 h-5" />
       </div>
     ),
     status: 'disconnected',
