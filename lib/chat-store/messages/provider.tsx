@@ -5,6 +5,7 @@ import { useChatSession } from "@/lib/chat-store/session/provider"
 import type { MessageAISDK } from "./api"
 import { createContext, useContext, useEffect, useState } from "react"
 import { writeToIndexedDB } from "../persist"
+import { usePathname } from "next/navigation"
 import {
   cacheMessages,
   clearMessagesForChat,
@@ -37,6 +38,14 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<MessageAISDK[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { chatId } = useChatSession()
+  const pathname = usePathname()
+
+  // Reset messages when pathname changes (navigation between routes)
+  useEffect(() => {
+    console.log(`[MessagesProvider] Pathname changed to: ${pathname}, resetting messages`)
+    setMessages([])
+    setIsLoading(false)
+  }, [pathname])
 
   useEffect(() => {
     if (chatId === null) {

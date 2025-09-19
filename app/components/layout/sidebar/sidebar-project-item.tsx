@@ -193,30 +193,25 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
       
       const targetPath = `/p/${project.id}`
       
-      // Try multiple navigation methods for production debugging
+      // Use Next.js router for navigation
       try {
-        console.log(`[SidebarProjectItem] Attempting router.push...`)
+        console.log(`[SidebarProjectItem] Using router.push for navigation`)
         router.push(targetPath)
         
-        // Fallback: direct window navigation if router fails
+        // Verify navigation after a short delay
         setTimeout(() => {
           if (window.location.pathname !== targetPath) {
-            console.warn(`[SidebarProjectItem] Router.push failed, using window.location`)
-            window.location.href = targetPath
+            console.warn(`[SidebarProjectItem] Navigation may have failed - expected ${targetPath}, got ${window.location.pathname}`)
+          } else {
+            console.log(`[SidebarProjectItem] Navigation successful`)
           }
-        }, 150)
+        }, 100)
         
       } catch (error) {
-        console.error(`[SidebarProjectItem] Navigation error:`, error)
-        // Direct fallback
+        console.error(`[SidebarProjectItem] Router navigation failed:`, error)
+        // Fallback to window.location only if router fails
         window.location.href = targetPath
       }
-      
-      // Debug: Check if navigation actually happened after a short delay
-      setTimeout(() => {
-        console.log(`[SidebarProjectItem] Navigation check - Current pathname: ${window.location.pathname}`)
-        console.log(`[SidebarProjectItem] Expected pathname: ${targetPath}`)
-      }, 100)
     },
     [isEditing, isMenuOpen, router, project.id, pathname]
   )

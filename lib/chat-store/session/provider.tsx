@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { createContext, useContext, useMemo } from "react"
+import { createContext, useContext, useMemo, useEffect } from "react"
 
 const ChatSessionContext = createContext<{ chatId: string | null }>({
   chatId: null,
@@ -15,16 +15,29 @@ export function ChatSessionProvider({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  
   const chatId = useMemo(() => {
     if (!pathname) return null
-    // Reset explícito al estar en Home u otra ruta raíz
-    if (pathname === '/' || pathname.startsWith('/p/')) return null
+    
+    // Reset explícito al estar en Home u otras rutas que no son de chat
+    if (pathname === '/' || pathname === '/dashboard' || pathname === '/docs' || 
+        pathname.startsWith('/agents/') || pathname.startsWith('/p/') || 
+        pathname.startsWith('/auth/') || pathname === '/privacy' || 
+        pathname === '/terms' || pathname.startsWith('/share/')) {
+      return null
+    }
+    
     if (pathname.startsWith("/c/")) {
       const id = pathname.split("/c/")[1]
       return id || null
     }
     return null
   }, [pathname])
+
+  // Log para debugging
+  useEffect(() => {
+    console.log(`[ChatSessionProvider] Pathname: ${pathname}, ChatId: ${chatId}`)
+  }, [pathname, chatId])
 
   return (
     <ChatSessionContext.Provider value={{ chatId }}>

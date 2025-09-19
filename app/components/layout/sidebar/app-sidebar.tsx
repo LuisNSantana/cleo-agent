@@ -19,7 +19,7 @@ import {
   X,
 } from "@phosphor-icons/react"
 import { useParams, useRouter, usePathname } from "next/navigation"
-import { useMemo } from "react"
+import { useMemo, useCallback } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { SidebarList } from "./sidebar-list"
 import { SidebarProject } from "./sidebar-project"
@@ -64,6 +64,11 @@ export function AppSidebar() {
     { href: "/docs", label: "Docs", icon: DocsIcon },
   ] as const
 
+  const handleNavClick = useCallback((href: string) => {
+    console.log(`[AppSidebar] Navigating to: ${href}`)
+    router.push(href)
+  }, [router])
+
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
       <SidebarHeader className="h-14 pl-3">
@@ -93,11 +98,13 @@ export function AppSidebar() {
                   : pathname === href || pathname.startsWith(href + "/")
                 return (
                   <SidebarMenuItem key={href}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                      <Link href={href} aria-label={label}>
-                        <Icon className="size-4" />
-                        <span>{label}</span>
-                      </Link>
+                    <SidebarMenuButton 
+                      isActive={isActive} 
+                      tooltip={label}
+                      onClick={() => handleNavClick(href)}
+                    >
+                      <Icon className="size-4" />
+                      <span>{label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -110,7 +117,7 @@ export function AppSidebar() {
             <button
               className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-2 py-2 text-sm transition-colors"
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => handleNavClick("/")}
             >
               <div className="flex items-center gap-2">
                 <NotePencilIcon size={20} />

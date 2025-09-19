@@ -66,10 +66,15 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   const calculatedEditorWidth = Math.floor(screenWidth * 0.7) // 70% of screen
   const actualEditorWidth = editorCollapsed ? 60 : (editorWidth || calculatedEditorWidth)
 
+  // Wrapper key basado en pathname para forzar remount de contenido interno
+  // Usar una combinación de pathname y timestamp para asegurar remount único
+  const contentKey = `${pathname}-${Date.now()}`
+
   // LOG: LayoutApp render and children
   if (typeof window !== 'undefined') {
     console.log('[LayoutApp] Rendered. Path:', window.location.pathname);
-    console.log('[LayoutApp] Children:', children);
+    console.log('[LayoutApp] Content key:', contentKey);
+    console.log('[LayoutApp] Children type:', typeof children);
   }
 
   // Mouse event handlers for the middle divider
@@ -112,7 +117,6 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
     }
   }, [isResizing, handleDividerMove, stopDividerResize])
 
-  // Wrapper key basado en pathname para forzar remount de contenido interno
   return (
     <div className="bg-background flex h-dvh w-full overflow-hidden relative">
       {/* Mobile-only static premium background (no video) */}
@@ -134,7 +138,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           }}
         >
           <Header hasSidebar={hasSidebar} />
-          <div className="h-full" key={pathname}>
+          <div className="h-full" key={contentKey}>
             {children}
           </div>
         </main>
