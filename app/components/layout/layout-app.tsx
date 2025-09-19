@@ -2,6 +2,8 @@
 
 import { Header } from "@/app/components/layout/header"
 import { AppSidebar } from "@/app/components/layout/sidebar/app-sidebar"
+import { useUser } from "@/lib/user-store/provider"
+import { usePathname } from "next/navigation"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useCanvasEditorStore } from "@/lib/canvas-editor/store"
 import { CanvasEditorShell } from "@/components/canvas-editor/canvas-editor-shell"
@@ -18,6 +20,8 @@ const InteractiveCanvasEntry = dynamic(
 )
 
 export function LayoutApp({ children }: { children: React.ReactNode }) {
+  const { user } = useUser()
+  const pathname = usePathname()
   const { preferences } = useUserPreferences()
   const hasSidebar = preferences.layout === "sidebar"
   const { isOpen, open } = useCanvasEditorStore()
@@ -108,6 +112,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
     }
   }, [isResizing, handleDividerMove, stopDividerResize])
 
+  // Wrapper key basado en pathname para forzar remount de contenido interno
   return (
     <div className="bg-background flex h-dvh w-full overflow-hidden relative">
       {/* Mobile-only static premium background (no video) */}
@@ -115,7 +120,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
         <ChatBackground overlayOpacity={0.9} />
       </div>
       {/* Foreground app chrome */}
-      {(hasSidebar || isMobile) && (
+      {user?.id && (hasSidebar || isMobile) && (
         <div className="relative z-10">
           <AppSidebar />
         </div>
@@ -129,7 +134,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           }}
         >
           <Header hasSidebar={hasSidebar} />
-          <div className="h-full">
+          <div className="h-full" key={pathname}>
             {children}
           </div>
         </main>

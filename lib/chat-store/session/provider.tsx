@@ -16,7 +16,13 @@ export function ChatSessionProvider({
 }) {
   const pathname = usePathname()
   const chatId = useMemo(() => {
-    if (pathname?.startsWith("/c/")) return pathname.split("/c/")[1]
+    if (!pathname) return null
+    // Reset explícito al estar en Home u otra ruta raíz
+    if (pathname === '/' || pathname.startsWith('/p/')) return null
+    if (pathname.startsWith("/c/")) {
+      const id = pathname.split("/c/")[1]
+      return id || null
+    }
     return null
   }, [pathname])
 
