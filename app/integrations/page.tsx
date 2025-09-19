@@ -137,12 +137,18 @@ export default function IntegrationsPage() {
   const checkCredentialStatus = async (serviceType: string): Promise<Integration['status']> => {
     try {
       const response = await fetch(`/api/${serviceType}/credentials`)
-      if (!response.ok) return 'disconnected'
+      if (!response.ok) {
+        console.log(`[${serviceType}] API response not ok:`, response.status)
+        return 'disconnected'
+      }
       
       const data = await response.json()
+      console.log(`[${serviceType}] API response:`, data)
+      
       if (data.success && data.credentials && data.credentials.length > 0) {
         // Verificar si hay al menos una credencial activa
         const hasActiveCredential = data.credentials.some((cred: any) => cred.is_active || cred.active)
+        console.log(`[${serviceType}] Has active credential:`, hasActiveCredential)
         return hasActiveCredential ? 'connected' : 'disconnected'
       }
       return 'disconnected'
@@ -288,6 +294,20 @@ export default function IntegrationsPage() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
               Connect your favorite accounts and services to supercharge Cleo Agent's capabilities with productivity, e-commerce, and automation tools
             </p>
+            
+            {/* Botón de refresh */}
+            <div className="flex justify-center mb-6">
+              <Button
+                onClick={refreshAllStatuses}
+                disabled={isRefreshing}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>{isRefreshing ? 'Checking...' : 'Refresh Status'}</span>
+              </Button>
+            </div>
             
             {/* Stats de integraciones */}
             <div className="flex justify-center space-x-8 text-sm mb-6">

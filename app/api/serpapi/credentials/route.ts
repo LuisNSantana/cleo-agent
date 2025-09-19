@@ -15,7 +15,7 @@ export async function GET() {
     const userId = await getCurrentUserId(); if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const r = await listSerpapiKeys(userId)
     if (!r.success) return NextResponse.json({ error: r.error }, { status: 500 })
-    return NextResponse.json({ success: true, keys: r.data })
+    return NextResponse.json({ success: true, credentials: r.data })
   } catch (e) {
     console.error('SerpAPI GET credentials error', e)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

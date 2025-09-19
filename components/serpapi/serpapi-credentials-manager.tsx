@@ -23,7 +23,7 @@ export function SerpapiCredentialsManager(){
     try {
       const r = await fetch('/api/serpapi/credentials')
       const j = await r.json()
-      if(j.success) setKeys(j.keys||[])
+      if(j.success) setKeys(j.credentials||[])
       else throw new Error(j.error||'Failed to load')
     } catch(e){
       toast({ title:'Error', description:'Failed to load SerpAPI credentials', status:'error' })
