@@ -50,3 +50,162 @@
   background-image: radial-gradient(1200px 400px at 0% 0%, color-mix(in oklch, var(--primary), transparent 85%), transparent),
     radial-gradient(1200px 400px at 100% 0%, color-mix(in oklch, var(--accent), transparent 85%), transparent);
 }
+
+/* React Flow enhancements for better zoom and touch experience */
+.react-flow__controls {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.react-flow__controls button {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  font-size: 16px !important;
+  min-height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 8px !important;
+  margin: 2px !important;
+  color: #374151 !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.react-flow__controls button:hover {
+  background: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+.react-flow__controls button svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* Enhanced touch targets for mobile */
+@media (max-width: 768px) {
+  .react-flow__controls button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    font-size: 18px !important;
+  }
+  
+  .react-flow__controls button svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}
+
+/* Improved minimap visibility */
+.react-flow__minimap {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+}
+
+/* Better panel visibility */
+.react-flow__panel {
+  z-index: 10 !important;
+}
+
+/* Smooth zoom transitions */
+.react-flow__viewport {
+  transition: transform 0.2s ease !important;
+}
+
+/* Touch optimization for nodes */
+.react-flow__node {
+  cursor: grab !important;
+}
+
+.react-flow__node:active {
+  cursor: grabbing !important;
+}
+
+/* Additional mobile and touch improvements */
+.react-flow__renderer {
+  touch-action: manipulation !important;
+}
+
+/* Better edge selection on touch */
+.react-flow__edge {
+  pointer-events: all !important;
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 3px !important;
+}
+
+/* Status and legend panels styling */
+.status-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+  min-width: 200px !important;
+}
+
+.legend-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  min-width: 220px !important;
+}
+
+.legend-panel h3 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  margin-bottom: 12px !important;
+}
+
+.legend-panel .legend-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+}
+
+.legend-panel .legend-color {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Mobile optimizations for panels */
+@media (max-width: 640px) {
+  .status-panel {
+    font-size: 13px !important;
+    padding: 10px 12px !important;
+    min-width: 180px !important;
+  }
+  
+  .legend-panel {
+    padding: 12px !important;
+    min-width: 200px !important;
+  }
+  
+  .legend-panel h3 {
+    font-size: 15px !important;
+  }
+  
+  .legend-panel .legend-item {
+    font-size: 13px !important;
+  }
+}

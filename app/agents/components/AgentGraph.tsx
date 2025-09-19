@@ -639,7 +639,17 @@ export function AgentGraph({
   }, [currentExecution, selectedExecution, currentStep, setEdges])
 
   return (
-    <div className={`${className} touch-none overscroll-contain`}>
+    <div className={`${className} touch-none overscroll-contain relative`}>
+      {/* Mobile zoom help overlay */}
+      <div className="absolute top-4 right-4 z-20 sm:hidden">
+        <div className="bg-black/60 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span>🔍</span>
+            <span>Pellizca para zoom, arrastra para mover</span>
+          </div>
+        </div>
+      </div>
+
       <ReactFlow
   onInit={(inst) => { rfRef.current = inst }}
         nodes={nodes}
@@ -655,20 +665,31 @@ export function AgentGraph({
         edgeTypes={edgeTypes}
         fitView={fitOnInit}
         fitViewOptions={{ padding: 0.15 }}
-        // Mobile/touch optimizations
+        // Mobile/touch optimizations with improved zoom
         panOnDrag
         panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch
-        zoomOnDoubleClick={false}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        zoomOnDoubleClick={true}
         nodesConnectable={false}
         selectionOnDrag={false}
-        minZoom={0.45}
-        maxZoom={2}
+        minZoom={0.2}
+        maxZoom={4}
         attributionPosition="bottom-left"
       >
-        <div className="hidden sm:block">
-          <Controls />
+        <div className="block">
+          <Controls 
+            style={{ 
+              background: 'rgba(255, 255, 255, 0.95)', 
+              borderRadius: '12px', 
+              padding: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.1)'
+            }}
+            showZoom={true}
+            showFitView={true}
+            showInteractive={true}
+          />
         </div>
   <Background color="#f1f5f9" gap={14} />
   <div className="hidden sm:block">
@@ -683,20 +704,20 @@ export function AgentGraph({
         />
   </div>
 
-        {/* Status Panel */}
-  <Panel position="top-left" className="hidden sm:block bg-white/90 p-2 rounded-md shadow max-w-xs w-64">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-1">
-              <div className="text-xs font-semibold text-gray-800">
+        {/* Status Panel - Now visible on mobile */}
+        <Panel position="top-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-gray-200/50 max-w-xs w-full sm:w-64">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+              <div className="text-sm font-semibold text-gray-800">
                 Sistema Multi-Agente
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => { try { rfRef.current?.fitView({ padding: 0.15 }) } catch (_) {} }}
-                  className="text-[11px] h-6 px-2"
-                  title="Fit"
+                  className="text-xs h-8 px-3 bg-white/80 hover:bg-white border border-gray-200 font-medium"
+                  title="Ajustar vista"
                 >
                   Fit
                 </Button>
@@ -704,7 +725,7 @@ export function AgentGraph({
                   variant="ghost" 
                   size="sm"
                   onClick={() => setShowLangChainFlow(!showLangChainFlow)}
-                  className="text-[11px] h-6 px-2"
+                  className="text-xs h-8 px-3 bg-white/80 hover:bg-white border border-gray-200 font-medium"
                 >
                   {showLangChainFlow ? 'Ocultar' : 'Mostrar'} Flujo
                 </Button>
@@ -712,8 +733,8 @@ export function AgentGraph({
                   variant={minimalMode ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setMinimalMode(!minimalMode)}
-                  className="text-[11px] h-6 px-2"
-                  title="Minimal mode"
+                  className="text-xs h-8 px-3 bg-white/80 hover:bg-white border border-gray-200 font-medium"
+                  title="Modo minimal"
                 >
                   Minimal
                 </Button>
@@ -721,8 +742,8 @@ export function AgentGraph({
                   variant="ghost"
                   size="sm"
                   onClick={() => resetGraphLayout()}
-                  className="text-[11px] h-6 px-2"
-                  title="Reset layout"
+                  className="text-xs h-8 px-3 bg-white/80 hover:bg-white border border-gray-200 font-medium"
+                  title="Reiniciar diseño"
                 >
                   Reset
                 </Button>
@@ -742,7 +763,7 @@ export function AgentGraph({
             
             {/* System Status */}
             <div className="space-y-2">
-              <div className="text-[11px] font-medium text-gray-700 uppercase tracking-wide">
+              <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">
                 Estado del Sistema
               </div>
               <div className="space-y-0.5 text-xs">
@@ -782,13 +803,25 @@ export function AgentGraph({
           </Panel>
         )}
 
-        {/* Tiny legend */}
-        <Panel position="bottom-left" className="hidden sm:block bg-white/90 p-2 rounded-md shadow text-[10px]">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-gray-400" /> Idle</div>
-            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-green-500" /> Running</div>
-            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-blue-500" /> Completed</div>
-            <div className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-purple-500" /> Trail</div>
+        {/* Enhanced legend - now visible on mobile */}
+        <Panel position="bottom-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-gray-200/50 text-xs">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-3 rounded-full bg-gray-400" /> 
+              <span className="font-medium text-gray-700">Idle</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-3 rounded-full bg-green-500" /> 
+              <span className="font-medium text-gray-700">Running</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-3 rounded-full bg-blue-500" /> 
+              <span className="font-medium text-gray-700">Completed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block size-3 rounded-full bg-purple-500" /> 
+              <span className="font-medium text-gray-700">Trail</span>
+            </div>
           </div>
         </Panel>
 
