@@ -300,17 +300,10 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
         </div>
       ) : (
         <>
-          <button
+          <Link
+            href={`/p/${project.id}`}
             className="block w-full text-left"
-            onClick={() => {
-              console.log(`[SidebarProjectItem] Navigating to project ${project.id}`);
-              const targetPath = `/p/${project.id}`;
-              console.log(`[SidebarProjectItem] Target path: ${targetPath}`);
-              console.log(`[SidebarProjectItem] Current pathname: ${pathname}`);
-              
-              // Force a full page navigation
-              window.location.href = targetPath;
-            }}
+            replace={true}
           >
             <div
               className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap hover:bg-accent/80 hover:text-foreground transition-colors rounded-md"
@@ -319,7 +312,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
               <FolderIcon size={20} />
               {displayName}
             </div>
-          </button>
+          </Link>
 
           <div className={menuClassName} key={project.id}>
             <SidebarProjectMenu
