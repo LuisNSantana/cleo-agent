@@ -14,6 +14,7 @@ import { getUserProfile } from "@/lib/user/api"
 import { ThemeProvider } from "next-themes"
 import Script from "next/script"
 import { LayoutClient } from "./layout-client"
+import { LayoutApp } from "./components/layout/layout-app"
 import { Analytics } from "@vercel/analytics/next"
 
 const geistSans = Geist({
@@ -157,7 +158,9 @@ export default async function RootLayout({
                       >
                         <SidebarProvider defaultOpen>
                           <Toaster position="top-center" />
-                          {children}
+                          <LayoutApp>
+                            {children}
+                          </LayoutApp>
                           <Analytics />
                         </SidebarProvider>
                       </ThemeProvider>

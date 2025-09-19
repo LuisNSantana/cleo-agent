@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { LayoutApp } from "@/app/components/layout/layout-app"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -146,8 +145,7 @@ export default function IntegrationsPage() {
 
   return (
     <MessagesProvider>
-      <LayoutApp>
-        <div className="container mx-auto px-6 py-8 max-w-7xl">
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Integraciones</h1>
             <p className="text-muted-foreground">
@@ -278,7 +276,6 @@ export default function IntegrationsPage() {
             </div>
           </div>
         </div>
-      </LayoutApp>
     </MessagesProvider>
   )
 }
