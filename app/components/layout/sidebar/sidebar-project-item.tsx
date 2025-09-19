@@ -304,7 +304,12 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
             className="block w-full text-left"
             onClick={() => {
               console.log(`[SidebarProjectItem] Navigating to project ${project.id}`);
-              router.push(`/p/${project.id}`);
+              const targetPath = `/p/${project.id}`;
+              console.log(`[SidebarProjectItem] Target path: ${targetPath}`);
+              console.log(`[SidebarProjectItem] Current pathname: ${pathname}`);
+              
+              // Force a full page navigation
+              window.location.href = targetPath;
             }}
           >
             <div
