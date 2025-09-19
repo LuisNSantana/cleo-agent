@@ -310,7 +310,6 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
             href={`/p/${project.id}`}
             className="block w-full"
             prefetch
-            onClick={handleLinkClick}
           >
             <div
               className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
