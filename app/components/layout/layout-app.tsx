@@ -62,6 +62,12 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   const calculatedEditorWidth = Math.floor(screenWidth * 0.7) // 70% of screen
   const actualEditorWidth = editorCollapsed ? 60 : (editorWidth || calculatedEditorWidth)
 
+  // LOG: LayoutApp render and children
+  if (typeof window !== 'undefined') {
+    console.log('[LayoutApp] Rendered. Path:', window.location.pathname);
+    console.log('[LayoutApp] Children:', children);
+  }
+
   // Mouse event handlers for the middle divider
   const startDividerResize = useCallback((e: React.MouseEvent) => {
     if (isMobile || !isOpen) return
