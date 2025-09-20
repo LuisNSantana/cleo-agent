@@ -220,6 +220,55 @@ export function useChatCore({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const [enableSearch, setEnableSearch] = useState(false)
+  // Pending tool confirmation state (single at a time for now)
+  const [pendingToolConfirmation, setPendingToolConfirmation] = useState<null | {
+    toolCallId: string
+    toolName: string
+    confirmationId: string
+    preview: any
+    pendingAction?: any
+  }>(null)
+  async function respondToToolConfirmation(accept: boolean) {
+    if (!pendingToolConfirmation) return
+    const body = {
+      confirmationId: pendingToolConfirmation.confirmationId,
+      toolCallId: pendingToolConfirmation.toolCallId,
+      accept,
+    }
+    try {
+      const res = await fetch('/api/confirm-tool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Failed confirming tool')
+      const json = await res.json()
+      if (accept && json.executed && json.result) {
+        const toolMsg: ChatMessage = {
+          id: `tool-${pendingToolConfirmation.toolCallId}`,
+          role: 'assistant',
+          content: '',
+          createdAt: new Date(),
+          parts: [
+            {
+              type: 'tool-invocation',
+              toolInvocation: {
+                state: 'result',
+                toolName: pendingToolConfirmation.toolName,
+                toolCallId: pendingToolConfirmation.toolCallId,
+                result: json.result,
+              },
+            } as any,
+          ],
+        }
+        setMessages((m) => [...m, toolMsg])
+      }
+    } catch (e) {
+      console.error('Confirm tool error', e)
+    } finally {
+      setPendingToolConfirmation(null)
+    }
+  }
   // Defer heavy consumers of the input value to keep typing responsive
   const deferredInput = useDeferredValue(input)
   // Mark heavy state updates (like large message list changes) as non-urgent
@@ -526,6 +575,21 @@ export function useChatCore({
                 
                 // Handle different types of streaming data
                 switch (data.type) {
+                  case 'tool-confirmation': {
+                    try {
+                      const c = (data as any).confirmation
+                      if (c?.confirmationId) {
+                        setPendingToolConfirmation({
+                          toolCallId: c.toolCallId,
+                          toolName: c.toolName,
+                          confirmationId: c.confirmationId,
+                          preview: c.preview,
+                          pendingAction: c.pendingAction,
+                        })
+                      }
+                    } catch {}
+                    break
+                  }
                   case "tool-invocation": {
                     // New SSE shape from /api/multi-model-chat: surface tool call/result in real time
                     try {
@@ -1243,6 +1307,9 @@ export function useChatCore({
     conversationStatus, // Mapped status for Conversation component
     chatInputStatus, // Mapped status for ChatInput component (includes "streaming")
     hasSentFirstMessageRef,
+    pendingToolConfirmation,
+    acceptToolConfirmation: () => respondToToolConfirmation(true),
+    rejectToolConfirmation: () => respondToToolConfirmation(false),
     submit: () => handleSubmit({ preventDefault: () => {} }),
     handleSuggestion: (suggestion: string) => {
       setInput(suggestion)

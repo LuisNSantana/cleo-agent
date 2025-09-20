@@ -458,9 +458,18 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
   const internalHint = await buildInternalDelegationHint(userMessage, routerHint)
+  
+  // Add agent capability information for smart delegation
+  const capabilityInfo = `\n\nAGENT SPECIALIZATION & DELEGATION RULES
+- Peter (delegate_to_peter): ONLY for Google Docs/Sheets/Slides creation. Do NOT delegate to Peter for email, calendar, general tasks, or anything outside Google Workspace document creation.
+- Ami (delegate_to_ami): General organization, scheduling, email management, file management, and research. Handles Gmail, Calendar, Drive files, and administrative tasks.
+- Astra (delegate_to_astra): Creative writing, content creation, social media posts, image generation, and design tasks.
+- Before delegating: Consider if you can handle the task directly with your available tools. Only delegate when the specialist agent has unique capabilities or access.
+- Agent visibility: Each agent can see their own tools, tags, and specializations when making delegation decisions.`
+  
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
 
     // -------------------------------------------------------------
     // Lightweight language detection & {{user_lang}} substitution

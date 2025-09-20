@@ -120,6 +120,9 @@ export function Chat() {
     conversationStatus,
     chatInputStatus,
     hasSentFirstMessageRef,
+    pendingToolConfirmation,
+    acceptToolConfirmation,
+    rejectToolConfirmation,
     submit,
     handleSuggestion,
     handleReload,
@@ -292,7 +295,36 @@ export function Chat() {
             </div>
           </motion.div>
         ) : (
-          <Conversation key="conversation" {...conversationProps} />
+          <>
+            <Conversation key="conversation" {...conversationProps} />
+            {pendingToolConfirmation && (
+              <div className="w-full max-w-3xl mx-auto px-4 mt-4">
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white text-xs">!</span>
+                    Confirm {pendingToolConfirmation.toolName} action
+                  </h3>
+                  <pre className="text-xs overflow-x-auto max-h-40 bg-white/70 dark:bg-black/30 p-2 rounded border border-amber-200 dark:border-amber-600 mb-3">
+{JSON.stringify(pendingToolConfirmation.preview || pendingToolConfirmation.pendingAction?.input || {}, null, 2)}
+                  </pre>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={acceptToolConfirmation}
+                      className="flex-1 inline-flex items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      Approve & Execute
+                    </button>
+                    <button
+                      onClick={rejectToolConfirmation}
+                      className="flex-1 inline-flex items-center justify-center rounded-md border border-red-400 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:bg-transparent dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </AnimatePresence>
 

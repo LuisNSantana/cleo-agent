@@ -4,12 +4,15 @@
  */
 
 import { requiresConfirmation, generateToolPreview, type ToolPreview, type ConfirmationResponse } from './simple'
+import { TOOL_SENSITIVITY_MAP, ALWAYS_CONFIRM_TOOLS, SAFE_AUTO_TOOLS, type PendingAction } from './types'
 
 // Special response type for tools that need confirmation
 export interface ToolConfirmationResult {
   needsConfirmation: true
   preview: ToolPreview
   confirmationId: string
+  // Full pending action metadata so the client can render rich UI without a separate in-memory store
+  pendingAction: PendingAction
 }
 
 // Regular tool response
@@ -26,6 +29,54 @@ const pendingConfirmations = new Map<string, {
   parameters: Record<string, any>
   executeFunction: () => Promise<any>
 }>()
+
+function computeSensitivity(toolName: string): 'low' | 'medium' | 'high' | 'critical' {
+  if (ALWAYS_CONFIRM_TOOLS.includes(toolName)) return 'critical'
+  if (SAFE_AUTO_TOOLS.includes(toolName)) return 'low'
+  const category = TOOL_SENSITIVITY_MAP[toolName]
+  switch (category) {
+    case 'financeActions': return 'critical'
+    case 'fileActions':
+    case 'dataModification': return 'high'
+    case 'emailActions':
+    case 'calendarActions':
+    case 'socialActions': return 'medium'
+    default: return 'medium'
+  }
+}
+
+function isUndoable(toolName: string): boolean {
+  return [
+    'sendGmailMessage',
+    'createCalendarEvent',
+    'postTweet',
+    'sendSlackMessage'
+  ].includes(toolName)
+}
+
+function buildPendingAction(toolName: string, parameters: Record<string, any>, preview: ToolPreview, confirmationId: string): PendingAction {
+  return {
+    id: confirmationId, // reuse confirmation id so client can map 1:1
+    toolName,
+    parameters,
+  description: preview.description,
+    category: TOOL_SENSITIVITY_MAP[toolName] || 'dataModification',
+    sensitivity: computeSensitivity(toolName),
+    undoable: isUndoable(toolName),
+    preview: {
+      title: preview.title,
+      summary: preview.description,
+      // Derive details from raw parameters since simple preview shape doesn't have structured details
+      details: Object.entries(parameters).slice(0, 10).map(([key, value]) => ({
+        label: key,
+        value: typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value),
+        type: Array.isArray(value) ? 'list' : 'text'
+      })),
+      warnings: preview.warnings,
+    },
+    timestamp: Date.now(),
+  }
+}
 
 /**
  * Wrap critical tools to show confirmation first
@@ -53,12 +104,15 @@ export async function withConfirmation<T>(
     parameters,
     executeFunction
   })
+
+  const pendingAction = buildPendingAction(toolName, parameters, preview, confirmationId)
   
   // Return confirmation request
   return {
     needsConfirmation: true,
     preview,
-    confirmationId
+    confirmationId,
+    pendingAction,
   }
 }
 

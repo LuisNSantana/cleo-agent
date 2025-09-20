@@ -501,6 +501,22 @@ export async function POST(req: NextRequest) {
 														}
 													}
 													controller.enqueue(encoder.encode(`data: ${JSON.stringify(resultEvent)}\n\n`))
+													// If this tool result indicates a confirmation is required, emit dedicated event
+													try {
+														if (t.result && typeof t.result === 'object' && (t.result as any).needsConfirmation) {
+															const confEvent = {
+																type: 'tool-confirmation',
+																confirmation: {
+																	toolCallId: t.toolCallId,
+																	toolName: t.toolName,
+																	confirmationId: (t.result as any).confirmationId,
+																	preview: (t.result as any).preview,
+																	pendingAction: (t.result as any).pendingAction,
+																}
+															}
+															controller.enqueue(encoder.encode(`data: ${JSON.stringify(confEvent)}\n\n`))
+														}
+													} catch {}
 												}
 											}
 										} catch {}

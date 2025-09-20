@@ -8,6 +8,8 @@
  * - Clearer clarification logic when intent is ambiguous
  */
 
+import { getAllAgentCapabilities } from './capability-inspector'
+
 interface DelegationSuggestion {
   agentId: string
   agentName: string
@@ -111,9 +113,9 @@ const AGENT_PATTERNS: KeywordPatterns = {
   },
   'peter-google': {
     primary: ['google', 'docs', 'sheets', 'drive', 'workspace', 'document', 'spreadsheet', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
-    secondary: ['template', 'productivity', 'automation', 'workflow', 'organize', 'collaborate', 'permissions', 'share', 'invite', 'compartir', 'permisos'],
+    secondary: ['template', 'collaborate', 'permissions', 'share', 'invite', 'compartir', 'permisos'],
     contextual: ['create a doc', 'share file', 'track progress', 'organize data', 'create a sheet', 'build a form'],
-    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja', 'calendar', 'calendario', 'meeting', 'reunión', 'reunion', 'appointment', 'cita', 'invite']
+    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja', 'calendar', 'calendario', 'meeting', 'reunión', 'reunion', 'appointment', 'cita', 'invite', 'schedule', 'planning', 'research', 'investigar', 'buscar', 'search', 'productivity', 'workflow', 'automation', 'organize']
   },
   'emma-ecommerce': {
     primary: [
@@ -339,6 +341,68 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
 }
 
 /**
+ * Get available tools and capabilities for an agent
+ */
+export async function getAgentCapabilities(agentId: string): Promise<{
+  tools: string[]
+  tags: string[]
+  description: string
+  specializations: string[]
+} | null> {
+  try {
+    // Import registry dynamically to avoid circular dependencies
+    const { agentRegistry } = await import('../registry')
+    const agent = await agentRegistry.getAgent(agentId)
+    
+    if (!agent) return null
+    
+    return {
+      tools: agent.tools || [],
+      tags: agent.tags || [],
+      description: agent.description || '',
+      specializations: extractSpecializations(agent.tags || [])
+    }
+  } catch (error) {
+    console.error('Error getting agent capabilities:', error)
+    return null
+  }
+}
+
+/**
+ * Extract specializations from agent tags
+ */
+function extractSpecializations(tags: string[]): string[] {
+  const specializationMap: Record<string, string[]> = {
+    'google': ['Google Workspace', 'Document Creation', 'Spreadsheet Analysis'],
+    'workspace': ['Productivity Tools', 'Collaboration'],
+    'docs': ['Document Creation', 'Text Processing'],
+    'sheets': ['Data Analysis', 'Spreadsheet Management'],
+    'drive': ['File Management', 'Cloud Storage'],
+    'calendar': ['Scheduling', 'Time Management'],
+    'ecommerce': ['Online Store Management', 'Sales Analytics'],
+    'shopify': ['E-commerce Platform', 'Product Management'],
+    'technical': ['Programming', 'Software Development'],
+    'programming': ['Code Development', 'API Integration'],
+    'creative': ['Design', 'Visual Content'],
+    'design': ['UI/UX Design', 'Graphic Design'],
+    'research': ['Data Research', 'Information Gathering'],
+    'analysis': ['Data Analysis', 'Performance Metrics']
+  }
+  
+  const specializations = new Set<string>()
+  tags.forEach(tag => {
+    const tagLower = tag.toLowerCase()
+    Object.entries(specializationMap).forEach(([key, specs]) => {
+      if (tagLower.includes(key)) {
+        specs.forEach(spec => specializations.add(spec))
+      }
+    })
+  })
+  
+  return Array.from(specializations)
+}
+
+/**
  * Extract a concise task description from user text
  */
 function extractTaskFromText(userText: string): string {
@@ -409,4 +473,130 @@ export function getDelegationSuggestions(userText: string): string[] {
   }
   
   return suggestions
+}
+
+/**
+ * Enhanced delegation analysis with capability-aware decision making
+ * Integrates agent capability inspector for smarter delegation decisions
+ */
+export async function analyzeForDelegationWithCapabilities(
+  userText: string, 
+  currentAgentId?: string,
+  context?: string
+): Promise<{
+  suggestion: DelegationSuggestion | null
+  agentCapabilities: Record<string, any>
+  shouldDelegate: boolean
+  reasoning: string[]
+}> {
+  // Get standard delegation suggestion
+  const suggestion = analyzeDelegationIntent(userText, context)
+  
+  // Get capabilities of all available agents
+  const capabilities = await getAllAgentCapabilities()
+  
+  // Analyze if current agent can handle the task
+  const currentAgentCaps = currentAgentId ? await getAgentCapabilities(currentAgentId) : null
+  
+  const reasoning: string[] = []
+  let shouldDelegate = false
+  
+  if (suggestion && suggestion.confidence > 0.6) {
+    // High confidence delegation
+    shouldDelegate = true
+    reasoning.push(`High confidence match for ${suggestion.agentName} (${suggestion.confidence.toFixed(2)})`)
+    reasoning.push(...suggestion.reasoning)
+  } else if (currentAgentCaps) {
+    // Check if current agent can handle the task
+    const canCurrentAgentHandle = canAgentHandleTask(userText, currentAgentCaps)
+    if (canCurrentAgentHandle.canHandle) {
+      shouldDelegate = false
+      reasoning.push('Current agent can handle this task directly')
+      reasoning.push(...canCurrentAgentHandle.reasons)
+    } else if (suggestion) {
+      shouldDelegate = true
+      reasoning.push('Current agent cannot handle task, delegating to specialist')
+      reasoning.push(...canCurrentAgentHandle.reasons)
+    }
+  }
+  
+  return {
+    suggestion,
+    agentCapabilities: capabilities,
+    shouldDelegate,
+    reasoning
+  }
+}
+
+/**
+ * Check if an agent can handle a specific task based on their capabilities
+ */
+function canAgentHandleTask(userText: string, agentCaps: {
+  tools: string[]
+  tags: string[]
+  description: string
+  specializations: string[]
+}): { canHandle: boolean, reasons: string[] } {
+  const text = userText.toLowerCase()
+  const reasons: string[] = []
+  
+  // Check if task matches agent's specializations
+  const matchedSpecs = agentCaps.specializations.filter(spec => 
+    text.includes(spec.toLowerCase())
+  )
+  
+  if (matchedSpecs.length > 0) {
+    reasons.push(`Matches specializations: ${matchedSpecs.join(', ')}`)
+    return { canHandle: true, reasons }
+  }
+  
+  // Check if task requires tools the agent doesn't have
+  const requiredTools = extractRequiredTools(text)
+  const missingTools = requiredTools.filter(tool => 
+    !agentCaps.tools.some(agentTool => agentTool.includes(tool))
+  )
+  
+  if (missingTools.length > 0) {
+    reasons.push(`Missing required tools: ${missingTools.join(', ')}`)
+    return { canHandle: false, reasons }
+  }
+  
+  // Check against agent tags
+  const relevantTags = agentCaps.tags.filter(tag => 
+    text.includes(tag.toLowerCase())
+  )
+  
+  if (relevantTags.length > 0) {
+    reasons.push(`Matches tags: ${relevantTags.join(', ')}`)
+    return { canHandle: true, reasons }
+  }
+  
+  reasons.push('No clear specialization match, general capability assumed')
+  return { canHandle: true, reasons }
+}
+
+/**
+ * Extract required tools from user text
+ */
+function extractRequiredTools(text: string): string[] {
+  const toolKeywords: Record<string, string[]> = {
+    'gmail': ['email', 'correo', 'mail', 'send email', 'reply'],
+    'calendar': ['calendar', 'calendario', 'schedule', 'meeting', 'cita', 'evento'],
+    'drive': ['drive', 'file', 'archivo', 'upload', 'share'],
+    'docs': ['document', 'documento', 'write', 'create doc'],
+    'sheets': ['spreadsheet', 'hoja de cálculo', 'excel', 'tabla'],
+    'slides': ['presentation', 'presentación', 'slides', 'diapositivas'],
+    'twitter': ['twitter', 'tweet', 'post', 'x.com'],
+    'notion': ['notion', 'notes', 'notas', 'database']
+  }
+  
+  const requiredTools: string[] = []
+  
+  Object.entries(toolKeywords).forEach(([tool, keywords]) => {
+    if (keywords.some(keyword => text.includes(keyword))) {
+      requiredTools.push(tool)
+    }
+  })
+  
+  return requiredTools
 }

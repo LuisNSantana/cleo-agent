@@ -217,7 +217,7 @@ export const delegateToTobyTool = tool({
 });
 
 export const delegateToAmiTool = tool({
-  description: 'Delegate creative, design, or visual content tasks to Ami specialist. Use for graphic design, creative writing, UI/UX design, branding, or artistic projects.',
+  description: 'Delegate executive assistant, organization, productivity, research, calendar, email management, or creative tasks to Ami specialist. Ami handles: scheduling, email triage, research, organization, productivity workflows, creative projects, and general assistance tasks. Use for anything requiring coordination, planning, or general assistant work.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return runDelegation({ agentId: 'ami-creative', task, context, priority, requirements })
@@ -225,7 +225,7 @@ export const delegateToAmiTool = tool({
 });
 
 export const delegateToPeterTool = tool({
-  description: 'Delegate Google Workspace tasks to Peter specialist. Use for Google Docs, Sheets, Drive, Calendar management, document creation, spreadsheet analysis, or productivity automation.',
+  description: 'Delegate Google Workspace tasks to Peter specialist. ONLY use for: Google Docs creation, Google Sheets creation, Google Slides, Drive file management. Peter has tools: createGoogleDoc, createGoogleSheet, createGoogleSlides, updateGoogleDoc, updateGoogleSheet, listDriveFiles, searchDriveFiles, getDriveFileDetails. DO NOT delegate email, calendar, scheduling, research, or general organization tasks.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
     return runDelegation({ agentId: 'peter-google', task, context, priority, requirements })
