@@ -1,8 +1,36 @@
 import { openproviders } from "@/lib/openproviders"
 import { ModelConfig } from "../types"
 
-// OpenAI: GPT-5 models (mini and nano)
+// OpenAI: GPT-4o and GPT-5 models
 const openaiModels: ModelConfig[] = [
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    provider: "OpenAI",
+    providerId: "openai",
+    modelFamily: "GPT-4o",
+    baseProviderId: "openai",
+    description:
+      "Fast and affordable GPT-4o mini with vision, reasoning, and tool use. Excellent for most tasks.",
+    tags: ["affordable", "fast", "vision", "tools", "reasoning"],
+    contextWindow: 128000,
+    inputCost: 0.15,
+    outputCost: 0.6,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://platform.openai.com",
+    apiDocs: "https://platform.openai.com/docs/models",
+    modelPage: "https://platform.openai.com/docs/models/gpt-4o-mini",
+    releasedAt: "2024-07-18",
+    icon: "openai",
+    apiSdk: (apiKey?: string) => openproviders("gpt-4o-mini", undefined, apiKey),
+  },
   {
     id: "gpt-5-mini-2025-08-07",
     name: "Smarter",

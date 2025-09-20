@@ -31,6 +31,9 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "meta-llama/llama-4-scout:free": "openrouter",
   // Additional OpenRouter free models
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
+  // X.AI Grok models
+  "openrouter:x-ai/grok-4-fast:free": "openrouter",
+  "x-ai/grok-4-fast:free": "openrouter",
   // Removed deprecated Nemotron Ultra 253B mapping
   "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
 

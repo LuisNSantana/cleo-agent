@@ -735,6 +735,37 @@ export const openrouterModels: ModelConfig[] = [
       }).chat("x-ai/grok-3-mini-beta"),
   },
   {
+    id: "openrouter:x-ai/grok-4-fast:free",
+    name: "Grok-4-Fast (Free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Grok",
+    baseProviderId: "x-ai",
+    description:
+      "Latest Grok-4 model optimized for speed and performance. Free tier available through OpenRouter.",
+    tags: ["free", "fast", "latest", "coding", "reasoning"],
+    contextWindow: 128000,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "free",
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/x-ai/grok-4-fast",
+    apiDocs: "https://openrouter.ai/x-ai/grok-4-fast",
+    modelPage: "https://x.ai/api",
+    releasedAt: "2025-01-15",
+    icon: "xai",
+    apiSdk: (apiKey?: string, opts?: { enableSearch?: boolean }) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        ...(opts?.enableSearch && {
+          extraBody: {
+            plugins: [{ id: "web", max_results: 3 }],
+          },
+        }),
+      }).chat("x-ai/grok-4-fast:free"),
+  },
+  {
     id: "openrouter:google/gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
     provider: "OpenRouter",

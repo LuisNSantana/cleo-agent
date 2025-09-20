@@ -11,7 +11,7 @@ import { makeDelegationDecision, analyzeTaskComplexity } from '@/lib/agents/comp
 import type { AgentConfig } from '@/lib/agents/types'
 
 // Build a dynamic internal hint to steer delegation without exposing it to the user
-function buildInternalDelegationHint(userMessage?: string, recommended?: { name: string; toolName?: string; reasons?: string[] }) {
+async function buildInternalDelegationHint(userMessage?: string, recommended?: { name: string; toolName?: string; reasons?: string[] }) {
   const base = `\n\nOPTIMIZED AGENT SYSTEM ACTIVE:
 🚀 NEW ARCHITECTURE: 68% tool reduction vs legacy system
 ⚡ SMART ROUTING: Complexity-based delegation (simple=direct, complex=specialist)
@@ -25,7 +25,7 @@ function buildInternalDelegationHint(userMessage?: string, recommended?: { name:
       console.log(`🧠 [OPTIMIZATION] Analyzing: "${userMessage.substring(0, 100)}..."`)
       
       // Use the new complexity scorer
-      const delegationDecision = makeDelegationDecision(userMessage)
+      const delegationDecision = await makeDelegationDecision(userMessage)
       const complexity = delegationDecision.complexity
       
       console.log(`📊 [OPTIMIZATION] Score: ${complexity.score}, Route: ${complexity.recommendation}`, {
@@ -36,16 +36,10 @@ function buildInternalDelegationHint(userMessage?: string, recommended?: { name:
       })
       
       if (delegationDecision.shouldDelegate && delegationDecision.targetAgent) {
-        // Updated agent mapping for optimized system
-        const agentMap: Record<string, string> = {
-          'ami': 'delegate_to_ami',          // Admin/coordination
-          'peter': 'delegate_to_peter',      // Google Workspace creation
-          'emma': 'delegate_to_emma',        // E-commerce
-          'apu': 'delegate_to_apu',          // Research & intelligence (consolidated)
-          'wex': 'delegate_to_wex',          // Automation
-          'astra': 'delegate_to_astra',      // Email specialist (sub-agent)
-          'notion-agent': 'delegate_to_notion_agent'  // Notion specialist (sub-agent)
-        }
+        // Get dynamic agent mapping from database
+        const { getDynamicAgentMapping } = await import('@/lib/agents/dynamic-delegation')
+        const agentMap = await getDynamicAgentMapping()
+        
         const toolName = agentMap[delegationDecision.targetAgent]
         
         return `${base}
@@ -53,7 +47,7 @@ function buildInternalDelegationHint(userMessage?: string, recommended?: { name:
 🎯 SMART DELEGATION DECISION:
 - Complexity Score: ${complexity.score}/100 (${complexity.recommendation})
 - Target: ${delegationDecision.targetAgent.toUpperCase()} specialist
-- Tool: ${toolName}
+- Tool: ${toolName || 'delegate_to_' + delegationDecision.targetAgent}
 - Reasoning: ${delegationDecision.reasoning}
 - Optimization: Focused specialist vs legacy 25+ tool overload
 - Expected: 60-75% better accuracy with domain expertise`
@@ -463,7 +457,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
-  const internalHint = buildInternalDelegationHint(userMessage, routerHint)
+  const internalHint = await buildInternalDelegationHint(userMessage, routerHint)
   const finalSystemPrompt = ragSystemAddon
     ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`
     : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}`

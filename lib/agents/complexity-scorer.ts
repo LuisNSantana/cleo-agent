@@ -185,9 +185,40 @@ function analyzeFactors(message: string): ComplexityFactors {
 
 /**
  * Get domain-specific agent suggestion based on message content
+ * Now includes dynamic agent lookup
  */
-export function suggestAgent(message: string): string | null {
+export async function suggestAgent(message: string): Promise<string | null> {
   const lowMessage = message.toLowerCase();
+  
+  // First try static patterns for performance (most common cases)
+  const staticSuggestion = suggestAgentStatic(lowMessage)
+  if (staticSuggestion) {
+    return staticSuggestion
+  }
+
+  // If no static match, try dynamic lookup for custom agents
+  try {
+    const { getAvailableAgentNames } = await import('./dynamic-delegation')
+    const availableAgents = await getAvailableAgentNames()
+    
+    // Look for agent names mentioned in the message
+    for (const agentName of availableAgents) {
+      if (lowMessage.includes(agentName.toLowerCase())) {
+        console.log(`🎯 [DYNAMIC DELEGATION] Found agent mention: ${agentName}`)
+        return agentName.toLowerCase()
+      }
+    }
+  } catch (error) {
+    console.error('Error in dynamic agent suggestion:', error)
+  }
+  
+  return null;
+}
+
+/**
+ * Static agent suggestions for performance (synchronous)
+ */
+function suggestAgentStatic(lowMessage: string): string | null {
   
   // Research and intelligence patterns (consolidated)
   if (/(research|analyze|investigate|news|market|stock|search|academic|scholar|serpapi)/.test(lowMessage)) {
@@ -235,14 +266,14 @@ export function suggestAgent(message: string): string | null {
 /**
  * Enhanced delegation decision with complexity analysis
  */
-export function makeDelegationDecision(userMessage: string): {
+export async function makeDelegationDecision(userMessage: string): Promise<{
   shouldDelegate: boolean;
   targetAgent?: string;
   reasoning: string;
   complexity: ComplexityScore;
-} {
+}> {
   const complexity = analyzeTaskComplexity(userMessage);
-  const suggestedAgent = suggestAgent(userMessage);
+  const suggestedAgent = await suggestAgent(userMessage);
   
   if (complexity.recommendation === 'direct') {
     return {

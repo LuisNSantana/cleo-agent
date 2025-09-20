@@ -146,6 +146,14 @@ export function AgentCreatorForm() {
       // ignore in non-browser env
     }
 
+    // Update graph data to show new agent and connections
+    try {
+      updateGraphData()
+      console.log('[AgentCreator] Updated graph data for new agent')
+    } catch (e) {
+      console.error('[AgentCreator] Failed to update graph data:', e)
+    }
+
     // keep a small visual feedback by clearing name/setting created suffix
     setForm(prev => ({ ...prev, name: prev.name ? `${prev.name} (creado)` : '' }))
   }

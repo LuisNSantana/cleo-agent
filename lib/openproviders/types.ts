@@ -141,6 +141,7 @@ export type OpenRouterModel =
   | "openrouter:openai/o4-mini"
   | "openrouter:openai/gpt-oss-120b"
   | "openrouter:x-ai/grok-3-mini-beta"
+  | "openrouter:x-ai/grok-4-fast:free"
   | "openrouter:qwen/qwen2.5-32b-instruct"
   | "openrouter:z-ai/glm-4.5"
   | "openrouter:deepseek/deepseek-chat-v3.1:free"

@@ -45,6 +45,20 @@ export async function POST(req: Request) {
         console.error('[API/register] Error auto-refreshing delegation:', refreshError)
       }
 
+      // Clear delegation cache to pick up new agent
+      try {
+        const cacheResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/clear-delegation-cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (cacheResponse.ok) {
+          console.log('[API/register] Cleared delegation cache for new agent')
+        }
+      } catch (cacheError) {
+        console.error('[API/register] Error clearing delegation cache:', cacheError)
+      }
+
       return NextResponse.json({ success: true, agentId: cfg.id })
     } catch (err) {
       console.error('Error registering runtime agent via wrapper:', err)
@@ -71,6 +85,20 @@ export async function POST(req: Request) {
           }
         } catch (refreshError) {
           console.error('[API/register] Error auto-refreshing delegation (retry):', refreshError)
+        }
+
+        // Clear delegation cache to pick up new agent
+        try {
+          const cacheResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/clear-delegation-cache`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          
+          if (cacheResponse.ok) {
+            console.log('[API/register] Cleared delegation cache for new agent (retry)')
+          }
+        } catch (cacheError) {
+          console.error('[API/register] Error clearing delegation cache (retry):', cacheError)
         }
 
         return NextResponse.json({ success: true, agentId: cfg.id, recreated: true })

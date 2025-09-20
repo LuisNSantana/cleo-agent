@@ -44,16 +44,15 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 const extraProviderModels: ModelConfig[] = [
   // OpenRouter: Tool-calling enabled models only
   ...pickById(openrouterModels, [
-    // Curated set
-    "openrouter:openai/gpt-4.1-mini",
-    "openrouter:z-ai/glm-4.5",
+    // Free tier optimized models (tool-capable)
+    "openrouter:x-ai/grok-4-fast:free", // New flagship free model
     "openrouter:deepseek/deepseek-chat-v3.1:free",
     "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
     "openrouter:nvidia/nemotron-nano-9b-v2:free",
     "openrouter:qwen/qwen3-next-80b-a3b-thinking",
     // High-end additions (paid)
-  // Removed deprecated Nemotron Ultra 253B
-  "openrouter:meta-llama/llama-3.1-405b-instruct",
+    // Removed deprecated Nemotron Ultra 253B
+    "openrouter:meta-llama/llama-3.1-405b-instruct",
     // Meta Llama 4 Maverick
     "openrouter:meta-llama/llama-4-maverick",
     // Fast vision companion
@@ -63,7 +62,7 @@ const extraProviderModels: ModelConfig[] = [
   ...pickById(mistralModels, ["mistral-medium-2508"]),
   // Add economical models for user variety
   ...pickById(geminiModels, ["gemini-2.5-flash-lite"]),
-  ...pickById(openaiModels, ["gpt-5-nano"]),
+  ...pickById(openaiModels, ["gpt-4o-mini", "gpt-5-nano"]),
 ]
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([

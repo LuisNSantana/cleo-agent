@@ -27,9 +27,9 @@ export const NON_AUTH_ALLOWED_MODELS = [
 // Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
   // Curated free/tool-capable list for authenticated users
-  // Prefer Sonoma Sky; keep Dusk hidden from selector
-  // "openrouter:openrouter/sonoma-dusk-alpha", // intentionally not free list
-  "openrouter:openrouter/sonoma-sky-alpha",
+  // Top tier free models
+  "openrouter:x-ai/grok-4-fast:free",  // New Grok-4 fast model - excellent performance
+  "openai/gpt-4o-mini",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   "openrouter:deepseek/deepseek-chat-v3.1:free",
   // High-end free options
@@ -42,7 +42,7 @@ export const FREE_MODELS_IDS = [
 ]
 
 // Default authenticated model: Sonoma Sky Alpha via OpenRouter
-export const MODEL_DEFAULT = "openrouter:openrouter/sonoma-sky-alpha"
+export const MODEL_DEFAULT = "openrouter:x-ai/grok-4-fast:free"
 
 // MODELO POR DEFECTO PARA GUESTS - DEEPSEEK (herramientas soportadas)
 export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"

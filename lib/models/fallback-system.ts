@@ -14,6 +14,8 @@ const modelFallbacks: Record<string, string> = {
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter:meta-llama/llama-3.3-8b-instruct:free",
   "openrouter:meta-llama/llama-3.3-8b-instruct:free": "gpt-4o-mini",
 
+  // FAST TIER - Grok-4-fast as primary, DeepSeek free as fallback
+  "openrouter:x-ai/grok-4-fast:free": "openrouter:deepseek/deepseek-chat-v3.1:free",
   // FAST TIER - OpenRouter GPT-OSS 120B (paid) as primary, DeepSeek free as fallback
   "openrouter:openai/gpt-oss-120b": "openrouter:deepseek/deepseek-chat-v3.1:free",
   // Fast Vision companion - Sonoma Sky falls back to GPT-4o-mini if unavailable
@@ -147,7 +149,7 @@ export function getRecommendedModel(requirements: {
  * Tier classification helpers
  */
 export function getModelTier(modelId: string): 'free' | 'fast' | 'balanced' | 'smarter' | 'unknown' {
-  const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free']
+  const freeModels = ['openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:nvidia/nemotron-nano-9b-v2:free', 'openrouter:x-ai/grok-4-fast:free']
   const fastModels = ['openrouter:openai/gpt-oss-120b', 'openrouter:openrouter/sonoma-sky-alpha', 'gpt-4o-mini']
   const balancedModels = ['gpt-oss-120b', 'openrouter:z-ai/glm-4.5']
   const smarterModels = ['gpt-5-mini-2025-08-07', 'claude-3-5-sonnet-latest-fallback']
