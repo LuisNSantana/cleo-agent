@@ -23,6 +23,7 @@ import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
 import { PencilSimple } from "@phosphor-icons/react"
+import ToolConfirmationIndicator from "@/components/chat/tool-confirmation-indicator"
 
 type ChatInputProps = {
   value: string
@@ -292,6 +293,7 @@ export function ChatInput({
             hasImages={files.some(isImageFile)} 
             onSuggestionAction={onSuggestionAction} 
           />
+          
           <PromptInputTextarea
             placeholder={placeholder || "Ask Cleo"}
             onKeyDown={handleKeyDown}

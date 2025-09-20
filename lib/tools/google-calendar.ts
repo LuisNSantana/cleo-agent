@@ -256,14 +256,20 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-  const userId = getCurrentUserId()
+    const { interceptToolCall } = await import('../confirmation/middleware')
     
-    try {
-      const started = Date.now()
-      if (!userId) return { success: false, message: 'Auth required' }
+    return interceptToolCall(
+      'createCalendarEvent',
+      { summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
+      async () => {
+        const userId = getCurrentUserId()
+        
+        try {
+          const started = Date.now()
+          if (!userId) return { success: false, message: 'Auth required' }
 
-      const accessToken = await getGoogleCalendarAccessToken(userId)
-      if (!accessToken) return { success: false, message: 'Connect Google Calendar' }
+          const accessToken = await getGoogleCalendarAccessToken(userId)
+          if (!accessToken) return { success: false, message: 'Connect Google Calendar' }
 
       // Validate dates with Luxon
       const start = DateTime.fromISO(startDateTime, { zone: timeZone })
@@ -314,18 +320,20 @@ export const createCalendarEventTool = tool({
           hangoutLink: data.hangoutsLink || data.conferenceData?.entryPoints?.[0]?.uri
         }
       }
-      if (userId) {
-        await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: true, execMs: Date.now() - started, params: { timeZone, attendees: attendees?.length ?? 0 } })
+        if (userId) {
+          await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: true, execMs: Date.now() - started, params: { timeZone, attendees: attendees?.length ?? 0 } })
+        }
+        return result
+      } catch (error) {
+        console.error('[GCal Create Error]:', error)
+        const message = error instanceof Error ? error.message : String(error)
+        const userId = getCurrentUserId()
+        if (userId) await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: false, execMs: 0, errorType: 'create_error' })
+        return { success: false, message: `Failed: ${message}` }
       }
-      return result
-    } catch (error) {
-      console.error('[GCal Create Error]:', error)
-      const message = error instanceof Error ? error.message : String(error)
-  const userId = getCurrentUserId()
-      if (userId) await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: false, execMs: 0, errorType: 'create_error' })
-      return { success: false, message: `Failed: ${message}` }
     }
-  },
+  )
+},
 })
 
 // Export

@@ -9,6 +9,9 @@ import { OptimizationInsights, extractPipelineOptimizations } from './optimizati
 import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus } from './real-time-optimization'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { PerformanceMetrics } from './performance-metrics'
+import { useToolConfirmation } from '@/hooks/use-tool-confirmation'
+import InChatToolConfirmation from '@/components/chat/in-chat-tool-confirmation'
+import { AnimatePresence } from 'framer-motion'
 
 type ConversationProps = {
   messages: MessageType[]
@@ -28,6 +31,9 @@ export function Conversation({
   userId,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
+  
+  // Hook for tool confirmation
+  const { isWaitingForConfirmation, pendingAction, resolveConfirmation } = useToolConfirmation()
 
   // Extract pipeline steps PER MESSAGE instead of globally
   const messagePipelineSteps = useMemo(() => {
@@ -270,7 +276,33 @@ export function Conversation({
               </div>
             </div>
           )}
-  <div className="pointer-events-none sticky bottom-0 flex w-full max-w-4xl items-end justify-end gap-4 px-6 pb-2">
+
+          {/* Tool Confirmation como mensaje en el chat */}
+          <AnimatePresence>
+            {isWaitingForConfirmation && pendingAction && (
+              <div className="group flex w-full max-w-4xl flex-col items-start gap-3 px-6 pb-4">
+                <div className="w-full">
+                  {/* Simular estructura de mensaje del asistente */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-400 text-white text-sm font-medium">
+                      🛡️
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Confirmation Required
+                      </div>
+                      <InChatToolConfirmation
+                        pendingAction={pendingAction}
+                        onConfirm={resolveConfirmation}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          <div className="pointer-events-none sticky bottom-0 flex w-full max-w-4xl items-end justify-end gap-4 px-6 pb-2">
             <ScrollButton className="absolute top-[-50px] right-[30px]" />
           </div>
         </ChatContainerContent>

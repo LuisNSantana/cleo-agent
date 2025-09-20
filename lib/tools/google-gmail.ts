@@ -269,12 +269,18 @@ export const sendGmailMessageTool = tool({
     references: z.string().optional(),
   }).refine((data) => !!data.text || !!data.html, { message: 'Either text or html body is required', path: ['text'] }),
   execute: async ({ to, subject = '(No subject)', text, html, cc, bcc, replyTo, threadId, inReplyTo, references }) => {
-  const userId = getCurrentUserId()
-    try {
-      const started = Date.now()
-      if (!userId) return { success: false, message: 'Auth required' }
-      const token = await getGmailAccessToken(userId)
-      if (!token) return { success: false, message: 'Connect Gmail in Settings' }
+    const { interceptToolCall } = await import('../confirmation/middleware')
+    
+    return interceptToolCall(
+      'sendGmailMessage',
+      { to, subject, text, html, cc, bcc, replyTo, threadId, inReplyTo, references },
+      async () => {
+        const userId = getCurrentUserId()
+        try {
+          const started = Date.now()
+          if (!userId) return { success: false, message: 'Auth required' }
+          const token = await getGmailAccessToken(userId)
+          if (!token) return { success: false, message: 'Connect Gmail in Settings' }
 
       // Build MIME message per RFC 2822
       const boundary = `----=_Part_${Date.now()}`
@@ -313,14 +319,16 @@ export const sendGmailMessageTool = tool({
         body: JSON.stringify(body),
       })
 
-      await trackToolUsage(userId, 'gmail.sendMessage', { ok: true, execMs: Date.now() - started, params: { hasHtml: !!html } })
-      return { success: true, message: 'Email sent', id: res.id, threadId: res.threadId }
-    } catch (error) {
-      console.error('[Gmail] send error:', error)
-  const userIdStr = getCurrentUserId()
-  if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
-      return { success: false, message: 'Failed to send email' }
-    }
+          await trackToolUsage(userId, 'gmail.sendMessage', { ok: true, execMs: Date.now() - started, params: { hasHtml: !!html } })
+          return { success: true, message: 'Email sent', id: res.id, threadId: res.threadId }
+        } catch (error) {
+          console.error('[Gmail] send error:', error)
+          const userIdStr = getCurrentUserId()
+          if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
+          return { success: false, message: 'Failed to send email' }
+        }
+      }
+    )
   }
 })
 

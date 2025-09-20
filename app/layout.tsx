@@ -17,6 +17,7 @@ import { LayoutClient } from "./layout-client"
 import { LayoutApp } from "./components/layout/layout-app"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 import { Analytics } from "@vercel/analytics/next"
+import { ToolConfirmationProvider } from "@/hooks/use-tool-confirmation"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -158,13 +159,15 @@ export default async function RootLayout({
                           enableSystem={false}
                           disableTransitionOnChange
                         >
-                          <SidebarProvider defaultOpen>
-                            <Toaster position="top-center" />
-                            <LayoutApp>
-                              {children}
-                            </LayoutApp>
-                            <Analytics />
-                          </SidebarProvider>
+                          <ToolConfirmationProvider>
+                            <SidebarProvider defaultOpen>
+                              <Toaster position="top-center" />
+                              <LayoutApp>
+                                {children}
+                              </LayoutApp>
+                              <Analytics />
+                            </SidebarProvider>
+                          </ToolConfirmationProvider>
                         </ThemeProvider>
                       </TooltipProvider>
                     </UserPreferencesProvider>
