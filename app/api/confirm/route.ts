@@ -1,30 +1,30 @@
 import { NextRequest } from 'next/server'
 import { resolveConfirmation } from '@/lib/confirmation/simple-blocking'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const { confirmationId, approved } = await request.json()
-
-    if (!confirmationId) {
-      return Response.json({ error: 'Missing confirmationId' }, { status: 400 })
+    
+    if (!confirmationId || typeof approved !== 'boolean') {
+      return Response.json({
+        success: false,
+        error: 'Invalid parameters: confirmationId and approved (boolean) required'
+      }, { status: 400 })
     }
 
-    const resolved = resolveConfirmation(confirmationId, Boolean(approved))
-
-    if (!resolved) {
-      return Response.json({ error: 'Confirmation not found or expired' }, { status: 404 })
-    }
-
-    return Response.json({ 
-      success: true, 
-      approved: Boolean(approved),
-      message: approved ? 'Action approved' : 'Action cancelled'
-    })
-
+    console.log(`[CONFIRM API] Processing confirmation ${confirmationId} with approved=${approved}`)
+    
+    const result = await resolveConfirmation(confirmationId, approved)
+    
+    console.log(`[CONFIRM API] Result:`, result)
+    
+    return Response.json(result)
+    
   } catch (error) {
-    console.error('[Simple Confirmation] Error:', error)
-    return Response.json({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    console.error('[Confirm API] Error:', error)
+    return Response.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

@@ -65,6 +65,9 @@ export class DailyLimitsManager {
     const premiumModels = {
       'google:gemini-2.5-flash-image-preview': 100,
       'openrouter:google/gemini-2.5-flash-image-preview': 100,
+      'openrouter:black-forest-labs/flux-1-schnell:free': 100,
+      'openrouter:black-forest-labs/flux-1-pro': 50,
+      'openrouter:openai/dall-e-3': 30,
       'openrouter:anthropic/claude-3.5-sonnet-20241022': 100,
       'openrouter:openai/gpt-4.1-mini': 100,
       'openrouter:openai/gpt-5-preview': 50

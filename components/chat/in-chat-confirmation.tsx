@@ -46,20 +46,34 @@ export default function InChatConfirmation({ onConfirmationChange }: InChatConfi
     setProcessing(confirmationId)
     
     try {
+      console.log(`[UI] Processing confirmation ${confirmationId} with approved=${approved}`)
+      
       const response = await fetch('/api/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmationId, approved })
       })
 
-      if (response.ok) {
-        // Remove from pending list
+      const result = await response.json()
+      console.log(`[UI] Confirmation result:`, result)
+
+      if (response.ok && result.success) {
+        // Remove from pending list immediately
         setPendingConfirmations(prev => prev.filter(p => p.id !== confirmationId))
+        
+        // Show feedback message
+        if (approved) {
+          console.log(`[UI] Tool executed successfully: ${result.message}`)
+        } else {
+          console.log(`[UI] Tool cancelled: ${result.message}`)
+        }
       } else {
-        console.error('Failed to process confirmation')
+        console.error('[UI] Failed to process confirmation:', result.error || 'Unknown error')
+        // Don't remove from list if there was an error
       }
     } catch (error) {
-      console.error('Error processing confirmation:', error)
+      console.error('[UI] Error processing confirmation:', error)
+      // Don't remove from list if there was an error
     } finally {
       setProcessing(null)
     }

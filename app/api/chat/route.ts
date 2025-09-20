@@ -55,7 +55,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    const modelId = 'gemini-2.5-flash-image-preview'
+    const modelId = 'openrouter:black-forest-labs/flux-1-schnell:free'
     
     // Get the actual model configuration
     const modelConfig = MODELS.find((m) => m.id === modelId)
@@ -72,57 +72,62 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    // Initialize Google provider with API key
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    if (!apiKey) {
-      throw new Error("Google API key not configured")
-    }
-
-    const google = createGoogleGenerativeAI({ apiKey })
-    const geminiModel = google('gemini-2.5-flash-image-preview')
-    
-    console.log('🎨 [GOOGLE SDK] Calling generateContent with Gemini 2.5 Flash Image Preview')
+    console.log('🎨 [OPENROUTER] Using FLUX.1 Schnell for image generation')
     
     try {
-      // Use the raw Google Generative AI SDK for image generation
-      const { GoogleGenerativeAI } = await import('@google/generative-ai')
-      const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
+      // Try OpenRouter FLUX.1 first (best value), then fallback to others
+      const openrouterApiKey = process.env.OPENROUTER_API_KEY
+      if (!openrouterApiKey) {
+        throw new Error("OpenRouter API key not configured")
+      }
 
-      const result = await model.generateContent({
-        contents: [{
-          role: "user",
-          parts: [{
-            text: `Generate a high-quality image: ${prompt}`
-          }]
-        }]
+      // Use OpenRouter API for FLUX.1 image generation
+      const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openrouterApiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+          'X-Title': 'Cleo Agent'
+        },
+        body: JSON.stringify({
+          model: 'black-forest-labs/flux-1-schnell:free',
+          messages: [{
+            role: 'user',
+            content: `Generate a high-quality image: ${prompt}`
+          }],
+          modalities: ['image', 'text'],
+          max_tokens: 1000
+        })
       })
 
-      const response = await result.response
-      const imageData = response.candidates?.[0]?.content?.parts?.[0]
+      if (!openrouterResponse.ok) {
+        const errorData = await openrouterResponse.text()
+        throw new Error(`OpenRouter API error: ${openrouterResponse.status} - ${errorData}`)
+      }
 
-      if (imageData && imageData.inlineData) {
-        // Convert base64 image to data URL
-        const imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`
-        
+      const openrouterData = await openrouterResponse.json()
+      const imageData = openrouterData.choices?.[0]?.message?.images?.[0]
+
+      if (imageData && imageData.image_url?.url) {
         const realResult = {
-          imageUrl,
+          imageUrl: imageData.image_url.url,
           title: `Generated Image: ${prompt.slice(0, 50)}`,
-          description: `AI-generated image based on: "${prompt}"`,
-          style: "AI Generated",
+          description: `AI-generated image using FLUX.1 Schnell: "${prompt}"`,
+          style: "FLUX.1 Schnell",
           dimensions: {
             width: 1024,
             height: 1024
           }
         }
 
-        console.log('🎨 [GOOGLE SDK] Real image generated successfully')
+        console.log('🎨 [OPENROUTER] FLUX.1 image generated successfully')
 
         // Record usage if user is authenticated
         if (user?.id) {
           try {
             await dailyLimits.recordUsage(user.id, modelId)
-            console.log('🎨 [GOOGLE SDK] Usage recorded for user:', user.id)
+            console.log('🎨 [OPENROUTER] Usage recorded for user:', user.id)
           } catch (error) {
             console.error('Failed to record image generation usage:', error)
           }
@@ -134,10 +139,72 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
           model: modelId
         }
       } else {
-        throw new Error("No image data received from Gemini")
+        // If FLUX fails, try DALL-E 3 fallback
+        console.log('🎨 [DALL-E FALLBACK] FLUX failed, trying DALL-E 3...')
+        
+        const openaiApiKey = process.env.OPENAI_API_KEY
+        if (!openaiApiKey) {
+          throw new Error("OpenAI API key not configured for fallback")
+        }
+
+        const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3',
+            prompt: prompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'standard'
+          })
+        })
+
+        if (!openaiResponse.ok) {
+          const errorData = await openaiResponse.text()
+          throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorData}`)
+        }
+
+        const openaiData = await openaiResponse.json()
+        const imageUrl = openaiData.data[0]?.url
+
+        if (!imageUrl) {
+          throw new Error("No image URL received from OpenAI")
+        }
+
+        const realResult = {
+          imageUrl,
+          title: `Generated Image: ${prompt.slice(0, 50)}`,
+          description: `AI-generated image using DALL-E 3: "${prompt}"`,
+          style: "DALL-E 3",
+          dimensions: {
+            width: 1024,
+            height: 1024
+          }
+        }
+
+        console.log('🎨 [DALL-E FALLBACK] DALL-E 3 image generated successfully')
+
+        // Record usage if user is authenticated
+        if (user?.id) {
+          try {
+            await dailyLimits.recordUsage(user.id, modelId)
+            console.log('🎨 [DALL-E FALLBACK] Usage recorded for user:', user.id)
+          } catch (error) {
+            console.error('Failed to record image generation usage:', error)
+          }
+        }
+
+        return {
+          success: true,
+          result: realResult,
+          model: 'dall-e-3-fallback'
+        }
       }
     } catch (sdkError) {
-      console.error('🎨 [GOOGLE SDK] Direct SDK error:', sdkError)
+      console.error('🎨 [IMAGE GENERATION] All providers failed:', sdkError)
       
       // Fallback to mock for now
       const mockResult = {
@@ -151,13 +218,13 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
         }
       }
 
-      console.log('🎨 [GOOGLE SDK] Mock fallback image generated')
+      console.log('🎨 [MOCK FALLBACK] All providers failed, using placeholder image')
 
       // Record usage if user is authenticated
       if (user?.id) {
         try {
           await dailyLimits.recordUsage(user.id, modelId)
-          console.log('🎨 [GOOGLE SDK] Usage recorded for user:', user.id)
+          console.log('🎨 [MOCK FALLBACK] Usage recorded for user:', user.id)
         } catch (error) {
           console.error('Failed to record image generation usage:', error)
         }
@@ -171,11 +238,11 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
     }
 
   } catch (error) {
-    console.error('🎨 [GOOGLE SDK] Image generation error:', error)
+    console.error('🎨 [IMAGE GENERATION] Error:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      model: 'gemini-2.5-flash-image-preview'
+      model: 'openrouter:black-forest-labs/flux-1-schnell:free'
     }
   }
 }
@@ -260,18 +327,22 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🎨 NANO BANANA IMAGE GENERATION
-    // If user selected Nano Banana model, they want to generate images
+    // 🎨 IMAGE GENERATION DETECTION
     // Check if this is an image generation model
     const isImageModel = originalModel.includes("image-preview") || 
                         originalModel.includes("flash-lite") ||
-                        normalizedModel === "gemini-2.5-flash-image-preview"
+                        originalModel.includes("flux") ||
+                        originalModel.includes("dall-e") ||
+                        normalizedModel === "gemini-2.5-flash-image-preview" ||
+                        normalizedModel === "flux-1-schnell" ||
+                        normalizedModel === "flux-1-pro" ||
+                        normalizedModel === "dall-e-3"
     
     if (userMessageText && isImageModel) {
       console.log('🎨 [IMAGE GENERATION] Image generation model detected, generating image for:', userMessageText)
 
       try {
-        // Call image generation function directly using Google SDK
+        // Call OpenRouter FLUX image generation function
         const imageResult = await generateImageDirectWithGoogle(userMessageText, isAuthenticated ? userId : undefined)
 
         if (imageResult.success && imageResult.result) {

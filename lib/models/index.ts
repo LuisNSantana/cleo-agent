@@ -53,6 +53,10 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:openai/gpt-4.1-mini", // Re-enabled OpenAI GPT-4.1 mini
     // Premium multimodal models with daily limits
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
+    // Image generation models - OpenRouter FLUX (best value)
+    "openrouter:black-forest-labs/flux-1-schnell:free", // 20 images/day - free high-quality
+    "openrouter:black-forest-labs/flux-1-pro", // 10 images/day - premium quality
+    "openrouter:openai/dall-e-3", // 8 images/day - artistic style
     "gemini-2.5-flash-image-preview", // 5 images/day - text-to-image (Google direct)
     "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast:free
     // High-end additions (paid)
