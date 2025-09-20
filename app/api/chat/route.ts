@@ -117,8 +117,11 @@ export async function POST(req: Request) {
 
     // 🎨 NANO BANANA IMAGE GENERATION
     // If user selected Nano Banana model, they want to generate images
-    if (userMessageText && originalModel.includes("image-preview")) {
-      console.log('🎨 [IMAGE GENERATION] Nano Banana model detected, generating image for:', userMessageText)
+    // Check if this is an image generation model
+    const isImageModel = originalModel.includes("image-preview") || originalModel.includes("flash-lite")
+    
+    if (userMessageText && isImageModel) {
+      console.log('🎨 [IMAGE GENERATION] Image generation model detected, generating image for:', userMessageText)
 
       try {
         // Call our image generation endpoint internally

@@ -82,7 +82,10 @@ export const ALWAYS_CONFIRM_TOOLS = [
   'deleteRecord', 
   'makeTransaction',
   'createPayment',
-  'deleteCalendarEvent'
+  'deleteCalendarEvent',
+  'createCalendarEvent',
+  'sendGmailMessage',
+  'postTweet'
 ]
 
 // Herramientas que son seguras para auto-ejecución

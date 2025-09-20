@@ -32,18 +32,23 @@ class ConfirmationStore {
 
   // Check if a tool needs confirmation
   needsConfirmation(toolName: string): boolean {
+    console.log(`🔍 [CONFIRMATION] Checking if ${toolName} needs confirmation`)
+    
     // Always safe tools
     if (SAFE_AUTO_TOOLS.includes(toolName)) {
+      console.log(`🔍 [CONFIRMATION] ${toolName} is in SAFE_AUTO_TOOLS`)
       return false
     }
 
     // Tools that always require confirmation
     if (ALWAYS_CONFIRM_TOOLS.includes(toolName)) {
+      console.log(`🔍 [CONFIRMATION] ${toolName} is in ALWAYS_CONFIRM_TOOLS`)
       return true
     }
 
     // Check if in bulk approval
     if (this.bulkApprovals.has(toolName)) {
+      console.log(`🔍 [CONFIRMATION] ${toolName} has bulk approval`)
       return false
     }
 
@@ -233,8 +238,14 @@ export async function interceptToolCall<T>(
   parameters: Record<string, any>, 
   executeFunction: () => Promise<T>
 ): Promise<T> {
+  console.log(`🛡️ [CONFIRMATION] Intercepting tool: ${toolName}`)
+  
   // Check if needs confirmation
-  if (!confirmationStore.needsConfirmation(toolName)) {
+  const needsConfirm = confirmationStore.needsConfirmation(toolName)
+  console.log(`🛡️ [CONFIRMATION] Tool ${toolName} needs confirmation: ${needsConfirm}`)
+  
+  if (!needsConfirm) {
+    console.log(`🛡️ [CONFIRMATION] Executing ${toolName} without confirmation`)
     return executeFunction()
   }
 
