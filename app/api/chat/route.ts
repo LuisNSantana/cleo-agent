@@ -27,6 +27,7 @@ import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
+import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
 
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
 export const runtime = "nodejs"
@@ -87,7 +88,136 @@ export async function POST(req: Request) {
 
     const userMessage = messages[messages.length - 1]
 
-  if (supabase && userMessage?.role === "user") {
+    // Extract text content from user message for image generation detection
+    let userMessageText = ""
+    if (userMessage?.role === "user") {
+      // Handle AI SDK v5 structure (parts) or legacy structure (content)
+      if ((userMessage as any).parts && Array.isArray((userMessage as any).parts)) {
+        // AI SDK v5 structure with parts
+        const textParts = (userMessage as any).parts
+          .filter((part: any) => part.type === "text")
+          .map((part: any) => part.text || "")
+          .join(" ")
+        userMessageText = textParts
+      } else if ((userMessage as any).content) {
+        // Legacy structure with content
+        const content = (userMessage as any).content
+        if (typeof content === "string") {
+          userMessageText = content
+        } else if (Array.isArray(content)) {
+          // Extract text from multimodal content
+          const textParts = content
+            .filter((part: any) => part.type === "text")
+            .map((part: any) => part.text || part.content || "")
+            .join(" ")
+          userMessageText = textParts
+        }
+      }
+    }
+
+    // 🎨 NANO BANANA IMAGE GENERATION
+    // If user selected Nano Banana model, they want to generate images
+    if (userMessageText && originalModel.includes("image-preview")) {
+      console.log('🎨 [IMAGE GENERATION] Nano Banana model detected, generating image for:', userMessageText)
+
+      try {
+        // Call our image generation endpoint internally
+        const imageResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/generate-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: userMessageText, // Use the full user message as prompt
+            userId: isAuthenticated ? userId : undefined
+          })
+        })
+
+          const imageResult = await imageResponse.json()
+
+          if (imageResult.success && imageResult.result) {
+            // Store a successful assistant message with the image result
+            const assistantResponse = `¡Imagen generada! He creado: "${imageResult.result.title}"\n\n![Generated Image](${imageResult.result.imageUrl})\n\n*${imageResult.result.description}*`
+            
+            if (supabase) {
+              await storeAssistantMessage({
+                supabase,
+                userId,
+                chatId,
+                messages: [{
+                  role: "assistant",
+                  content: assistantResponse
+                }],
+                model: originalModel,
+                inputTokens: userMessageText.length / 4, // Rough estimate
+                outputTokens: assistantResponse.length / 4, // Rough estimate
+                message_group_id,
+              })
+            }
+
+            // Return the image generation result as a streaming response
+            const stream = new ReadableStream({
+              start(controller) {
+                const encoder = new TextEncoder()
+                // Send the image result in a format the frontend can understand
+                const response = JSON.stringify({
+                  type: 'image_generated',
+                  data: imageResult.result
+                })
+                controller.enqueue(encoder.encode(response))
+                controller.close()
+              }
+            })
+
+            return new Response(stream, {
+              headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'X-Accel-Buffering': 'no',
+              },
+            })
+          } else {
+            console.error('🎨 [IMAGE GENERATION] Failed:', imageResult.error || 'Unknown error')
+            // Fall through to normal chat processing with error message
+            const errorMessage = `No pude generar la imagen: ${imageResult.error || 'Error desconocido'}. Intentaré ayudarte de otra manera.`
+            
+            if (supabase) {
+              await storeAssistantMessage({
+                supabase,
+                userId,
+                chatId,
+                messages: [{
+                  role: "assistant",
+                  content: errorMessage
+                }],
+                model: originalModel,
+                inputTokens: userMessageText.length / 4,
+                outputTokens: errorMessage.length / 4,
+                message_group_id,
+              })
+            }
+
+            const stream = new ReadableStream({
+              start(controller) {
+                const encoder = new TextEncoder()
+                controller.enqueue(encoder.encode(errorMessage))
+                controller.close()
+              }
+            })
+
+            return new Response(stream, {
+              headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'X-Accel-Buffering': 'no',
+              },
+            })
+          }
+        } catch (error) {
+          console.error('🎨 [IMAGE GENERATION] Error calling endpoint:', error)
+          // Fall through to normal chat processing
+        }
+    }
+
+    if (supabase && userMessage?.role === "user") {
       // Process the content to create a clean summary for database storage
       let contentForDB = ""
 
