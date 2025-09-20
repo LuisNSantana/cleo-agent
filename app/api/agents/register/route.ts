@@ -23,6 +23,28 @@ export async function POST(req: Request) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[API/register] Registered runtime agent with icon:', { id: cfg.id, icon: cfg.icon })
       }
+
+      // Auto-refresh delegation tools for Cleo
+      try {
+        const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/auto-refresh-delegation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            newAgentId: cfg.id, 
+            newAgentName: cfg.name 
+          })
+        })
+        
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          console.log('[API/register] Auto-refreshed delegation tools:', refreshData)
+        } else {
+          console.warn('[API/register] Failed to auto-refresh delegation tools')
+        }
+      } catch (refreshError) {
+        console.error('[API/register] Error auto-refreshing delegation:', refreshError)
+      }
+
       return NextResponse.json({ success: true, agentId: cfg.id })
     } catch (err) {
       console.error('Error registering runtime agent via wrapper:', err)
@@ -31,6 +53,26 @@ export async function POST(req: Request) {
   const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
         recreateAgentOrchestrator()
         registerRuntimeAgent(cfg)
+
+        // Auto-refresh delegation tools for Cleo
+        try {
+          const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/auto-refresh-delegation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              newAgentId: cfg.id, 
+              newAgentName: cfg.name 
+            })
+          })
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            console.log('[API/register] Auto-refreshed delegation tools (retry):', refreshData)
+          }
+        } catch (refreshError) {
+          console.error('[API/register] Error auto-refreshing delegation (retry):', refreshError)
+        }
+
         return NextResponse.json({ success: true, agentId: cfg.id, recreated: true })
       } catch (err2) {
         console.error('Retry after recreate failed:', err2)

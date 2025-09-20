@@ -80,6 +80,22 @@ export function AgentGraph({
     return () => clearTimeout(id)
   }, [])
 
+  // Listen for agent creation events to update the graph
+  React.useEffect(() => {
+    const handleAgentCreated = (event: CustomEvent) => {
+      console.log('Agent created, updating graph:', event.detail)
+      // Small delay to allow delegation tools to be updated on server
+      setTimeout(() => {
+        updateGraphData()
+      }, 2000)
+    }
+
+    window.addEventListener('agent:created', handleAgentCreated as EventListener)
+    return () => {
+      window.removeEventListener('agent:created', handleAgentCreated as EventListener)
+    }
+  }, [updateGraphData])
+
   // Convert our data to React Flow format
   const initialNodes: Node[] = useMemo(() => {
     // Hide the raw cleo-supervisor agent node to avoid duplication with the dedicated router-node
@@ -260,13 +276,12 @@ export function AgentGraph({
   }, [storeNodes, executeAgent, executions, currentExecution, selectedExecution, currentStep, minimalMode])
 
   const initialEdges: Edge[] = useMemo(() => {
-    // Base edges from store, but hide noisy tool/handoff edges (e.g., delegate, complete_task)
+    // Base edges from store, including delegation connections
     const baseEdges = storeEdges
       .filter((edgeData) => {
         const label = String(edgeData.label || '').toLowerCase()
-        // Hide delegation and tool edges to avoid duplicate/ambiguous paths
+        // Hide only handoff/tool edges but keep delegation connections
         if (edgeData.type === 'handoff') return false
-        if (label.includes('delegate') || label.includes('delegar')) return false
         if (label.includes('complete_task') || label.includes('complete')) return false
         // Also hide any edges that reference the hidden cleo-supervisor node
         if (edgeData.source === 'cleo-supervisor' || edgeData.target === 'cleo-supervisor') return false

@@ -15,6 +15,7 @@ import { AgentConfig, AgentRole } from '@/lib/agents/types'
 export function AgentCreatorForm() {
   const addAgent = useClientAgentStore(state => state.addAgent)
   const selectAgent = useClientAgentStore(state => state.selectAgent)
+  const updateGraphData = useClientAgentStore(state => state.updateGraphData)
 
   const [form, setForm] = useState<Partial<AgentConfig>>({
     name: '',
@@ -114,6 +115,9 @@ export function AgentCreatorForm() {
     // add locally for instant UX
     addAgent(agent)
     selectAgent(agent)
+    
+    // Update graph to show new connections
+    updateGraphData()
 
     // notify server orchestrator to register runtime agent
     try {
@@ -125,6 +129,11 @@ export function AgentCreatorForm() {
       const data = await res.json()
       if (!data || !data.success) {
         console.warn('Server failed to register agent:', data?.error)
+      } else {
+        // Agent registered successfully, update graph with delegation tools
+        setTimeout(() => {
+          updateGraphData()
+        }, 1000) // Small delay to allow delegation tools to be updated
       }
     } catch (err) {
       console.error('Failed to call /api/agents/register', err)

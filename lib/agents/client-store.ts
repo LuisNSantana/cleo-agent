@@ -411,7 +411,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         }
       })
 
-  // Create edges array; we'll add only explicit parent → sub-agent relationships
+  // Create edges array; we'll add parent → sub-agent relationships and delegation tools
   const edges: AgentEdge[] = []
 
   // Add explicit parent → sub-agent relationships (e.g., Nora → Luna/Zara)
@@ -427,6 +427,48 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           })
         }
       })
+
+  // Add delegation tool connections (e.g., Cleo can delegate to LUIS)
+  agents.forEach(agent => {
+    if (agent.tools && agent.tools.length > 0) {
+      agent.tools.forEach(tool => {
+        // Check if this is a delegation tool
+        if (tool.startsWith('delegate_to_')) {
+          // Extract the target agent ID from the tool name
+          const targetIdWithUnderscores = tool.replace('delegate_to_', '')
+          
+          // Try to find the target agent by various ID matching strategies
+          let targetAgent = null
+          
+          // Strategy 1: Direct UUID match (most common)
+          targetAgent = agents.find(a => a.id.replace(/[^a-zA-Z0-9]/g, '_') === targetIdWithUnderscores)
+          
+          // Strategy 2: Try predefined agent names (toby, ami, peter, etc.)
+          if (!targetAgent) {
+            const agentName = targetIdWithUnderscores.replace(/_/g, '').toLowerCase()
+            targetAgent = agents.find(a => a.name.toLowerCase() === agentName)
+          }
+          
+          // Strategy 3: Try exact ID match with dashes restored
+          if (!targetAgent) {
+            const targetId = targetIdWithUnderscores.replace(/_/g, '-')
+            targetAgent = agents.find(a => a.id === targetId)
+          }
+          
+          if (targetAgent && agent.id !== targetAgent.id) {
+            edges.push({
+              id: `${agent.id}-${targetAgent.id}-delegate`,
+              source: agent.id,
+              target: targetAgent.id,
+              type: 'delegation',
+              animated: false,
+              label: `delegate to ${targetAgent.name}`
+            })
+          }
+        }
+      })
+    }
+  })
 
       // Update connections in nodes
       nodes.forEach(node => {
