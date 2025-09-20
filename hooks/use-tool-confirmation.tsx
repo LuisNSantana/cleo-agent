@@ -33,32 +33,83 @@ export function ToolConfirmationProvider({ children }: ToolConfirmationProviderP
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
 
   useEffect(() => {
-    // Polling para detectar acciones pendientes
-    const checkPendingActions = () => {
-      const pending = confirmationStore.getPendingAction()
-      console.log('🔍 [CLIENT] Checking pending actions:', pending)
-      
-      if (pending && pending.id !== pendingAction?.id) {
-        console.log('🔍 [CLIENT] New pending action detected:', pending)
-        setPendingAction(pending)
-      } else if (!pending && pendingAction) {
-        console.log('🔍 [CLIENT] Clearing pending action')
-        setPendingAction(null)
+    // Polling para detectar acciones pendientes desde el backend
+    const checkPendingActions = async () => {
+      try {
+        const response = await fetch('/api/chat/pending-confirmations')
+        const data = await response.json()
+        
+        if (data.success && data.confirmations.length > 0) {
+          const latestConfirmation = data.confirmations[0] // Get the most recent one
+          
+          if (latestConfirmation && latestConfirmation.confirmationId !== pendingAction?.id) {
+            console.log('🔍 [CLIENT] New pending confirmation detected:', latestConfirmation)
+            
+            // Convert to PendingAction format
+            const newPendingAction: PendingAction = {
+              id: latestConfirmation.confirmationId,
+              toolName: latestConfirmation.toolName,
+              parameters: latestConfirmation.pendingAction?.parameters || {},
+              description: latestConfirmation.preview?.description || '',
+              category: latestConfirmation.pendingAction?.category || 'dataModification',
+              sensitivity: latestConfirmation.pendingAction?.sensitivity || 'medium',
+              undoable: latestConfirmation.pendingAction?.undoable || false,
+              preview: latestConfirmation.preview || {
+                title: 'Confirmation Required',
+                description: 'Please confirm this action',
+                parameters: []
+              },
+              timestamp: latestConfirmation.timestamp || Date.now()
+            }
+            
+            setPendingAction(newPendingAction)
+          }
+        } else if (data.success && data.confirmations.length === 0 && pendingAction) {
+          console.log('🔍 [CLIENT] No pending confirmations, clearing state')
+          setPendingAction(null)
+        }
+      } catch (error) {
+        console.error('🔍 [CLIENT] Error checking pending confirmations:', error)
       }
     }
 
     // Check inicial
     checkPendingActions()
 
-    // Polling cada 300ms para detectar nuevas acciones pendientes
-    const interval = setInterval(checkPendingActions, 300)
+    // Polling cada 500ms para detectar nuevas acciones pendientes
+    const interval = setInterval(checkPendingActions, 500)
 
     return () => clearInterval(interval)
   }, [pendingAction])
 
-  const resolveConfirmation = (result: ConfirmationResult) => {
+  const resolveConfirmation = async (result: ConfirmationResult) => {
     if (pendingAction) {
-      confirmationStore.resolveConfirmation(pendingAction.id, result)
+      console.log(`[CLIENT] Resolving confirmation ${pendingAction.id}:`, result)
+      
+      try {
+        // Call backend endpoint to execute the confirmed tool
+        const response = await fetch('/api/chat/confirm-tool', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            confirmationId: pendingAction.id,
+            approved: result.action === 'approve',
+          }),
+        })
+
+        const data = await response.json()
+        
+        if (data.success) {
+          console.log(`[CLIENT] Tool execution result:`, data.result)
+        } else {
+          console.error(`[CLIENT] Tool execution failed:`, data.error)
+        }
+      } catch (error) {
+        console.error(`[CLIENT] Error calling confirm-tool endpoint:`, error)
+      }
+      
       setPendingAction(null)
     }
   }

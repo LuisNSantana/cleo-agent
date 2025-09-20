@@ -1,4 +1,5 @@
 import { storeAssistantMessage } from "@/app/api/chat/api"
+import { isConfirmationRequest } from "@/lib/confirmation/wrapper"
 
 type AnySupabase = any
 
@@ -24,6 +25,39 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
     convertedMessages,
     resultStart,
   } = params
+
+  const onToolResult = ({ toolName, result }: { toolName: string; result: any }) => {
+    // Check if this tool result requires confirmation
+    if (isConfirmationRequest(result)) {
+      console.log(`[TOOL CONFIRMATION] Tool ${toolName} requires confirmation:`, result.confirmationId)
+      
+      // Store confirmation in global context so the polling endpoint can access it
+      if (typeof globalThis !== 'undefined') {
+        const confirmations = (globalThis as any).__pendingConfirmations || new Map()
+        confirmations.set(result.confirmationId, {
+          toolName,
+          result,
+          timestamp: Date.now()
+        })
+        ;(globalThis as any).__pendingConfirmations = confirmations
+        console.log(`[TOOL CONFIRMATION] Stored confirmation ${result.confirmationId} globally`)
+      }
+      
+      // Return structured confirmation response
+      // This will cause the AI to include confirmation data in its response
+      return {
+        type: 'confirmation-required',
+        toolName,
+        confirmationId: result.confirmationId,
+        preview: result.preview,
+        pendingAction: result.pendingAction,
+        needsConfirmation: true
+      }
+    }
+    
+    // For regular tool results, return them as-is
+    return result
+  }
 
   const onError = (err: unknown) => {
     // Clean up global context on streaming error
@@ -141,5 +175,5 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
     }
   }
 
-  return { onError, onFinish }
+  return { onError, onFinish, onToolResult }
 }

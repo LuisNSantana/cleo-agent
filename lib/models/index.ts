@@ -50,9 +50,10 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
     "openrouter:nvidia/nemotron-nano-9b-v2:free",
     "openrouter:qwen/qwen3-next-80b-a3b-thinking",
+    "openrouter:openai/gpt-4.1-mini", // Re-enabled OpenAI GPT-4.1 mini
     // Premium multimodal models with daily limits
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
-    "openrouter:google/gemini-2.5-flash-image-preview", // 5 images/day - text-to-image
+    "gemini-2.5-flash-image-preview", // 5 images/day - text-to-image (Google direct)
     "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast:free
     // High-end additions (paid)
     // Removed deprecated Nemotron Ultra 253B
@@ -65,7 +66,7 @@ const extraProviderModels: ModelConfig[] = [
   // Re-enable Mistral Medium in selector
   ...pickById(mistralModels, ["mistral-medium-2508"]),
   // Add economical models for user variety
-  ...pickById(geminiModels, ["gemini-2.5-flash-lite"]),
+  ...pickById(geminiModels, ["gemini-2.5-flash-image-preview"]), // Only add image preview, keep OpenRouter lite
   ...pickById(openaiModels, ["gpt-4o-mini", "gpt-5", "gpt-5-nano"]),
 ]
 

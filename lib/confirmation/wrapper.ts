@@ -13,6 +13,8 @@ export interface ToolConfirmationResult {
   confirmationId: string
   // Full pending action metadata so the client can render rich UI without a separate in-memory store
   pendingAction: PendingAction
+  // Optional message for the model to display
+  message?: string
 }
 
 // Regular tool response
@@ -107,12 +109,26 @@ export async function withConfirmation<T>(
 
   const pendingAction = buildPendingAction(toolName, parameters, preview, confirmationId)
   
-  // Return confirmation request
+  console.log(`[TOOL CONFIRMATION] Stored pending confirmation ${confirmationId} for ${toolName}`)
+  
+  // Return a special message that includes the confirmation data
+  // This will be displayed by the model and detected by the frontend
   return {
     needsConfirmation: true,
-    preview,
     confirmationId,
+    preview,
     pendingAction,
+    // Also include a text message for the model to display
+    message: `🔒 **Action requires confirmation**
+
+I need your permission to execute: **${preview.title}**
+
+${preview.description}
+
+${preview.warnings && preview.warnings.length > 0 ? 
+  `⚠️ **Warnings:**\n${preview.warnings.map(w => `• ${w}`).join('\n')}\n` : ''}
+
+Please review the action details above and choose to approve or cancel this operation.`
   }
 }
 

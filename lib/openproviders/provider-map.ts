@@ -122,6 +122,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
 
   // Google
   "gemini-2.5-flash-lite": "google",
+  "gemini-2.5-flash-image-preview": "google",
   "gemini-2.0-flash-001": "google",
   "gemini-1.5-flash": "google",
   "gemini-1.5-flash-latest": "google",
