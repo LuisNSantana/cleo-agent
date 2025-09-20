@@ -87,10 +87,10 @@ export async function saveFinalAssistantMessage(
     content: finalPlainText || "",
     parts: parts as unknown as Json,
     message_group_id,
-  model: model ? normalizeModelId(model) : undefined,
-  user_id: userId,
-    input_tokens: opts?.inputTokens ?? null,
-    output_tokens: opts?.outputTokens ?? null,
+    model: model ? normalizeModelId(model) : undefined,
+    user_id: userId,
+    input_tokens: opts?.inputTokens ? Math.round(Number(opts.inputTokens)) : null,
+    output_tokens: opts?.outputTokens ? Math.round(Number(opts.outputTokens)) : null,
     response_time_ms: opts?.responseTimeMs ?? null,
   } as const
 

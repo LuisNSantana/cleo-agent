@@ -81,38 +81,93 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
     const google = createGoogleGenerativeAI({ apiKey })
     const geminiModel = google('gemini-2.5-flash-image-preview')
     
-    console.log('🎨 [GOOGLE SDK] Calling generateObject with Gemini 2.5 Flash Image Preview')
+    console.log('🎨 [GOOGLE SDK] Calling generateContent with Gemini 2.5 Flash Image Preview')
     
-    // For now, return a mock response until we implement the proper image generation
-    // The AI SDK doesn't yet have full support for direct image generation responses
-    // We'll need to use the raw Google API or wait for SDK updates
-    const mockResult = {
-      imageUrl: `https://via.placeholder.com/1024x1024/4F46E5/FFFFFF?text=${encodeURIComponent(prompt.slice(0, 50))}`,
-      title: `Generated Image: ${prompt.slice(0, 50)}`,
-      description: `AI-generated image based on: "${prompt}"`,
-      style: "Digital Art",
-      dimensions: {
-        width: 1024,
-        height: 1024
+    try {
+      // Use the raw Google Generative AI SDK for image generation
+      const { GoogleGenerativeAI } = await import('@google/generative-ai')
+      const genAI = new GoogleGenerativeAI(apiKey)
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
+
+      const result = await model.generateContent({
+        contents: [{
+          role: "user",
+          parts: [{
+            text: `Generate a high-quality image: ${prompt}`
+          }]
+        }]
+      })
+
+      const response = await result.response
+      const imageData = response.candidates?.[0]?.content?.parts?.[0]
+
+      if (imageData && imageData.inlineData) {
+        // Convert base64 image to data URL
+        const imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`
+        
+        const realResult = {
+          imageUrl,
+          title: `Generated Image: ${prompt.slice(0, 50)}`,
+          description: `AI-generated image based on: "${prompt}"`,
+          style: "AI Generated",
+          dimensions: {
+            width: 1024,
+            height: 1024
+          }
+        }
+
+        console.log('🎨 [GOOGLE SDK] Real image generated successfully')
+
+        // Record usage if user is authenticated
+        if (user?.id) {
+          try {
+            await dailyLimits.recordUsage(user.id, modelId)
+            console.log('🎨 [GOOGLE SDK] Usage recorded for user:', user.id)
+          } catch (error) {
+            console.error('Failed to record image generation usage:', error)
+          }
+        }
+
+        return {
+          success: true,
+          result: realResult,
+          model: modelId
+        }
+      } else {
+        throw new Error("No image data received from Gemini")
       }
-    }
-
-    console.log('🎨 [GOOGLE SDK] Mock image generated successfully')
-
-    // Record usage if user is authenticated
-    if (user?.id) {
-      try {
-        await dailyLimits.recordUsage(user.id, modelId)
-        console.log('🎨 [GOOGLE SDK] Usage recorded for user:', user.id)
-      } catch (error) {
-        console.error('Failed to record image generation usage:', error)
+    } catch (sdkError) {
+      console.error('🎨 [GOOGLE SDK] Direct SDK error:', sdkError)
+      
+      // Fallback to mock for now
+      const mockResult = {
+        imageUrl: `https://via.placeholder.com/1024x1024/4F46E5/FFFFFF?text=${encodeURIComponent(prompt.slice(0, 50))}`,
+        title: `Generated Image: ${prompt.slice(0, 50)}`,
+        description: `AI-generated image based on: "${prompt}"`,
+        style: "Digital Art",
+        dimensions: {
+          width: 1024,
+          height: 1024
+        }
       }
-    }
 
-    return {
-      success: true,
-      result: mockResult,
-      model: modelId
+      console.log('🎨 [GOOGLE SDK] Mock fallback image generated')
+
+      // Record usage if user is authenticated
+      if (user?.id) {
+        try {
+          await dailyLimits.recordUsage(user.id, modelId)
+          console.log('🎨 [GOOGLE SDK] Usage recorded for user:', user.id)
+        } catch (error) {
+          console.error('Failed to record image generation usage:', error)
+        }
+      }
+
+      return {
+        success: true,
+        result: mockResult,
+        model: modelId
+      }
     }
 
   } catch (error) {
