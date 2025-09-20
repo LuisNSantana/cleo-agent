@@ -36,10 +36,13 @@ export function ToolConfirmationProvider({ children }: ToolConfirmationProviderP
     // Polling para detectar acciones pendientes
     const checkPendingActions = () => {
       const pending = confirmationStore.getPendingAction()
+      console.log('🔍 [CLIENT] Checking pending actions:', pending)
       
       if (pending && pending.id !== pendingAction?.id) {
+        console.log('🔍 [CLIENT] New pending action detected:', pending)
         setPendingAction(pending)
       } else if (!pending && pendingAction) {
+        console.log('🔍 [CLIENT] Clearing pending action')
         setPendingAction(null)
       }
     }

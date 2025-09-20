@@ -256,9 +256,9 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-    const { interceptToolCall } = await import('../confirmation/middleware')
+    const { withConfirmation } = await import('../confirmation/wrapper')
     
-    return interceptToolCall(
+    return withConfirmation(
       'createCalendarEvent',
       { summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
       async () => {

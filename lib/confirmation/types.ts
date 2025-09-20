@@ -77,19 +77,32 @@ export const TOOL_SENSITIVITY_MAP: Record<string, keyof Omit<ToolExecutionSettin
 }
 
 // Herramientas que SIEMPRE requieren confirmación (no se pueden desactivar)
+// SOLO acciones críticas que pueden tener consecuencias importantes
 export const ALWAYS_CONFIRM_TOOLS = [
+  // Comunicación externa
+  'sendGmailMessage',
+  'postTweet',
+  'sendSlackMessage',
+  'publishPost',
+  
+  // Gestión de calendario (afecta a otros)
+  'createCalendarEvent',
+  'updateCalendarEvent',
+  'deleteCalendarEvent',
+  
+  // Archivos críticos
   'deleteFile',
-  'deleteRecord', 
+  'deleteRecord',
+  
+  // Financiero
   'makeTransaction',
   'createPayment',
-  'deleteCalendarEvent',
-  'createCalendarEvent',
-  'sendGmailMessage',
-  'postTweet'
+  'createInvoice'
 ]
 
-// Herramientas que son seguras para auto-ejecución
+// Herramientas que son seguras para auto-ejecución (sin confirmación)
 export const SAFE_AUTO_TOOLS = [
+  // Búsqueda y lectura (solo consultas)
   'searchWeb',
   'getWeather', 
   'readFile',
@@ -98,7 +111,21 @@ export const SAFE_AUTO_TOOLS = [
   'listGmailMessages',
   'getGmailMessage',
   'searchDocuments',
-  'generateImage'
+  
+  // Generación creativa (sin riesgo)
+  'generateImage',
+  'generateText',
+  'generateCode',
+  
+  // Análisis y procesamiento
+  'analyzeDocument',
+  'extractData',
+  'summarizeText',
+  
+  // Utilidades
+  'getCurrentDateTime',
+  'randomFact',
+  'weatherInfo'
 ]
 
 // Datos de preview para una acción pendiente

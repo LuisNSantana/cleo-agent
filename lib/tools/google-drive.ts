@@ -4,15 +4,17 @@ import { createClient } from '@/lib/supabase/server'
 import { trackToolUsage } from '@/lib/analytics'
 import { getCurrentModel, getCurrentUserId } from '@/lib/server/request-context'
 
+// Simple in-memory token cache (5 min)
+const tokenCache: Record<string, { token: string; expiry: number }> = {}
+
 async function getGoogleDriveAccessToken(userId: string): Promise<string | null> {
-  console.log('🔍 Getting Google Drive access token for user:', userId)
-  
+  const cacheKey = `drive:${userId}`
+  const cached = tokenCache[cacheKey]
+  if (cached && cached.expiry > Date.now()) return cached.token
+
   try {
     const supabase = await createClient()
-    if (!supabase) {
-      console.error('❌ Failed to create Supabase client')
-      return null
-    }
+    if (!supabase) return null
 
     const { data, error } = await (supabase as any)
       .from('user_service_connections')
@@ -22,89 +24,52 @@ async function getGoogleDriveAccessToken(userId: string): Promise<string | null>
       .eq('connected', true)
       .single()
 
-    console.log('🔍 Database query result:', {
-      hasData: !!data,
-      error: error,
-      hasAccessToken: data?.access_token ? 'yes' : 'no',
-      hasRefreshToken: data?.refresh_token ? 'yes' : 'no',
-      tokenExpiresAt: data?.token_expires_at
+    if (error || !data) return null
+
+    const now = Date.now()
+    const expiresAt = data.token_expires_at ? new Date(data.token_expires_at).getTime() : 0
+    if (data.access_token && expiresAt > now + 300000) { // 5 min buffer
+      tokenCache[cacheKey] = { token: data.access_token, expiry: expiresAt }
+      return data.access_token
+    }
+
+    if (!data.refresh_token) return null
+
+    // Refresh token
+    const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        refresh_token: data.refresh_token,
+        grant_type: 'refresh_token',
+      }),
     })
 
-    if (error || !data) {
-      console.error('No Google Drive connection found:', error)
+    if (!refreshRes.ok) {
+      // mark disconnected on hard failure
+      await (supabase as any)
+        .from('user_service_connections')
+        .update({ connected: false })
+        .eq('user_id', userId)
+        .eq('service_id', 'google-workspace')
       return null
     }
 
-    // Check if token is expired or missing expiry, and refresh if necessary
-    const now = new Date()
-    const expiresAt = data.token_expires_at ? new Date(data.token_expires_at) : null
-    const shouldRefresh = (!expiresAt || now >= expiresAt) && data.refresh_token
+    const tokenData = await refreshRes.json()
+    const newExpiry = now + tokenData.expires_in * 1000
 
-    if (shouldRefresh) {
-      console.log('Token expired or missing expiry, attempting refresh...')
-      try {
-        // Refresh the token
-        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-            refresh_token: data.refresh_token,
-            grant_type: 'refresh_token',
-          }),
-        })
+    await (supabase as any)
+      .from('user_service_connections')
+      .update({ access_token: tokenData.access_token, token_expires_at: new Date(newExpiry).toISOString(), connected: true })
+      .eq('user_id', userId)
+      .eq('service_id', 'google-workspace')
 
-        if (!refreshResponse.ok) {
-          const errorText = await refreshResponse.text()
-          console.error('Failed to refresh Google token:', errorText)
-          // Marcar como desconectado si el refresh falla
-          await (supabase as any)
-            .from('user_service_connections')
-            .update({ connected: false })
-            .eq('user_id', userId)
-            .eq('service_id', 'google-workspace')
-          return null
-        }
-
-        const tokenData = await refreshResponse.json()
-        const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000)
-
-        // Update the token in the database
-        const { error: updateError } = await (supabase as any)
-          .from('user_service_connections')
-          .update({
-            access_token: tokenData.access_token,
-            token_expires_at: newExpiresAt.toISOString(),
-            connected: true
-          })
-          .eq('user_id', userId)
-          .eq('service_id', 'google-workspace')
-
-        if (updateError) {
-          console.error('Failed to update refreshed token:', updateError)
-          return null
-        }
-
-        console.log('Token refreshed successfully')
-        return tokenData.access_token
-      } catch (refreshError) {
-        console.error('Error refreshing token:', refreshError)
-        // Marcar como desconectado si el refresh falla
-        await (supabase as any)
-          .from('user_service_connections')
-          .update({ connected: false })
-          .eq('user_id', userId)
-          .eq('service_id', 'google-workspace')
-        return null
-      }
-    }
-
-    return data.access_token
+    tokenCache[cacheKey] = { token: tokenData.access_token, expiry: newExpiry }
+    return tokenData.access_token
   } catch (error) {
-    console.error('Error getting Google Drive access token:', error)
+    console.error('Error getting Drive access token:', error)
     return null
   }
 }
@@ -171,7 +136,7 @@ export const listDriveFilesTool = tool({
       if (!accessToken) {
         return {
           success: false,
-          message: 'Google Drive not connected. Please connect your Google Drive in Settings > Connections.',
+          message: 'Connect Google Drive in Settings',
           files: [],
           total_count: 0
         }
@@ -277,7 +242,7 @@ export const searchDriveFilesTool = tool({
       if (!accessToken) {
         return {
           success: false,
-          message: 'Google Drive not connected. Please connect your Google Drive in Settings > Connections.',
+          message: 'Connect Google Drive in Settings',
           files: [],
           total_count: 0
         }
@@ -407,7 +372,7 @@ export const getDriveFileDetailsTool = tool({
       if (!accessToken) {
         return {
           success: false,
-          message: 'Google Drive not connected. Please connect your Google Drive in Settings > Connections.',
+          message: 'Connect Google Drive in Settings',
           file: null
         }
       }
@@ -479,15 +444,21 @@ export const getDriveFileDetailsTool = tool({
 
 // 📁 Create a new folder in Google Drive
 export const createDriveFolderTool = tool({
-  description: '📁 Create a new folder in Google Drive. Use this when user wants to organize their files by creating new folders.',
+  description: '📁 Create a new folder in Google Drive. Use after the user has reviewed a preview and explicitly approved the folder creation.',
   inputSchema: z.object({
     name: z.string().min(1).describe('Name of the folder to create'),
     parentFolderId: z.string().optional().describe('ID of the parent folder. If not provided, creates in root folder'),
     description: z.string().optional().describe('Optional description for the folder'),
   }),
   execute: async ({ name, parentFolderId, description }) => {
-    // Get userId from request-scoped context
-    const userId = getCurrentUserId()
+    const { withConfirmation } = await import('../confirmation/wrapper')
+    
+    return withConfirmation(
+      'createDriveFolder',
+      { name, parentFolderId, description },
+      async () => {
+        // Get userId from request-scoped context
+        const userId = getCurrentUserId()
     
     try {
       if (!userId) {
@@ -502,7 +473,7 @@ export const createDriveFolderTool = tool({
       if (!accessToken) {
         return {
           success: false,
-          message: 'Google Drive not connected. Please connect your Google Drive in Settings > Connections.',
+          message: 'Connect Google Drive in Settings',
           folder: null
         }
       }
@@ -539,7 +510,7 @@ export const createDriveFolderTool = tool({
         await trackToolUsage(userId, 'googleDrive.createFolder', { ok: true, execMs: Date.now() - started, params: { hasParent: !!parentFolderId } })
       }
       return result
-  } catch (error) {
+    } catch (error) {
       console.error('Error creating Drive folder:', error)
       if (userId) await trackToolUsage(userId, 'googleDrive.createFolder', { ok: false, execMs: 0, errorType: 'create_folder_error' })
       return {
@@ -548,7 +519,9 @@ export const createDriveFolderTool = tool({
         folder: null
       }
     }
-  },
+  }
+) // closing withConfirmation wrapper
+},
 })
 
 // ⬆️ Upload a new file to Google Drive
@@ -561,23 +534,29 @@ export const uploadFileToDriveTool = tool({
     folderId: z.string().optional().describe('Optional destination folder ID in Drive'),
   }),
   execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
-    const userId = getCurrentUserId()
-    try {
-  const started = Date.now()
-      if (!userId) {
-        return {
-          success: false,
-          message: 'Authentication required to upload to Google Drive',
-          file: null,
-        }
-      }
+    const { withConfirmation } = await import('../confirmation/wrapper')
+    
+    return withConfirmation(
+      'uploadToDrive',
+      { filename, content, mimeType, folderId },
+      async () => {
+        const userId = getCurrentUserId()
+        try {
+          const started = Date.now()
+          if (!userId) {
+            return {
+              success: false,
+              message: 'Authentication required to upload to Google Drive',
+              file: null,
+            }
+          }
 
-      // Get (and refresh if needed) the access token
-      let accessToken = await getGoogleDriveAccessToken(userId)
-      if (!accessToken) {
-        return {
-          success: false,
-          message: 'Google Drive not connected. Connect it in Settings > Connections and try again.',
+          // Get (and refresh if needed) the access token
+          let accessToken = await getGoogleDriveAccessToken(userId)
+          if (!accessToken) {
+            return {
+              success: false,
+              message: 'Connect Google Drive in Settings',
           file: null,
         }
       }
@@ -649,7 +628,7 @@ export const uploadFileToDriveTool = tool({
         await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: true, execMs: Date.now() - started, params: { hasFolder: !!folderId, mimeType } })
       }
       return result
-  } catch (error) {
+    } catch (error) {
       console.error('Error uploading file to Drive:', error)
       if (userId) await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: false, execMs: 0, errorType: 'upload_error' })
       return {
@@ -658,7 +637,9 @@ export const uploadFileToDriveTool = tool({
         file: null,
       }
     }
-  },
+  }
+) // closing withConfirmation wrapper
+},
 })
 
 // Helper functions
