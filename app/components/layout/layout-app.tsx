@@ -20,6 +20,11 @@ const InteractiveCanvasEntry = dynamic(
   { ssr: false }
 )
 
+const SimpleConfirmationDialog = dynamic(
+  () => import("@/components/chat/simple-confirmation-dialog"),
+  { ssr: false }
+)
+
 export function LayoutApp({ children }: { children: React.ReactNode }) {
   const { user } = useUser()
   const pathname = usePathname()
@@ -188,6 +193,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
       
       {/* Interactive Drawing Canvas */}
       <InteractiveCanvasEntry />
+      
+      {/* Simple Confirmation Dialog */}
+      <SimpleConfirmationDialog />
       
       {/* Footer for Google verification compliance */}
       <footer className="fixed bottom-2 left-2 z-40 text-xs text-muted-foreground space-x-3">
