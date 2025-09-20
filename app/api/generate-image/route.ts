@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { dailyLimits } from "@/lib/daily-limits"
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"
-import { generateObject } from "ai"
 import { z } from "zod"
 import { MODELS } from "@/lib/models"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // Schema for image generation response
 const ImageGenerationSchema = z.object({
@@ -40,11 +39,11 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    const modelId = 'google:gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
-    const model = MODELS.find(m => m.id === modelId)
-    if (!model) {
+    const modelConfig = MODELS.find(m => m.id === modelId)
+    if (!modelConfig) {
       return NextResponse.json(
         { error: "Image generation model not found" },
         { status: 500 }
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Check daily limits for authenticated users
     if (user?.id) {
-      const limitCheck = await dailyLimits.canUseModel(user.id, modelId, model)
+      const limitCheck = await dailyLimits.canUseModel(user.id, modelId, modelConfig)
       
       if (!limitCheck.canUse) {
         return NextResponse.json(
@@ -68,15 +67,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create OpenRouter client for Gemini 2.5 Flash Image Preview
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      headers: {
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-        'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
-      },
-      baseURL: 'https://openrouter.ai/api/v1',
-    })
+    // Initialize Google Generative AI
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Google API key not configured" },
+        { status: 500 }
+      )
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
 
     // Enhanced prompt for better image generation
     const enhancedPrompt = `Create a high-quality image with the following description: "${prompt}". 
@@ -85,30 +86,35 @@ export async function POST(request: NextRequest) {
     console.log('🎨 Generating image with prompt:', enhancedPrompt)
 
     // Generate image using Gemini 2.5 Flash Image Preview
-    // Note: This is a simplified approach. In reality, you might need to use a different method
-    // as generateObject is for structured outputs, not image generation
-    
-    // For now, we'll simulate the image generation response
-    // In a real implementation, you would call the appropriate image generation API
-    const mockImageResponse = {
-      imageUrl: `https://via.placeholder.com/1024x1024/4F46E5/FFFFFF?text=${encodeURIComponent(prompt.slice(0, 50))}`,
+    const result = await geminiModel.generateContent({
+      contents: [{
+        role: "user",
+        parts: [{
+          text: enhancedPrompt
+        }]
+      }]
+    })
+
+    const response = await result.response
+    const imageData = response.candidates?.[0]?.content?.parts?.[0]
+
+    if (!imageData || !imageData.inlineData) {
+      throw new Error("No image data received from Gemini")
+    }
+
+    // Convert base64 image to data URL
+    const imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`
+
+    const imageResponse = {
+      imageUrl,
       title: `Generated Image: ${prompt.slice(0, 50)}`,
       description: `AI-generated image based on: "${prompt}"`,
-      style: "Digital Art",
+      style: "AI Generated",
       dimensions: {
         width: 1024,
         height: 1024
       }
     }
-
-    // TODO: Replace with actual OpenRouter/Gemini image generation call
-    // This would look something like:
-    // const result = await openrouter.generateImage({
-    //   model: "google/gemini-2.5-flash-image-preview",
-    //   prompt: enhancedPrompt,
-    //   size: "1024x1024",
-    //   quality: "standard"
-    // })
 
     // Record usage if user is authenticated
     if (user?.id) {
@@ -121,11 +127,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      result: mockImageResponse,
+      result: imageResponse,
       model: modelId,
       usage: user?.id ? {
         userId: user.id,
-        remaining: (await dailyLimits.canUseModel(user.id, modelId, model)).remaining - 1
+        remaining: (await dailyLimits.canUseModel(user.id, modelId, modelConfig)).remaining - 1
       } : null
     })
 
@@ -152,18 +158,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    const modelId = 'google:gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
-    const model = MODELS.find(m => m.id === modelId)
-    if (!model) {
+    const modelConfig = MODELS.find(m => m.id === modelId)
+    if (!modelConfig) {
       return NextResponse.json(
         { error: "Image generation model not found" },
         { status: 500 }
       )
     }
     
-    const limitCheck = await dailyLimits.canUseModel(userId, modelId, model)
+    const limitCheck = await dailyLimits.canUseModel(userId, modelId, modelConfig)
     
     return NextResponse.json({
       canGenerate: limitCheck.canUse,

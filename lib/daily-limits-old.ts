@@ -29,12 +29,37 @@ export class DailyLimitsManager {
         return { canUse: true, remaining: model.dailyLimit, limit: model.dailyLimit }
       }
 
-      // For testing user luisnayibsantana@gmail.com, return high limits
-      // This avoids the TypeScript and database issues temporarily
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+      // Get daily limit record using raw SQL
+      const { data, error } = await supabase
+        .rpc('fn_get_daily_limit', {
+          p_user_id: userId,
+          p_model_id: modelId,
+          p_usage_date: today,
+          p_default_limit: model.dailyLimit
+        })
+
+      if (error) {
+        console.error('Error checking daily limits:', error)
+        return { canUse: true, remaining: model.dailyLimit, limit: model.dailyLimit }
+      }
+
+      const record = data?.[0]
+      if (!record) {
+        return {
+          canUse: true,
+          remaining: model.dailyLimit,
+          limit: model.dailyLimit
+        }
+      }
+
+      const remaining = Math.max(0, record.daily_limit - record.usage_count)
+      
       return {
-        canUse: true,
-        remaining: 99,
-        limit: 100
+        canUse: record.usage_count < record.daily_limit,
+        remaining,
+        limit: record.daily_limit
       }
     } catch (error) {
       console.error('Error in canUseModel:', error)
@@ -47,9 +72,24 @@ export class DailyLimitsManager {
    */
   async recordUsage(userId: string, modelId: string): Promise<void> {
     try {
-      // For testing, just log usage without database recording
-      // This avoids the float/integer conversion error
-      console.log(`Recording usage for user ${userId}, model ${modelId}`)
+      const supabase = await this.getSupabase()
+      if (!supabase) {
+        console.warn('Supabase not available, cannot record usage')
+        return
+      }
+
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+      // Increment usage count using raw SQL to handle race conditions
+      const { error } = await supabase.rpc('increment_daily_usage', {
+        p_user_id: userId,
+        p_model_id: modelId,
+        p_usage_date: today
+      })
+
+      if (error) {
+        console.error('Error recording daily usage:', error)
+      }
     } catch (error) {
       console.error('Error in recordUsage:', error)
     }
@@ -59,21 +99,21 @@ export class DailyLimitsManager {
    * Get user's remaining usage for all premium models today
    */
   async getUserDailyStatus(userId: string): Promise<Record<string, { used: number; remaining: number; limit: number }>> {
-    // For testing, return high limits
+    // Placeholder implementation
     const status: Record<string, { used: number; remaining: number; limit: number }> = {}
     
+    // Known premium models with their limits
     const premiumModels = {
-      'google:gemini-2.5-flash-image-preview': 100,
-      'openrouter:google/gemini-2.5-flash-image-preview': 100,
-      'openrouter:anthropic/claude-3.5-sonnet-20241022': 100,
-      'openrouter:openai/gpt-4.1-mini': 100,
-      'openrouter:openai/gpt-5-preview': 50
+      'gpt-5': 12,
+      'openrouter:anthropic/claude-sonnet-4': 7,
+      'openrouter:google/gemini-2.5-flash-image-preview': 5
     }
 
     for (const [modelId, limit] of Object.entries(premiumModels)) {
+      const used = 0 // This would come from database
       status[modelId] = {
-        used: 0,
-        remaining: limit,
+        used,
+        remaining: Math.max(0, limit - used),
         limit
       }
     }
@@ -118,23 +158,48 @@ export class DailyLimitsManager {
   }
 
   /**
-   * Get intelligent fallback model based on request type and user tier
+   * Get the appropriate model for a request, with fallback for vision
    */
-  static getIntelligentFallback(requestType: 'image' | 'coding' | 'analysis' | 'general', isPremium: boolean = false): string {
-    if (requestType === 'image') {
-      return isPremium ? 'gpt-4o' : 'gpt-4o-mini'
-    }
+  static async getModelForRequest(
+    primaryModelId: string, 
+    attachments: any[] = [], 
+    userId?: string
+  ): Promise<{ modelId: string; reason?: string }> {
     
-    if (requestType === 'coding') {
-      return isPremium ? 'openrouter:anthropic/claude-3.5-sonnet-20241022' : 'gpt-4o-mini'
+    // If no attachments that require vision, use primary model
+    if (!this.requiresVision(attachments)) {
+      return { modelId: primaryModelId }
     }
-    
-    if (requestType === 'analysis') {
-      return isPremium ? 'gpt-5' : 'openrouter:google/gemini-2.5-flash-lite'
+
+    // Check if primary model supports vision
+    // This would be better to check from the model config, but for now we hardcode
+    const visionCapableModels = [
+      'gpt-4o-mini',
+      'gpt-5',
+      'openrouter:anthropic/claude-sonnet-4',
+      'openrouter:google/gemini-2.5-flash',
+      'openrouter:google/gemini-2.5-flash-lite'
+    ]
+
+    if (visionCapableModels.includes(primaryModelId)) {
+      return { modelId: primaryModelId }
     }
+
+    // Primary model doesn't support vision, get fallback
+    const fallbackModel = this.getVisionFallbackModel(primaryModelId)
     
-    // General fallback
-    return 'gpt-4o-mini'
+    if (!fallbackModel) {
+      // Use GPT-4o mini as last resort
+      return { 
+        modelId: 'gpt-4o-mini', 
+        reason: `Switched to GPT-4o mini for image/document analysis (${primaryModelId} doesn't support vision)` 
+      }
+    }
+
+    return { 
+      modelId: fallbackModel,
+      reason: `Switched to ${fallbackModel} for image/document analysis (${primaryModelId} doesn't support vision)`
+    }
   }
 }
 
