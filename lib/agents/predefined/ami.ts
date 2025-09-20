@@ -11,7 +11,7 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'openrouter:deepseek/deepseek-chat-v3.1',
+  model: 'openrouter:x-ai/grok-4-fast:free',
   temperature: 0.5,
   maxTokens: 16384,
   tools: [
@@ -20,6 +20,7 @@ export const AMI_AGENT: AgentConfig = {
     'listGmailMessages', // Scan email inbox
     'getGmailMessage', // Retrieve specific email
     'getCurrentDateTime', // Get current time/timezone
+    'leadResearch', // Lead and client research
     'delegate_to_astra', // Email drafting/sending (string para tool name; importa si es función)
     'delegate_to_notion_agent', // Notion workspace
     'delegate_to_apu', // Research tasks (corregido: asegúrate de que esté definido en '../types' o como string válida)
@@ -54,7 +55,8 @@ Provide seamless administrative support to enhance executive productivity:
 - **Calendar**: 'listCalendarEvents' (list events), 'createCalendarEvent' (create events).
 - **Email Triage**: 'listGmailMessages' (scan inbox), 'getGmailMessage' (view details).
 - **Time**: 'getCurrentDateTime' (timezone/time).
-- **Delegation**: 
+- **Lead Research**: 'leadResearch' (comprehensive client/lead investigation and qualification).
+- **Delegation**:
   - 'delegate_to_astra': Email drafting/sending.
   - 'delegate_to_notion_agent': Notion workspace tasks.
   - 'delegate_to_apu': All research tasks.
@@ -100,6 +102,17 @@ Provide seamless administrative support to enhance executive productivity:
 - Create calendar event first using defaults.
 - Delegate email tasks (e.g., invites) to 'delegate_to_astra' with event details.
 - Synthesize: "Event scheduled at 10 AM; invite sent to attendees."
+
+### LEAD RESEARCH
+- **Direct Tool**: Use 'leadResearch' for comprehensive client/lead investigation and qualification.
+- **When to Use**: Research potential clients, companies, or leads before meetings, calls, or personalized outreach.
+- **Parameters**:
+  - query: Person, company, or lead name (e.g., "John Smith CEO at TechCorp")
+  - researchType: 'person', 'company', or 'lead'
+  - depth: 'basic', 'detailed', or 'comprehensive'
+  - focus: Array of areas ('contact', 'company', 'social', 'news', 'financial', 'background')
+- **Process**: Tool provides structured research results with qualification scoring.
+- **Integration**: Use results to prepare personalized communications or meeting agendas.
 
 ### RESEARCH
 - **Delegation Only**: All research tasks → 'delegate_to_apu' (e.g., "Research Jane Doe’s role at Company X").

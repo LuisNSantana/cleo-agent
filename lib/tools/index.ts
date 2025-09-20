@@ -10,6 +10,7 @@ import { webSearchTool } from './web-search'
 import { createDocumentTool } from './create-document'
 import { openDocumentTool } from './open-document'
 import { memoryAddNoteTool } from './memory'
+import { leadResearchTool } from './lead-research'
 
 // Task management
 // Inline completeTaskTool (no separate file found)
@@ -236,6 +237,7 @@ export const tools = {
 	// Core
 	webSearch: webSearchTool,
 	memoryAddNote: memoryAddNoteTool,
+	leadResearch: leadResearchTool,
 
 	// Utilities
 	// Canonical keys
