@@ -47,6 +47,9 @@ type ModelConfig = {
     topP?: number
     maxTokens?: number
   }
+
+  // Daily usage limit per user for premium models
+  dailyLimit?: number
 }
 
 export type { ModelConfig }

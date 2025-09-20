@@ -34,6 +34,14 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // X.AI Grok models
   "openrouter:x-ai/grok-4-fast:free": "openrouter",
   "x-ai/grok-4-fast:free": "openrouter",
+  // Claude 4 models
+  "openrouter:anthropic/claude-sonnet-4": "openrouter",
+  "anthropic/claude-sonnet-4": "openrouter",
+  // Gemini 2.5 models
+  "openrouter:google/gemini-2.5-flash-image-preview": "openrouter",
+  "google/gemini-2.5-flash-image-preview": "openrouter",
+  "openrouter:google/gemini-2.5-flash-lite": "openrouter",
+  "google/gemini-2.5-flash-lite": "openrouter",
   // Removed deprecated Nemotron Ultra 253B mapping
   "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
 
@@ -80,6 +88,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "o3-2025-04-16": "openai",
   "o4-mini": "openai",
   "o4-mini-2025-04-16": "openai",
+  "gpt-5": "openai",
   "gpt-5-nano": "openai",
   "gpt-5-mini-2025-08-07": "openai",
 

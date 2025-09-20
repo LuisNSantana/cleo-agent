@@ -16,6 +16,7 @@ type ConversationProps = {
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => void
   onReload: () => void
+  userId?: string // For image generation
 }
 
 export function Conversation({
@@ -24,6 +25,7 @@ export function Conversation({
   onDelete,
   onEdit,
   onReload,
+  userId,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
 
@@ -196,6 +198,7 @@ export function Conversation({
                   parts={message.parts}
                   status={status}
                   userMessage={userMessage} // Pasar contexto del usuario
+                  userId={userId} // For image generation
                 >
                   {messageText}
                 </Message>

@@ -20,6 +20,7 @@ type MessageProps = {
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   userMessage?: string // Para detección de archivos
+  userId?: string // For image generation
 }
 
 export function Message({
@@ -35,6 +36,7 @@ export function Message({
   parts,
   status,
   className,
+  userId,
 }: MessageProps) {
   // Remove copied state from here - let each component handle it locally
   const copyToClipboard = useCallback(() => {
@@ -44,15 +46,16 @@ export function Message({
   if (variant === "user") {
     return (
       <MessageUser
-  copied={false} // Always false, let MessageUser handle its own state
-  copyToClipboardAction={copyToClipboard}
-  onReloadAction={onReloadAction}
-  onEditAction={onEditAction}
-  onDeleteAction={onDeleteAction}
+        copied={false} // Always false, let MessageUser handle its own state
+        copyToClipboardAction={copyToClipboard}
+        onReloadAction={onReloadAction}
+        onEditAction={onEditAction}
+        onDeleteAction={onDeleteAction}
         id={id}
         hasScrollAnchor={hasScrollAnchor}
         attachments={attachments}
         className={className}
+        userId={userId}
       >
         {children}
       </MessageUser>

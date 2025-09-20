@@ -151,8 +151,9 @@ export function Chat() {
       onDelete: handleDelete,
       onEdit: handleEdit,
       onReload: handleReload,
+      userId: user?.id, // For image generation
     }),
-    [messages, conversationStatus, handleDelete, handleEdit, handleReload]
+    [messages, conversationStatus, handleDelete, handleEdit, handleReload, user?.id]
   )
 
   const handleShowPlaceholder = useCallback((newPlaceholder: string) => {

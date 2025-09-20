@@ -579,8 +579,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       onDelete: handleDelete,
       onEdit: handleEdit,
       onReload: handleReload,
+      userId: user?.id, // For image generation
     }),
-    [messages, status, handleDelete, handleEdit, handleReload]
+    [messages, status, handleDelete, handleEdit, handleReload, user?.id]
   )
 
   // Memoize the chat input props

@@ -35,7 +35,7 @@ export const FREE_MODELS_IDS = [
   // High-end free options
   // paid Nemotron is excluded from FREE list
   // Economical models for user variety
-  "gemini-2.5-flash-lite",
+  "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast:free
   "gpt-5-nano",
   // Emergency fallback
   "gpt-4o-mini",

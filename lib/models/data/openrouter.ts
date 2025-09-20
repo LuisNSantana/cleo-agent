@@ -538,6 +538,7 @@ export const openrouterModels: ModelConfig[] = [
     apiDocs: "https://openrouter.ai/anthropic/claude-sonnet-4",
     modelPage: "https://www.anthropic.com/claude/sonnet",
     releasedAt: "2025-04-01",
+    dailyLimit: 7, // 7 uses per day - premium multimodal model (expensive)
     icon: "claude",
     apiSdk: (apiKey?: string, opts?: { enableSearch?: boolean }) =>
       createOpenRouter({
@@ -801,6 +802,83 @@ export const openrouterModels: ModelConfig[] = [
           },
         }),
       }).chat("google/gemini-2.5-flash"),
+  },
+  // Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
+  {
+    id: "openrouter:google/gemini-2.5-flash-image-preview",
+    name: "Gemini 2.5 Flash Image Preview (Nano Banana)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Gemini",
+    baseProviderId: "google",
+    description:
+      "Gemini's text-to-image generation model (Nano Banana). Creates high-quality images from text descriptions with fast processing.",
+    tags: ["text-to-image", "image-generation", "creative", "nano-banana"],
+    contextWindow: 128000,
+    inputCost: 0.30, // $0.30 per 1M text tokens
+    outputCost: 0.039, // $0.039 per image
+    priceUnit: "per image/1M tokens",
+    vision: false,
+    tools: false,
+    audio: false,
+    reasoning: false,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai",
+    apiDocs: "https://openrouter.ai/google/gemini-2.5-flash-image-preview",
+    modelPage: "https://ai.google.dev/gemini-api/docs/vision",
+    releasedAt: "2025-08-01",
+    dailyLimit: 5, // 5 images per day - text-to-image generation
+    icon: "gemini",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("google/gemini-2.5-flash-image-preview"),
+  },
+  // Gemini 2.5 Flash Lite - Economical multimodal option for vision fallback
+  {
+    id: "openrouter:google/gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Gemini",
+    baseProviderId: "google",
+    description:
+      "Economical Gemini 2.5 Flash Lite with multimodal vision capabilities. Perfect for image analysis fallback when using text-only models.",
+    tags: ["economical", "multimodal", "vision", "fast", "fallback"],
+    contextWindow: 1000000,
+    inputCost: 0.10, // $0.10 per 1M tokens for text/image/video
+    outputCost: 0.40, // $0.40 per 1M tokens
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai",
+    apiDocs: "https://openrouter.ai/google/gemini-2.5-flash-lite",
+    modelPage: "https://ai.google.dev/gemini-api/docs/models/gemini",
+    releasedAt: "2025-06-20",
+    icon: "gemini",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("google/gemini-2.5-flash-lite"),
   },
   {
     id: "openrouter:meta-llama/llama-3.3-8b-instruct:free",
