@@ -115,6 +115,62 @@ const openaiModels: ModelConfig[] = [
     icon: "openai",
     apiSdk: (apiKey?: string) => openproviders("gpt-5-nano", undefined, apiKey),
   },
+  {
+    id: "gpt-4o-search-preview-2025-03-11",
+    name: "GPT-4o Search Preview",
+    provider: "OpenAI",
+    providerId: "openai",
+    modelFamily: "GPT-4o",
+    baseProviderId: "openai",
+    description: "GPT-4o with native real-time web search capabilities. Perfect for up-to-date information and research tasks.",
+    tags: ["web-search", "real-time", "research", "internet", "current-events", "vision", "tools"],
+    contextWindow: 128000,
+    inputCost: 2.5, // $2.50 per 1M tokens
+    outputCost: 10.0, // $10.00 per 1M tokens
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: true, // ✅ NATIVE WEB SEARCH
+    openSource: false,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://platform.openai.com",
+    apiDocs: "https://platform.openai.com/docs/models/gpt-4o-search-preview",
+    modelPage: "https://platform.openai.com/docs/models/gpt-4o-search-preview",
+    releasedAt: "2025-03-11",
+    icon: "openai",
+    apiSdk: (apiKey?: string) => openproviders("gpt-4o-search-preview-2025-03-11", undefined, apiKey),
+  },
+  {
+    id: "gpt-4o-mini-search-preview",
+    name: "GPT-4o Mini Search Preview",
+    provider: "OpenAI",
+    providerId: "openai",
+    modelFamily: "GPT-4o",
+    baseProviderId: "openai",
+    description: "Affordable GPT-4o mini with native real-time web search. Cost-effective for web research and current information.",
+    tags: ["web-search", "real-time", "affordable", "research", "internet", "current-events", "vision", "tools"],
+    contextWindow: 128000,
+    inputCost: 0.15, // $0.15 per 1M tokens
+    outputCost: 0.6, // $0.60 per 1M tokens
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: true, // ✅ NATIVE WEB SEARCH
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://platform.openai.com",
+    apiDocs: "https://platform.openai.com/docs/models/gpt-4o-mini-search-preview",
+    modelPage: "https://platform.openai.com/docs/models/gpt-4o-mini-search-preview",
+    releasedAt: "2025-03-11",
+    icon: "openai",
+    apiSdk: (apiKey?: string) => openproviders("gpt-4o-mini-search-preview", undefined, apiKey),
+  },
 ]
 
 export { openaiModels }

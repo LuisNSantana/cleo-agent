@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { dailyLimits } from "@/lib/daily-limits"
 import { z } from "zod"
 import { MODELS } from "@/lib/models"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { generateText } from "ai"
 
 // Schema for image generation response
 const ImageGenerationSchema = z.object({
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    const modelId = 'google:gemini-2.5-flash-image-preview'
+    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview' // Usar OpenRouter Gemini Nano Banana
     
     // Get the actual model configuration
     const modelConfig = MODELS.find(m => m.id === modelId)
@@ -67,43 +67,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Initialize Google Generative AI
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    if (!apiKey) {
+    // Get OpenRouter API key
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY
+    if (!openRouterApiKey) {
       return NextResponse.json(
-        { error: "Google API key not configured" },
+        { error: "OpenRouter API key not configured" },
         { status: 500 }
       )
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
+    // Get the model's SDK instance for OpenRouter
+    const openRouterModel = modelConfig.apiSdk?.(openRouterApiKey)
+    if (!openRouterModel) {
+      return NextResponse.json(
+        { error: "OpenRouter model SDK not available" },
+        { status: 500 }
+      )
+    }
 
     // Enhanced prompt for better image generation
     const enhancedPrompt = `Create a high-quality image with the following description: "${prompt}". 
     Make it visually appealing, well-composed, and detailed. If no specific style is mentioned, use a modern, professional style.`
 
-    console.log('🎨 Generating image with prompt:', enhancedPrompt)
+    console.log('🎨 Generating image with OpenRouter Gemini:', enhancedPrompt)
 
-    // Generate image using Gemini 2.5 Flash Image Preview
-    const result = await geminiModel.generateContent({
-      contents: [{
-        role: "user",
-        parts: [{
-          text: enhancedPrompt
-        }]
-      }]
+    // Generate image using OpenRouter Gemini 2.5 Flash Image Preview via AI SDK
+    const result = await generateText({
+      model: openRouterModel,
+      prompt: enhancedPrompt,
     })
 
-    const response = await result.response
-    const imageData = response.candidates?.[0]?.content?.parts?.[0]
+    // For image generation models through OpenRouter, the response should contain image data
+    const generatedText = result.text
 
-    if (!imageData || !imageData.inlineData) {
-      throw new Error("No image data received from Gemini")
+    // Since this is an image generation model, the response should contain image data
+    // We need to check if it's a base64 image or a URL
+    let imageUrl = ''
+    
+    if (generatedText.includes('data:image')) {
+      imageUrl = generatedText
+    } else if (generatedText.includes('http')) {
+      imageUrl = generatedText.trim()
+    } else {
+      // If it's base64 without data URL prefix, add it
+      imageUrl = `data:image/png;base64,${generatedText}`
     }
-
-    // Convert base64 image to data URL
-    const imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`
 
     const imageResponse = {
       imageUrl,

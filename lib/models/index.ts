@@ -62,7 +62,7 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
     // Image generation models (valid OpenRouter models only)
     "openrouter:openai/dall-e-3", // 8 images/day - proven to work
-    "google:gemini-2.5-flash-image-preview", // Gemini fallback
+    "openrouter:google/gemini-2.5-flash-image-preview", // OpenRouter Gemini Nano Banana
     // High-end additions (paid)
     // Removed deprecated Nemotron Ultra 253B
     "openrouter:meta-llama/llama-3.1-405b-instruct",
@@ -75,7 +75,12 @@ const extraProviderModels: ModelConfig[] = [
   ...pickById(mistralModels, ["mistral-medium-2508"]),
   // Add economical models for user variety
   ...pickById(geminiModels, ["gemini-2.5-flash-image-preview"]), // Only add image preview, keep OpenRouter lite
-  ...pickById(openaiModels, ["gpt-4o-mini", "gpt-5", "gpt-5-nano"]),
+  ...pickById(openaiModels, [
+    "gpt-4o-mini", 
+    "gpt-5", 
+    "gpt-5-nano",
+    "gpt-4o-mini-search-preview", // ✅ Native web search (affordable)
+  ]),
 ]
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([
