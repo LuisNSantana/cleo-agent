@@ -42,14 +42,6 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "google/gemini-2.5-flash-image-preview": "openrouter",
   "openrouter:google/gemini-2.5-flash-lite": "openrouter",
   "google/gemini-2.5-flash-lite": "openrouter",
-  // FLUX image generation models
-  "openrouter:black-forest-labs/flux-1-schnell:free": "openrouter",
-  "black-forest-labs/flux-1-schnell:free": "openrouter",
-  "openrouter:black-forest-labs/flux-1-pro": "openrouter",
-  "black-forest-labs/flux-1-pro": "openrouter",
-  // DALL-E image generation
-  "openrouter:openai/dall-e-3": "openrouter",
-  "openai/dall-e-3": "openrouter",
   // Removed deprecated Nemotron Ultra 253B mapping
   "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
 
@@ -131,11 +123,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Google
   "gemini-2.5-flash-lite": "google",
   "gemini-2.5-flash-image-preview": "google",
-  // FLUX image models (normalized names)
-  "flux-1-schnell": "openrouter",
-  "flux-1-pro": "openrouter",
-  // DALL-E image models (normalized name)
-  "dall-e-3": "openrouter",
+  // Image generation models (simplified)
   "gemini-2.0-flash-001": "google",
   "gemini-1.5-flash": "google",
   "gemini-1.5-flash-latest": "google",
@@ -171,6 +159,8 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
 
   // XAI
   "grok-4": "xai",
+  "grok-4-fast-reasoning": "xai",  // New Grok 4 Fast Reasoning
+  "grok-4-fast-non-reasoning": "xai",  // New Grok 4 Fast Non-Reasoning
   "grok-3": "xai",
   "grok-3-latest": "xai",
   "grok-3-fast": "xai",

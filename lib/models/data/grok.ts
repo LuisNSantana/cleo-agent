@@ -14,6 +14,90 @@ import { getXAIModel } from "../../xai"
  */
 const grokModels: ModelConfig[] = [
   {
+    id: "grok-4-fast-reasoning",
+    name: "Grok 4 Fast (Reasoning)",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description:
+      "Latest Grok 4 Fast with advanced reasoning capabilities. 2M context window, multimodal support, perfect for complex analysis and document processing.",
+    webSearch: true,
+    // Pricing from attachment: $0.20/$0.40 input, $0.50 output
+    inputCost: 0.20, // $0.20 per 1M tokens (<128k), $0.40 (>128k)
+    outputCost: 0.50, // $0.50 per 1M tokens
+    priceUnit: "per 1M tokens",
+    tags: [
+      "reasoning",
+      "multimodal",
+      "2m-context",
+      "latest",
+      "premium",
+      "document-analysis"
+    ],
+    contextWindow: 2000000, // 2M tokens!
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai/news/grok-4-fast",
+    apiDocs: "https://docs.x.ai/",
+    modelPage: "https://x.ai/news/grok-4-fast",
+    releasedAt: "2025-09-19",
+    dailyLimit: 50, // reasonable limit for premium reasoning
+    icon: "xai",
+    defaults: {
+      temperature: 0.3,
+      topP: 0.9,
+    },
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-fast-reasoning", apiKey) as any,
+  },
+  {
+    id: "grok-4-fast-non-reasoning",
+    name: "Grok 4 Fast (Multimodal)",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description:
+      "Grok 4 Fast optimized for multimodal tasks. Excellent for image analysis, document processing, and general tasks with 2M context window.",
+    webSearch: true,
+    // Same competitive pricing
+    inputCost: 0.20,
+    outputCost: 0.50,
+    priceUnit: "per 1M tokens",
+    tags: [
+      "multimodal",
+      "fast",
+      "2m-context",
+      "image-analysis",
+      "documents",
+      "cost-effective"
+    ],
+    contextWindow: 2000000, // 2M tokens
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: false, // non-reasoning variant
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai/news/grok-4-fast",
+    apiDocs: "https://docs.x.ai/",
+    modelPage: "https://x.ai/news/grok-4-fast",
+    releasedAt: "2025-09-19",
+    dailyLimit: 100, // higher limit for non-reasoning
+    icon: "xai",
+    defaults: {
+      temperature: 0.3,
+      topP: 0.9,
+    },
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-fast-non-reasoning", apiKey) as any,
+  },
+  {
     id: "grok-3-mini",
     name: "Faster",
     provider: "xAI",

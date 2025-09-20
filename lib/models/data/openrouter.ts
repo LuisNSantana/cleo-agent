@@ -809,123 +809,6 @@ export const openrouterModels: ModelConfig[] = [
         }),
       }).chat("google/gemini-2.5-flash"),
   },
-  // FLUX.1 Schnell - Best value image generation model (free)
-  {
-    id: "openrouter:black-forest-labs/flux-1-schnell:free",
-    name: "FLUX.1 Schnell (Free)",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "FLUX",
-    baseProviderId: "black-forest-labs",
-    description:
-      "Free FLUX.1 Schnell model for high-quality image generation. Faster generation with excellent prompt adherence and detail accuracy.",
-    tags: ["text-to-image", "image-generation", "creative", "free", "fast", "high-quality"],
-    contextWindow: 4096,
-    inputCost: 0, // Free
-    outputCost: 0, // Free
-    priceUnit: "per image",
-    vision: false,
-    tools: false,
-    audio: false,
-    reasoning: false,
-    webSearch: false,
-    openSource: true,
-    speed: "Fast",
-    intelligence: "High",
-    website: "https://openrouter.ai/black-forest-labs/flux-1-schnell:free",
-    apiDocs: "https://openrouter.ai/docs/features/multimodal/image-generation",
-    modelPage: "https://huggingface.co/black-forest-labs/FLUX.1-schnell",
-    releasedAt: "2024-08-01",
-    dailyLimit: 20, // 20 free images per day
-    icon: "openrouter",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-        headers: {
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
-        },
-        baseURL: 'https://openrouter.ai/api/v1',
-      }).chat("black-forest-labs/flux-1-schnell:free"),
-  },
-  // FLUX.1 Pro - Premium image generation with highest quality
-  {
-    id: "openrouter:black-forest-labs/flux-1-pro",
-    name: "FLUX.1 Pro",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "FLUX",
-    baseProviderId: "black-forest-labs",
-    description:
-      "Premium FLUX.1 Pro model for highest quality image generation. Superior prompt adherence, anatomical accuracy, and visual quality.",
-    tags: ["text-to-image", "image-generation", "creative", "premium", "high-quality", "professional"],
-    contextWindow: 4096,
-    inputCost: 0.05, // $0.05 per image
-    outputCost: 0.05,
-    priceUnit: "per image",
-    vision: false,
-    tools: false,
-    audio: false,
-    reasoning: false,
-    webSearch: false,
-    openSource: false,
-    speed: "Fast",
-    intelligence: "High",
-    website: "https://openrouter.ai/black-forest-labs/flux-1-pro",
-    apiDocs: "https://openrouter.ai/docs/features/multimodal/image-generation",
-    modelPage: "https://huggingface.co/black-forest-labs/FLUX.1-dev",
-    releasedAt: "2024-08-01",
-    dailyLimit: 10, // 10 images per day for premium model
-    icon: "openrouter",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-        headers: {
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
-        },
-        baseURL: 'https://openrouter.ai/api/v1',
-      }).chat("black-forest-labs/flux-1-pro"),
-  },
-  // OpenAI DALL-E 3 - Backup image generation option
-  {
-    id: "openrouter:openai/dall-e-3",
-    name: "DALL-E 3",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "DALL-E",
-    baseProviderId: "openai",
-    description:
-      "OpenAI's DALL-E 3 for image generation. Good for stylized art and creative imagery, though less accurate with details than FLUX.",
-    tags: ["text-to-image", "image-generation", "creative", "stylized", "artistic"],
-    contextWindow: 4096,
-    inputCost: 0.04, // $0.04 per image
-    outputCost: 0.04,
-    priceUnit: "per image",
-    vision: false,
-    tools: false,
-    audio: false,
-    reasoning: false,
-    webSearch: false,
-    openSource: false,
-    speed: "Medium",
-    intelligence: "High",
-    website: "https://openrouter.ai/openai/dall-e-3",
-    apiDocs: "https://openrouter.ai/docs/features/multimodal/image-generation",
-    modelPage: "https://openai.com/dall-e-3",
-    releasedAt: "2023-10-01",
-    dailyLimit: 8, // 8 images per day
-    icon: "openai",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-        headers: {
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
-        },
-        baseURL: 'https://openrouter.ai/api/v1',
-      }).chat("openai/dall-e-3"),
-  },
   // Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
   {
     id: "openrouter:google/gemini-2.5-flash-image-preview",
@@ -935,11 +818,11 @@ export const openrouterModels: ModelConfig[] = [
     modelFamily: "Gemini",
     baseProviderId: "google",
     description:
-      "Gemini's text-to-image generation model (Nano Banana). Creates high-quality images from text descriptions with fast processing.",
-    tags: ["text-to-image", "image-generation", "creative", "nano-banana"],
+      "Gemini's text-to-image generation model (Nano Banana). Creates high-quality images from text descriptions with fast processing and good value for money.",
+    tags: ["text-to-image", "image-generation", "creative", "nano-banana", "affordable"],
     contextWindow: 128000,
     inputCost: 0.30, // $0.30 per 1M text tokens
-    outputCost: 0.039, // $0.039 per image
+    outputCost: 0.039, // $0.039 per image (very competitive)
     priceUnit: "per image/1M tokens",
     vision: false,
     tools: false,

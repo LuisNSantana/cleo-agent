@@ -55,7 +55,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    const modelId = 'openrouter:black-forest-labs/flux-1-schnell:free'
+    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
     const modelConfig = MODELS.find((m) => m.id === modelId)
@@ -72,7 +72,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    console.log('🎨 [OPENROUTER] Using FLUX.1 Schnell for image generation')
+    console.log('🎨 [OPENROUTER] Using Gemini 2.5 Flash Image Preview for image generation')
     
     try {
       // Try OpenRouter FLUX.1 first (best value), then fallback to others
@@ -91,7 +91,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
           'X-Title': 'Cleo Agent'
         },
         body: JSON.stringify({
-          model: 'black-forest-labs/flux-1-schnell:free',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{
             role: 'user',
             content: `Generate a high-quality image: ${prompt}`
@@ -113,8 +113,8 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
         const realResult = {
           imageUrl: imageData.image_url.url,
           title: `Generated Image: ${prompt.slice(0, 50)}`,
-          description: `AI-generated image using FLUX.1 Schnell: "${prompt}"`,
-          style: "FLUX.1 Schnell",
+          description: `AI-generated image using Gemini 2.5 Flash Image Preview: "${prompt}"`,
+          style: "Gemini 2.5 Flash",
           dimensions: {
             width: 1024,
             height: 1024
@@ -242,7 +242,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      model: 'openrouter:black-forest-labs/flux-1-schnell:free'
+      model: 'openrouter:google/gemini-2.5-flash-image-preview'
     }
   }
 }

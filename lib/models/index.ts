@@ -9,6 +9,7 @@ import { ModelConfig } from "./types"
 import { openrouterModels } from "./data/openrouter"
 import { geminiModels } from "./data/gemini"
 import { openaiModels } from "./data/openai"
+import { grokModels } from "./data/grok" // Import Grok models
 
 /**
  * Cleo Agent Models - Optimized 3-Tier System
@@ -42,6 +43,12 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 
 // Keep 3-tier primaries and add only validated, tool-capable models
 const extraProviderModels: ModelConfig[] = [
+  // XAI Grok models (Premium unlimited usage)
+  ...pickById(grokModels, [
+    "grok-4-fast-reasoning", // New Grok 4 Fast with reasoning - multimodal, 2M context
+    "grok-4-fast-non-reasoning", // New Grok 4 Fast without reasoning - faster, 2M context
+    "grok-3-mini", // Existing free model
+  ]),
   // OpenRouter: Tool-calling enabled models only
   ...pickById(openrouterModels, [
     // Free tier optimized models (tool-capable)
@@ -53,12 +60,9 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:openai/gpt-4.1-mini", // Re-enabled OpenAI GPT-4.1 mini
     // Premium multimodal models with daily limits
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
-    // Image generation models - OpenRouter FLUX (best value)
-    "openrouter:black-forest-labs/flux-1-schnell:free", // 20 images/day - free high-quality
-    "openrouter:black-forest-labs/flux-1-pro", // 10 images/day - premium quality
-    "openrouter:openai/dall-e-3", // 8 images/day - artistic style
-    "gemini-2.5-flash-image-preview", // 5 images/day - text-to-image (Google direct)
-    "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast:free
+    // Image generation models (valid OpenRouter models only)
+    "openrouter:openai/dall-e-3", // 8 images/day - proven to work
+    "google:gemini-2.5-flash-image-preview", // Gemini fallback
     // High-end additions (paid)
     // Removed deprecated Nemotron Ultra 253B
     "openrouter:meta-llama/llama-3.1-405b-instruct",

@@ -63,14 +63,16 @@ export class DailyLimitsManager {
     const status: Record<string, { used: number; remaining: number; limit: number }> = {}
     
     const premiumModels = {
-      'google:gemini-2.5-flash-image-preview': 100,
-      'openrouter:google/gemini-2.5-flash-image-preview': 100,
-      'openrouter:black-forest-labs/flux-1-schnell:free': 100,
-      'openrouter:black-forest-labs/flux-1-pro': 50,
-      'openrouter:openai/dall-e-3': 30,
-      'openrouter:anthropic/claude-3.5-sonnet-20241022': 100,
-      'openrouter:openai/gpt-4.1-mini': 100,
-      'openrouter:openai/gpt-5-preview': 50
+      // Solo estos modelos tienen límites reales
+      'google:gemini-2.5-flash-image-preview': 100, // Nano Banana - tiene límite
+      'openrouter:google/gemini-2.5-flash-image-preview': 100, // Nano Banana via OpenRouter
+      'openrouter:anthropic/claude-sonnet-4': 50, // Claude 4 - tiene límite
+      'openrouter:openai/gpt-5-preview': 30, // GPT-5 - tiene límite
+      // Los siguientes NO tienen límites (comentados para claridad):
+      // 'grok-4-fast-reasoning': sin límite
+      // 'grok-4-fast-non-reasoning': sin límite  
+      // 'grok-3-mini': sin límite
+      // 'openrouter:openai/gpt-4.1-mini': sin límite (ilimitado)
     }
 
     for (const [modelId, limit] of Object.entries(premiumModels)) {
