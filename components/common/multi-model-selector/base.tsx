@@ -153,26 +153,18 @@ export function MultiModelSelector({
   // Get the hovered model data
   const hoveredModelData = models.find((model) => model.id === hoveredModel)
 
-  const filteredModels = filterAndSortModels(
-    models,
-    favoriteModels || [],
-    searchQuery,
-    isModelHidden
-  )
-
-  // Ensure unique entries to avoid duplicate keys (parity with ModelSelector)
-  const dedupedModels = useMemo(() => {
-    const seen = new Set<string>()
-    const result: ModelConfig[] = []
-    for (const m of filteredModels) {
-      const k = `${m.icon || "unknown"}::${m.id}`
-      if (!seen.has(k)) {
-        seen.add(k)
-        result.push(m)
-      }
+  // Group models by provider for better UX
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, ModelConfig[]> = {}
+    for (const model of models) {
+      if (isModelHidden(model.id)) continue
+      if (searchQuery && !model.name.toLowerCase().includes(searchQuery.toLowerCase())) continue
+      const providerKey = model.provider || "Other"
+      if (!groups[providerKey]) groups[providerKey] = []
+      groups[providerKey].push(model)
     }
-    return result
-  }, [filteredModels])
+    return groups
+  }, [models, isModelHidden, searchQuery])
 
   if (isLoadingModels) {
     return null
@@ -384,15 +376,25 @@ export function MultiModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : dedupedModels.length > 0 ? (
-                dedupedModels.map((model) => renderModelItem(model))
+              ) : Object.entries(groupedModels).length > 0 ? (
+                Object.entries(groupedModels).map(([providerKey, modelsGroup]) => {
+                  return (
+                    <div key={providerKey} className="mb-2 border-b border-border last:border-b-0">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-muted text-muted-foreground font-semibold rounded-t-md">
+                        <span>{providerKey}</span>
+                        <span className="ml-auto text-xs">{modelsGroup.length} models</span>
+                      </div>
+                      {modelsGroup.map((model) => renderModelItem(model))}
+                    </div>
+                  )
+                })
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                  <p className="text-muted-foreground mb-2 text-sm">
+                  <p className="text-muted-foreground mb-1 text-sm">
                     No results found.
                   </p>
                   <a
-                    href="https://github.com/ibelick/zola/issues/new?title=Model%20Request%3A%20"
+                    href="https://github.com/LuisNSantana/cleo-agent/issues/new"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground text-sm underline"
@@ -464,51 +466,59 @@ export function MultiModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : dedupedModels.length > 0 ? (
-                dedupedModels.map((model) => {
-                  const isLocked = !model.accessible
-                  const isSelected = selectedModelIds.includes(model.id)
-                  const provider = PROVIDERS.find(
-                    (provider) => provider.id === model.icon
-                  )
-
+              ) : Object.entries(groupedModels).length > 0 ? (
+                Object.entries(groupedModels).map(([providerKey, modelsGroup]) => {
+                  const provider = PROVIDERS.find((p) => p.id === modelsGroup[0]?.icon)
                   return (
-                    <DropdownMenuItem
-                      key={model.id}
-                      className={cn(
-                        "flex w-full items-center justify-between px-3 py-2",
-                        isSelected && "bg-accent"
-                      )}
-                      onSelect={(e) => {
-                        e.preventDefault()
-                        handleModelToggle(model.id, isLocked)
-                      }}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
+                    <div key={providerKey} className="mb-2 border-b border-border last:border-b-0">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-muted text-muted-foreground font-semibold rounded-t-md">
                         {provider?.icon && <provider.icon className="size-5" />}
-                        <div className="flex flex-col gap-0">
-                          <span className="text-sm">{model.name}</span>
-                        </div>
+                        <span>{provider?.name || providerKey}</span>
+                        <span className="ml-auto text-xs">{modelsGroup.length} models</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isSelected && <CheckIcon className="size-4" />}
-                        {isLocked && (
-                          <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                            <span>Locked</span>
-                          </div>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
+                      {modelsGroup.map((model) => {
+                        const isLocked = !model.accessible
+                        const isSelected = selectedModelIds.includes(model.id)
+                        return (
+                          <DropdownMenuItem
+                            key={model.id}
+                            className={cn(
+                              "flex w-full items-center justify-between px-3 py-2",
+                              isSelected && "bg-accent"
+                            )}
+                            onSelect={(e) => {
+                              e.preventDefault()
+                              handleModelToggle(model.id, isLocked)
+                            }}
+                            onFocus={() => {
+                              if (isDropdownOpen) {
+                                setHoveredModel(model.id)
+                              }
+                            }}
+                            onMouseEnter={() => {
+                              if (isDropdownOpen) {
+                                setHoveredModel(model.id)
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              {provider?.icon && <provider.icon className="size-5" />}
+                              <div className="flex flex-col gap-0">
+                                <span className="text-sm">{model.name}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isSelected && <CheckIcon className="size-4" />}
+                              {isLocked && (
+                                <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                                  <span>Locked</span>
+                                </div>
+                              )}
+                            </div>
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </div>
                   )
                 })
               ) : (

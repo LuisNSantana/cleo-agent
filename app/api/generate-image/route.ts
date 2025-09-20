@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview' // Usar OpenRouter Gemini Nano Banana
+    // Use the correct OpenRouter model ID as per user instruction
+    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
     const modelConfig = MODELS.find(m => m.id === modelId)
