@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    // Use Google Gemini 2.5 Flash Image Preview (Nano Banana) for actual image generation
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    // Use Google Gemini 2.5 Flash Image Preview directly (Nano Banana) for actual image generation
+    const modelId = 'gemini-2.5-flash-image-preview'
     console.log('🎯 [DEBUG] Using modelId:', modelId)
     
     // Get the actual model configuration
@@ -246,7 +246,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    const modelId = 'gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
     const modelConfig = MODELS.find(m => m.id === modelId)

@@ -81,6 +81,10 @@ const extraProviderModels: ModelConfig[] = [
     "gpt-4o-search-preview-2025-03-11", // ✅ Native web search
     "gpt-4o-mini-search-preview", // ✅ Native web search (affordable)
   ]),
+  // Add Google Gemini models for direct access
+  ...pickById(geminiModels, [
+    "gemini-2.5-flash-image-preview", // Direct Google API for image generation
+  ]),
 ]
 
 const STATIC_MODELS: ModelConfig[] = dedupeById([
