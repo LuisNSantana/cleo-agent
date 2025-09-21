@@ -55,7 +55,11 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+  // Preferimos el ID directo (Google) porque la variante OpenRouter puede filtrarse del listado UI.
+  // Aceptamos alias legacy 'openrouter:google/gemini-2.5-flash-image-preview'.
+  const preferredId = 'gemini-2.5-flash-image-preview'
+  const legacyId = 'openrouter:google/gemini-2.5-flash-image-preview'
+  const modelId = MODELS.find(m => m.id === preferredId) ? preferredId : legacyId
     
     // Get the actual model configuration
     const modelConfig = MODELS.find((m) => m.id === modelId)
@@ -72,7 +76,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
     }
 
-    console.log('🎨 [OPENROUTER] Using Gemini 2.5 Flash Image Preview for image generation')
+  console.log('🎨 [IMAGE] Using Gemini 2.5 Flash Image Preview for image generation via', modelId === preferredId ? 'direct Google' : 'OpenRouter proxy')
     
     try {
       // Try OpenRouter FLUX.1 first (best value), then fallback to others
@@ -82,7 +86,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
       }
 
       // Use OpenRouter API for FLUX.1 image generation
-      const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openrouterApiKey}`,
@@ -91,7 +95,7 @@ async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
           'X-Title': 'Cleo Agent'
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview', // OpenRouter internal model slug
           messages: [{
             role: 'user',
             content: `Generate a high-quality image: ${prompt}`

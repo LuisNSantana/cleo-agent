@@ -22,7 +22,7 @@ export default function AgentsManagePage() {
   } = useClientAgentStore()
 
   return (
-    <div className="py-6 mt-2 sm:mt-3">
+    <div className="py-5">
       {/* Section Header */}
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Manage Agents</h1>
