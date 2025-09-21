@@ -93,7 +93,9 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
         body: JSON.stringify({
           prompt,
           userId
-        })
+        }),
+        // Add timeout to prevent hanging requests - 120 seconds for image generation
+        signal: AbortSignal.timeout(120000) // 120 seconds timeout
       })
 
       const data = await response.json()
@@ -130,7 +132,18 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
       }
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate image'
+      let errorMessage = 'Failed to generate image'
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+          errorMessage = 'Image generation timed out after 2 minutes. Please try again with a simpler description.'
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       console.error('Image generation error:', error)
       
       showToast("Generation Failed", errorMessage, "destructive")

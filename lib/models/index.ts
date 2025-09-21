@@ -73,12 +73,12 @@ const extraProviderModels: ModelConfig[] = [
   ]),
   // Re-enable Mistral Medium in selector
   ...pickById(mistralModels, ["mistral-medium-2508"]),
-  // Add economical models for user variety
-  ...pickById(geminiModels, ["gemini-2.5-flash-image-preview"]), // Only add image preview, keep OpenRouter lite
+  // Add OpenAI models with native web search
   ...pickById(openaiModels, [
     "gpt-4o-mini", 
     "gpt-5", 
     "gpt-5-nano",
+    "gpt-4o-search-preview-2025-03-11", // ✅ Native web search
     "gpt-4o-mini-search-preview", // ✅ Native web search (affordable)
   ]),
 ]
