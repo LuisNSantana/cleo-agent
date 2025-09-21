@@ -74,12 +74,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get Google API key
-    const googleApiKey = process.env.GOOGLE_API_KEY
+    // Get Google API key (accept both legacy GOOGLE_API_KEY and preferred GOOGLE_GENERATIVE_AI_API_KEY)
+    const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY
     if (!googleApiKey) {
-      console.log('❌ [DEBUG] Google API key not configured')
+      console.log('❌ [DEBUG] Google API key not configured (tried GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_API_KEY)')
       return NextResponse.json(
-        { error: "Google API key not configured" },
+        { error: "Missing Google Gemini API key. Set env var GOOGLE_GENERATIVE_AI_API_KEY." },
         { status: 500 }
       )
     }

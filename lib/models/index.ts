@@ -87,11 +87,17 @@ const extraProviderModels: ModelConfig[] = [
   ]),
 ]
 
-const STATIC_MODELS: ModelConfig[] = dedupeById([
-  ...optimizedModels, // 3-tier primaries (Fast/Balanced/Smarter)
-  // LangChain orchestration routes are hidden from UI intentionally
-  ...extraProviderModels, // Key models from OpenRouter & Gemini
+let STATIC_MODELS: ModelConfig[] = dedupeById([
+  ...optimizedModels,
+  ...extraProviderModels,
 ])
+
+// Post-processing rules to prevent confusing duplicates in selector.
+// 1. Prefer direct Google Gemini image model over OpenRouter proxy when both exist.
+const hasDirectNanoBanana = STATIC_MODELS.some(m => m.id === 'gemini-2.5-flash-image-preview')
+if (hasDirectNanoBanana) {
+  STATIC_MODELS = STATIC_MODELS.filter(m => m.id !== 'openrouter:google/gemini-2.5-flash-image-preview')
+}
 
 // Debug logs removed for production safety
 

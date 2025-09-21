@@ -24,7 +24,16 @@ export function AgentsTopNav() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
-    <header className="app-fixed-header">
+    // Secondary navigation bar: sits below global header. We intentionally
+    // avoid using app-fixed-header (reserved for the global header) to prevent
+    // double stacked fixed layers. Instead we make this bar sticky with a top
+    // offset equal to the global header height variable.
+    <header
+      className={cn(
+        "sticky z-40 w-full border-b divider-subtle bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70",
+        "top-[var(--app-header-height,56px)]" // fallback to 56px if CSS var missing
+      )}
+    >
       <div className="w-full flex h-full items-center justify-between px-2 sm:px-4 lg:px-6">
         {/* Left: brand + back to app home */}
         <div className="flex items-center gap-2 sm:gap-3">
@@ -92,7 +101,7 @@ export function AgentsTopNav() {
       </div>
 
       {/* Mobile nav buttons */}
-  <div className="md:hidden border-t divider-subtle bg-background/80 backdrop-blur-sm">
+  <div className="md:hidden border-t divider-subtle bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto grid grid-cols-5 gap-1 px-1 py-2 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon
