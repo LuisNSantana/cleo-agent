@@ -369,25 +369,20 @@ export async function POST(req: Request) {
               })
             }
 
-            // Return the image generation result as a streaming response
-            const stream = new ReadableStream({
-              start(controller) {
-                const encoder = new TextEncoder()
-                // Send the image result in a format the frontend can understand
-                const response = JSON.stringify({
-                  type: 'image_generated',
-                  data: imageResult.result
-                })
-                controller.enqueue(encoder.encode(response))
-                controller.close()
-              }
-            })
-
-            return new Response(stream, {
+            /**
+             * IMPORTANT: Previously we returned a custom one-off JSON line with { type: 'image_generated' }.
+             * The frontend (useChat from @ai-sdk/react) expects either:
+             *   - Standard model text streaming chunks, OR
+             *   - A final plain text response representing the assistant message.
+             * Because we short‑circuit for image models, the UI never received a normal assistant message,
+             * so the generated image markdown was never rendered. We now simply return the markdown
+             * assistant response body so the hook appends it as a standard assistant message.
+             */
+            return new Response(assistantResponse, {
               headers: {
                 'Content-Type': 'text/plain; charset=utf-8',
-                'X-Accel-Buffering': 'no',
-              },
+                'Cache-Control': 'no-cache',
+              }
             })
           } else {
             console.error('🎨 [IMAGE GENERATION] Failed:', imageResult.error || 'Unknown error')

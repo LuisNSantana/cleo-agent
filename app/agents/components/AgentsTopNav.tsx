@@ -29,11 +29,13 @@ export function AgentsTopNav() {
     // offset equal to the global header height variable.
     <header
       className={cn(
-        "sticky top-[var(--app-header-height,56px)] z-30 w-full border-b divider-subtle",
-        "bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/55"
+        "sticky top-[var(--app-header-height,56px)] z-40 w-full border-b divider-subtle",
+        "bg-background/72 backdrop-blur-md supports-[backdrop-filter]:bg-background/55",
+        "agents-subnav"
       )}
+      style={{ ['--agents-subnav-height' as any]: '44px' }}
     >
-      <div className="mx-auto flex h-11 max-w-screen-2xl items-center gap-3 px-3 sm:px-5">
+      <div className="mx-auto flex h-[var(--agents-subnav-height)] max-w-screen-2xl items-center gap-3 px-3 sm:px-5">
         <div className="flex items-center gap-2 min-w-[12rem]">
           <span className="text-[13px] font-semibold tracking-wide text-foreground/90">Agent Control Center</span>
           <span className="hidden sm:inline text-subtle text-xs">/</span>
