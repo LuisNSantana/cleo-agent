@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { dailyLimits } from "@/lib/daily-limits"
 import { z } from "zod"
 import { MODELS } from "@/lib/models"
-import { generateText } from "ai"
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Schema for image generation response
 const ImageGenerationSchema = z.object({
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    // Use the correct OpenRouter model ID as per user instruction
+    // Use Google Gemini 2.5 Flash Image Preview (Nano Banana) for actual image generation
     const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
     console.log('🎯 [DEBUG] Using modelId:', modelId)
     
@@ -74,80 +74,92 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get OpenRouter API key
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY
-    if (!openRouterApiKey) {
+    // Get Google API key
+    const googleApiKey = process.env.GOOGLE_API_KEY
+    if (!googleApiKey) {
+      console.log('❌ [DEBUG] Google API key not configured')
       return NextResponse.json(
-        { error: "OpenRouter API key not configured" },
+        { error: "Google API key not configured" },
         { status: 500 }
       )
     }
 
-    // Get the model's SDK instance for OpenRouter
-    const openRouterModel = modelConfig.apiSdk?.(openRouterApiKey)
-    console.log('🎯 [DEBUG] OpenRouter model SDK created:', !!openRouterModel)
-    
-    if (!openRouterModel) {
-      console.log('❌ [DEBUG] OpenRouter model SDK not available')
-      return NextResponse.json(
-        { error: "OpenRouter model SDK not available" },
-        { status: 500 }
-      )
-    }
+    // Initialize Google Gemini AI
+    const genAI = new GoogleGenerativeAI(googleApiKey)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
 
-    // Enhanced prompt for better image generation
-    const enhancedPrompt = `Create a high-quality image with the following description: "${prompt}". 
-    Make it visually appealing, well-composed, and detailed. If no specific style is mentioned, use a modern, professional style.`
+    // Enhanced prompt for better image generation in English (works better according to docs)
+    const enhancedPrompt = `Generate a high-quality image: ${prompt}. Make it visually appealing, well-composed, and detailed.`
 
-    console.log('🎨 Generating image with OpenRouter Gemini:', enhancedPrompt)
+    console.log('🎨 Generating image with Google Gemini SDK:', enhancedPrompt)
 
-    // Generate image using OpenRouter Gemini 2.5 Flash Image Preview via AI SDK
-    let result
-    let generatedText
+    // Generate image using official Google Gemini SDK
+    let imageData
     
     try {
-      console.log('🎯 [DEBUG] About to call generateText with model')
-      result = await generateText({
-        model: openRouterModel,
-        prompt: enhancedPrompt,
-      })
-      console.log('🎯 [DEBUG] generateText completed successfully')
-      generatedText = result.text
+      console.log('🎯 [DEBUG] Making direct call to Google Gemini API')
       
-      // Log the raw response for debugging
-      console.log('🔍 Raw model response (first 200 chars):', generatedText.substring(0, 200))
-      console.log('🔍 Response length:', generatedText.length)
+      const result = await model.generateContent([enhancedPrompt])
+      const response = await result.response
+      
+      console.log('🎯 [DEBUG] Google API response received')
+      console.log('🔍 Response candidates length:', response.candidates?.length || 0)
+      
+      if (response.candidates && response.candidates[0]) {
+        const candidate = response.candidates[0]
+        console.log('🔍 Candidate content parts:', candidate.content?.parts?.length || 0)
+        
+        // Look for image data in the response parts
+        for (const part of candidate.content?.parts || []) {
+          console.log('🔍 Part type:', typeof part)
+          console.log('🔍 Part keys:', Object.keys(part))
+          
+          if (part.text) {
+            console.log('🔍 Part text (first 100 chars):', part.text.substring(0, 100))
+          }
+          
+          if (part.inlineData && part.inlineData.data) {
+            console.log('✅ Found image data in inlineData')
+            imageData = part.inlineData.data
+            break
+          }
+        }
+        
+        if (!imageData) {
+          console.error('❌ No image data found in response parts')
+          throw new Error('No image data found in Gemini response')
+        }
+      } else {
+        console.error('❌ [DEBUG] No candidates in response')
+        throw new Error('No candidates in Gemini response')
+      }
       
     } catch (modelError) {
-      console.error('Model generation failed:', modelError)
+      console.error('Google Gemini API failed:', modelError)
       throw new Error(`Image generation model failed: ${modelError instanceof Error ? modelError.message : 'Unknown model error'}`)
     }
 
-    // Validate that we have a meaningful response
-    if (!generatedText || generatedText.trim().length === 0) {
-      throw new Error('Model returned empty response')
+    // Validate that we have meaningful image data
+    if (!imageData || typeof imageData !== 'string') {
+      throw new Error('Model returned invalid image data')
     }
 
-    // Since this is an image generation model, the response should contain image data
-    // We need to check if it's a base64 image or a URL
+    // The imageData from Google Gemini should be base64 encoded
     let imageUrl = ''
     
-    if (generatedText.includes('data:image')) {
-      imageUrl = generatedText
-    } else if (generatedText.includes('http')) {
-      imageUrl = generatedText.trim()
-    } else if (generatedText.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(generatedText.trim())) {
-      // If it looks like base64 data (long string of valid base64 characters)
-      imageUrl = `data:image/png;base64,${generatedText.trim()}`
+    if (imageData.startsWith('data:image')) {
+      // Already a data URL
+      imageUrl = imageData
     } else {
-      // Model returned text instead of image data
-      console.error('Model returned text instead of image:', generatedText.substring(0, 200))
-      throw new Error('Model returned text instead of image data. This might indicate the model is not properly configured for image generation.')
+      // Raw base64 data, add proper data URL prefix
+      imageUrl = `data:image/png;base64,${imageData}`
     }
+
+    console.log('✅ [DEBUG] Successfully processed image data, length:', imageData.length)
 
     // Final validation that we have a valid image URL
     if (!imageUrl || imageUrl === 'data:image/png;base64,') {
-      throw new Error('Failed to extract valid image data from model response')
+      throw new Error('Failed to create valid image data URL')
     }
 
     const imageResponse = {
