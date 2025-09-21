@@ -320,6 +320,41 @@ code {
   font-variation-settings: var(--default-mono-font-variation-settings);
 }
 
+/* =============================
+   Global Fixed Header System
+   Centralized header height + utilities so content never scrolls under header
+   ============================= */
+:root {
+  --app-header-height: 56px;
+}
+
+@media (min-width: 1024px) {
+  :root { --app-header-height: 60px; }
+}
+
+/* Utility: apply top padding equal to header height */
+.pt-header { padding-top: var(--app-header-height); }
+
+/* Fixed header base style (avoid re-declaring in multiple components) */
+.app-fixed-header {
+  height: var(--app-header-height);
+  top: 0; left: 0; right: 0;
+  position: fixed;
+  z-index: 50;
+  /* Subtle glass + separator for readability */
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  background: linear-gradient(to bottom, hsl(var(--background)/0.82), hsl(var(--background)/0.68));
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 40%);
+  pointer-events: none; /* Children re-enable */
+}
+
+.app-fixed-header > * { pointer-events: auto; }
+
+/* Spacer utility (rare cases) */
+.h-app-header { height: var(--app-header-height); }
+
+
 /* sonner toast */
 [data-sonner-toaster] > li {
   width: 100%;

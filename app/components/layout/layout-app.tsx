@@ -121,9 +121,8 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
       )}
       <div className="flex flex-1 h-dvh relative z-10">
         <main 
-          className="@container relative h-dvh overflow-y-auto transition-all duration-300 ease-in-out"
+          className="@container relative h-dvh overflow-y-auto transition-all duration-300 ease-in-out pt-header"
           style={{ 
-            paddingTop: '56px',
             width: isOpen && !isMobile ? `${chatWidth}%` : '100%'
           }}
         >
@@ -138,10 +137,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           <div
             onMouseDown={startDividerResize}
             className={cn(
-              "relative w-1 bg-border cursor-col-resize group hover:bg-primary/60 transition-all z-10 flex items-center justify-center",
+              "relative w-1 bg-border cursor-col-resize group hover:bg-primary/60 transition-all z-10 flex items-center justify-center pt-header",
               isResizing && "bg-primary w-2"
             )}
-            style={{ paddingTop: '56px' }}
             title="Arrastra para ajustar el tamaño del chat y editor"
           >
             <div className="absolute inset-y-0 -left-2 -right-2 group-hover:bg-primary/10 transition-colors" />
@@ -158,10 +156,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
         
         {isOpen && (
           <div 
-            className="flex-shrink-0 transition-all duration-300 ease-in-out"
+            className="flex-shrink-0 transition-all duration-300 ease-in-out pt-header"
             style={{ 
-              width: isMobile ? '100%' : `${100 - chatWidth}%`,
-              paddingTop: '56px'
+              width: isMobile ? '100%' : `${100 - chatWidth}%`
             }}
           >
             <CanvasEditorShell 

@@ -89,6 +89,7 @@ import { TroubleshootingIssueMatrix } from '@/components/docs/TroubleshootingIss
 import { DiagnosticCommands } from '@/components/docs/DiagnosticCommands'
 import { RecoveryFlows } from '@/components/docs/RecoveryFlows'
 import { ErrorTaxonomy } from '@/components/docs/ErrorTaxonomy'
+import { usePathname } from 'next/navigation'
 
 // Locale content interface for safer indexing
 interface LocaleContent {
@@ -232,16 +233,28 @@ const content: Record<string, LocaleContent> = {
         answer: "We support GPT-4, Claude, Gemini, and specialized models through OpenRouter. Each model has different strengths for various tasks."
       },
       {
+        question: "How is pricing & usage metered?",
+        answer: "Model usage is metered by provider tokens (upstream) plus Cleo orchestration overhead. You can set per-user and per-workspace soft & hard budgets in Settings → Billing. Real-time token + cost dashboards are provided under Analytics." 
+      },
+      {
         question: "Is my data secure?",
-        answer: "Yes! We use enterprise-grade encryption, never train on your data, and give you full control over your information and integrations."
+        answer: "Yes! We use enterprise-grade encryption, never train on your data, isolate per-tenant storage, and you can revoke any integration at any time. Private context is never sent to models without explicit scope." 
       },
       {
-        question: "Can I use Cleo offline?",
-        answer: "Basic features work offline, but AI responses and integrations require internet connectivity for optimal performance."
+        question: "What happens to my data if I delete an agent?",
+        answer: "The agent configuration is removed immediately; conversation logs and memory embeddings tied to it are soft-retained for 24h (grace) then purged unless you enabled compliance retention." 
       },
       {
-        question: "How do I integrate with Google Workspace?",
-        answer: "Go to Settings > Integrations, click 'Connect Google', and follow the OAuth flow to grant the necessary permissions."
+        question: "Can I self-host or run local models?",
+        answer: "Yes. You can provide an OpenAI-compatible endpoint or run local inference (e.g. via Ollama) and register it as a custom provider. Latency & capability metadata can be annotated for routing heuristics." 
+      },
+      {
+        question: "What is on the roadmap?",
+        answer: "Upcoming: execution trace inspector, real-time collaboration cursors on canvas, fine-grained per-tool RBAC, vector workspace sync, and autonomous scheduled tasks." 
+      },
+      {
+        question: "How do I report issues or request features?",
+        answer: "Use the in-app feedback panel or open a ticket via Support → New Request. Attach session trace ID from the footer for fastest triage." 
       }
     ],
 
@@ -315,8 +328,8 @@ const content: Record<string, LocaleContent> = {
       {
         icon: BarChart3,
         title: "Panel de Analytics",
-        desc: "Rastrea uso, rendimiento e insights",
-        features: ["Métricas de uso", "Rendimiento de modelos", "Seguimiento de costos", "Reportes personalizados"],
+        desc: "Acompaña uso, rendimiento e insights",
+        features: ["Métricas de uso", "Rendimiento de modelos", "Rastreo de costes", "Informes personalizados"],
         color: "orange"
       },
       {
@@ -695,7 +708,9 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
     (["en", "es", "pt"].includes(initialLang) ? initialLang : "en") as Lang
   )
   const [searchQuery, setSearchQuery] = useState("")
+  const [faqSearch, setFaqSearch] = useState("")
   const [activeSection, setActiveSection] = useState("overview")
+  const pathname = usePathname()
 
   const t = useMemo(() => content[lang], [lang])
 
@@ -728,10 +743,37 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
 
   const activeSpy = useScrollSpy(Array.from(DOC_SECTION_ORDER))
 
+  // Helper: slugify for FAQ anchors
+  const slugify = (s: string) => s.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+
+  // Filtered FAQ for FAQ-specific search
+  const visibleFaq = useMemo(() => {
+    if (!faqSearch) return t.faqItems
+    const q = faqSearch.toLowerCase()
+    return t.faqItems.filter(item =>
+      item.question.toLowerCase().includes(q) ||
+      item.answer.toLowerCase().includes(q)
+    )
+  }, [faqSearch, t])
+
+  // Structured data (JSON-LD) for SEO
+  const faqJsonLd = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: t.faqItems.map(f => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer }
+    }))
+  }), [t])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  <header className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Image src="/img/agents/logocleo4.png" alt="Cleo" width={32} height={32} />
@@ -767,7 +809,7 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
       </header>
 
       {/* Mobile Search */}
-      <div className="border-b bg-background md:hidden">
+  <div className="border-b bg-background md:hidden mt-16">
         <div className="container mx-auto px-4 py-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -813,7 +855,7 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
       )}
 
       {/* New layout grid with sidebar */}
-      <div className="container mx-auto px-4 py-12 flex gap-10">
+  <div className="container mx-auto px-4 pt-28 pb-12 flex gap-10">
         <DocsSidebar active={activeSpy as DocSectionId} />
         <div className="flex-1 space-y-32">
           <DocSectionContainer id="overview" title="Overview" subtitle={t.subtitle}>
@@ -1063,19 +1105,57 @@ OPENROUTER_API_KEY=...`}
           </DocSectionContainer>
           <DocSectionContainer id="faq" title={t.faq} subtitle="Answers to recurring questions">
             <div className="space-y-6">
-              <Accordion type="single" collapsible className="w-full">
-                {t.faqItems.slice(0,2).map((item, idx) => (
-                  <AccordionItem key={idx} value={`faq-${idx}`}>
-                    <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
-                    <AccordionContent>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{item.answer}</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-              <div className="rounded-md border p-4 bg-background/60">
-                <p className="text-xs text-muted-foreground">Showing 2 of {t.faqItems.length} questions. Full FAQ expansion coming next (pricing, limits, privacy, roadmap, enterprise).</p>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search FAQ..."
+                    value={faqSearch}
+                    onChange={(e) => setFaqSearch(e.target.value)}
+                    className="pl-9"
+                    aria-label="Search FAQ"
+                  />
+                </div>
+                {faqSearch && (
+                  <p className="text-xs text-muted-foreground">
+                    {visibleFaq.length} match{visibleFaq.length === 1 ? '' : 'es'} for "{faqSearch}" · <button onClick={() => setFaqSearch('')} className="underline hover:text-primary">clear</button>
+                  </p>
+                )}
               </div>
+              <Accordion type="multiple" className="w-full">
+                {visibleFaq.map((item, idx) => {
+                  const slug = slugify(item.question)
+                  return (
+                    <AccordionItem key={slug} value={slug} id={`faq-${slug}`}>
+                      <AccordionTrigger className="text-left group">
+                        <span className="flex-1 text-left">{item.question}</span>
+                        <a
+                          href={`#faq-${slug}`}
+                          aria-label="Copy link to this question"
+                          className="opacity-0 group-hover:opacity-60 ml-2 text-xs transition hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard?.writeText(`${window.location.origin}${pathname}#faq-${slug}`)
+                          }}
+                        >#</a>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{item.answer}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                })}
+              </Accordion>
+              {visibleFaq.length === 0 && (
+                <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+                  No FAQ matches. Try adjusting your search.
+                </div>
+              )}
+              <script
+                type="application/ld+json"
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+              />
             </div>
           </DocSectionContainer>
         </div>
