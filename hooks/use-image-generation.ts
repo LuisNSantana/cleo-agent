@@ -64,10 +64,14 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
   }, [userId])
 
   const generateImage = useCallback(async (prompt: string): Promise<ImageGenerationResult> => {
+    console.log('🎯 [DEBUG] generateImage called, isGenerating:', isGenerating, 'prompt:', prompt.substring(0, 50))
+    
     if (isGenerating) {
+      console.warn('⚠️ [DEBUG] Image generation already in progress, returning early')
       return { success: false, error: "Image generation already in progress" }
     }
 
+    console.log('🎯 [DEBUG] Setting isGenerating to true')
     setIsGenerating(true)
 
     try {
@@ -153,6 +157,7 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
         error: errorMessage
       }
     } finally {
+      console.log('🎯 [DEBUG] Setting isGenerating to false in finally block')
       setIsGenerating(false)
     }
   }, [isGenerating, userId, checkCanGenerate, onImageGenerated, showToast])
@@ -189,6 +194,13 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
     
     // Utils
     reset: () => {
+      console.log('🎯 [DEBUG] Resetting image generation state')
+      setLastGenerated(null)
+      setIsGenerating(false)
+    },
+    // Emergency reset for stuck states
+    forceReset: () => {
+      console.log('🆘 [DEBUG] Force resetting image generation state')
       setLastGenerated(null)
       setIsGenerating(false)
     }

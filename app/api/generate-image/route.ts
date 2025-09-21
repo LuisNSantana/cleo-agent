@@ -18,10 +18,14 @@ const ImageGenerationSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  console.log('🎯 [DEBUG] POST /api/generate-image endpoint called')
+  
   try {
     const { prompt, userId } = await request.json()
+    console.log('🎯 [DEBUG] Request data:', { prompt: prompt?.substring(0, 50), userId })
 
     if (!prompt) {
+      console.log('❌ [DEBUG] No prompt provided')
       return NextResponse.json(
         { error: "Prompt is required" },
         { status: 400 }
@@ -41,9 +45,11 @@ export async function POST(request: NextRequest) {
     const effectiveUserId = user?.id || 'anonymous'
     // Use the correct OpenRouter model ID as per user instruction
     const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    console.log('🎯 [DEBUG] Using modelId:', modelId)
     
     // Get the actual model configuration
     const modelConfig = MODELS.find(m => m.id === modelId)
+    console.log('🎯 [DEBUG] Model config found:', !!modelConfig)
     if (!modelConfig) {
       return NextResponse.json(
         { error: "Image generation model not found" },
@@ -79,7 +85,10 @@ export async function POST(request: NextRequest) {
 
     // Get the model's SDK instance for OpenRouter
     const openRouterModel = modelConfig.apiSdk?.(openRouterApiKey)
+    console.log('🎯 [DEBUG] OpenRouter model SDK created:', !!openRouterModel)
+    
     if (!openRouterModel) {
+      console.log('❌ [DEBUG] OpenRouter model SDK not available')
       return NextResponse.json(
         { error: "OpenRouter model SDK not available" },
         { status: 500 }
@@ -97,14 +106,17 @@ export async function POST(request: NextRequest) {
     let generatedText
     
     try {
+      console.log('🎯 [DEBUG] About to call generateText with model')
       result = await generateText({
         model: openRouterModel,
         prompt: enhancedPrompt,
       })
+      console.log('🎯 [DEBUG] generateText completed successfully')
       generatedText = result.text
       
       // Log the raw response for debugging
       console.log('🔍 Raw model response (first 200 chars):', generatedText.substring(0, 200))
+      console.log('🔍 Response length:', generatedText.length)
       
     } catch (modelError) {
       console.error('Model generation failed:', modelError)
