@@ -24,8 +24,8 @@ export function AgentsTopNav() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b divider-subtle bg-background/70 toolbar-blur">
-      <div className="w-full flex h-16 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6">
+    <header className="app-fixed-header">
+      <div className="w-full flex h-full items-center justify-between px-2 sm:px-4 lg:px-6">
         {/* Left: brand + back to app home */}
         <div className="flex items-center gap-2 sm:gap-3">
           <Link href="/" className="group inline-flex items-center gap-2 radius-md px-2 py-1 hover:bg-muted/40">
@@ -34,8 +34,8 @@ export function AgentsTopNav() {
           </Link>
           <Separator orientation="vertical" className="mx-1 h-6 divider-subtle" />
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-foreground">Agent Control Center</span>
-            <span className="text-muted-foreground">•</span>
+            <span className="font-medium text-strong leading-tight">Agent Control Center</span>
+            <span className="text-subtle">•</span>
             {/* Breadcrumbs */}
             <nav aria-label="Breadcrumb" className="breadcrumb hidden sm:block">
               {(() => {
@@ -44,7 +44,7 @@ export function AgentsTopNav() {
                   <span className="inline-flex items-center gap-1">
                     <Link href="/agents">Agents</Link>
                     <span aria-hidden>›</span>
-                    <span className="text-foreground">{current?.label || 'Overview'}</span>
+                    <span className="text-soft">{current?.label || 'Overview'}</span>
                   </span>
                 )
               })()}
@@ -53,12 +53,12 @@ export function AgentsTopNav() {
         </div>
 
         {/* Center: navigation (horizontal on md+, compact on mobile) */}
-        <nav className="hidden md:flex items-center gap-1 radius-lg bg-muted/40 p-1">
+  <nav className="hidden md:flex items-center gap-1 radius-lg bg-muted/50 p-1 backdrop-blur-sm">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn('radius-md px-3 py-2 text-sm font-medium transition-colors', active ? 'bg-muted/70 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}> 
+              <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn('radius-md px-3 py-2 text-sm font-medium transition-colors', active ? 'bg-muted/70 text-strong shadow-sm' : 'text-subtle hover:text-strong hover:bg-muted/50')}> 
                 <span className="inline-flex items-center gap-2">
                   <Icon className="h-4 w-4" />
                   {item.label}
@@ -78,7 +78,7 @@ export function AgentsTopNav() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="sm" className="text-subtle hover:text-strong">
                     <House className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -92,13 +92,13 @@ export function AgentsTopNav() {
       </div>
 
       {/* Mobile nav buttons */}
-      <div className="md:hidden border-t divider-subtle bg-background/70">
+  <div className="md:hidden border-t divider-subtle bg-background/80 backdrop-blur-sm">
         <div className="mx-auto grid grid-cols-5 gap-1 px-1 py-2 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href
             return (
-              <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-1 radius-md px-1 py-1 text-[11px] font-medium transition-colors', active ? 'bg-muted/70 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
+              <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-1 radius-md px-1 py-1 text-[11px] font-medium transition-colors', active ? 'bg-muted/70 text-strong' : 'text-subtle hover:text-strong hover:bg-muted/50')}>
                 <Icon className="h-5 w-5" />
                 <span>{item.label}</span>
               </Link>

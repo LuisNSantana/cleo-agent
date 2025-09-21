@@ -17,7 +17,7 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: only validated tool-capable models
-  "openrouter:deepseek/deepseek-chat-v3.1:free",
+  "openrouter:x-ai/grok-4-fast:free", // Replaced DeepSeek with Grok 4 Fast (better performance & still free)
   "openrouter:z-ai/glm-4.5",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   // Keep one vision-capable emergency fallback
@@ -44,8 +44,8 @@ export const FREE_MODELS_IDS = [
 // Default authenticated model: Sonoma Sky Alpha via OpenRouter
 export const MODEL_DEFAULT = "openrouter:x-ai/grok-4-fast:free"
 
-// MODELO POR DEFECTO PARA GUESTS - DEEPSEEK (herramientas soportadas)
-export const MODEL_DEFAULT_GUEST = "openrouter:deepseek/deepseek-chat-v3.1:free"
+// MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (mejor rendimiento y herramientas soportadas)
+export const MODEL_DEFAULT_GUEST = "openrouter:x-ai/grok-4-fast:free"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

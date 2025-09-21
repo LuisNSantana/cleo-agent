@@ -1613,8 +1613,8 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
         {sections.map(({ title, items }) => (
           <div key={title} className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">{title}</h3>
-              <span className="text-xs text-slate-400">{items.filter(a => matchesSearch(a) && matchesTool(a)).length} items</span>
+              <h3 className="text-lg font-semibold text-strong leading-tight">{title}</h3>
+              <span className="text-xs text-subtle">{items.filter(a => matchesSearch(a) && matchesTool(a)).length} items</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6 w-full">
               <AnimatePresence>
@@ -1627,7 +1627,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                     exit={{ opacity: 0, scale: 0.8 }}
                   >
                     <Card 
-                      className="h-full surface-1 border-border transition-all duration-300 group relative overflow-hidden cursor-pointer"
+                      className="h-full surface-1 border-border transition-all duration-300 group relative overflow-hidden cursor-pointer hover:shadow-sm"
                       onClick={() => setDetailsAgent(agent)}
                     >
                       {/* Removed colored hover overlay for neutral look */}
@@ -1636,7 +1636,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                         <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="relative group">
-                              <Avatar className="h-16 w-16 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105">
+                              <Avatar className="h-16 w-16 rounded-xl ring-1 ring-foreground-subtle/15 group-hover:ring-foreground-soft/30 transition-all duration-300 group-hover:scale-105">
                                 {getAgentAvatar(agent) ? (
                                   <AvatarImage src={getAgentAvatar(agent)!} alt={agent.name} className="object-cover rounded-xl" />
                                 ) : null}
@@ -1647,7 +1647,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                               <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300 blur-xl" style={{ backgroundColor: agent.color }} />
                             </div>
                             <div className="flex-1">
-                              <CardTitle className="text-lg text-white mb-1">{agent.name}</CardTitle>
+                              <CardTitle className="text-lg font-semibold text-strong mb-1 leading-tight tracking-wide">{agent.name}</CardTitle>
                               <div className="mb-2">
                                 {(() => { const info = getSpecificRoleLabel(agent); return (
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${info.colorClass}`}>
@@ -1656,7 +1656,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                                 )})()}
                               </div>
                               {agent.description && (
-                                <p className="text-xs text-slate-400 line-clamp-1">{agent.description}</p>
+                                <p className="text-xs text-subtle line-clamp-1">{agent.description}</p>
                               )}
                             </div>
                           </div>
@@ -1667,28 +1667,28 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
                         {agent.tags && agent.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {agent.tags.slice(0, 3).map((tag, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                              <Badge key={index} variant="secondary" className="text-xs bg-muted text-soft border border-border/60">
                                 {tag}
                               </Badge>
                             ))}
                             {agent.tags.length > 3 && (
-                              <Badge variant="secondary" className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                              <Badge variant="secondary" className="text-xs bg-muted text-soft border border-border/60">
                                 +{agent.tags.length - 3}
                               </Badge>
                             )}
                           </div>
                         )}
                         
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
-                          <div className="text-xs text-slate-400">
+                        <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                          <div className="text-xs text-subtle">
                             <span className="font-medium">{agent.model}</span>
                           </div>
                           
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-white/10" title="Copy agent">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopyFromAgent(agent) }} className="h-8 w-8 p-0 hover:bg-muted/40" title="Copy agent">
                               <CopyIcon className="w-3 h-3" />
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-white/10">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(agent) }} className="h-8 w-8 p-0 hover:bg-muted/40">
                               <PencilIcon className="w-3 h-3" />
                             </Button>
                             {/* Hide delete for default agents */}
