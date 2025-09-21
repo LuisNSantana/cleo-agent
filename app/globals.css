@@ -91,24 +91,26 @@
 :root {
   /* Premium light theme: warm, pastel off-white that feels soft and exquisite */
   --background: #faf7f2; /* warm ivory */
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: #faf7f2;
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: #faf7f2;
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
+  --foreground: oklch(0.18 0.006 285.9); /* slightly darker for base text */
+  --foreground-soft: oklch(0.42 0.015 285.9); /* mid emphasis */
+  --foreground-subtle: oklch(0.55 0.018 286); /* low emphasis still readable */
+  --card: #fdfaf6;
+  --card-foreground: var(--foreground);
+  --popover: #fefbf7;
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.27 0.010 285.9); /* increased contrast */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: #f2efe9; /* subtle warm tint */
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: #f3f0ea;
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: #f0ece5;
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: #e9e3d9;
-  --input: #e9e3d9;
-  --ring: oklch(0.705 0.015 286.067);
+  --secondary: #efe9df; /* more separation */
+  --secondary-foreground: var(--foreground);
+  --muted: #f2ece4; /* align to secondary but softer */
+  --muted-foreground: var(--foreground-subtle);
+  --accent: #ece5db; /* darker for better contrast with accent-foreground */
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(0.55 0.24 27.3);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: #e2dbd1; /* slightly darker */
+  --input: #e2dbd1;
+  --ring: oklch(0.62 0.018 286);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -116,12 +118,12 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
   --sidebar: #fbf8f3;
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #f0ece5;
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: #e9e3d9;
+  --sidebar-accent: #ede7dd;
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
   /* Minimal design system tokens */
@@ -158,28 +160,58 @@
   --ease-emphasized: cubic-bezier(0.2, 0.0, 0, 1);
 }
 
+/* Typography & contrast utilities */
+.text-strong { color: var(--foreground); }
+.text-soft { color: var(--foreground-soft); }
+.text-subtle { color: var(--foreground-subtle); }
+.contrast-boost { filter: contrast(1.08) saturate(1.02); }
+
+/* Tight leading for large headings */
+.leading-tight { line-height: 1.15; }
+
+/* Slight tracking for all-caps badges */
+.tracking-wide-caps { letter-spacing: 0.06em; }
+
+/* Contrast & Typography System Notes
+   ---------------------------------
+   Emphasis tiers:
+     - --foreground (primary text)
+     - --foreground-soft (secondary labels, meta stats)
+     - --foreground-subtle (de-emphasized helper text)
+   Utilities map directly to these tiers: .text-strong, .text-soft, .text-subtle
+   Surfaces: background < secondary < muted < accent < card < popover (light)
+   Dark mode surfaces: background < secondary < muted < surface-2 < surface-3
+   Accessibility: Base body copy uses at least ~4.5:1 contrast; subtle may approach ~3.8–4.2:1 but reserved for non-essential meta.
+   To adjust global contrast: tweak --foreground and cascade soft/subtle from there.
+*/
+
+body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering: optimizeLegibility; }
+
+
 .dark {
   /* Modern neutral dark theme - warm grays instead of cool blues */
   /* Based on best practices from Discord, GitHub, VS Code */
-  --background: #0d1117; /* GitHub-inspired neutral dark */
-  --foreground: #f0f6fc; /* Clean white with slight warmth */
-  --card: #161b22; /* Slightly elevated neutral gray */
-  --card-foreground: #e6edf3; /* Soft white for card content */
-  --popover: #161b22; /* Consistent with cards */
-  --popover-foreground: #e6edf3;
-  --primary: #6b7280; /* Modern neutral gray - trending 2025 */
+  --background: #0e1013; /* Slightly deeper for contrast */
+  --foreground: #f2f5f9; /* Clean white with warmth */
+  --foreground-soft: #cbd5df;
+  --foreground-subtle: #96a3b0;
+  --card: #161b22; /* Elevated neutral */
+  --card-foreground: var(--foreground);
+  --popover: #161b22;
+  --popover-foreground: var(--foreground);
+  --primary: #7b8390; /* Raised slightly */
   --primary-foreground: #ffffff;
-  --secondary: #21262d; /* Warm dark gray */
-  --secondary-foreground: #c9d1d9; /* Muted light gray */
-  --muted: #30363d; /* Mid-tone neutral */
-  --muted-foreground: #7d8590; /* Subtle text color */
-  --accent: #f8fafc; /* Soft white pastel accent */
+  --secondary: #1b2026; /* More distinct from background */
+  --secondary-foreground: var(--foreground-soft);
+  --muted: #262c33;
+  --muted-foreground: var(--foreground-subtle);
+  --accent: #f8fafc; /* Light accent for chips */
   --accent-foreground: #1f2937;
-  --destructive: #f85149; /* Soft red */
+  --destructive: #f85149;
   --destructive-foreground: #ffffff;
-  --border: #30363d; /* Subtle but visible borders */
-  --input: #21262d; /* Input background */
-  --ring: #6b7280; /* Focus ring matches primary */
+  --border: #2a3138; /* Slightly darker for delineation */
+  --input: #1b2026;
+  --ring: #7b8390;
   /* Charts: neutral but distinguishable colors */
   --chart-1: #79c0ff; /* Light blue */
   --chart-2: #56d364; /* Green */
@@ -187,19 +219,19 @@
   --chart-4: #a5a5a5; /* Gray */
   --chart-5: #ff7b72; /* Red */
   /* Sidebar: slightly different from main for hierarchy */
-  --sidebar: #0d1117; /* Same as background for cohesion */
-  --sidebar-foreground: #f0f6fc;
-  --sidebar-primary: #6b7280;
+  --sidebar: #0f1215;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #21262d;
-  --sidebar-accent-foreground: #c9d1d9;
-  --sidebar-border: #30363d;
-  --sidebar-ring: #6b7280;
+  --sidebar-accent: #1b2026;
+  --sidebar-accent-foreground: var(--foreground-soft);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 
   /* Elevation surfaces (neutral warm grays) */
   --surface-1: #161b22; /* Slight elevation */
-  --surface-2: #21262d; /* Medium elevation */
-  --surface-3: #30363d; /* High elevation */
+  --surface-2: #20262d; /* Medium elevation (adjusted) */
+  --surface-3: #2b323a; /* High elevation clearer separation */
 
   /* Shadows (subtle for dark mode) */
   --shadow-1: 0 1px 3px rgba(0,0,0,0.4);

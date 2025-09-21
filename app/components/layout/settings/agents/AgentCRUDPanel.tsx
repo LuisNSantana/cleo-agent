@@ -1552,10 +1552,10 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">
+          <h2 className="text-2xl font-semibold text-strong">
             Agent Control Center
           </h2>
-          <p className="text-muted-foreground mt-1">Manage and configure your AI agents</p>
+          <p className="mt-1 text-subtle">Manage and configure your AI agents</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -1564,7 +1564,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
             disabled={isRefreshing}
             variant="outline"
             size="sm"
-            className="border-border text-foreground hover:bg-muted/20 transition-all duration-200"
+            className="border-border text-soft hover:bg-muted/40 transition-colors duration-200"
           >
             <ArrowClockwise className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Syncing...' : 'Refresh'}
@@ -1573,7 +1573,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
           <Button
             onClick={() => { resetForm(); setEditingAgent(null); setIsCreateDialogOpen(true) }}
             variant="outline"
-            className="border-border text-foreground hover:bg-muted/20 transition-all duration-200"
+            className="border-border text-soft hover:bg-muted/40 transition-colors duration-200"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
             Create Agent
@@ -1588,9 +1588,9 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
             <select
               value={viewFilter}
               onChange={e => setViewFilter(e.target.value as any)}
-              className="bg-slate-800/60 border border-slate-700 text-sm text-slate-200 rounded px-2 py-1"
+              className="bg-secondary/60 border border-border text-sm text-soft rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring/40"
             >
-              <option value="all">View: All</option>
+              <option value="all" className="text-foreground">View: All</option>
               <option value="defaults">View: Default Agents</option>
               <option value="mine">View: My Agents</option>
               <option value="subagents">View: Sub-agents</option>

@@ -104,10 +104,10 @@ export function AgentsSettings() {
                   />
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-strong">
                     Agent Control Center
                   </h1>
-                  <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                  <p className="text-sm sm:text-base text-subtle mt-1">
                     Gestiona tu sistema multi-agente desde un único lugar
                   </p>
                 </div>
@@ -148,20 +148,20 @@ export function AgentsSettings() {
                       </CardTitle>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-medium text-foreground">
+                      <div className="text-lg font-medium text-strong">
                         {m.stats.value}
                       </div>
-                      <div className="text-xs text-muted-foreground">{m.stats.label}</div>
+                      <div className="text-xs text-subtle">{m.stats.label}</div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">{m.description}</p>
+                  <p className="text-sm text-subtle mb-4">{m.description}</p>
                   <ul className="space-y-1.5 mb-4">
                     {m.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-foreground/40" />
-                        <span className="text-foreground/90">{f}</span>
+                        <span className="text-soft">{f}</span>
                       </li>
                     ))}
                   </ul>
