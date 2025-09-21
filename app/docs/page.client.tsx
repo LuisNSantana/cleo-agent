@@ -66,9 +66,55 @@ import {
   Cpu,
   Network
 } from "lucide-react"
+import { AgentRolesGrid } from '@/components/docs/AgentRolesGrid'
+import { AgentConfigExamples } from '@/components/docs/AgentConfigExamples'
+import { AgentLifecycle } from '@/components/docs/AgentLifecycle'
+import { AgentPatternsHeuristics } from '@/components/docs/AgentPatternsHeuristics'
+import { AgentCreationCriteria } from '@/components/docs/AgentCreationCriteria'
+import { PromptExamplesGrid } from '@/components/docs/PromptExamplesGrid'
+import { ModelLatencyTiers } from '@/components/docs/ModelLatencyTiers'
+import { ModelSelectionHeuristics } from '@/components/docs/ModelSelectionHeuristics'
+import { ModelFallbackCascade } from '@/components/docs/ModelFallbackCascade'
+import { MultiAgentArchitecture } from '@/components/docs/MultiAgentArchitecture'
+import { OrchestrationPhases } from '@/components/docs/OrchestrationPhases'
+import { RoutingStrategies } from '@/components/docs/RoutingStrategies'
+import { ArbitrationPatterns } from '@/components/docs/ArbitrationPatterns'
+import { SupervisionLoops } from '@/components/docs/SupervisionLoops'
+import { ToolPermissionScopes } from '@/components/docs/ToolPermissionScopes'
+import { ToolApprovalFlow } from '@/components/docs/ToolApprovalFlow'
+import { RateLimitingMatrix } from '@/components/docs/RateLimitingMatrix'
+import { AuditLoggingPatterns } from '@/components/docs/AuditLoggingPatterns'
+import { RiskClassificationMatrix } from '@/components/docs/RiskClassificationMatrix'
+import { TroubleshootingIssueMatrix } from '@/components/docs/TroubleshootingIssueMatrix'
+import { DiagnosticCommands } from '@/components/docs/DiagnosticCommands'
+import { RecoveryFlows } from '@/components/docs/RecoveryFlows'
+import { ErrorTaxonomy } from '@/components/docs/ErrorTaxonomy'
+
+// Locale content interface for safer indexing
+interface LocaleContent {
+  title: string
+  subtitle: string
+  searchPlaceholder: string
+  backHome: string
+  getStarted?: string
+  heroTitle?: string
+  heroSubtitle?: string
+  heroFeatures?: Array<{ icon: LucideIcon; text: string; desc: string }>
+  featureCards?: Array<{ icon: LucideIcon; title: string; desc: string; features: string[]; color: string }>
+  integrations?: string
+  integrationDesc?: string
+  integrationCategories?: Array<{ title: string; items: Array<{ name: string; desc: string }> }>
+  faq: string
+  faqItems: Array<{ question: string; answer: string }>
+  guide?: string
+  guideSteps?: Array<{ title: string; content: string; icon: LucideIcon }>
+  quickStart?: string
+  quickStartDesc?: string
+  quickSteps?: Array<{ step: number; title: string; desc: string }>
+}
 
 // Enhanced i18n content store with comprehensive content
-const content = {
+const content: Record<string, LocaleContent> = {
   en: {
     // Header
     title: "Cleo Documentation",
@@ -98,7 +144,7 @@ const content = {
     ],
 
     // Main Features
-    features: "Core Features",
+  // label removed (was 'features') not part of LocaleContent interface
     featureCards: [
       {
         icon: Bot,
@@ -243,7 +289,7 @@ const content = {
     ],
 
     // Main Features
-    features: "Características Principales",
+  // label removed (was 'features') not part of LocaleContent interface
     featureCards: [
       {
         icon: Bot,
@@ -400,15 +446,15 @@ const content = {
       { icon: Palette, text: "Design Bonito", desc: "Interface intuitiva que parece natural" }
     ],
 
-    // Quick Start
-    quickStart: "Início Rápido",
-    quickStartDesc: "Comece a funcionar em minutos",
-    quickSteps: [
-      { step: 1, title: "Registrar", desc: "Crie sua conta e escolha seu plano" },
-      { step: 2, title: "Conectar Ferramentas", desc: "Vincule Google, Notion e outros serviços" },
-      { step: 3, title: "Criar Agente", desc: "Configure seu primeiro agente especializado" },
-      { step: 4, title: "Começar Chat", desc: "Inicie seu fluxo de trabalho inteligente" }
-    ],
+    // Quick Start (REMOVED duplicate to avoid key collision)
+    // quickStart: "Início Rápido",
+    // quickStartDesc: "Comece a funcionar em minutos",
+    // quickSteps: [
+    //   { step: 1, title: "Registrar", desc: "Crie sua conta e escolha seu plano" },
+    //   { step: 2, title: "Conectar Ferramentas", desc: "Vincule Google, Notion e outros serviços" },
+    //   { step: 3, title: "Criar Agente", desc: "Configure seu primeiro agente especializado" },
+    //   { step: 4, title: "Começar Chat", desc: "Inicie seu fluxo de trabalho inteligente" }
+    // ],
 
     // Main Features
     featureCards: [
@@ -537,11 +583,112 @@ const content = {
     ],
 
     // Main Features
-    features: "Características Principais"
+    // features: "Características Principais" // Duplicate removed
   }
-} as const
+}
 
 type Lang = keyof typeof content
+
+// Sidebar section anchor IDs constant
+const DOC_SECTION_ORDER = [
+  'overview',
+  'quick-start',
+  'agents',
+  'prompts',
+  'models',
+  'tools-safety',
+  'multi-agent',
+  'image-generation',
+  'troubleshooting',
+  'faq'
+] as const
+
+type DocSectionId = typeof DOC_SECTION_ORDER[number]
+
+// Reusable layout shell for sections (premium style)
+function DocSectionContainer({ id, children, title, subtitle }: { id: DocSectionId, children: React.ReactNode, title: string, subtitle?: string }) {
+  return (
+    <section id={id} className="scroll-mt-28 relative">
+      <div className="mb-8">
+        <h2 className="text-3xl font-semibold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          {title}
+        </h2>
+        {subtitle && <p className="mt-2 text-base text-muted-foreground max-w-2xl">{subtitle}</p>}
+      </div>
+      <div className="relative rounded-xl border border-border/50 bg-gradient-to-b from-background/40 to-background/10 backdrop-blur-sm p-6 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.25)]">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+// Premium skeleton placeholder block
+function SkeletonBlock({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className="h-4 w-full animate-pulse rounded bg-muted/40" style={{ animationDelay: `${i * 120}ms` }} />
+      ))}
+    </div>
+  )
+}
+
+// Sidebar component with scroll spy
+function DocsSidebar({ active }: { active: DocSectionId }) {
+  return (
+    <nav aria-label="Documentation navigation" className="sticky top-20 hidden h-[calc(100vh-6rem)] w-56 shrink-0 lg:block">
+      <ul className="space-y-2 text-sm">
+        {DOC_SECTION_ORDER.map(section => {
+          const labelMap: Record<DocSectionId, string> = {
+            'overview': 'Overview',
+            'quick-start': 'Quick Start',
+            'agents': 'Agents',
+            'prompts': 'Prompt Examples',
+            'models': 'Model Strategy',
+            'tools-safety': 'Tool Safety',
+            'multi-agent': 'Multi-Agent',
+            'image-generation': 'Image Generation',
+            'troubleshooting': 'Troubleshooting',
+            'faq': 'FAQ'
+          }
+          const isActive = active === section
+          return (
+            <li key={section}>
+              <a
+                href={`#${section}`}
+                className={`group flex items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-muted/60 ${isActive ? 'bg-muted font-medium text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                <span className="truncate">{labelMap[section]}</span>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
+  )
+}
+
+// Hook: scroll spy (lightweight)
+function useScrollSpy(ids: string[], offset = 160) {
+  const [active, setActive] = useState<string>(ids[0])
+  useEffect(() => {
+    function onScroll() {
+      let current = ids[0]
+      for (const id of ids) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top - offset <= 0) current = id
+      }
+      setActive(current)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [ids, offset])
+  return active
+}
 
 export default function DocsPageClient({ initialLang = "en" }: { initialLang?: Lang }) {
   const [lang, setLang] = useState<Lang>(
@@ -560,7 +707,7 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
     const results: Array<{ type: 'feature' | 'faq'; item: any }> = []
 
     // Search in features
-    t.featureCards.forEach(card => {
+    t.featureCards?.forEach((card) => {
       if (card.title.toLowerCase().includes(query) ||
           card.desc.toLowerCase().includes(query) ||
           card.features.some(f => f.toLowerCase().includes(query))) {
@@ -569,7 +716,7 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
     })
 
     // Search in FAQ
-    t.faqItems.forEach(item => {
+    t.faqItems.forEach((item) => {
       if (item.question.toLowerCase().includes(query) ||
           item.answer.toLowerCase().includes(query)) {
         results.push({ type: 'faq', item })
@@ -578,6 +725,8 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
 
     return results
   }, [searchQuery, t])
+
+  const activeSpy = useScrollSpy(Array.from(DOC_SECTION_ORDER))
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -663,211 +812,274 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
         </div>
       )}
 
-      {/* Main Content */}
-      {!filteredContent && (
-        <>
-          {/* Hero Section */}
-          <section className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 py-20 text-white">
-            <div className="absolute inset-0 bg-black/20" />
-            <div className="container relative mx-auto px-4">
-              <div className="mx-auto max-w-4xl text-center">
-                <h1 className="mb-6 text-4xl font-bold tracking-tight sm:text-6xl">
-                  {t.heroTitle}
-                </h1>
-                <p className="mb-8 text-xl text-blue-100 sm:text-2xl">
-                  {t.heroSubtitle}
-                </p>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                  {t.heroFeatures.map((feature, index) => (
-                    <div key={index} className="rounded-lg bg-white/10 p-6 backdrop-blur">
-                      <feature.icon className="mx-auto mb-3 h-8 w-8" />
-                      <h3 className="mb-2 font-semibold">{feature.text}</h3>
-                      <p className="text-sm text-blue-100">{feature.desc}</p>
+      {/* New layout grid with sidebar */}
+      <div className="container mx-auto px-4 py-12 flex gap-10">
+        <DocsSidebar active={activeSpy as DocSectionId} />
+        <div className="flex-1 space-y-32">
+          <DocSectionContainer id="overview" title="Overview" subtitle={t.subtitle}>
+            <p className="text-sm leading-relaxed text-muted-foreground">Cleo centraliza agentes inteligentes, herramientas conectadas y flujos de trabajo productivos en una sola experiencia premium. Usa el menú lateral para explorar cada área.</p>
+          </DocSectionContainer>
+          <DocSectionContainer id="quick-start" title="Quick Start" subtitle="Launch in minutes and build momentum">
+            <div className="space-y-10">
+              <ol className="list-decimal ml-6 space-y-6 text-sm">
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Crea tu cuenta / inicia sesión.</span>
+                  <div className="mt-2 text-muted-foreground">Accede a la app y ve a <code className="rounded bg-muted px-1 py-0.5 text-xs">Settings → API & Keys</code>.</div>
+                </li>
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Configura tus claves de modelo.</span>
+                  <div className="mt-2 text-muted-foreground">Introduce al menos una clave (OpenAI, Anthropic, Groq u OpenRouter). Cleo autodetectará disponibilidad y latencias.</div>
+                  <div className="mt-3 rounded-md border bg-background/60 p-4 text-xs font-mono leading-relaxed">
+{`# Ejemplo (.env.local)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=...
+GROQ_API_KEY=...
+OPENROUTER_API_KEY=...`}
+                  </div>
+                </li>
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Crea tu primer agente.</span>
+                  <div className="mt-2 text-muted-foreground">Ve a <code className="rounded bg-muted px-1 py-0.5 text-xs">Agents</code> y pulsa “New Agent”. Elige rol <code className="bg-muted px-1 py-0.5 rounded text-xs">specialist</code> para tareas concretas.</div>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border bg-gradient-to-br from-muted/20 to-background p-4">
+                      <p className="mb-2 text-xs font-semibold tracking-wide text-primary">Config JSON (UI equivalente)</p>
+                      <pre className="overflow-x-auto text-[11px] leading-relaxed font-mono">
+{`{
+  "name": "Research Scout",
+  "description": "Busca y resume información actual",
+  "role": "specialist",
+  "model": "gpt-4o-mini",
+  "temperature": 0.4,
+  "tools": ["web_search", "web_fetch"],
+  "prompt": "Eres un agente que verifica, contrasta y sintetiza fuentes creíbles." ,
+  "memoryEnabled": true,
+  "memoryType": "short_term"
+}`}
+                      </pre>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Quick Start */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <div className="mx-auto max-w-4xl">
-                <div className="mb-12 text-center">
-                  <h2 className="mb-4 text-3xl font-bold">{t.quickStart}</h2>
-                  <p className="text-xl text-muted-foreground">{t.quickStartDesc}</p>
-                </div>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                  {t.quickSteps.map((step, index) => (
-                    <div key={index} className="relative">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground mb-4 text-lg font-bold">
-                        {step.step}
-                      </div>
-                      <h3 className="mb-2 font-semibold">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground">{step.desc}</p>
-                      {index < t.quickSteps.length - 1 && (
-                        <ArrowRight className="absolute -right-3 top-6 hidden h-6 w-6 text-muted-foreground lg:block" />
-                      )}
+                    <div className="rounded-lg border bg-gradient-to-br from-muted/20 to-background p-4">
+                      <p className="mb-2 text-xs font-semibold tracking-wide text-primary">Creación vía API (POST)</p>
+                      <pre className="overflow-x-auto text-[11px] leading-relaxed font-mono">
+{`curl -X POST https://api.tu-dominio.com/api/agents/create \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  -d '{
+    "name": "Research Scout",
+    "description": "Busca y resume información actual",
+    "role": "specialist",
+    "model": "gpt-4o-mini",
+    "tools": ["web_search", "web_fetch"],
+    "prompt": "Eres un agente que verifica y sintetiza fuentes confiables",
+    "memoryEnabled": true,
+    "memoryType": "short_term"
+  }'`}
+                      </pre>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Features */}
-          <section className="bg-muted/30 py-16">
-            <div className="container mx-auto px-4">
-              <div className="mx-auto max-w-6xl">
-                <div className="mb-12 text-center">
-                  <h2 className="mb-4 text-3xl font-bold">{t.features}</h2>
-                  <p className="text-xl text-muted-foreground">
-                    Discover the powerful features that make Cleo your ultimate AI workspace companion
-                  </p>
-                </div>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {t.featureCards.map((card, index) => (
-                    <Card key={index} className="group hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className={`inline-flex h-12 w-12 items-center justify-center rounded-lg bg-${card.color}-100 text-${card.color}-600 mb-4`}>
-                          <card.icon className="h-6 w-6" />
-                        </div>
-                        <CardTitle className="group-hover:text-primary transition-colors">
-                          {card.title}
-                        </CardTitle>
-                        <CardDescription>{card.desc}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {card.features.map((feature, fIndex) => (
-                            <li key={fIndex} className="flex items-center gap-2 text-sm">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Getting Started Guide */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <div className="mx-auto max-w-4xl">
-                <div className="mb-12 text-center">
-                  <h2 className="mb-4 text-3xl font-bold">{t.guide}</h2>
-                  <p className="text-xl text-muted-foreground">
-                    Follow this step-by-step guide to unlock the full potential of Cleo
-                  </p>
-                </div>
-                <div className="space-y-8">
-                  {t.guideSteps.map((step, index) => (
-                    <div key={index} className="flex gap-6">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <step.icon className="h-6 w-6" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="mb-3 text-xl font-semibold">{step.title}</h3>
-                        <p className="text-muted-foreground">{step.content}</p>
-                      </div>
+                  </div>
+                </li>
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Ejecuta un prompt de prueba.</span>
+                  <div className="mt-2 text-muted-foreground">Selecciona el agente recién creado en el panel de conversación y pregunta: <em className="italic">“Resume en 5 viñetas las tendencias actuales en IA para edge computing”</em>.</div>
+                  <div className="mt-3 rounded-md border bg-background/60 p-4 text-xs font-mono leading-relaxed">
+{`curl -X POST https://api.tu-dominio.com/api/agents/execute \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  -d '{
+    "agentId": "<AGENT_ID>",
+    "input": "Resume en 5 viñetas las tendencias actuales en IA para edge computing"
+  }'`}
+                  </div>
+                </li>
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Crea una mini cadena (workflow).</span>
+                  <div className="mt-2 text-muted-foreground">Agrega un segundo agente evaluador (rol <code className="rounded bg-muted px-1 py-0.5 text-xs">evaluator</code>) para refinar calidad. El supervisor puede delegar automáticamente.</div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border p-4 bg-muted/10">
+                      <p className="text-xs font-semibold mb-1 text-primary">1. Specialist</p>
+                      <p className="text-[11px] text-muted-foreground">Recolecta y sintetiza info cruda.</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
+                    <div className="rounded-lg border p-4 bg-muted/10">
+                      <p className="text-xs font-semibold mb-1 text-primary">2. Evaluator</p>
+                      <p className="text-[11px] text-muted-foreground">Verifica, limpia sesgos, estructura.</p>
+                    </div>
+                    <div className="rounded-lg border p-4 bg-muted/10">
+                      <p className="text-xs font-semibold mb-1 text-primary">3. Output Final</p>
+                      <p className="text-[11px] text-muted-foreground">Supervisor integra y entrega.</p>
+                    </div>
+                  </div>
+                </li>
+                <li className="leading-relaxed">
+                  <span className="font-medium text-foreground">Guarda y reutiliza.</span>
+                  <div className="mt-2 text-muted-foreground">Exporta la configuración de agentes o clónala para nuevas variantes (baja temperatura para datos, alta para ideación).</div>
+                </li>
+              </ol>
 
-          {/* Integrations */}
-          <section className="bg-muted/30 py-16">
-            <div className="container mx-auto px-4">
-              <div className="mx-auto max-w-6xl">
-                <div className="mb-12 text-center">
-                  <h2 className="mb-4 text-3xl font-bold">{t.integrations}</h2>
-                  <p className="text-xl text-muted-foreground">{t.integrationDesc}</p>
-                </div>
-                <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                  {t.integrationCategories.map((category, index) => (
-                    <Card key={index}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Network className="h-5 w-5" />
-                          {category.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {category.items.map((item, itemIndex) => (
-                            <div key={itemIndex} className="flex items-start gap-3">
-                              <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                              <div>
-                                <h4 className="font-medium">{item.name}</h4>
-                                <p className="text-sm text-muted-foreground">{item.desc}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+              <div className="rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-6">
+                <h4 className="mb-2 text-sm font-semibold tracking-wide text-primary">Checklist de validación</h4>
+                <ul className="grid gap-2 text-xs sm:grid-cols-2 md:grid-cols-3">
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Clave de modelo válida</li>
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Primer agente creado</li>
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Ejecución exitosa</li>
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Delegación configurada</li>
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Workflow guardado</li>
+                  <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary"></span>Ajuste de temperatura probado</li>
+                </ul>
               </div>
-            </div>
-          </section>
 
-          {/* FAQ */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <div className="mx-auto max-w-4xl">
-                <div className="mb-12 text-center">
-                  <h2 className="mb-4 text-3xl font-bold">{t.faq}</h2>
-                  <p className="text-xl text-muted-foreground">
-                    Find answers to common questions about Cleo
-                  </p>
-                </div>
-                <Accordion type="single" collapsible className="space-y-4">
-                  {t.faqItems.map((item, index) => (
-                    <AccordionItem key={index} value={`item-${index}`}>
-                      <AccordionTrigger className="text-left">
-                        {item.question}
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
-                        {item.answer}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+              <div className="rounded-lg border bg-background/80 p-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Consejos rápidos</p>
+                <ul className="text-xs space-y-2 text-muted-foreground">
+                  <li><strong>0.2–0.4</strong> temperatura: respuesta estable / factual. <strong>0.7–0.9</strong>: ideación / creatividad.</li>
+                  <li>Incluye <code className="bg-muted px-1 py-0.5 rounded">objetivo claro</code> en el prompt: mejora delegación.</li>
+                  <li>Activa memoria corta para contexto de sesión; evita memoria larga si no necesitas persistencia.</li>
+                  <li>Limita herramientas: 2–3 por agente max para precisión.</li>
+                </ul>
               </div>
             </div>
-          </section>
-
-          {/* CTA Section */}
-          <section className="bg-primary py-16 text-primary-foreground">
-            <div className="container mx-auto px-4 text-center">
-              <h2 className="mb-4 text-3xl font-bold">Ready to Get Started?</h2>
-              <p className="mb-8 text-xl opacity-90">
-                Join thousands of users who are already transforming their workflow with Cleo
-              </p>
-              <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-                <Button size="lg" variant="secondary" asChild>
-                  <Link href="/auth/signup">
-                    {t.getStarted}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10">
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Watch Demo
-                </Button>
+          </DocSectionContainer>
+          <DocSectionContainer id="agents" title="Agents" subtitle="Design, specialize and orchestrate autonomous assistants">
+            <div className="space-y-12 text-sm leading-relaxed">
+              <p className="text-muted-foreground max-w-3xl">Agents in Cleo are modular, typed entities with a defined <code className="bg-muted px-1 py-0.5 rounded text-[10px]">role</code>, <code className="bg-muted px-1 py-0.5 rounded text-[10px]">model</code>, <code className="bg-muted px-1 py-0.5 rounded text-[10px]">prompt</code>, and an allowed tool set. The multi‑agent graph routes tasks between them via the supervisor.</p>
+              <AgentRolesGrid />
+              <AgentConfigExamples />
+              <AgentLifecycle />
+              <AgentPatternsHeuristics />
+              <AgentCreationCriteria />
+            </div>
+          </DocSectionContainer>
+          <DocSectionContainer id="prompts" title="Prompt Examples" subtitle="High‑quality prompt patterns for reliable outputs">
+            <div className="space-y-8 text-sm">
+              <p className="text-muted-foreground max-w-3xl">A curated set of production‑grade prompt archetypes covering system conditioning, structured extraction, reasoning, delegation, and evaluation. All outputs are designed for deterministic parsing and multi‑agent chaining.</p>
+              <PromptExamplesGrid />
+              <div className="rounded-lg border p-4 bg-background/70">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Guidelines</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li>Prefer explicit JSON schemas for extraction & handoff.</li>
+                  <li>Bound reasoning tokens: reduces drift + cost.</li>
+                  <li>Separate evaluation from generation for higher factuality.</li>
+                  <li>Use lower temperature for system / evaluator prompts.</li>
+                  <li>Never mix natural language + JSON in machine‑consumable outputs.</li>
+                </ul>
               </div>
             </div>
-          </section>
-        </>
-      )}
+          </DocSectionContainer>
+          <DocSectionContainer id="models" title="Model Strategy" subtitle="Choose the optimal model per intent, cost and latency">
+            <div className="space-y-10 text-sm">
+              <p className="text-muted-foreground max-w-3xl">Model selection in Cleo balances latency, determinism, reasoning depth and cost. Use fast tiers for routing & control loops, balanced for planning & synthesis, and escalate only when confidence or structure thresholds fail.</p>
+              <ModelLatencyTiers />
+              <ModelSelectionHeuristics />
+              <ModelFallbackCascade />
+              <div className="rounded-lg border p-5 bg-background/70">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Caching & Cost Control</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li>Deduplicate identical structured extraction prompts via hash cache.</li>
+                  <li>Use temperature 0–0.3 for parse‑critical tasks to reduce retries.</li>
+                  <li>Persist intermediate balanced-tier outputs for heavy escalation reuse.</li>
+                  <li>Track token usage per agent role to spot misalignment.</li>
+                  <li>Batch low priority tasks during off-peak windows.</li>
+                </ul>
+              </div>
+              <div className="rounded-lg border p-5 bg-gradient-to-br from-primary/5 to-background">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Confidence Signals</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li><strong>Structural</strong>: JSON schema validation pass/fail.</li>
+                  <li><strong>Self-estimated certainty</strong>: Model returns numeric confidence (sanity bound).</li>
+                  <li><strong>Evaluator score</strong>: Independent pass for factuality & coherence.</li>
+                  <li><strong>Time budget</strong>: Abort escalation if nearing SLA limit.</li>
+                  <li><strong>Cost guardrail</strong>: Hard ceiling per user/session triggers degrade mode.</li>
+                </ul>
+              </div>
+            </div>
+          </DocSectionContainer>
+          <DocSectionContainer id="tools-safety" title="Tool Safety" subtitle="Approval workflows and secure execution model">
+            <div className="space-y-10 text-sm">
+              <p className="text-muted-foreground max-w-3xl">Tool execution is governed by scoped permissions, real‑time policy checks, human approval escalation and immutable audit trails. Minimize blast radius by constraining agents to least privilege.</p>
+              <ToolPermissionScopes />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ToolApprovalFlow />
+                <RiskClassificationMatrix />
+              </div>
+              <RateLimitingMatrix />
+              <AuditLoggingPatterns />
+              <div className="rounded-lg border p-5 bg-gradient-to-br from-primary/5 to-background">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Best Practices</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li>Create separate agents for high‑risk tools (isolate scope).</li>
+                  <li>Hash + diff args for write operations to show intent clarity.</li>
+                  <li>Enable human queue only for sensitive+execute not routine writes.</li>
+                  <li>Alert on unusual burst patterns (entropy of tool sequence).</li>
+                  <li>Rotate API keys & enforce per‑agent tokens when possible.</li>
+                </ul>
+              </div>
+            </div>
+          </DocSectionContainer>
+          <DocSectionContainer id="multi-agent" title="Multi-Agent" subtitle="Delegation, supervision and collaboration patterns">
+            <div className="space-y-10 text-sm">
+              <p className="text-muted-foreground max-w-3xl">Cleo orchestrates agents through an adaptive supervisor that performs intent routing, delegation, arbitration and evaluation. The system emphasizes minimal escalation, deterministic structure, and explicit confidence signals.</p>
+              <MultiAgentArchitecture />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <OrchestrationPhases />
+                <RoutingStrategies />
+              </div>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ArbitrationPatterns />
+                <SupervisionLoops />
+              </div>
+              <div className="rounded-lg border p-5 bg-gradient-to-br from-primary/5 to-background">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Optimization Tips</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li>Cache classification & routing decisions by normalized query signature.</li>
+                  <li>Short‑circuit evaluator when structural parse already passes high confidence.</li>
+                  <li>Limit refinement loops (N ≤ 2) to prevent cost spirals.</li>
+                  <li>Track per‑role token + latency metrics to prune underperforming agents.</li>
+                  <li>Fallback to single‑agent mode in degraded / high load states.</li>
+                </ul>
+              </div>
+            </div>
+          </DocSectionContainer>
+          <DocSectionContainer id="image-generation" title="Image Generation" subtitle="Creative rendering with model selection & limits">
+            <SkeletonBlock lines={4} />
+          </DocSectionContainer>
+          <DocSectionContainer id="troubleshooting" title="Troubleshooting" subtitle="Common issues, diagnostics and recovery steps">
+            <div className="space-y-10 text-sm">
+              <p className="text-muted-foreground max-w-3xl">Use this guide to quickly isolate issues across routing, delegation, tooling, memory and cost. Patterns are designed for rapid triage with structured remediation.</p>
+              <TroubleshootingIssueMatrix />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <DiagnosticCommands />
+                <ErrorTaxonomy />
+              </div>
+              <RecoveryFlows />
+              <div className="rounded-lg border p-5 bg-gradient-to-br from-primary/5 to-background">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-primary">Preventative Monitoring</p>
+                <ul className="text-[11px] space-y-1 text-muted-foreground">
+                  <li>Alert on escalation chain length {'>'} 2.</li>
+                  <li>Track JSON parse failure rate; auto‑lower temperature if spike detected.</li>
+                  <li>Log per‑tool p95 latency & throttle anomalies.</li>
+                  <li>Capture evaluator disagreement rate as drift signal.</li>
+                  <li>Budget guard: emit event at 80% daily cost threshold.</li>
+                </ul>
+              </div>
+            </div>
+          </DocSectionContainer>
+          <DocSectionContainer id="faq" title={t.faq} subtitle="Answers to recurring questions">
+            <div className="space-y-6">
+              <Accordion type="single" collapsible className="w-full">
+                {t.faqItems.slice(0,2).map((item, idx) => (
+                  <AccordionItem key={idx} value={`faq-${idx}`}>
+                    <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
+                    <AccordionContent>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{item.answer}</p>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+              <div className="rounded-md border p-4 bg-background/60">
+                <p className="text-xs text-muted-foreground">Showing 2 of {t.faqItems.length} questions. Full FAQ expansion coming next (pricing, limits, privacy, roadmap, enterprise).</p>
+              </div>
+            </div>
+          </DocSectionContainer>
+        </div>
+      </div>
     </div>
   )
 }
