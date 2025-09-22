@@ -20,6 +20,7 @@ import { useChatCore } from "./use-chat-core"
 import { TipOnboarding } from "../onboarding/tip-onboarding"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
+import ConfirmationPanel, { ConfirmationItem } from "@/components/chat/confirmation-panel"
 
 const FeedbackWidget = dynamic(
   () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
@@ -218,6 +219,72 @@ export function Chat() {
     ]
   )
 
+    // --- Confirmation Panel Integration ---
+    // Heuristic category inference based on tool name
+    const inferCategory = useCallback((toolName: string): string => {
+      if (/calendar|event/i.test(toolName)) return 'calendarActions'
+      if (/mail|email|inbox/i.test(toolName)) return 'emailActions'
+      if (/file|doc|note|notion|document/i.test(toolName)) return 'fileActions'
+      if (/delete|remove|destroy|purge/i.test(toolName)) return 'delete'
+      if (/tweet|social|post/i.test(toolName)) return 'socialActions'
+      return 'dataModification'
+    }, [])
+
+    // Sensitivity inference
+    const inferSensitivity = useCallback((toolName: string): 'low'|'medium'|'high'|'critical' => {
+      if (/delete|destroy|purge/i.test(toolName)) return 'critical'
+      if (/update|modify|write|create|send/i.test(toolName)) return 'high'
+      if (/open|read|fetch|get/i.test(toolName)) return 'low'
+      return 'medium'
+    }, [])
+
+    const confirmationItems: ConfirmationItem[] = useMemo(() => {
+      if (!pendingToolConfirmation) return []
+      const previewSource: any = pendingToolConfirmation.preview || pendingToolConfirmation.pendingAction?.input || {}
+      const details: {label: string; value: string}[] = []
+      // Flatten simple key/value pairs into details (limit 12 to keep UI tidy)
+      if (previewSource && typeof previewSource === 'object') {
+        Object.entries(previewSource).slice(0, 12).forEach(([k,v]) => {
+          if (v == null) return
+          let valueStr: string
+          if (typeof v === 'string') valueStr = v
+          else if (typeof v === 'number' || typeof v === 'boolean') valueStr = String(v)
+          else valueStr = JSON.stringify(v)
+          // Truncate very long values
+          if (valueStr.length > 220) valueStr = valueStr.slice(0, 217) + '…'
+          details.push({ label: k, value: valueStr })
+        })
+      }
+      return [{
+        id: pendingToolConfirmation.confirmationId,
+        toolName: pendingToolConfirmation.toolName,
+        category: inferCategory(pendingToolConfirmation.toolName),
+        sensitivity: inferSensitivity(pendingToolConfirmation.toolName),
+        undoable: !/delete|destroy|purge/i.test(pendingToolConfirmation.toolName),
+        timestamp: Date.now(),
+        preview: {
+          title: pendingToolConfirmation.toolName,
+          summary: previewSource?.message || undefined,
+          details,
+          warnings: /delete|destroy|purge/i.test(pendingToolConfirmation.toolName) ? ["This action cannot be undone."] : undefined
+        },
+        message: typeof previewSource === 'string' ? previewSource : undefined
+      }]
+    }, [pendingToolConfirmation, inferCategory, inferSensitivity])
+
+    const [confirmationLoadingId, setConfirmationLoadingId] = useState<string|null>(null)
+    const handleResolveConfirmation = useCallback(async (id: string, approved: boolean) => {
+      if (!pendingToolConfirmation) return
+      setConfirmationLoadingId(id)
+      try {
+        if (approved) await acceptToolConfirmation()
+        else await rejectToolConfirmation()
+      } finally {
+        // Clear loading state slightly after hook clears pendingToolConfirmation to avoid flicker
+        setTimeout(() => setConfirmationLoadingId(null), 120)
+      }
+    }, [pendingToolConfirmation, acceptToolConfirmation, rejectToolConfirmation])
+
   // Handle redirect for invalid chatId - only redirect if we're certain the chat doesn't exist
   // and we're not in a transient state during chat creation
   if (
@@ -297,32 +364,12 @@ export function Chat() {
         ) : (
           <>
             <Conversation key="conversation" {...conversationProps} />
-            {pendingToolConfirmation && (
-              <div className="w-full max-w-3xl mx-auto px-4 mt-4">
-                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2">
-                  <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white text-xs">!</span>
-                    Confirm {pendingToolConfirmation.toolName} action
-                  </h3>
-                  <pre className="text-xs overflow-x-auto max-h-40 bg-white/70 dark:bg-black/30 p-2 rounded border border-amber-200 dark:border-amber-600 mb-3">
-{JSON.stringify(pendingToolConfirmation.preview || pendingToolConfirmation.pendingAction?.input || {}, null, 2)}
-                  </pre>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={acceptToolConfirmation}
-                      className="flex-1 inline-flex items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                      Approve & Execute
-                    </button>
-                    <button
-                      onClick={rejectToolConfirmation}
-                      className="flex-1 inline-flex items-center justify-center rounded-md border border-red-400 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:bg-transparent dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+            {confirmationItems.length > 0 && (
+              <ConfirmationPanel
+                items={confirmationItems}
+                onResolve={handleResolveConfirmation}
+                loadingId={confirmationLoadingId}
+              />
             )}
           </>
         )}
