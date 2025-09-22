@@ -4,6 +4,7 @@ import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
 import { tools, ensureDelegationToolForAgent } from "@/lib/tools"
+import { scoreDelegationIntent } from '@/lib/delegation/intent-heuristics'
 import { filterImagesForModel, MODEL_IMAGE_LIMITS } from "@/lib/image-management"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { stepCountIs, streamText } from "ai"
@@ -275,6 +276,9 @@ export async function POST(req: Request) {
       debugRag,
     } = parsed.data as ChatRequest
 
+  // Delegation heuristic debug flag (can be toggled via query param in future)
+  const debugDelegation = process.env.DEBUG_DELEGATION_INTENT === 'true'
+
   // Normalize model ID early and also keep original with prefix
   const originalModel = model
   const normalizedModel = normalizeModelId(model)
@@ -300,6 +304,24 @@ export async function POST(req: Request) {
     // Increment message count for successful validation
     if (supabase) {
       await incrementMessageCount({ supabase, userId })
+    }
+
+    // Resolve authenticated user early and enforce authorization (prevents spoofed userId)
+    let realUserId: string = userId
+    if (supabase && isAuthenticated) {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser()
+        if (authErr || !authData?.user) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+        }
+        if (authData.user.id !== userId) {
+          console.warn('[ChatAPI] userId mismatch; using authenticated id', { provided: userId, auth: authData.user.id })
+        }
+        realUserId = authData.user.id
+      } catch (e) {
+        console.error('[ChatAPI] Failed to resolve authenticated user', e)
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+      }
     }
 
     const userMessage = messages[messages.length - 1]
@@ -523,6 +545,33 @@ export async function POST(req: Request) {
       throw new Error(`Model ${modelConfig.id} has no API SDK configured`)
     }
 
+    // --- Delegation Intent Heuristics (Lote 1) ---
+    // Evaluate user last message intent BEFORE prompt assembly so we can inject a system hint if strong.
+    let delegationIntent: ReturnType<typeof scoreDelegationIntent> | null = null
+    try {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user')
+      let lastUserPlain = ''
+      if (lastUser) {
+        if (typeof (lastUser as any).content === 'string') lastUserPlain = (lastUser as any).content
+        else if (Array.isArray((lastUser as any).content)) {
+          lastUserPlain = (lastUser as any).content
+            .filter((p: any) => p?.type === 'text')
+            .map((p: any) => p.text || p.content || '')
+            .join('\n')
+        } else if (Array.isArray((lastUser as any).parts)) {
+          lastUserPlain = (lastUser as any).parts
+            .filter((p: any) => p?.type === 'text')
+            .map((p: any) => p.text || p.content || '')
+            .join('\n')
+        }
+      }
+      if (lastUserPlain.trim()) {
+        delegationIntent = scoreDelegationIntent(lastUserPlain, { debug: debugDelegation })
+      }
+    } catch (e) {
+      console.warn('[DelegationIntent] heuristic failed', e)
+    }
+
     // Use reasoning-optimized prompt for GPT-5 models when no custom prompt
     let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
     if (normalizedModel.startsWith('gpt-5') && !systemPrompt) {
@@ -530,6 +579,15 @@ export async function POST(req: Request) {
       baseSystemPrompt = getCleoPrompt(normalizedModel, 'reasoning')
       console.log(`[GPT-5] Using reasoning-optimized prompt for ${normalizedModel}`)
     }
+  // If strong delegation intent (score >= 0.55) add lightweight internal system hint.
+  // Avoid mentioning scores to the model; just nudge tool selection.
+  if (delegationIntent?.target && delegationIntent.score >= 0.55) {
+    const agentKey = delegationIntent.target
+    // Derive tool name from agent key pattern delegate_to_<normalized_name>
+    const normalized = agentKey.replace(/[^a-z0-9]+/g, '_')
+    const toolName = `delegate_to_${normalized}`
+    baseSystemPrompt += `\n\nINTERNAL DELEGATION HINT: The user's request likely maps to specialist agent '${agentKey}'. Consider calling tool ${toolName} if it would provide unique capabilities or faster resolution. If you delegate, briefly explain why.`
+  }
   const effectiveSystemPrompt = baseSystemPrompt
 
     // Attempt to parse personality type from system prompt for observability
@@ -607,16 +665,7 @@ export async function POST(req: Request) {
       }
     }
 
-  // Inject userId and model into request-scoped context (and legacy globalThis for now)
-  // Get the real Supabase user ID instead of the frontend userId
-    let realUserId = userId
-    if (supabase && isAuthenticated) {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (!userError && userData?.user) {
-        realUserId = userData.user.id
-        console.log('🔍 Using real Supabase user ID for tools:', realUserId)
-      }
-    }
+  // Inject userId and model into request-scoped context (already resolved earlier as realUserId)
   ;(globalThis as any).__currentUserId = realUserId
   ;(globalThis as any).__currentModel = normalizedModel
 
@@ -696,6 +745,20 @@ export async function POST(req: Request) {
         toolsForRun = rest
         activeTools = Object.keys(toolsForRun)
       } catch {}
+    }
+
+    // Ensure all delegation tools are present (non-forcing) so model can choose.
+    try {
+      const agents = await getAllAgentsUnified()
+      for (const a of agents) {
+        if (a.role !== 'supervisor') {
+          ensureDelegationToolForAgent(a.id, a.name)
+        }
+      }
+      // After ensuring, refresh registry reference (tools is mutated inside helper)
+      toolsForRun = tools as typeof tools
+    } catch (e) {
+      console.warn('[ChatAPI] Failed to ensure delegation tools', e)
     }
 
     // Provider-specific tool name normalization
@@ -1296,6 +1359,10 @@ export async function POST(req: Request) {
   const result = await withRequestContext({ userId: realUserId, model: effectiveModelId, requestId: reqId }, async () => {
     return streamText(additionalParams)
   })
+
+    // Placeholder: High-score missed tracking (will emit after model run if no delegation tool was called)
+    // We would inspect tool invocation results in onFinish handler (already wired) — if none match delegate_to_* and delegationIntent.score >= 0.75 emit event.
+    // Implementation deferred to dedicated task (todo id 12).
 
     // For document opening queries, disable sending reasoning to prevent content in expandable
   // Hide reasoning to avoid exposing internal planning; UI can add toggles later if desired

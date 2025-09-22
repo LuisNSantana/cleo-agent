@@ -236,10 +236,10 @@ export function useChatCore({
       accept,
     }
     try {
-      const res = await fetch('/api/confirm-tool', {
+      const res = await fetch('/api/confirmations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ id: pendingToolConfirmation.confirmationId, approved: accept })
       })
       if (!res.ok) throw new Error('Failed confirming tool')
       const json = await res.json()
@@ -590,6 +590,29 @@ export function useChatCore({
                     } catch {}
                     break
                   }
+                  case "pending-confirmation":
+                    try {
+                      // Only set if no active confirmation to avoid overlap
+                      if (!pendingToolConfirmation) {
+                        setPendingToolConfirmation({
+                          toolCallId: data.confirmationId || `confirm-${Date.now()}`,
+                          toolName: data.toolName || 'tool',
+                          confirmationId: data.confirmationId,
+                          preview: {
+                            message: data.message,
+                            params: data.params
+                          }
+                        })
+                      }
+                    } catch {}
+                    break
+                  case "confirmation-resolved":
+                    try {
+                      if (pendingToolConfirmation && pendingToolConfirmation.confirmationId === data.confirmationId) {
+                        setPendingToolConfirmation(null)
+                      }
+                    } catch {}
+                    break
                   case "tool-invocation": {
                     // New SSE shape from /api/multi-model-chat: surface tool call/result in real time
                     try {

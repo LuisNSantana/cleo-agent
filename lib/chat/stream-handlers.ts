@@ -26,7 +26,12 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
     resultStart,
   } = params
 
+  let delegationToolUsed = false
+
   const onToolResult = ({ toolName, result }: { toolName: string; result: any }) => {
+    try {
+      if (/^delegate_to_/.test(toolName)) delegationToolUsed = true
+    } catch {}
     // Check if this tool result requires confirmation
     if (isConfirmationRequest(result)) {
       console.log(`[TOOL CONFIRMATION] Tool ${toolName} requires confirmation:`, result.confirmationId)
@@ -144,6 +149,24 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
         outputTokens,
         responseTimeMs,
       })
+
+      // Delegation missed tracking (baseline): emit event if high intent and no delegation tool used
+      try {
+        const intent = (globalThis as any).__lastDelegationIntent || (response as any)?.delegationIntent
+        if (intent && !delegationToolUsed && intent.score >= 0.75) {
+          const { emitPipelineEventExternal } = await import('@/lib/tools/delegation')
+          emitPipelineEventExternal?.({
+            type: 'delegation-missed',
+            score: intent.score,
+            target: intent.target,
+            scores: intent.scores,
+            timestamp: new Date().toISOString(),
+            reason: 'High intent score without delegate tool invocation'
+          })
+        }
+      } catch (e) {
+        console.warn('[DelegationMissed] emission failed', e)
+      }
 
       // Best-effort: update model usage analytics via RPC, ignore errors
       try {

@@ -34,6 +34,11 @@ function emitPipelineEvent(event: any) {
   }
 }
 
+// Public export for other subsystems (confirmations, calendar, etc.)
+export function emitPipelineEventExternal(event: any) {
+  emitPipelineEvent(event)
+}
+
 // Display names now resolved via shared helper
 
 // Delegation tool schema

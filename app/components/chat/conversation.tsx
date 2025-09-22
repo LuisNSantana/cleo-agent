@@ -9,8 +9,6 @@ import { OptimizationInsights, extractPipelineOptimizations } from './optimizati
 import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus } from './real-time-optimization'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { PerformanceMetrics } from './performance-metrics'
-import InChatConfirmation from '@/components/chat/in-chat-confirmation'
-import { AnimatePresence } from 'framer-motion'
 
 type ConversationProps = {
   messages: MessageType[]
@@ -35,20 +33,22 @@ export function Conversation({
   const messagePipelineSteps = useMemo(() => {
     const messageSteps: Map<string, PipelineStep[]> = new Map()
     
-  // ...existing code...
-    
     messages.forEach((msg, msgIndex) => {
       if (!msg.parts || !Array.isArray(msg.parts)) return
       
       const steps: PipelineStep[] = []
-  // ...existing code...
-      
+      // Extract steps from each part of the message
       msg.parts.forEach((part, partIndex) => {
         // Use any casting to handle custom execution-step type
         const anyPart = part as any
         if (anyPart && anyPart.type === 'execution-step' && anyPart.step) {
           const step = anyPart.step as PipelineStep
-          // ...existing code...
+          // Add a unique ID for each step based on message and part index
+          step.id = `${msg.id}-step-${partIndex}`
+          // Add timestamp from the message if available
+          if ((msg as any).createdAt) {
+            step.timestamp = (msg as any).createdAt
+          }
           steps.push(step)
         }
       })
@@ -273,7 +273,7 @@ export function Conversation({
           )}
 
           {/* Simple In-Chat Confirmation */}
-          <InChatConfirmation />
+          {/* Removed legacy InChatConfirmation (now handled via pendingToolConfirmation modal) */}
 
           <div className="pointer-events-none sticky bottom-0 flex w-full max-w-4xl items-end justify-end gap-4 px-6 pb-2">
             <ScrollButton className="absolute top-[-50px] right-[30px]" />

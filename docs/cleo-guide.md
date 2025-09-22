@@ -189,6 +189,10 @@ Variables importantes: `OPENAI_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `BRAVE_S
 - Gestión de llaves: `lib/user-keys.ts`
 - Hook de chat (cliente): `app/components/chat/use-chat-core.ts`
 
+### 15.1) Delegación y Confirmaciones
+
+- Documento detallado de eventos SSE, confirmaciones y heurística de delegación: `docs/delegation-and-confirmation-events.md`
+
 ---
 
 ¿Dudas o mejoras? Abre un issue/PR con el apartado de esta guía que quieras ampliar.

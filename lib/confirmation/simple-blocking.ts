@@ -1,7 +1,9 @@
 /**
  * 🛡️ Simple Blocking Confirmation System
  * Proper Promise-based confirmation that integrates with chat flow
+ * Now emits SSE events via delegation pipeline when controller is active.
  */
+import { emitPipelineEventExternal } from '@/lib/tools/delegation'
 
 // Tools that need confirmation
 const NEEDS_CONFIRMATION = [
@@ -126,6 +128,26 @@ export async function blockForConfirmation<T>(
       createdAt: Date.now()
     })
 
+    // Emit SSE event (best effort) so UI can render modal without polling immediately
+    try {
+      const category = inferCategory(toolName)
+      const sensitivity = inferSensitivity(toolName, params)
+      const undoable = toolName !== 'deleteDriveFile'
+      const preview = buildPreview(toolName, params, message)
+      emitPipelineEventExternal?.({
+        type: 'pending-confirmation',
+        confirmationId,
+        toolName,
+        message,
+        params: sanitizeParams(params),
+        category,
+        sensitivity,
+        undoable,
+        preview,
+        timestamp: new Date().toISOString()
+      })
+    } catch {}
+
     // The Promise will be resolved when resolveConfirmation is called
     // If user approves, executeFunction will be called and its result returned
     // If user rejects, the Promise will be rejected
@@ -149,6 +171,7 @@ export async function resolveConfirmation(confirmationId: string, approved: bool
       console.log(`[CONFIRMATION] Executing ${pending.toolName}...`)
       const result = await pending.executeFunction()
       pending.resolve(result)
+      try { emitPipelineEventExternal?.({ type: 'confirmation-resolved', confirmationId, approved: true, toolName: pending.toolName, timestamp: new Date().toISOString() }) } catch {}
       return { 
         success: true, 
         result,
@@ -158,6 +181,7 @@ export async function resolveConfirmation(confirmationId: string, approved: bool
       console.log(`[CONFIRMATION] User cancelled ${pending.toolName}`)
       const cancelError = new Error(`User cancelled ${pending.toolName}`)
       pending.reject(cancelError)
+      try { emitPipelineEventExternal?.({ type: 'confirmation-resolved', confirmationId, approved: false, toolName: pending.toolName, timestamp: new Date().toISOString() }) } catch {}
       return { 
         success: true, 
         message: `❌ ${pending.toolName} cancelled by user`
@@ -183,4 +207,66 @@ export function getPendingConfirmations() {
     params: data.params,
     message: data.message
   }))
+}
+
+function sanitizeParams(obj: any) {
+  try {
+    const clone: Record<string, any> = {}
+    for (const k of Object.keys(obj || {})) {
+      const v = obj[k]
+      if (typeof v === 'string') {
+        clone[k] = v.length > 400 ? v.slice(0, 400) + '…' : v
+      } else {
+        clone[k] = v
+      }
+    }
+    return clone
+  } catch {
+    return {}
+  }
+}
+
+// --- Metadata helpers for enriched confirmation events ---
+function inferCategory(toolName: string): string {
+  if (toolName.includes('Calendar')) return 'calendarActions'
+  if (toolName.includes('Gmail') || toolName.includes('Email')) return 'emailActions'
+  if (toolName.toLowerCase().includes('drive') || toolName.toLowerCase().includes('file')) return 'fileActions'
+  if (toolName.toLowerCase().includes('tweet')) return 'socialActions'
+  return 'dataModification'
+}
+
+function inferSensitivity(toolName: string, params: any): 'low'|'medium'|'high'|'critical' {
+  if (toolName === 'deleteDriveFile') return 'high'
+  if (toolName === 'sendGmailMessage' || toolName === 'postTweet') return 'medium'
+  if (toolName === 'createCalendarEvent') return 'low'
+  return 'medium'
+}
+
+function buildPreview(toolName: string, params: any, message: string) {
+  // Simple structured preview used by richer UI component
+  const details: Array<{ label: string; value: string; type?: string }> = []
+  if (toolName === 'createCalendarEvent') {
+    details.push({ label: 'Title', value: String(params.summary || '') })
+    details.push({ label: 'Start', value: String(params.startDateTime || '') })
+    details.push({ label: 'End', value: String(params.endDateTime || '') })
+    if (params.location) details.push({ label: 'Location', value: String(params.location) })
+  } else if (toolName === 'sendGmailMessage') {
+    details.push({ label: 'To', value: String(params.to || ''), type: 'email' })
+    details.push({ label: 'Subject', value: String(params.subject || '') })
+  } else if (toolName === 'postTweet') {
+    details.push({ label: 'Text', value: String(params.text || '') })
+  } else if (toolName === 'uploadToDrive' || toolName === 'createDriveFile') {
+    details.push({ label: 'File', value: String(params.name || params.filename || '') })
+    if (params.parentId) details.push({ label: 'Folder', value: String(params.parentId) })
+  } else if (toolName === 'deleteDriveFile') {
+    details.push({ label: 'File ID', value: String(params.fileId || '') })
+  }
+
+  return {
+    title: `Confirm ${toolName}`,
+    summary: message.split('\n')[0] || message,
+    description: message,
+    details,
+    warnings: toolName === 'deleteDriveFile' ? ['This action is irreversible'] : [],
+  }
 }
