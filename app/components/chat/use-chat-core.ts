@@ -231,6 +231,8 @@ export function useChatCore({
     sensitivity?: string
     undoable?: boolean
   }>(null)
+  // Track seen confirmation IDs to avoid duplicate UI prompts from repeated SSE events
+  const seenConfirmationIdsRef = useRef<Set<string>>(new Set())
   async function respondToToolConfirmation(accept: boolean) {
     if (!pendingToolConfirmation) return
     const body = {
@@ -582,6 +584,13 @@ export function useChatCore({
                     try {
                       const c = (data as any).confirmation
                       if (c?.confirmationId) {
+                        if (seenConfirmationIdsRef.current.has(c.confirmationId)) {
+                          // Duplicate event - ignore
+                          if (process.env.NODE_ENV !== 'production') console.debug('[confirmation] duplicate tool-confirmation ignored', c.confirmationId)
+                        } else {
+                          seenConfirmationIdsRef.current.add(c.confirmationId)
+                          if (process.env.NODE_ENV !== 'production') console.debug('[confirmation] new tool-confirmation', c.confirmationId)
+                        }
                         setPendingToolConfirmation({
                           toolCallId: c.toolCallId,
                           toolName: c.toolName,
@@ -596,7 +605,13 @@ export function useChatCore({
                   case "pending-confirmation":
                     try {
                       // Only set if no active confirmation to avoid overlap
-                      if (!pendingToolConfirmation) {
+                      if (!pendingToolConfirmation && data.confirmationId) {
+                        if (seenConfirmationIdsRef.current.has(data.confirmationId)) {
+                          if (process.env.NODE_ENV !== 'production') console.debug('[confirmation] duplicate pending-confirmation ignored', data.confirmationId)
+                          break
+                        }
+                        seenConfirmationIdsRef.current.add(data.confirmationId)
+                        if (process.env.NODE_ENV !== 'production') console.debug('[confirmation] new pending-confirmation', data.confirmationId)
                         setPendingToolConfirmation({
                           toolCallId: data.confirmationId || `confirm-${Date.now()}`,
                           toolName: data.toolName || 'tool',
@@ -616,6 +631,9 @@ export function useChatCore({
                     try {
                       if (pendingToolConfirmation && pendingToolConfirmation.confirmationId === data.confirmationId) {
                         setPendingToolConfirmation(null)
+                        if (data.confirmationId) {
+                          if (process.env.NODE_ENV !== 'production') console.debug('[confirmation] resolved and cleared', data.confirmationId, 'approved:', data.approved)
+                        }
                       }
                     } catch {}
                     break
