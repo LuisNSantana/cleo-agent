@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Check, X, AlertTriangle, Calendar, Mail, Folder, Settings, Trash2, Loader2 } from 'lucide-react'
+import { Check, X, AlertTriangle, Calendar, Mail, Folder, Settings, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 
 export interface ConfirmationItemPreviewDetail {
@@ -51,9 +51,20 @@ const sensitivityColor: Record<string, {border: string; bg: string; chip: string
   critical: { border: 'border-red-500 dark:border-red-700', bg: 'bg-red-50 dark:bg-red-900/40', chip: 'bg-red-500 dark:bg-red-700 text-white', text: 'text-red-900 dark:text-red-100' }
 }
 
+// Utility: strip basic markdown bold/italics and asterisks for compact preview snippets
+function sanitizeInline(text?: string) {
+  if (!text) return ''
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .trim()
+}
+
 export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationPanelProps) {
   const [index, setIndex] = useState(0)
   const current = items[index]
+  const [detailsOpen, setDetailsOpen] = useState<boolean>(true)
 
   // Derived queue meta
   const queueInfo = useMemo(() => ({ total: items.length, position: index + 1 }), [items.length, index])
@@ -84,21 +95,27 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
   }, [current, handleApprove, handleReject, queueInfo.total])
 
   if (!current) return null
+
+  // Auto‑collapse details on very small screens to save space
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth < 480) setDetailsOpen(false)
+    }
+  }, [current?.id])
   const colors = sensitivityColor[current.sensitivity] || sensitivityColor.medium
   const icon = categoryIcon[current.category] || <Settings className="h-5 w-5" />
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex w-full justify-center px-4 pb-6 pointer-events-none">
-      <Card role="dialog" aria-labelledby={`confirm-title-${current.id}`} aria-describedby={`confirm-desc-${current.id}`} className={clsx('max-w-3xl w-full pointer-events-auto shadow-xl border backdrop-blur-md', colors.border, colors.bg)}>
-        <div className="flex flex-col gap-4 p-5">
+      <Card role="dialog" aria-labelledby={`confirm-title-${current.id}`} aria-describedby={`confirm-desc-${current.id}`} className={clsx('w-full shadow-sm border mb-3 rounded-lg', colors.border, colors.bg)}>
+        <div className="flex flex-col gap-3 p-4">
           <header className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className={clsx('flex h-10 w-10 items-center justify-center rounded-md border', colors.border, colors.bg)}>
                 {icon}
               </div>
               <div className="space-y-1">
-                <h2 id={`confirm-title-${current.id}`} className={clsx('font-semibold leading-tight flex items-center gap-2', colors.text)}>
-                  {current.preview.title || current.toolName}
+                <h2 id={`confirm-title-${current.id}`} className={clsx('font-semibold leading-tight flex items-center gap-2 flex-wrap', colors.text)}>
+                  {sanitizeInline(current.preview.title) || current.toolName}
                   <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', colors.chip)}>
                     {current.sensitivity}
                   </span>
@@ -110,9 +127,19 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
                 </h2>
                 {current.preview.summary && (
                   <p id={`confirm-desc-${current.id}`} className="text-sm text-muted-foreground max-w-prose">
-                    {current.preview.summary}
+                    {sanitizeInline(current.preview.summary)}
                   </p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(o => !o)}
+                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary rounded"
+                  aria-expanded={detailsOpen}
+                  aria-controls={`confirm-details-${current.id}`}
+                >
+                  {detailsOpen ? <ChevronUp className="h-3 w-3"/> : <ChevronDown className="h-3 w-3"/>}
+                  {detailsOpen ? 'Ocultar detalles' : 'Ver detalles'}
+                </button>
               </div>
             </div>
             {queueInfo.total > 1 && (
@@ -127,12 +154,12 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
           </header>
 
           {/* Details */}
-          {current.preview.details && current.preview.details.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2">
+          {detailsOpen && current.preview.details && current.preview.details.length > 0 && (
+            <div id={`confirm-details-${current.id}`} className="grid gap-2 sm:grid-cols-2">
               {current.preview.details.slice(0,10).map((d, idx) => (
-                <div key={idx} className="flex flex-col rounded border border-border/40 bg-background/40 px-3 py-2">
-                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{d.label}</span>
-                  <span className="text-sm break-words leading-snug">{d.value || '—'}</span>
+                <div key={idx} className="flex flex-col rounded border border-border/40 bg-background/50 px-3 py-2 min-w-0">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium truncate" title={d.label}>{d.label}</span>
+                  <span className="text-xs break-words leading-snug max-h-24 overflow-auto whitespace-pre-wrap" title={d.value}>{d.value || '—'}</span>
                 </div>
               ))}
             </div>
@@ -140,11 +167,11 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
 
           {/* Warnings */}
           {current.preview.warnings && current.preview.warnings.length > 0 && (
-            <div className="rounded-md border border-orange-300/70 bg-orange-100/60 dark:border-orange-700 dark:bg-orange-900/30 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium text-orange-800 dark:text-orange-200">
-                <AlertTriangle className="h-4 w-4" /> Warnings
+            <div className="rounded-md border border-orange-300/60 bg-orange-100/40 dark:border-orange-700 dark:bg-orange-900/30 p-2 space-y-1">
+              <div className="flex items-center gap-1 text-xs font-medium text-orange-800 dark:text-orange-200">
+                <AlertTriangle className="h-3 w-3" /> Alerta
               </div>
-              <ul className="list-disc pl-5 space-y-1 text-sm text-orange-700 dark:text-orange-300">
+              <ul className="pl-4 space-y-0.5 text-xs text-orange-700 dark:text-orange-300 list-disc">
                 {current.preview.warnings.map((w,i) => <li key={i}>{w}</li>)}
               </ul>
             </div>
@@ -152,37 +179,36 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
 
           {/* Raw message optional (collapsed by default in future) */}
           {current.message && !current.preview.summary && (
-            <pre className="max-h-40 overflow-auto rounded bg-muted/30 p-3 text-xs whitespace-pre-wrap font-mono text-muted-foreground">
-              {current.message}
+            <pre className="max-h-32 overflow-auto rounded bg-muted/20 p-2 text-[11px] whitespace-pre-wrap font-mono text-muted-foreground leading-snug">
+              {sanitizeInline(current.message)}
             </pre>
           )}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-[11px] text-muted-foreground order-2 sm:order-1">
-                Enter = Approve • Esc = Cancel • {new Date(current.timestamp).toLocaleTimeString()}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-1">
+              <div className="text-[10px] text-muted-foreground order-2 sm:order-1 tracking-wide">
+                ↵ Enter = Aprobar • Esc = Cancelar • {new Date(current.timestamp).toLocaleTimeString()}
               </div>
-              <div className="flex gap-3 order-1 sm:order-2">
+              <div className="flex gap-2 order-1 sm:order-2 w-full sm:w-auto">
                 <Button
                   onClick={handleApprove}
                   disabled={loadingId === current.id}
-                  className="bg-green-600 hover:bg-green-700 text-white min-w-[150px]"
+                  className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none sm:min-w-[140px] h-9 text-sm"
                 >
-                  {loadingId === current.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                  Approve & Execute
+                  {loadingId === current.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                  Aprobar
                 </Button>
                 <Button
                   onClick={handleReject}
                   disabled={loadingId === current.id}
                   variant="outline"
-                  className="min-w-[120px] border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                  className="flex-1 sm:flex-none sm:min-w-[110px] h-9 text-sm border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
                 >
-                  <X className="h-4 w-4 mr-2" /> Cancel
+                  <X className="h-4 w-4 mr-1" /> Cancelar
                 </Button>
               </div>
             </div>
         </div>
       </Card>
-    </div>
   )
 }
 

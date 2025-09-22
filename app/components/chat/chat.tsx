@@ -365,11 +365,13 @@ export function Chat() {
           <>
             <Conversation key="conversation" {...conversationProps} />
             {confirmationItems.length > 0 && (
-              <ConfirmationPanel
-                items={confirmationItems}
-                onResolve={handleResolveConfirmation}
-                loadingId={confirmationLoadingId}
-              />
+              <div className="w-full max-w-4xl mx-auto px-4 mt-2">
+                <ConfirmationPanel
+                  items={confirmationItems}
+                  onResolve={handleResolveConfirmation}
+                  loadingId={confirmationLoadingId}
+                />
+              </div>
             )}
           </>
         )}

@@ -227,6 +227,9 @@ export function useChatCore({
     confirmationId: string
     preview: any
     pendingAction?: any
+    category?: string
+    sensitivity?: string
+    undoable?: boolean
   }>(null)
   async function respondToToolConfirmation(accept: boolean) {
     if (!pendingToolConfirmation) return
@@ -601,7 +604,10 @@ export function useChatCore({
                           preview: {
                             message: data.message,
                             params: data.params
-                          }
+                          },
+                          category: data.category,
+                          sensitivity: data.sensitivity,
+                          undoable: data.undoable,
                         })
                       }
                     } catch {}
