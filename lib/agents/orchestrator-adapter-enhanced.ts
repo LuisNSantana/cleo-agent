@@ -39,54 +39,6 @@ class CoreEventEmitter {
   }
 }
 
-// Event-driven execution tracking to replace polling
-class ExecutionEventEmitter {
-  private listeners = new Map<string, Array<(execution: AgentExecution) => void>>()
-
-  subscribe(executionId: string, callback: (execution: AgentExecution) => void) {
-    if (!this.listeners.has(executionId)) {
-      this.listeners.set(executionId, [])
-    }
-    this.listeners.get(executionId)!.push(callback)
-
-    // Return unsubscribe function
-    return () => {
-      const callbacks = this.listeners.get(executionId)
-      if (callbacks) {
-        const index = callbacks.indexOf(callback)
-        if (index > -1) {
-          callbacks.splice(index, 1)
-        }
-        if (callbacks.length === 0) {
-          this.listeners.delete(executionId)
-        }
-      }
-    }
-  }
-
-  emit(executionId: string, execution: AgentExecution) {
-    const callbacks = this.listeners.get(executionId)
-    if (callbacks) {
-      callbacks.forEach(callback => {
-        try {
-          callback(execution)
-        } catch (error) {
-          console.error('Error in execution callback:', error)
-        }
-      })
-    }
-  }
-
-  clear(executionId: string) {
-    this.listeners.delete(executionId)
-  }
-}
-
-// Global execution event emitter
-const g = globalThis as any
-if (!g.__cleoExecutionEvents) g.__cleoExecutionEvents = new ExecutionEventEmitter()
-const executionEvents = g.__cleoExecutionEvents as ExecutionEventEmitter
-
 // Core orchestrator with delegation support
 class EnhancedCoreOrchestrator {
   private modelFactory = new CoreModelFactory()
@@ -125,6 +77,10 @@ class EnhancedCoreOrchestrator {
 }
 
 // Global state
+const g = globalThis as any
+if (!g.__cleoRuntimeAgents) g.__cleoRuntimeAgents = new Map<string, AgentConfig>()
+if (!g.__cleoExecRegistry) g.__cleoExecRegistry = [] as AgentExecution[]
+if (!g.__cleoAdapterListeners) g.__cleoAdapterListeners = [] as Array<(event: any) => void>
 if (!g.__cleoCoreOrchestrator) g.__cleoCoreOrchestrator = new EnhancedCoreOrchestrator()
 
 const runtimeAgents = g.__cleoRuntimeAgents as Map<string, AgentConfig>
@@ -289,13 +245,6 @@ export function getAgentOrchestrator() {
       const idx = listeners.indexOf(fn)
       if (idx >= 0) listeners.splice(idx, 1)
     },
-    // Event-driven execution tracking to replace polling
-    subscribeToExecution(executionId: string, callback: (execution: AgentExecution) => void) {
-      return executionEvents.subscribe(executionId, callback)
-    },
-    unsubscribeFromExecution(executionId: string) {
-      executionEvents.clear(executionId)
-    },
     cleanup() {
       listeners.splice(0, listeners.length)
     }
@@ -377,14 +326,10 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   
   // Simple core execution (no delegation, direct response)
   setTimeout(() => {
-    exec.status = 'completed'
-    exec.endTime = new Date()
-    exec.result = 'Core orchestrator response (basic mode - no delegation)'
-    exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
-    
-    // Emit event for subscribers to replace polling
-    executionEvents.emit(exec.id, exec)
-    
+  exec.status = 'completed'
+  exec.endTime = new Date()
+  exec.result = 'Core orchestrator response (basic mode - no delegation)'
+  exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
     listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
   }, 1000)
   

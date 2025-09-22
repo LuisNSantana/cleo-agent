@@ -985,16 +985,19 @@ export async function POST(req: Request) {
             let lastStepCount = 0
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
+            const POLL_MS = 400
 
-            // Replace polling with event-driven approach
-            const unsubscribe = execId ? (orchestrator as any).subscribeToExecution?.(execId, async (execution: any) => {
+            const interval = setInterval(async () => {
               try {
+                const snapshot = execId ? orchestrator.getExecution?.(execId) : null
+                if (!snapshot) return
+
                 // Stream new steps as execution-step events
-                const steps = Array.isArray(execution.steps) ? execution.steps : []
+                const steps = Array.isArray(snapshot.steps) ? snapshot.steps : []
                 if (steps.length > lastStepCount) {
                   for (let i = lastStepCount; i < steps.length; i++) {
                     const step = steps[i]
-
+                    
                     // Debug: Log step structure to understand what we're getting
                     console.log('🔍 [PIPELINE DEBUG] Step received:', {
                       id: step?.id,
@@ -1003,33 +1006,33 @@ export async function POST(req: Request) {
                       content: step?.content?.slice(0, 100),
                       metadata: step?.metadata
                     })
-
+                    
                     send({ type: 'execution-step', step })
                     // Accumulate for DB persistence
                     try { persistedParts.push({ type: 'execution-step', step }) } catch {}
-
+                    
                     // Enhanced delegation flow - trigger ONLY ONCE per unique delegation
                     const stepContent = String(step?.content || '').toLowerCase()
                     const isOriginalDelegationStep = (
-                      step?.action === 'delegating' &&
+                      step?.action === 'delegating' && 
                       !step?.metadata?.synthetic && // Don't generate for synthetic steps
                       !step?.id?.startsWith('synthetic-') && // Don't generate for our synthetic steps
                       stepContent.includes('delegat') &&
                       step?.metadata?.delegatedTo
                     )
-
+                    
                     // Create a unique key for this delegation to prevent duplicates
-                    const delegationKey = step?.metadata?.delegatedTo ?
-                      `${step.metadata.sourceAgent || 'cleo'}-${step.metadata.delegatedTo}` :
+                    const delegationKey = step?.metadata?.delegatedTo ? 
+                      `${step.metadata.sourceAgent || 'cleo'}-${step.metadata.delegatedTo}` : 
                       null
-
+                    
                     if (isOriginalDelegationStep && delegationKey && !generatedSteps.has(delegationKey)) {
                       console.log('🎯 [PIPELINE DEBUG] ORIGINAL delegation detected, generating live pipeline for:', delegationKey)
                       generatedSteps.add(delegationKey)
-
+                      
                       const target = step.metadata.delegatedTo
                       const targetName = target === 'ami-creative' ? 'Ami' : (target || 'Agent')
-
+                      
                       // Send a simple live update step that will evolve
                       const liveStep = {
                         id: `live-${delegationKey}-${Date.now()}`,
@@ -1037,8 +1040,8 @@ export async function POST(req: Request) {
                         agent: target,
                         action: 'analyzing' as const,
                         content: `${targetName} processing delegation...`,
-                        metadata: {
-                          synthetic: true,
+                        metadata: { 
+                          synthetic: true, 
                           pipelineStep: true,
                           liveUpdate: true,
                           delegationKey: delegationKey
@@ -1046,7 +1049,7 @@ export async function POST(req: Request) {
                       }
                       send({ type: 'execution-step', step: liveStep })
                       try { persistedParts.push({ type: 'execution-step', step: liveStep }) } catch {}
-
+                      
                       console.log('✅ [PIPELINE DEBUG] Live delegation step sent')
                     }
                   }
@@ -1054,10 +1057,10 @@ export async function POST(req: Request) {
                 }
 
                 // Handle completion
-                if (execution.status === 'completed' || execution.status === 'failed') {
+                if (snapshot.status === 'completed' || snapshot.status === 'failed') {
                   const finalText = String(
-                    execution?.result || execution?.messages?.slice(-1)?.[0]?.content ||
-                    (execution.status === 'failed' ? `Could not complete delegation: ${execution?.error || 'unknown error'}` : '')
+                    snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content ||
+                    (snapshot.status === 'failed' ? `Could not complete delegation: ${snapshot?.error || 'unknown error'}` : '')
                   )
 
                   // Generate Cleo supervision step before final completion
@@ -1067,8 +1070,8 @@ export async function POST(req: Request) {
                     agent: 'cleo',
                     action: 'reviewing' as const,
                     content: 'Cleo reviewing and supervising final response for quality and accuracy',
-                    metadata: {
-                      synthetic: true,
+                    metadata: { 
+                      synthetic: true, 
                       pipelineStep: true,
                       supervision: true
                     }
@@ -1083,8 +1086,8 @@ export async function POST(req: Request) {
                     agent: 'cleo',
                     action: 'completing' as const,
                     content: 'Cleo synthesizing and finalizing response delivery',
-                    metadata: {
-                      synthetic: true,
+                    metadata: { 
+                      synthetic: true, 
                       pipelineStep: true,
                       synthesis: true
                     }
@@ -1095,7 +1098,7 @@ export async function POST(req: Request) {
                   // Generate final delegation steps before completion
                   openDelegations.forEach((delegation, stepId) => {
                     const targetName = delegation.targetAgent === 'ami-creative' ? 'Ami' : (delegation.targetAgent || 'Agent')
-
+                    
                     // Close delegation tool chips with detailed results
                     send({
                       type: 'tool-invocation',
@@ -1103,8 +1106,8 @@ export async function POST(req: Request) {
                         state: 'result',
                         toolName: 'delegate',
                         toolCallId: stepId,
-                        result: {
-                          summary: `Delegation to ${targetName} completed`,
+                        result: { 
+                          summary: `Delegation to ${targetName} completed`, 
                           text: finalText.slice(0, 400),
                           agent: targetName,
                           status: 'success'
@@ -1119,8 +1122,8 @@ export async function POST(req: Request) {
                           state: 'result',
                           toolName: 'delegate',
                           toolCallId: stepId,
-                          result: {
-                            summary: `Delegation to ${targetName} completed`,
+                          result: { 
+                            summary: `Delegation to ${targetName} completed`, 
                             text: finalText.slice(0, 400),
                             agent: targetName,
                             status: 'success'
@@ -1159,8 +1162,7 @@ export async function POST(req: Request) {
                     } catch {}
                   }
 
-                  // Clean up subscription instead of interval
-                  if (unsubscribe) unsubscribe()
+                  clearInterval(interval)
                   // Clean up pipeline event controller
                   clearPipelineEventController()
                   try { controller.close() } catch {}
@@ -1168,13 +1170,12 @@ export async function POST(req: Request) {
               } catch (err) {
                 // Emit error and close
                 try { send({ type: 'finish', error: 'execution-bridge-failed' }) } catch {}
-                // Clean up subscription on error
-                if (unsubscribe) unsubscribe()
+                clearInterval(interval)
                 // Clean up pipeline event controller on error
                 clearPipelineEventController()
                 try { controller.close() } catch {}
               }
-            }) : null
+            }, POLL_MS)
           },
           cancel() {
             // No-op
