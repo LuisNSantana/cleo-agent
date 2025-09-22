@@ -245,14 +245,134 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   }
   
   if (legacyOrch) {
+    let exec: AgentExecution | null = null
     if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
-      const exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, filteredPrior)
-      execRegistry.push(exec)
-      return exec
+      exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, filteredPrior)
+    } else if (typeof legacyOrch.startAgentExecution === 'function') {
+      exec = legacyOrch.startAgentExecution(input, agentId)
     }
-    if (typeof legacyOrch.startAgentExecution === 'function') {
-      const exec = legacyOrch.startAgentExecution(input, agentId)
-      execRegistry.push(exec)
+    if (exec) {
+      const attachOptions = (target: AgentExecution, attempt: number) => {
+        if (!target.options) target.options = {}
+        const opt = target.options as any // extend dynamically
+        const envDefault = parseInt(process.env.AGENT_DEFAULT_TIMEOUT_MS || '', 10)
+        const fromEnv = !isNaN(envDefault) ? envDefault : undefined
+        const agentCfg = (coreOrchestrator.getAgentConfigs().get(target.agentId)) as any
+        const agentTimeout = agentCfg?.options?.timeouts?.default || agentCfg?.timeouts?.default
+        const longRunningToolsPatterns = [/calendar/i, /schedule/i, /meeting/i, /event/i]
+        const possibleTools: string[] = Array.isArray(agentCfg?.tools) ? agentCfg.tools : []
+        const hasLongRunningTool = possibleTools.some(t => longRunningToolsPatterns.some(r => r.test(t)))
+        const bucket = hasLongRunningTool ? 90000 : 60000
+        let resolved = opt.timeoutMs || agentTimeout || fromEnv || bucket
+        const MAX_CAP = 300000
+        if (resolved > MAX_CAP) resolved = MAX_CAP
+        if (resolved < 10000) resolved = 10000
+        opt.timeoutMs = resolved
+        opt.__enhancedAttempt = attempt
+      }
+
+      const ensureRegistry = (target: AgentExecution) => {
+        if (!execRegistry.find(e => e.id === target.id)) execRegistry.push(target)
+      }
+
+      const scheduleGuards = (target: AgentExecution) => {
+  attachOptions(target, ((target.options as any)?.__enhancedAttempt as number) || 1)
+        ensureRegistry(target)
+  const timeoutMs = (target.options as any)!.timeoutMs as number
+        const startTs = Date.now()
+        ;(target as any).originalStartTime = (target as any).originalStartTime || target.startTime
+        let warned = false
+        let activityCount = 0
+        let lastActivityTs = Date.now()
+        const recordActivity = () => { lastActivityTs = Date.now(); activityCount++ }
+
+        // Hook to detect external mutations (poll every 5s)
+        const pollInterval = setInterval(() => {
+          if (target.status !== 'running') {
+            clearInterval(pollInterval)
+            clearTimeout(timeoutHandle)
+            return
+          }
+          // Detect new messages or steps growth as activity
+          if ((target.messages && target.messages.length > activityCount) || (target.steps && target.steps.length > 0)) {
+            recordActivity()
+            try {
+              listeners.forEach(fn => fn({ type: 'execution_activity', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, messages: target.messages.length, steps: target.steps?.length || 0 } }))
+            } catch {}
+          }
+          const elapsed = Date.now() - startTs
+          // Update metrics
+          try {
+            target.metrics.executionTimeMs = elapsed
+            target.metrics.executionTime = Math.round(elapsed / 1000)
+          } catch {}
+          // Warning at 80%
+            if (!warned && elapsed >= timeoutMs * 0.8) {
+              warned = true
+              target.messages.push({ id: `${target.id}_timeout_warn`, type: 'system', content: `Aviso: la ejecución se aproxima al límite de tiempo (${Math.round(timeoutMs/1000)}s).`, timestamp: new Date() })
+              listeners.forEach(fn => fn({ type: 'execution_timeout_warning', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, timeoutMs } }))
+            }
+          // Idle progress event cada 15s sin actividad
+          if (Date.now() - lastActivityTs >= 15000) {
+            listeners.forEach(fn => fn({ type: 'execution_progress', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, idle: true, elapsedMs: elapsed } }))
+            lastActivityTs = Date.now()
+          }
+        }, 5000)
+
+        const timeoutHandle = setTimeout(() => {
+          if (target.status === 'running') {
+            // Timeout
+            const attempt = ((target.options as any)?.__enhancedAttempt as number) || 1
+            if (!target.messages) target.messages = []
+            target.status = 'failed'
+            target.endTime = new Date()
+            target.error = 'timeout'
+            target.result = 'Execution timed out (legacy orchestrator no respondió a tiempo)'
+            target.messages.push({ id: `${target.id}_timeout_final`, type: 'system', content: String(target.result), timestamp: new Date() })
+            listeners.forEach(fn => fn({ type: 'execution_failed', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, error: 'timeout', attempt } }))
+            clearInterval(pollInterval)
+
+            // Reintento automático si attempt == 1 y no hubo pasos ni mensajes AI
+            const hasAIMessage = (target.messages || []).some(m => m.type === 'ai')
+            const hasSteps = Array.isArray(target.steps) && target.steps.length > 0
+            if (attempt === 1 && !hasAIMessage && !hasSteps) {
+              const retryExec = restartExecution(target, 2)
+              listeners.forEach(fn => fn({ type: 'execution_retry', agentId: retryExec.agentId, timestamp: new Date(), data: { executionId: retryExec.id, previousExecutionId: target.id, attempt: 2 } }))
+            }
+          }
+        }, timeoutMs)
+      }
+
+      const restartExecution = (prev: AgentExecution, attempt: number): AgentExecution => {
+        // Lanzar un nuevo intento usando legacy orchestrator de nuevo
+        let newExec: AgentExecution | null = null
+        try {
+          if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
+            // Pasamos histórico filtrado (prev.input puede existir)
+            newExec = legacyOrch.startAgentExecutionWithHistory(prev.input || input, agentId, filteredPrior)
+          } else if (typeof legacyOrch.startAgentExecution === 'function') {
+            newExec = legacyOrch.startAgentExecution(prev.input || input, agentId)
+          }
+        } catch (e) {
+          prev.messages.push({ id: `${prev.id}_retry_failed_immediate`, type: 'system', content: 'Reintento falló al iniciar: ' + (e as Error).message, timestamp: new Date() })
+          return prev
+        }
+        if (!newExec) return prev
+        newExec.metrics = newExec.metrics || prev.metrics
+        newExec.metrics.retryCount = (prev.metrics.retryCount || 0) + 1
+        newExec.messages = newExec.messages || []
+        newExec.messages.push({ id: `${newExec.id}_retry_notice`, type: 'system', content: 'Retrying execution after timeout (attempt ' + attempt + '/2)', timestamp: new Date() })
+  attachOptions(newExec, attempt)
+        ensureRegistry(newExec)
+        scheduleGuards(newExec)
+        return newExec
+      }
+
+      // Inicialización del primer intento
+      exec.input = input
+      exec.metrics = exec.metrics || { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 }
+      attachOptions(exec, 1)
+      scheduleGuards(exec)
       return exec
     }
   }
