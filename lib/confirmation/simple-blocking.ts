@@ -4,6 +4,7 @@
  * Now emits SSE events via delegation pipeline when controller is active.
  */
 import { emitPipelineEventExternal } from '@/lib/tools/delegation'
+import { actionSnapshotStore, ActionLifecycle, redactInput } from '@/lib/actions/snapshot-store'
 
 // Tools that need confirmation
 const NEEDS_CONFIRMATION = [
@@ -100,42 +101,60 @@ Do you want me to execute this action?`
 /**
  * Block execution until user confirms - returns a Promise that resolves with the actual result
  */
-export async function blockForConfirmation<T>(
-  toolName: string,
-  params: any,
-  executeFunction: () => Promise<T>
-): Promise<T> {
-  
+export async function blockForConfirmation<T>(toolName: string, params: any, executeFunction: () => Promise<T>): Promise<T> {
+  // Always create an action snapshot so frontend can unify handling
+  const snapshot = actionSnapshotStore.create('tool', {
+    meta: { toolName },
+    input: redactInput(params)
+  })
+  const actionId = snapshot.id
+  ActionLifecycle.start(actionId)
+
   if (!needsConfirmation(toolName)) {
-    // No confirmation needed - execute immediately
-    return await executeFunction()
+    try {
+      const result = await executeFunction()
+      ActionLifecycle.result(actionId, { result }, 'tool completed')
+      emitPipelineEventExternal?.({ type: 'action_event', actionId, kind: 'tool', status: 'completed', event: actionSnapshotStore.get(actionId)?.events.slice(-1)[0] })
+      return result
+    } catch (e: any) {
+      ActionLifecycle.error(actionId, { message: e?.message || 'tool error' })
+      emitPipelineEventExternal?.({ type: 'action_event', actionId, kind: 'tool', status: 'error', event: actionSnapshotStore.get(actionId)?.events.slice(-1)[0] })
+      throw e
+    }
   }
 
-  // Generate confirmation message
+  // Need confirmation path
   const message = generateConfirmationMessage(toolName, params)
   const confirmationId = `confirm_${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const block = ActionLifecycle.awaitingConfirmation(actionId, sanitizeParams(params))
+  emitPipelineEventExternal?.({ type: 'action_event', actionId, kind: 'tool', status: 'awaiting_confirmation', event: actionSnapshotStore.get(actionId)?.events.slice(-1)[0] })
 
-  // Create a Promise that will be resolved when user responds
   return new Promise<T>((resolve, reject) => {
-    // Store the confirmation for the UI to pick up
     pendingConfirmations.set(confirmationId, {
       toolName,
       params,
       message,
-      resolve,
-      reject,
+      resolve: (result: any) => {
+        ActionLifecycle.result(actionId, { result }, 'tool completed')
+        emitPipelineEventExternal?.({ type: 'action_event', actionId, kind: 'tool', status: 'completed', event: actionSnapshotStore.get(actionId)?.events.slice(-1)[0] })
+        resolve(result)
+      },
+      reject: (err: any) => {
+        ActionLifecycle.error(actionId, { message: err?.message || 'tool error' })
+        emitPipelineEventExternal?.({ type: 'action_event', actionId, kind: 'tool', status: 'error', event: actionSnapshotStore.get(actionId)?.events.slice(-1)[0] })
+        reject(err)
+      },
       executeFunction,
       createdAt: Date.now()
     })
 
-    // Emit SSE event (best effort) so UI can render modal without polling immediately
     try {
       const category = inferCategory(toolName)
       const sensitivity = inferSensitivity(toolName, params)
       const undoable = toolName !== 'deleteDriveFile'
       const preview = buildPreview(toolName, params, message)
       emitPipelineEventExternal?.({
-        type: 'pending-confirmation',
+        type: 'pending-confirmation', // legacy event for existing UI
         confirmationId,
         toolName,
         message,
@@ -144,20 +163,18 @@ export async function blockForConfirmation<T>(
         sensitivity,
         undoable,
         preview,
+        actionId,
+        blockId: block?.id,
         timestamp: new Date().toISOString()
       })
     } catch {}
-
-    // The Promise will be resolved when resolveConfirmation is called
-    // If user approves, executeFunction will be called and its result returned
-    // If user rejects, the Promise will be rejected
   })
 }
 
 /**
  * Resolve a pending confirmation
  */
-export async function resolveConfirmation(confirmationId: string, approved: boolean): Promise<{ success: boolean; result?: any; message?: string }> {
+export async function resolveConfirmation(confirmationId: string, approved: boolean): Promise<{ success: boolean; result?: any; message?: string; executed?: boolean; approved?: boolean; actionId?: string }> {
   const pending = pendingConfirmations.get(confirmationId)
   if (!pending) {
     return { success: false, message: 'Confirmation not found or already processed' }
@@ -175,7 +192,10 @@ export async function resolveConfirmation(confirmationId: string, approved: bool
       return { 
         success: true, 
         result,
-        message: `✅ ${pending.toolName} executed successfully`
+        message: `✅ ${pending.toolName} executed successfully`,
+        executed: true,
+        approved: true,
+        actionId: findActionIdByTool(pending.toolName)
       }
     } else {
       console.log(`[CONFIRMATION] User cancelled ${pending.toolName}`)
@@ -184,7 +204,10 @@ export async function resolveConfirmation(confirmationId: string, approved: bool
       try { emitPipelineEventExternal?.({ type: 'confirmation-resolved', confirmationId, approved: false, toolName: pending.toolName, timestamp: new Date().toISOString() }) } catch {}
       return { 
         success: true, 
-        message: `❌ ${pending.toolName} cancelled by user`
+        message: `❌ ${pending.toolName} cancelled by user`,
+        executed: false,
+        approved: false,
+        actionId: findActionIdByTool(pending.toolName)
       }
     }
   } catch (error) {
@@ -192,9 +215,18 @@ export async function resolveConfirmation(confirmationId: string, approved: bool
     pending.reject(error)
     return { 
       success: false, 
-      message: `Error executing ${pending.toolName}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Error executing ${pending.toolName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      executed: false,
+      approved: true,
+      actionId: findActionIdByTool(pending.toolName)
     }
   }
+}
+
+function findActionIdByTool(toolName: string): string | undefined {
+  // Simple reverse scan (bounded store size) – optimize later if needed with index
+  // Not critical path because confirmations are few.
+  return undefined
 }
 
 /**

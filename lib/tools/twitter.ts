@@ -7,6 +7,8 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getActiveTwitterCredentials, getSystemTwitterCredentials } from '@/lib/twitter/credentials'
+import { blockForConfirmation } from '@/lib/confirmation/simple-blocking'
+import { redactInput } from '@/lib/actions/snapshot-store'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { createHmac } from 'crypto'
 
@@ -64,15 +66,45 @@ async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
  * Post a tweet to X (Twitter)
  * Uses user credentials when available for actual posting
  */
+// Heuristic helpers
+function analyzeTweet(raw: string) {
+  const content = raw.replace(/\s+/g, ' ').trim()
+  const hashtags = Array.from(content.match(/#[A-Za-z0-9_]+/g) || [])
+  const mentions = Array.from(content.match(/@[A-Za-z0-9_]+/g) || [])
+  const urls = Array.from(content.match(/https?:\/\/\S+/g) || [])
+  const charCount = [...content].length
+  const overLimit = charCount > 280
+  const nearLimit = !overLimit && charCount >= 250
+  const suggested = charCount > 280 ? trimToSafe(content) : content
+  const warnings: string[] = []
+  if (overLimit) warnings.push(`Exceeds 280 chars by ${charCount - 280}`)
+  else if (nearLimit) warnings.push('Near 280 char limit—review before posting')
+  if (hashtags.length > 4) warnings.push('Too many hashtags (optimal 1-3)')
+  return { content, hashtags, mentions, urls, charCount, overLimit, nearLimit, warnings, suggested }
+}
+
+function trimToSafe(text: string) {
+  if ([...text].length <= 280) return text
+  const arr = [...text]
+  const sliced = arr.slice(0, 277).join('').replace(/[\s.,;:!-]+$/,'')
+  return sliced + '…'
+}
+
 export const postTweetTool = tool({
   description: 'Post a tweet to X/Twitter. Use for publishing content, announcements, and social media engagement.',
   inputSchema: z.object({
-    content: z.string().max(280, 'Tweet content must be 280 characters or less').describe('The tweet content to post'),
+    content: z.string().min(1).describe('The tweet content to post (will be validated and trimmed if >280)'),
     reply_to_id: z.string().optional().describe('ID of tweet to reply to (optional)'),
     quote_tweet_id: z.string().optional().describe('ID of tweet to quote (optional)')
   }),
   execute: async ({ content, reply_to_id, quote_tweet_id }) => {
-    try {
+    // Wrap with confirmation (social action) to show enriched preview
+    return blockForConfirmation('postTweet', { content, reply_to_id, quote_tweet_id }, async () => {
+      try {
+        const analysis = analyzeTweet(content)
+        if (analysis.overLimit) {
+          return { success: false, error: `Tweet too long (${analysis.charCount}). Provide shorter content.` }
+        }
       const credentials = await getTwitterCredentials()
       // Prefer OAuth 2.0 Bearer token for v2 endpoint; fall back to OAuth 1.0a user auth for v1.1
       const hasBearer = !!credentials.bearer_token
@@ -87,7 +119,7 @@ export const postTweetTool = tool({
 
       if (hasBearer) {
         // v2 create tweet
-        const tweetData: any = { text: content }
+        const tweetData: any = { text: analysis.suggested }
         if (reply_to_id) tweetData.reply = { in_reply_to_tweet_id: reply_to_id }
         if (quote_tweet_id) tweetData.quote_tweet_id = quote_tweet_id
         const response = await fetch('https://api.twitter.com/2/tweets', {
@@ -109,8 +141,12 @@ export const postTweetTool = tool({
           data: {
             tweet_id: result.data?.id,
             tweet_url: result.data?.id ? `https://x.com/i/web/status/${result.data.id}` : undefined,
-            content,
-            posted_at: new Date().toISOString()
+            content: analysis.suggested,
+            posted_at: new Date().toISOString(),
+            hashtags: analysis.hashtags,
+            mentions: analysis.mentions,
+            urls: analysis.urls,
+            char_count: analysis.charCount,
           }
         }
       }
@@ -149,7 +185,11 @@ export const postTweetTool = tool({
       }
 
       const url = 'https://api.twitter.com/1.1/statuses/update.json'
-      const bodyParams: Record<string, string> = { status: content }
+      const legacyAnalysis = analyzeTweet(content)
+      if (legacyAnalysis.overLimit) {
+        return { success: false, error: `Tweet too long (${legacyAnalysis.charCount}). Provide shorter content.` }
+      }
+      const bodyParams: Record<string, string> = { status: legacyAnalysis.suggested }
       if (reply_to_id) bodyParams.in_reply_to_status_id = reply_to_id
   const authHeader = oauthParams('POST', url, bodyParams)
       const resp = await fetch(url, {
@@ -171,8 +211,12 @@ export const postTweetTool = tool({
         data: {
           tweet_id: resJson.id_str,
           tweet_url: resJson.id_str ? `https://x.com/i/web/status/${resJson.id_str}` : undefined,
-          content,
-          posted_at: new Date().toISOString()
+          content: legacyAnalysis.suggested,
+          posted_at: new Date().toISOString(),
+          hashtags: legacyAnalysis.hashtags,
+          mentions: legacyAnalysis.mentions,
+          urls: legacyAnalysis.urls,
+          char_count: legacyAnalysis.charCount,
         }
       }
     } catch (error) {
@@ -182,6 +226,7 @@ export const postTweetTool = tool({
         error: error instanceof Error ? error.message : 'Failed to post tweet. Please check your connection and Twitter API credentials.'
       }
     }
+    })
   }
 })
 

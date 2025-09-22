@@ -5,6 +5,7 @@ import { getCurrentUserId } from '@/lib/server/request-context'
 import { logger } from '@/lib/utils/logger'
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization'
 import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver'
+import { actionSnapshotStore, ActionLifecycle, redactInput } from '@/lib/actions/snapshot-store'
 
 // Global event controller for pipeline streaming
 let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -22,7 +23,7 @@ export function clearPipelineEventController() {
   globalEventEncoder = null
 }
 
-// Helper to emit pipeline events
+// Helper to emit pipeline events (legacy + new unified action_event wrapper)
 function emitPipelineEvent(event: any) {
   if (globalEventController && globalEventEncoder) {
     try {
@@ -83,13 +84,29 @@ async function runDelegation(params: {
   normPriority ? `Prioridad: ${normPriority}` : null,
   ].filter(Boolean).join('\n')
 
-  // Emit delegation start event
+  // Create snapshot for this delegation action
+  const snapshot = actionSnapshotStore.create('delegation', {
+    meta: { userId, agentId, delegationTarget: agentId },
+    input: redactInput({ task, context, priority: normPriority, requirements })
+  })
+  const actionId = snapshot.id
+  ActionLifecycle.start(actionId)
+  const startedEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
   emitPipelineEvent({
-    type: 'delegation-start',
+    type: 'delegation-start', // legacy event for current UI
     agentId,
     agentName: getAgentDisplayName(agentId),
     task,
+    actionId,
     timestamp: new Date().toISOString()
+  })
+  // New unified action event
+  emitPipelineEvent({
+    type: 'action_event',
+    actionId,
+    kind: 'delegation',
+    status: 'running',
+    event: startedEvent
   })
 
   // Start execution (UI variant propagates user/thread when present)
@@ -104,13 +121,23 @@ async function runDelegation(params: {
   const POLL_MS = runtime.delegationPollMs
   let lastProgressAt = startedAt
 
-  // Emit processing event
+  // Emit initial processing as progress (detail only)
+  ActionLifecycle.progress(actionId, 0, 'starting')
+  let lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
   emitPipelineEvent({
-    type: 'delegation-processing',
+    type: 'delegation-processing', // legacy
     agentId,
     agentName: getAgentDisplayName(agentId),
     status: 'running',
+    actionId,
     timestamp: new Date().toISOString()
+  })
+  emitPipelineEvent({
+    type: 'action_event',
+    actionId,
+    kind: 'delegation',
+    status: 'running',
+    event: lastActionEvent
   })
 
   // Poll until completion/timeout
@@ -131,13 +158,24 @@ async function runDelegation(params: {
       
       // Emit progress events when status changes
       if (status !== lastStatus) {
+        // Map orchestrator status to progress detail
+        ActionLifecycle.progress(actionId, snapshot?.progress ?? lastProgress, `status:${status}`)
+        lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         emitPipelineEvent({
-          type: 'delegation-progress',
+          type: 'delegation-progress', // legacy
           agentId,
           agentName: getAgentDisplayName(agentId),
           status,
           progress: snapshot?.progress || 0,
+          actionId,
           timestamp: new Date().toISOString()
+        })
+        emitPipelineEvent({
+          type: 'action_event',
+          actionId,
+            kind: 'delegation',
+          status: 'running',
+          event: lastActionEvent
         })
         lastStatus = status
       }
@@ -164,27 +202,44 @@ async function runDelegation(params: {
       
       if (snapshot?.status === 'completed') {
         finalResult = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
-        
-        // Emit completion event
+        ActionLifecycle.result(actionId, { result: finalResult }, 'delegation completed')
+        lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
+        // Emit completion events (legacy + new)
         emitPipelineEvent({
           type: 'delegation-complete',
           agentId,
           agentName: getAgentDisplayName(agentId),
           result: finalResult,
+          actionId,
           timestamp: new Date().toISOString()
+        })
+        emitPipelineEvent({
+          type: 'action_event',
+          actionId,
+          kind: 'delegation',
+          status: 'completed',
+          event: lastActionEvent
         })
         break
       }
       if (snapshot?.status === 'failed') {
         finalResult = `Delegation failed: ${snapshot?.error || 'unknown error'}`
-        
-        // Emit failure event
+        ActionLifecycle.error(actionId, { message: finalResult, code: 'DELEGATION_FAILED' })
+        lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         emitPipelineEvent({
           type: 'delegation-error',
           agentId,
           agentName: getAgentDisplayName(agentId),
           error: snapshot?.error || 'unknown error',
+          actionId,
           timestamp: new Date().toISOString()
+        })
+        emitPipelineEvent({
+          type: 'action_event',
+          actionId,
+          kind: 'delegation',
+          status: 'error',
+          event: lastActionEvent
         })
         break
       }
@@ -196,6 +251,15 @@ async function runDelegation(params: {
   if (!finalResult) {
     const elapsed = Date.now() - startedAt
     finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
+    ActionLifecycle.timeout(actionId)
+    lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
+    emitPipelineEvent({
+      type: 'action_event',
+      actionId,
+      kind: 'delegation',
+      status: 'timeout',
+      event: lastActionEvent
+    })
   }
 
   return {
@@ -210,6 +274,7 @@ async function runDelegation(params: {
     agentId,
     result: finalResult,
     executionId: execId,
+    actionId
   }
 }
 

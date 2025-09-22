@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Check, X, AlertTriangle, Calendar, Mail, Folder, Settings, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Check, X, AlertTriangle, Calendar, Mail, Folder, Settings, Trash2, Loader2, ChevronDown, ChevronUp, Hash, AtSign, Link as LinkIcon } from 'lucide-react'
 import clsx from 'clsx'
 
 export interface ConfirmationItemPreviewDetail {
@@ -33,6 +33,7 @@ interface ConfirmationPanelProps {
   items: ConfirmationItem[]
   onResolve: (id: string, approved: boolean) => Promise<void> | void
   loadingId?: string | null
+  minimal?: boolean // forces compact mode
 }
 
 const categoryIcon: Record<string, React.ReactNode> = {
@@ -61,9 +62,11 @@ function sanitizeInline(text?: string) {
     .trim()
 }
 
-export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationPanelProps) {
+export function ConfirmationPanel({ items, onResolve, loadingId, minimal }: ConfirmationPanelProps) {
   const [index, setIndex] = useState(0)
   const current = items[index]
+  const isNarrow = typeof window !== 'undefined' ? window.innerWidth < 520 : false
+  const compact = minimal || isNarrow
   const [detailsOpen, setDetailsOpen] = useState<boolean>(true)
 
   // Derived queue meta
@@ -106,7 +109,7 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
   const icon = categoryIcon[current.category] || <Settings className="h-5 w-5" />
 
   return (
-      <Card role="dialog" aria-labelledby={`confirm-title-${current.id}`} aria-describedby={`confirm-desc-${current.id}`} className={clsx('w-full shadow-sm border mb-3 rounded-lg', colors.border, colors.bg)}>
+      <Card role="dialog" aria-labelledby={`confirm-title-${current.id}`} aria-describedby={`confirm-desc-${current.id}`} className={clsx('w-full shadow-sm border mb-3 rounded-lg', colors.border, colors.bg, compact && 'py-2') }>
         <div className="flex flex-col gap-3 p-4">
           <header className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -114,23 +117,23 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
                 {icon}
               </div>
               <div className="space-y-1">
-                <h2 id={`confirm-title-${current.id}`} className={clsx('font-semibold leading-tight flex items-center gap-2 flex-wrap', colors.text)}>
+                <h2 id={`confirm-title-${current.id}`} className={clsx('font-semibold leading-tight flex items-center gap-2 flex-wrap', colors.text, compact && 'text-sm') }>
                   {sanitizeInline(current.preview.title) || current.toolName}
                   <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', colors.chip)}>
                     {current.sensitivity}
                   </span>
-                  {!current.undoable && (
+                  {!current.undoable && !compact && (
                     <span className="text-[10px] uppercase tracking-wide font-semibold bg-red-600 text-white px-2 py-0.5 rounded">
                       Irreversible
                     </span>
                   )}
                 </h2>
-                {current.preview.summary && (
+                {current.preview.summary && !compact && (
                   <p id={`confirm-desc-${current.id}`} className="text-sm text-muted-foreground max-w-prose">
                     {sanitizeInline(current.preview.summary)}
                   </p>
                 )}
-                <button
+                {!compact && <button
                   type="button"
                   onClick={() => setDetailsOpen(o => !o)}
                   className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary rounded"
@@ -139,7 +142,7 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
                 >
                   {detailsOpen ? <ChevronUp className="h-3 w-3"/> : <ChevronDown className="h-3 w-3"/>}
                   {detailsOpen ? 'Ocultar detalles' : 'Ver detalles'}
-                </button>
+                </button>}
               </div>
             </div>
             {queueInfo.total > 1 && (
@@ -153,8 +156,74 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
             )}
           </header>
 
-          {/* Details */}
-          {detailsOpen && current.preview.details && current.preview.details.length > 0 && (
+          {/* Specialized tweet preview */}
+          { current.toolName === 'postTweet' && detailsOpen && !compact && (
+            <div className="flex flex-col gap-2" id={`confirm-details-${current.id}`}>
+              {/* Character counter */}
+              {(() => {
+                const textDetail = current.preview.details?.find(d => d.label === 'Text')
+                const text = textDetail?.value || ''
+                const length = [...text].length
+                const nearLimit = length >= 250 && length <= 280
+                const overLimit = length > 280
+                return (
+                  <div className={clsx('flex items-center justify-between rounded border px-3 py-2 text-xs', overLimit ? 'border-red-500 bg-red-100/50 dark:bg-red-900/30' : nearLimit ? 'border-amber-400 bg-amber-100/40 dark:bg-amber-900/30' : 'border-border/40 bg-background/50') }>
+                    <span className="font-medium">Caracteres</span>
+                    <span className={clsx('font-mono', overLimit && 'text-red-600 dark:text-red-400', nearLimit && 'text-amber-600 dark:text-amber-300')}>{length} / 280</span>
+                  </div>
+                )
+              })()}
+              {/* Tweet text block */}
+              {(() => {
+                const text = current.preview.details?.find(d => d.label === 'Text')?.value || ''
+                return (
+                  <div className="rounded border border-border/40 bg-background/50 p-3">
+                    <span className="block text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">Contenido</span>
+                    <p className="text-sm whitespace-pre-wrap break-words leading-snug max-h-52 overflow-auto">{text}</p>
+                  </div>
+                )
+              })()}
+              {/* Hashtags, mentions, urls extraction (basic regex again on client) */}
+              {(() => {
+                const text = current.preview.details?.find(d => d.label === 'Text')?.value || ''
+                const hashtags = Array.from(text.match(/#[A-Za-z0-9_]+/g) || [])
+                const mentions = Array.from(text.match(/@[A-Za-z0-9_]+/g) || [])
+                const urls = Array.from(text.match(/https?:\/\/\S+/g) || [])
+                const hasMeta = hashtags.length + mentions.length + urls.length > 0
+                if (!hasMeta) return null
+                return (
+                  <div className="flex flex-col gap-2">
+                    {hashtags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><Hash className="h-3 w-3"/>Hashtags</span>
+                        {hashtags.slice(0,12).map(h => (
+                          <span key={h} className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[11px] font-medium">{h}</span>
+                        ))}
+                      </div>
+                    )}
+                    {mentions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><AtSign className="h-3 w-3"/>Menciones</span>
+                        {mentions.slice(0,12).map(m => (
+                          <span key={m} className="px-2 py-0.5 rounded-full bg-indigo-200 dark:bg-indigo-700 text-[11px] font-medium">{m}</span>
+                        ))}
+                      </div>
+                    )}
+                    {urls.length > 0 && (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><LinkIcon className="h-3 w-3"/>Links</span>
+                        {urls.slice(0,6).map(u => (
+                          <span key={u} className="px-2 py-0.5 rounded bg-emerald-200 dark:bg-emerald-700 text-[10px] max-w-[160px] truncate" title={u}>{u}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+          {/* Generic details fallback */}
+          { current.toolName !== 'postTweet' && !compact && detailsOpen && current.preview.details && current.preview.details.length > 0 && (
             <div id={`confirm-details-${current.id}`} className="grid gap-2 sm:grid-cols-2">
               {current.preview.details.slice(0,10).map((d, idx) => (
                 <div key={idx} className="flex flex-col rounded border border-border/40 bg-background/50 px-3 py-2 min-w-0">
@@ -166,7 +235,7 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
           )}
 
           {/* Warnings */}
-          {current.preview.warnings && current.preview.warnings.length > 0 && (
+          { !compact && current.preview.warnings && current.preview.warnings.length > 0 && (
             <div className="rounded-md border border-orange-300/60 bg-orange-100/40 dark:border-orange-700 dark:bg-orange-900/30 p-2 space-y-1">
               <div className="flex items-center gap-1 text-xs font-medium text-orange-800 dark:text-orange-200">
                 <AlertTriangle className="h-3 w-3" /> Alerta
@@ -177,31 +246,33 @@ export function ConfirmationPanel({ items, onResolve, loadingId }: ConfirmationP
             </div>
           )}
 
-          {/* Raw message optional (collapsed by default in future) */}
-          {current.message && !current.preview.summary && (
+          {/* Raw message */}
+          { !compact && current.message && !current.preview.summary && (
             <pre className="max-h-32 overflow-auto rounded bg-muted/20 p-2 text-[11px] whitespace-pre-wrap font-mono text-muted-foreground leading-snug">
               {sanitizeInline(current.message)}
             </pre>
           )}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-1">
-              <div className="text-[10px] text-muted-foreground order-2 sm:order-1 tracking-wide">
-                ↵ Enter = Aprobar • Esc = Cancelar • {new Date(current.timestamp).toLocaleTimeString()}
-              </div>
+              {!compact && (
+                <div className="text-[10px] text-muted-foreground order-2 sm:order-1 tracking-wide">
+                  ↵ Enter = Aprobar • Esc = Cancelar • {new Date(current.timestamp).toLocaleTimeString()}
+                </div>
+              )}
               <div className="flex gap-2 order-1 sm:order-2 w-full sm:w-auto">
                 <Button
                   onClick={handleApprove}
                   disabled={loadingId === current.id}
-                  className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none sm:min-w-[140px] h-9 text-sm"
+                  className={clsx('bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none h-9 text-sm', compact ? 'min-w-[0] px-3' : 'sm:min-w-[140px]')}
                 >
                   {loadingId === current.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-                  Aprobar
+                  {compact ? 'OK' : 'Aprobar'}
                 </Button>
                 <Button
                   onClick={handleReject}
                   disabled={loadingId === current.id}
                   variant="outline"
-                  className="flex-1 sm:flex-none sm:min-w-[110px] h-9 text-sm border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                  className={clsx('flex-1 sm:flex-none h-9 text-sm border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950', compact ? 'min-w-[0] px-3' : 'sm:min-w-[110px]')}
                 >
                   <X className="h-4 w-4 mr-1" /> Cancelar
                 </Button>

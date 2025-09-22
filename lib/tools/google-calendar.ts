@@ -257,10 +257,31 @@ export const createCalendarEventTool = tool({
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
     const { blockForConfirmation } = await import('../confirmation/simple-blocking')
-    
+    // Title refinement heuristics
+    function refineTitle(raw: string, desc?: string): string {
+      if (!raw) return 'Untitled Event'
+      const trimmed = raw.trim()
+      // If looks generic
+      const generic = /^(add|create|schedule|programar|hacer|evento|meeting|reunión)( an?| una)? (evento|event|meeting)?$/i
+      if (generic.test(trimmed) || trimmed.length < 4) {
+        // Try to extract quoted phrase from description
+        if (desc) {
+          const quote = desc.match(/"([^"]{4,80})"|'([^']{4,80})'/)
+          if (quote) return (quote[1] || quote[2]).slice(0, 65)
+          // First sentence
+          const firstSentence = desc.split(/\. |\n|;|—/)[0]
+          if (firstSentence && firstSentence.length > 8) return firstSentence.slice(0,65)
+        }
+        return 'Scheduled Meeting'
+      }
+      // If too long truncate
+      if (trimmed.length > 65) return trimmed.slice(0,62) + '…'
+      return trimmed
+    }
+    const refinedSummary = refineTitle(summary, description)
     return blockForConfirmation(
       'createCalendarEvent',
-      { summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
+      { summary: refinedSummary, originalSummary: summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
       async () => {
         const userId = getCurrentUserId()
         
@@ -282,7 +303,7 @@ export const createCalendarEventTool = tool({
       const needsConference = addConference || /meeting|reunión|call|conference/i.test(summary)
 
       const eventData: any = {
-        summary,
+        summary: refinedSummary,
         description,
         start: { dateTime: start.toISO(), timeZone },
         end: { dateTime: end.toISO(), timeZone },
@@ -306,7 +327,7 @@ export const createCalendarEventTool = tool({
 
       const result = {
         success: true,
-        message: `Created "${summary}"`,
+        message: `Created "${refinedSummary}"`,
         event: {
           id: data.id,
           summary: data.summary,

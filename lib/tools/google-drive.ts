@@ -451,9 +451,8 @@ export const createDriveFolderTool = tool({
     description: z.string().optional().describe('Optional description for the folder'),
   }),
   execute: async ({ name, parentFolderId, description }) => {
-    const { withConfirmation } = await import('../confirmation/wrapper')
-    
-    return withConfirmation(
+    const { blockForConfirmation } = await import('../confirmation/simple-blocking')
+    return blockForConfirmation(
       'createDriveFolder',
       { name, parentFolderId, description },
       async () => {
@@ -520,7 +519,7 @@ export const createDriveFolderTool = tool({
       }
     }
   }
-) // closing withConfirmation wrapper
+)
 },
 })
 
@@ -534,9 +533,8 @@ export const uploadFileToDriveTool = tool({
     folderId: z.string().optional().describe('Optional destination folder ID in Drive'),
   }),
   execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
-    const { withConfirmation } = await import('../confirmation/wrapper')
-    
-    return withConfirmation(
+    const { blockForConfirmation } = await import('../confirmation/simple-blocking')
+    return blockForConfirmation(
       'uploadToDrive',
       { filename, content, mimeType, folderId },
       async () => {
@@ -638,7 +636,7 @@ export const uploadFileToDriveTool = tool({
       }
     }
   }
-) // closing withConfirmation wrapper
+)
 },
 })
 

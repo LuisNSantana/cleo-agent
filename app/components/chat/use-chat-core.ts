@@ -248,7 +248,7 @@ export function useChatCore({
       })
       if (!res.ok) throw new Error('Failed confirming tool')
       const json = await res.json()
-      if (accept && json.executed && json.result) {
+      if (accept && json.executed) {
         const toolMsg: ChatMessage = {
           id: `tool-${pendingToolConfirmation.toolCallId}`,
           role: 'assistant',
@@ -261,7 +261,7 @@ export function useChatCore({
                 state: 'result',
                 toolName: pendingToolConfirmation.toolName,
                 toolCallId: pendingToolConfirmation.toolCallId,
-                result: json.result,
+                result: json.result || { success: true, message: json.message || 'Action completed' },
               },
             } as any,
           ],
