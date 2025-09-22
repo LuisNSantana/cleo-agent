@@ -5,6 +5,7 @@
 
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
+import { globalErrorHandler } from '@/lib/agents/core/error-handler'
 import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
@@ -223,6 +224,15 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
   })
 }
 
+
+// Utilidad: Detecta si hay dependencias entre agentes (dummy, reemplazar por lógica real)
+function detectAgentDependencies(agentIds: string[]): { parallel: string[], sequential: string[][] } {
+  // Por ahora, asume que todos pueden ir en paralelo si no hay dependencias explícitas
+  // En el futuro, analizar el grafo de dependencias real
+  return { parallel: agentIds, sequential: [] }
+}
+
+// Refactor: Soporta ejecución concurrente de agentes sin dependencias
 function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
   // Filter ToolMessages to prevent LangChain errors before delegating
   const filteredPrior = prior ? (prior || []).filter(m => m.role !== 'tool').concat(
@@ -232,7 +242,87 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       metadata: m.metadata
     }))
   ) : []
-  
+
+  // Detectar si hay múltiples agentes a ejecutar (dummy: si input es array, usar todos; si no, solo uno)
+  let agentIds: string[] = []
+  if (Array.isArray(agentId)) {
+    agentIds = agentId
+  } else if (agentId) {
+    agentIds = [agentId]
+  } else {
+    agentIds = ['cleo-supervisor']
+  }
+
+  // Si hay más de un agente y no hay dependencias, ejecutar en paralelo
+  if (agentIds.length > 1) {
+    const { parallel } = detectAgentDependencies(agentIds)
+    const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+    const ctxUser = getCurrentUserId()
+    const effectiveUserId = ctxUser || NIL_UUID
+    const exec: AgentExecution = {
+      id: executionId,
+      agentId: agentIds.join(','),
+      threadId: 'default',
+      userId: effectiveUserId,
+      status: 'running',
+      startTime: new Date(),
+      messages: [],
+      metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 },
+      steps: []
+    }
+
+    // Ejecutar todos los agentes en paralelo
+    Promise.allSettled(parallel.map(aid => {
+      // Circuit breaker y retry/backoff por agente
+      return globalErrorHandler.withRetry(
+        () => new Promise((resolve, reject) => {
+          let legacyOrch = (globalThis as any).__cleoOrchestrator
+          if (!legacyOrch) {
+            try {
+              legacyOrch = getLegacyOrchestrator()
+            } catch {}
+          }
+          if (legacyOrch && typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
+            const subExec = legacyOrch.startAgentExecutionWithHistory(input, aid, filteredPrior)
+            // Espera a que termine (simulado con setTimeout si no hay promesa real)
+            const checkDone = () => {
+              if (subExec.status === 'completed') {
+                resolve(subExec)
+              } else if (subExec.status === 'failed') {
+                reject(new Error(subExec.error || 'Agent failed'))
+              } else {
+                setTimeout(checkDone, 100)
+              }
+            }
+            checkDone()
+          } else {
+            // Fallback: simula ejecución simple
+            setTimeout(() => {
+              resolve({ agentId: aid, result: 'Core orchestrator response (basic mode - no delegation)' })
+            }, 1000)
+          }
+        }),
+        aid // context para circuit breaker por agentId
+      )
+    })).then(results => {
+      exec.status = 'completed'
+      exec.endTime = new Date()
+      // results: PromiseSettledResult[]
+      const summary = results.map(r => {
+        if (r.status === 'fulfilled') return r.value
+        else return { error: r.reason }
+      })
+      exec.result = summary
+      exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: JSON.stringify(summary), timestamp: new Date() })
+      listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
+    })
+
+    execRegistry.push(exec)
+    return exec
+  }
+
+  // Si solo hay un agente, usa el flujo legacy/core normal
   // For full delegation functionality, use legacy orchestrator
   let legacyOrch = (globalThis as any).__cleoOrchestrator
   if (!legacyOrch) {
@@ -243,7 +333,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       console.warn('[Enhanced Adapter] Failed to initialize legacy orchestrator, using basic core:', e)
     }
   }
-  
+
   if (legacyOrch) {
     if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
       const exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, filteredPrior)
@@ -256,7 +346,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       return exec
     }
   }
-  
+
   // Fallback: simple core execution (without delegation)
   const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   const NIL_UUID = '00000000-0000-0000-0000-000000000000'
@@ -265,7 +355,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   const exec: AgentExecution = {
     id: executionId,
     agentId: agentId || 'cleo-supervisor',
-  threadId: 'default',
+    threadId: 'default',
     userId: effectiveUserId,
     status: 'running',
     startTime: new Date(),
@@ -273,16 +363,16 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 },
     steps: []
   }
-  
+
   // Simple core execution (no delegation, direct response)
   setTimeout(() => {
-  exec.status = 'completed'
-  exec.endTime = new Date()
-  exec.result = 'Core orchestrator response (basic mode - no delegation)'
-  exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
+    exec.status = 'completed'
+    exec.endTime = new Date()
+    exec.result = 'Core orchestrator response (basic mode - no delegation)'
+    exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
     listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
   }, 1000)
-  
+
   execRegistry.push(exec)
   return exec
 }
