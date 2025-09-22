@@ -123,77 +123,27 @@ export function getAgentOrchestrator() {
         globalOrchestratorExists: !!(globalThis as any).__cleoOrchestrator
       })
       
-      // Try core orchestrator first (where delegation steps are stored)
+      // Try legacy orchestrator first (where delegation executions are stored)
       try {
         const legacyOrch = (globalThis as any).__cleoOrchestrator
-        const coreInstance = legacyOrch?.core // Access core directly
-        
-        console.log('🔍 [ENHANCED ADAPTER] Checking core orchestrator:', {
-          executionId,
-          legacyOrchExists: !!legacyOrch,
-          coreInstanceExists: !!coreInstance,
-          hasGetExecutionStatus: !!(coreInstance && typeof coreInstance.getExecutionStatus === 'function')
-        })
-        
-        if (coreInstance && typeof coreInstance.getExecutionStatus === 'function') {
-          const e = coreInstance.getExecutionStatus(executionId)
+        if (legacyOrch && typeof legacyOrch.getExecution === 'function') {
+          const e = legacyOrch.getExecution(executionId)
           
-          console.log('🔍 [ENHANCED ADAPTER] Core result:', {
+          console.log('🔍 [ENHANCED ADAPTER] Legacy result:', {
             executionId,
-            coreExecutionExists: !!e,
+            legacyExecutionExists: !!e,
             hasSteps: !!(e && e.steps && e.steps.length > 0),
-            coreStatus: e?.status
+            legacyStatus: e?.status,
+            hasMessages: !!(e && e.messages && e.messages.length > 0)
           })
           
-          // Always try to merge with legacy for messages, regardless of steps
           if (e) {
-            try {
-              const legacyE = legacyOrch.getExecution(executionId)
-              console.log('🟡 [ENHANCED ADAPTER] Merging core with legacy:', {
-                executionId,
-                coreHasSteps: !!(e.steps && e.steps.length > 0),
-                legacyExists: !!legacyE,
-                legacyMessagesCount: legacyE?.messages?.length || 0,
-                legacyStatus: legacyE?.status,
-                coreStatus: e.status
-              })
-              
-              if (legacyE && legacyE.messages && legacyE.messages.length > 0) {
-                const merged = {
-                  ...e,
-                  messages: legacyE.messages,
-                  status: legacyE.status || e.status
-                } as AgentExecution
-                
-                console.log('🟡 [ENHANCED ADAPTER] Returning merged execution:', {
-                  executionId,
-                  finalMessagesCount: merged.messages?.length || 0,
-                  finalStatus: merged.status
-                })
-                
-                return merged
-              }
-            } catch (mergeError) {
-              console.error('🟡 [ENHANCED ADAPTER] Merge failed:', mergeError)
-            }
-            
-            // If no legacy messages, return core as-is
-            console.log('🟡 [ENHANCED ADAPTER] No legacy messages, returning core execution')
             return e as AgentExecution
           }
         }
       } catch (err) {
-        console.error('Error getting execution from core:', err)
+        console.error('Error getting execution from legacy:', err)
       }
-      
-      // Try legacy as fallback
-      try {
-        const lorch = (globalThis as any).__cleoOrchestrator
-        if (lorch && typeof lorch.getExecution === 'function') {
-          const e = lorch.getExecution(executionId)
-          if (e) return e as AgentExecution
-        }
-      } catch {}
       
       // Fallback to adapter registry
       return execRegistry.find(e => e.id === executionId) || null
