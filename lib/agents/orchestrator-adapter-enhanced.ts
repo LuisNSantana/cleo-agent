@@ -245,18 +245,30 @@ function createAndRunExecutionWithContext(
 function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
   // Delegate to unified legacy orchestrator entrypoint for consistency
   try {
+    console.log('🔍 [ENHANCED ADAPTER] Attempting to get legacy orchestrator...')
     let legacy = (globalThis as any).__cleoOrchestrator
+    
     if (!legacy) {
+      console.log('🔍 [ENHANCED ADAPTER] No global orchestrator, trying to import...')
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const mod = require('@/lib/agents/agent-orchestrator')
+        console.log('🔍 [ENHANCED ADAPTER] Module imported, keys:', Object.keys(mod))
+        
         legacy = mod.getAgentOrchestrator ? mod.getAgentOrchestrator() : (mod.default?.getAgentOrchestrator ? mod.default.getAgentOrchestrator() : null)
+        console.log('🔍 [ENHANCED ADAPTER] Legacy orchestrator:', !!legacy, legacy ? Object.keys(legacy) : 'none')
       } catch (err) {
-        console.warn('[Enhanced Unified] Could not load legacy orchestrator', err)
+        console.error('❌ [ENHANCED ADAPTER] Could not load legacy orchestrator', err)
       }
+    } else {
+      console.log('🔍 [ENHANCED ADAPTER] Using global orchestrator, keys:', Object.keys(legacy))
     }
+    
     if (legacy && typeof legacy.startAgentExecutionWithHistory === 'function') {
+      console.log('🔍 [ENHANCED ADAPTER] Calling startAgentExecutionWithHistory with:', { input: input.slice(0, 50), agentId, priorLength: prior?.length || 0 })
       const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
+      console.log('🔍 [ENHANCED ADAPTER] Execution created:', { id: exec?.id, status: exec?.status, agentId: exec?.agentId })
+      
       // Ensure bootstrap step exists
       if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
         try {
@@ -269,12 +281,19 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
             progress: 0,
             metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId }
           })
-        } catch {}
+          console.log('🔍 [ENHANCED ADAPTER] Added bootstrap step to execution')
+        } catch (e) {
+          console.error('❌ [ENHANCED ADAPTER] Failed to add bootstrap step:', e)
+        }
       }
       return exec
+    } else {
+      console.error('❌ [ENHANCED ADAPTER] Legacy orchestrator not available or missing startAgentExecutionWithHistory method')
+      console.log('🔍 [ENHANCED ADAPTER] Legacy object:', legacy)
+      console.log('🔍 [ENHANCED ADAPTER] Has startAgentExecutionWithHistory?', legacy ? typeof legacy.startAgentExecutionWithHistory : 'no legacy')
     }
   } catch (e) {
-    console.warn('[Enhanced Unified] Fallback path engaged', e)
+    console.error('❌ [ENHANCED ADAPTER] Exception in orchestrator delegation:', e)
     // Best-effort structured log (synchronous) if logger available
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires

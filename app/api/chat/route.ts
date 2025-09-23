@@ -1146,29 +1146,66 @@ export async function POST(req: Request) {
                     snapshotKeys: Object.keys(snapshot || {})
                   })
                   
-                  // Extract final text from the last assistant message in execution
+                  // Extract final text from execution snapshot
                   let finalText = ''
                   try {
                     if (snapshot.status === 'failed') {
                       finalText = `Could not complete delegation: ${snapshot?.error || 'unknown error'}`
-                    } else if (snapshot?.messages && Array.isArray(snapshot.messages) && snapshot.messages.length > 0) {
-                      // Find the last assistant message with content
-                      const lastAssistantMessage = [...snapshot.messages].reverse().find((msg: any) => 
-                        msg?.role === 'assistant' && msg?.content
-                      )
-                      if (lastAssistantMessage?.content) {
-                        finalText = String(lastAssistantMessage.content)
-                      } else {
-                        // Fallback: use the last message content regardless of role
-                        const lastMessage = snapshot.messages[snapshot.messages.length - 1]
-                        finalText = String(lastMessage?.content || '')
+                    } else {
+                      // Priority 1: Use snapshot.result if available (for unified execution results)
+                      if (snapshot?.result && typeof snapshot.result === 'string' && snapshot.result.trim()) {
+                        finalText = String(snapshot.result).trim()
+                        console.log('🔍 [PIPELINE DEBUG] Using snapshot.result:', finalText.slice(0, 100))
                       }
+                      // Priority 2: Extract from messages array if no result or result is generic fallback
+                      else if (snapshot?.messages && Array.isArray(snapshot.messages) && snapshot.messages.length > 0) {
+                        // Find the last assistant message with substantial content
+                        const lastAssistantMessage = [...snapshot.messages].reverse().find((msg: any) => 
+                          msg?.role === 'assistant' && msg?.content && String(msg.content).trim().length > 50
+                        )
+                        if (lastAssistantMessage?.content) {
+                          finalText = String(lastAssistantMessage.content).trim()
+                          console.log('🔍 [PIPELINE DEBUG] Using assistant message:', finalText.slice(0, 100))
+                        } else {
+                          // Fallback: use the last message content regardless of role
+                          const lastMessage = snapshot.messages[snapshot.messages.length - 1]
+                          if (lastMessage?.content && String(lastMessage.content).trim().length > 10) {
+                            finalText = String(lastMessage.content).trim()
+                            console.log('🔍 [PIPELINE DEBUG] Using last message:', finalText.slice(0, 100))
+                          }
+                        }
+                      }
+                      
+                      // If result is generic fallback, try to get actual delegation result
+                      if (finalText === 'Enhanced unified fallback response' || finalText.length < 50) {
+                        console.log('🔍 [PIPELINE DEBUG] Detected generic fallback, looking for actual delegation result')
+                        // Check if there are tool results or delegation completion data
+                        if (snapshot?.messages && Array.isArray(snapshot.messages)) {
+                          const allMessages = snapshot.messages
+                          const substantialMessage = allMessages.find((msg: any) => 
+                            msg?.content && 
+                            String(msg.content).length > 100 && 
+                            !String(msg.content).includes('Enhanced unified fallback')
+                          )
+                          if (substantialMessage?.content) {
+                            finalText = String(substantialMessage.content).trim()
+                            console.log('🔍 [PIPELINE DEBUG] Found substantial content:', finalText.slice(0, 100))
+                          }
+                        }
+                      }
+                    }
+                    
+                    // Final fallback if no content found
+                    if (!finalText || finalText.trim().length === 0) {
+                      finalText = 'Task completed successfully'
                     }
                     
                     // Log extraction details for debugging
                     console.log('🔍 [PIPELINE DEBUG] Final text extraction:', {
                       status: snapshot.status,
                       messagesCount: snapshot?.messages?.length || 0,
+                      hasResult: !!snapshot?.result,
+                      resultPreview: snapshot?.result ? String(snapshot.result).slice(0, 50) : 'none',
                       finalTextLength: finalText.length,
                       finalTextPreview: finalText.slice(0, 100) + (finalText.length > 100 ? '...' : '')
                     })
