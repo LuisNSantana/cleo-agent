@@ -4,5 +4,10 @@
 export const confirmationStore = {
   subscribe: () => () => {},
   getState: () => ({ pendingAction: null }),
-  setState: () => {}
+  setState: () => {},
+  getSettings: () => ({
+    confirmationTimeout: 0,
+    autoConfirm: false,
+    requireConfirmation: true
+  })
 }
