@@ -17,13 +17,25 @@ export function getRequestContext(): RequestContext | undefined {
 }
 
 export function getCurrentUserId(): string | undefined {
-  return storage.getStore()?.userId || (globalThis as any).__currentUserId
+  const context = storage.getStore()
+  if (!context?.userId) {
+    console.warn('🚨 [SECURITY] getCurrentUserId called without proper request context')
+  }
+  return context?.userId
 }
 
 export function getCurrentModel(): string | undefined {
-  return storage.getStore()?.model || (globalThis as any).__currentModel
+  const context = storage.getStore()
+  if (!context?.model) {
+    console.warn('🚨 [SECURITY] getCurrentModel called without proper request context')
+  }
+  return context?.model
 }
 
 export function getCurrentRequestId(): string | undefined {
-  return storage.getStore()?.requestId || (globalThis as any).__requestId
+  const context = storage.getStore()
+  if (!context?.requestId) {
+    console.warn('🚨 [SECURITY] getCurrentRequestId called without proper request context')
+  }
+  return context?.requestId
 }

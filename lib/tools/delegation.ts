@@ -75,7 +75,7 @@ async function runDelegation(params: {
       ? 'high'
       : (priority || 'normal')
   const orchestrator = getAgentOrchestrator() as any
-  const userId = getCurrentUserId?.() || (globalThis as any).__currentUserId || '00000000-0000-0000-0000-000000000000'
+  const userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
 
   const input = [
     `Tarea: ${task}`,

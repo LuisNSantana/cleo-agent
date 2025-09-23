@@ -23,24 +23,22 @@ export default function InChatConfirmation({ onConfirmationChange }: InChatConfi
 
   // Poll for pending confirmations
   useEffect(() => {
-    const checkPending = async () => {
+    const fetchPendingConfirmations = async () => {
       try {
-        const response = await fetch('/api/pending-confirmations')
-        if (response.ok) {
-          const data = await response.json()
-          const confirmations = data.confirmations || []
-          setPendingConfirmations(confirmations)
-          onConfirmationChange?.(confirmations.length > 0)
-        }
+        // TODO: Replace with SSE event-driven updates from action snapshot system
+        // For now, return empty array since legacy endpoint is removed
+        console.warn('[InChatConfirmation] Legacy polling removed - should use SSE events')
+        setPendingConfirmations([])
       } catch (error) {
-        console.error('Error checking confirmations:', error)
+        console.error('Error fetching pending confirmations:', error)
+        setPendingConfirmations([])
       }
     }
 
-    checkPending()
-    const interval = setInterval(checkPending, 500) // Check every 500ms
+    fetchPendingConfirmations()
+    const interval = setInterval(fetchPendingConfirmations, 2000)
     return () => clearInterval(interval)
-  }, [onConfirmationChange])
+  }, [])
 
   const handleConfirmation = async (confirmationId: string, approved: boolean) => {
     setProcessing(confirmationId)

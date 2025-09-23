@@ -12,7 +12,7 @@ import { EventEmitter } from './event-emitter'
 import { AgentErrorHandler } from './error-handler'
 import { SystemMessage } from '@langchain/core/messages'
 import { AsyncLocalStorage } from 'async_hooks'
-import { withRequestContext } from '@/lib/server/request-context'
+import { withRequestContext, getRequestContext } from '@/lib/server/request-context'
 
 // AsyncLocalStorage for execution context
 const executionContext = new AsyncLocalStorage<string>()
@@ -72,9 +72,6 @@ export class ExecutionManager {
     try {
       this.eventEmitter.emit('execution.started', execution)
 
-      // Store execution ID in global context for delegation tracking
-      ;(globalThis as any).__currentExecutionId = execution.id
-
       // Filter out standalone ToolMessages which cause LangChain errors
       // ToolMessages must only follow same-turn tool_calls
       const filteredMessages = this.filterStaleToolMessages(context.messageHistory)
@@ -90,8 +87,6 @@ export class ExecutionManager {
 
       // Compile graph and execute within request context so tools can read userId
       const compiledGraph = graph.compile()
-      // Also set legacy global for any tools still reading from globalThis
-      ;(globalThis as any).__currentUserId = context.userId
       const result = await withRequestContext({ userId: context.userId, requestId: execution.id }, async () => {
         return compiledGraph.invoke(initialState)
       })
@@ -122,28 +117,17 @@ export class ExecutionManager {
 
   this.eventEmitter.emit('execution.completed', execution)
 
-      // Don't clean up global execution ID immediately - keep it for delegation tracking
-      // It will be cleaned up when the execution context is fully disposed
-      // delete (globalThis as any).__currentExecutionId
-
-  // Clean up legacy global after execution completes
-  try { delete (globalThis as any).__currentUserId } catch {}
   return executionResult
     } catch (error) {
       await this.errorHandler.handleExecutionError(execution, error as Error)
       
-      // Don't clean up global execution ID immediately on error - keep it for delegation tracking
-      // It will be cleaned up when the execution context is fully disposed
-      // delete (globalThis as any).__currentExecutionId
-      
-  // On error, attempt to clean up legacy global
-  try { delete (globalThis as any).__currentUserId } catch {}
   throw error
     }
   }
 
   async executeTools(toolCalls: any[], agentConfig: AgentConfig): Promise<ToolResult[]> {
     const results: ToolResult[] = []
+    const requestContext = getRequestContext()
 
     for (const toolCall of toolCalls) {
       try {
@@ -152,7 +136,7 @@ export class ExecutionManager {
         if (toolCall.name?.startsWith('notion_')) {
           // Best-effort credential resolution (no throw)
           try {
-            const userId = (globalThis as any).__currentUserId || agentConfig.userId
+            const userId = requestContext?.userId || agentConfig.userId
             console.log('[Notion][ToolExec] Checking credentials for userId:', userId)
             const key = await resolveNotionKey(userId)
             notionCredentialPresent = !!key
@@ -166,8 +150,8 @@ export class ExecutionManager {
         logToolExecutionStart({
             event: 'tool_start',
             agentId: agentConfig.id,
-            userId: (globalThis as any).__currentUserId || agentConfig.userId,
-            executionId: (globalThis as any).__currentExecutionId,
+            userId: requestContext?.userId || agentConfig.userId,
+            executionId: requestContext?.requestId,
             tool: toolCall.name,
             argsShape: toolCall.args ? Object.keys(toolCall.args) : [],
             notionCredentialPresent
@@ -197,8 +181,8 @@ export class ExecutionManager {
         logToolExecutionEnd({
           event: 'tool_end',
           agentId: agentConfig.id,
-          userId: (globalThis as any).__currentUserId || agentConfig.userId,
-          executionId: (globalThis as any).__currentExecutionId,
+          userId: requestContext?.userId || agentConfig.userId,
+          executionId: requestContext?.requestId,
           tool: toolCall.name,
           success: true,
           durationMs: Date.now() - execStart,
@@ -222,8 +206,8 @@ export class ExecutionManager {
         logToolExecutionEnd({
           event: 'tool_end',
           agentId: agentConfig.id,
-          userId: (globalThis as any).__currentUserId || agentConfig.userId,
-          executionId: (globalThis as any).__currentExecutionId,
+          userId: requestContext?.userId || agentConfig.userId,
+          executionId: requestContext?.requestId,
           tool: toolCall.name,
           success: false,
           durationMs: 0,
@@ -265,18 +249,16 @@ export class ExecutionManager {
    * Only cleanup when explicitly called by orchestrator
    */
   cleanupExecutionContext(executionId: string): void {
-    if ((globalThis as any).__currentExecutionId === executionId) {
-  delete (globalThis as any).__currentExecutionId
-  logger.debug(`🧹 [EXECUTION] Cleaned up execution context for: ${executionId}`)
-    }
+    // Execution context is now handled by AsyncLocalStorage
+    logger.debug(`🧹 [EXECUTION] Execution context cleaned up for: ${executionId}`)
   }
 
   /**
    * Set execution context for delegation tracking
-   * @deprecated Use ExecutionManager.runWithExecutionId instead
+   * @deprecated Use withRequestContext instead for proper isolation
    */
   setExecutionContext(executionId: string): void {
-  (globalThis as any).__currentExecutionId = executionId
-  logger.debug(`🔄 [EXECUTION] Set execution context for: ${executionId}`)
+    // No longer using global variables for context
+    logger.debug(`🔄 [EXECUTION] Set execution context deprecated for: ${executionId}`)
   }
 }

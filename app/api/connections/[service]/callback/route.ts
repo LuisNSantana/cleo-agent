@@ -88,7 +88,7 @@ export async function GET(
         console.log('Google token exchange successful, fetching user info...')
         // Get Google user info with token
         accountInfo = await getGoogleUserInfo(tokenData.access_token)
-        console.log('Google user info retrieved successfully for:', accountInfo.email)
+        console.log('Google user info retrieved successfully')
         break
       case "notion":
         tokenData = await exchangeNotionCode(code, baseUrl)

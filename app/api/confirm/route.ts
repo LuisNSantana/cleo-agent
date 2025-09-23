@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { resolveConfirmation } from '@/lib/confirmation/simple-blocking'
+import { resolveConfirmation } from '@/lib/confirmation/unified'
 
 export async function POST(request: Request) {
   try {

@@ -256,7 +256,7 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-    const { blockForConfirmation } = await import('../confirmation/simple-blocking')
+    const { requestConfirmation } = await import('../confirmation/unified')
     // Title refinement heuristics
     function refineTitle(raw: string, desc?: string): string {
       if (!raw) return 'Untitled Event'
@@ -279,7 +279,7 @@ export const createCalendarEventTool = tool({
       return trimmed
     }
     const refinedSummary = refineTitle(summary, description)
-    return blockForConfirmation(
+    return requestConfirmation(
       'createCalendarEvent',
       { summary: refinedSummary, originalSummary: summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
       async () => {

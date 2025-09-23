@@ -354,7 +354,7 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 			}),
 			execute: async ({ task, context, priority, requirements }) => {
 				const orchestrator = getAgentOrchestrator() as any
-				const userId = getCurrentUserId?.() || (globalThis as any).__currentUserId || '00000000-0000-0000-0000-000000000000'
+				const userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
 				const input = [
 					`Tarea: ${task}`,
 					context ? `Contexto: ${context}` : null,

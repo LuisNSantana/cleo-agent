@@ -269,9 +269,9 @@ export const sendGmailMessageTool = tool({
     references: z.string().optional(),
   }).refine((data) => !!data.text || !!data.html, { message: 'Either text or html body is required', path: ['text'] }),
   execute: async ({ to, subject = '(No subject)', text, html, cc, bcc, replyTo, threadId, inReplyTo, references }) => {
-    const { blockForConfirmation } = await import('../confirmation/simple-blocking')
+    const { requestConfirmation } = await import('../confirmation/unified')
     
-    return blockForConfirmation(
+    return requestConfirmation(
       'sendGmailMessage',
       { to, subject, text, html, cc, bcc, replyTo, threadId, inReplyTo, references },
       async () => {

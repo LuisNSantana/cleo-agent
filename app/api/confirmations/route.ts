@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPendingConfirmations, resolveConfirmation } from '@/lib/confirmation/simple-blocking'
+import { getPendingConfirmations, resolveConfirmation } from '@/lib/confirmation/unified'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {

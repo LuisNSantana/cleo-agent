@@ -20,18 +20,17 @@ export default function SimpleConfirmationDialog() {
   useEffect(() => {
     const checkPending = async () => {
       try {
-        const response = await fetch('/api/pending-confirmations')
-        if (response.ok) {
-          const data = await response.json()
-          setPendingConfirmations(data.confirmations || [])
-        }
+        // TODO: Replace with SSE event-driven updates from action snapshot system
+        // For now, return empty array since legacy endpoint is removed
+        console.warn('[SimpleConfirmationDialog] Legacy polling removed - should use SSE events')
+        setPendingConfirmations([])
       } catch (error) {
         console.error('Error checking confirmations:', error)
       }
     }
 
     checkPending()
-    const interval = setInterval(checkPending, 1000)
+    const interval = setInterval(checkPending, 5000) // Reduced frequency
     return () => clearInterval(interval)
   }, [])
 

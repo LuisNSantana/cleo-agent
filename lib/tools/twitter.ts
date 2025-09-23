@@ -7,7 +7,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getActiveTwitterCredentials, getSystemTwitterCredentials } from '@/lib/twitter/credentials'
-import { blockForConfirmation } from '@/lib/confirmation/simple-blocking'
+import { requestConfirmation } from '@/lib/confirmation/unified'
 import { redactInput } from '@/lib/actions/snapshot-store'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { createHmac } from 'crypto'
@@ -15,7 +15,7 @@ import { createHmac } from 'crypto'
 // Helper function to get Twitter credentials
 async function getTwitterCredentials() {
   try {
-    const userId = getCurrentUserId?.() || (globalThis as any).__currentUserId
+    const userId = getCurrentUserId?.()
     
     if (userId) {
       const result = await getActiveTwitterCredentials(userId)
@@ -99,7 +99,7 @@ export const postTweetTool = tool({
   }),
   execute: async ({ content, reply_to_id, quote_tweet_id }) => {
     // Wrap with confirmation (social action) to show enriched preview
-    return blockForConfirmation('postTweet', { content, reply_to_id, quote_tweet_id }, async () => {
+    return requestConfirmation('postTweet', { content, reply_to_id, quote_tweet_id }, async () => {
       try {
         const analysis = analyzeTweet(content)
         if (analysis.overLimit) {

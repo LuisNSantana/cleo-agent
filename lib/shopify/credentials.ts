@@ -193,7 +193,7 @@ export async function getDecryptedAccessToken(
     console.log('🔐 Debug - access_token format:', {
       token_length: tokenRaw.length,
       colon_count: (tokenRaw.match(/:/g) || []).length,
-      token_preview: tokenRaw.substring(0, 50) + '...'
+      has_token: tokenRaw.length > 0
     });
     
     const parts = tokenRaw.split(':');
