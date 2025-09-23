@@ -111,7 +111,11 @@ export function getAgentOrchestrator() {
       prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
       _forceSupervised?: boolean
     ) {
-      // Use the same execution logic; thread/user are read from request-context
+      // If userId is explicitly provided, use it in a new request context
+      if (_userId) {
+        return createAndRunExecutionWithContext(input, agentId, prior || [], _userId)
+      }
+      // Fallback to existing context
       return createAndRunExecution(input, agentId, prior || [])
     },
     // Execution getters - combine legacy and core
@@ -220,6 +224,21 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
       }
       default: return [new HumanMessage(String(m.content || ''))]
     }
+  })
+}
+
+function createAndRunExecutionWithContext(
+  input: string, 
+  agentId: string | undefined, 
+  prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+  userId: string
+): AgentExecution {
+  // Import request context utilities
+  const { withRequestContext } = require('@/lib/server/request-context')
+  
+  // Run execution within the specified user context
+  return withRequestContext({ userId, requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }, () => {
+    return createAndRunExecution(input, agentId, prior)
   })
 }
 

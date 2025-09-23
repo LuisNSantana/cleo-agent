@@ -145,8 +145,24 @@ export const listCalendarEventsTool = tool({
       if (!accessToken) return { success: false, message: 'Connect Google Calendar in Settings', events: [], total: 0 }
 
       const now = DateTime.now().setZone(timeZone)
-      const defaultMin = timeMin || now.toISO()
-      const defaultMax = timeMax || now.plus({ days: 7 }).toISO()
+      
+      // Ensure proper RFC3339 formatting with timezone
+      let defaultMin: string, defaultMax: string
+      if (timeMin) {
+        // Parse provided timeMin and ensure it has timezone info
+        const parsedMin = DateTime.fromISO(timeMin, { zone: timeZone })
+        defaultMin = (parsedMin.isValid ? parsedMin.toISO() : now.toISO()) || now.toISO()!
+      } else {
+        defaultMin = now.toISO() || now.toISO()!
+      }
+      
+      if (timeMax) {
+        // Parse provided timeMax and ensure it has timezone info
+        const parsedMax = DateTime.fromISO(timeMax, { zone: timeZone })
+        defaultMax = (parsedMax.isValid ? parsedMax.toISO() : now.plus({ days: 7 }).toISO()) || now.plus({ days: 7 }).toISO()!
+      } else {
+        defaultMax = now.plus({ days: 7 }).toISO() || now.plus({ days: 7 }).toISO()!
+      }
 
       // Auto-correct past years (for model issues)
       let finalMin: string | null = defaultMin
