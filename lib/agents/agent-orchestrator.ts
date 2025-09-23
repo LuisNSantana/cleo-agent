@@ -288,7 +288,18 @@ function createAndRunExecution(
 	logger.debug(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs}ms for agent ${target.id}`)
 	
 	// Add timeout wrapper to prevent hanging
-	const executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs })
+	// Ensure ALS request context is preserved for downstream tools (calendar, drive, etc.)
+	let executionPromise: Promise<any>
+	try {
+		// Lazy require to avoid client bundle impact
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		const { withRequestContext } = require('@/lib/server/request-context')
+		executionPromise = withRequestContext({ userId: exec.userId, requestId: exec.id }, () => core.executeAgent(target, ctx, { timeout: timeoutMs }))
+		logger.debug('🔐 [LEGACY DEBUG] Wrapped core.executeAgent with request context', { executionId: exec.id, userId: exec.userId })
+	} catch (ctxWrapErr) {
+		logger.warn('⚠️ [LEGACY DEBUG] Failed to wrap with request context, executing directly', { error: ctxWrapErr instanceof Error ? ctxWrapErr.message : String(ctxWrapErr) })
+		executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs })
+	}
 	const timeoutPromise = new Promise((_, reject) => {
 		setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
 	})

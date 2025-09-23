@@ -9,6 +9,7 @@ import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
 // Import legacy orchestrator as backup for complex delegation logic
+// IMPORTANT: Avoid early static import side-effects if bundler tree-shakes; we'll dynamic-load safely
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
 
 // Simple core components for optimized execution
@@ -243,33 +244,45 @@ function createAndRunExecutionWithContext(
 }
 
 function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
-  // Delegate to unified legacy orchestrator entrypoint for consistency
-  try {
-    console.log('🔍 [ENHANCED ADAPTER] Attempting to get legacy orchestrator...')
+  const attemptLegacy = (): any => {
+    // Priority 1: existing global (already initialized)
     let legacy = (globalThis as any).__cleoOrchestrator
-    
-    if (!legacy) {
-      console.log('🔍 [ENHANCED ADAPTER] No global orchestrator, trying to import...')
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const mod = require('@/lib/agents/agent-orchestrator')
-        console.log('🔍 [ENHANCED ADAPTER] Module imported, keys:', Object.keys(mod))
-        
-        legacy = mod.getAgentOrchestrator ? mod.getAgentOrchestrator() : (mod.default?.getAgentOrchestrator ? mod.default.getAgentOrchestrator() : null)
-        console.log('🔍 [ENHANCED ADAPTER] Legacy orchestrator:', !!legacy, legacy ? Object.keys(legacy) : 'none')
-      } catch (err) {
-        console.error('❌ [ENHANCED ADAPTER] Could not load legacy orchestrator', err)
-      }
-    } else {
-      console.log('🔍 [ENHANCED ADAPTER] Using global orchestrator, keys:', Object.keys(legacy))
+    if (legacy) return legacy
+    try {
+      // Direct call ensures initialization (getAgentOrchestrator sets global)
+      legacy = getLegacyOrchestrator()
+      console.log('🔍 [ENHANCED ADAPTER] Legacy orchestrator initialized via direct call', {
+        hasStartWithHistory: typeof legacy.startAgentExecutionWithHistory,
+        keys: Object.keys(legacy || {})
+      })
+      return legacy
+    } catch (err) {
+      console.error('❌ [ENHANCED ADAPTER] Direct legacy initialization failed', err)
     }
-    
+    return null
+  }
+
+  try {
+    console.log('🔍 [ENHANCED ADAPTER] Delegation entrypoint invoked')
+    let legacy = attemptLegacy()
+
+    // Background non-blocking quick retries (upgrade path) if method missing
+    if (!legacy || typeof legacy.startAgentExecutionWithHistory !== 'function') {
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const late = attemptLegacy()
+          if (late && typeof late.startAgentExecutionWithHistory === 'function' && !legacy) {
+            console.log('🔍 [ENHANCED ADAPTER] Late legacy orchestrator availability detected (upgrade will not retro-run current exec)')
+            legacy = late
+          }
+        }, 50 * (i + 1))
+      }
+    }
+
     if (legacy && typeof legacy.startAgentExecutionWithHistory === 'function') {
-      console.log('🔍 [ENHANCED ADAPTER] Calling startAgentExecutionWithHistory with:', { input: input.slice(0, 50), agentId, priorLength: prior?.length || 0 })
+      console.log('🔍 [ENHANCED ADAPTER] startAgentExecutionWithHistory OK', { priorLen: prior?.length || 0, agentId })
       const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
-      console.log('🔍 [ENHANCED ADAPTER] Execution created:', { id: exec?.id, status: exec?.status, agentId: exec?.agentId })
-      
-      // Ensure bootstrap step exists
+
       if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
         try {
           exec.steps.push({
@@ -281,20 +294,15 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
             progress: 0,
             metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId }
           })
-          console.log('🔍 [ENHANCED ADAPTER] Added bootstrap step to execution')
         } catch (e) {
-          console.error('❌ [ENHANCED ADAPTER] Failed to add bootstrap step:', e)
+          console.warn('⚠️ [ENHANCED ADAPTER] Failed to add bootstrap step', e)
         }
       }
       return exec
-    } else {
-      console.error('❌ [ENHANCED ADAPTER] Legacy orchestrator not available or missing startAgentExecutionWithHistory method')
-      console.log('🔍 [ENHANCED ADAPTER] Legacy object:', legacy)
-      console.log('🔍 [ENHANCED ADAPTER] Has startAgentExecutionWithHistory?', legacy ? typeof legacy.startAgentExecutionWithHistory : 'no legacy')
     }
+    console.error('❌ [ENHANCED ADAPTER] Legacy orchestrator missing startAgentExecutionWithHistory after retries')
   } catch (e) {
-    console.error('❌ [ENHANCED ADAPTER] Exception in orchestrator delegation:', e)
-    // Best-effort structured log (synchronous) if logger available
+    console.error('❌ [ENHANCED ADAPTER] Exception in orchestrator delegation', e)
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { emitExecutionEvent } = require('@/lib/agents/logging-events')
@@ -309,7 +317,8 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       })
     } catch {}
   }
-  // Minimal fallback (rare)
+
+  // Controlled fallback
   const exec: AgentExecution = {
     id: `exec_${Date.now()}_${Math.random().toString(36).slice(2,9)}`,
     agentId: agentId || 'cleo-supervisor',
@@ -318,9 +327,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     status: 'running',
     startTime: new Date(),
     messages: [],
-    steps: [
-      { id: `step_${Date.now()}_bootstrap`, timestamp: new Date(), agent: agentId || 'cleo-supervisor', action: 'routing', content: 'Enhanced fallback unified execution started', progress: 0, metadata: { unified_entrypoint: true, fallback: true } }
-    ],
+    steps: [ { id: `step_${Date.now()}_bootstrap`, timestamp: new Date(), agent: agentId || 'cleo-supervisor', action: 'routing', content: 'Enhanced fallback unified execution started', progress: 0, metadata: { unified_entrypoint: true, fallback: true } } ],
     metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 }
   }
   execRegistry.push(exec)
@@ -329,7 +336,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     exec.endTime = new Date()
     exec.result = 'Enhanced unified fallback response'
     exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result), timestamp: new Date() })
-  }, 300)
+  }, 150)
   return exec
 }
 
