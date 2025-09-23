@@ -4,6 +4,7 @@
  */
 
 import { getAgentByIdForUser, getAllAgentsForUser } from './unified-service'
+import { getCurrentUserId } from '@/lib/server/request-context'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 import type { UnifiedAgent } from './unified-types'
@@ -36,8 +37,14 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
   try {
     // Use NIL UUID to avoid non-UUID propagation; DB fetch later guarded by UUID check
     if (!userId) {
-      console.warn('🔍 No userId provided for getAgentById, using NIL UUID')
-      userId = '00000000-0000-0000-0000-000000000000'
+      const recovered = getCurrentUserId()
+      if (recovered) {
+        console.warn('🔁 [unified-config-server] Recovered userId from request context for getAgentById', recovered)
+        userId = recovered
+      } else {
+        console.warn('🔍 No userId provided for getAgentById, using NIL UUID')
+        userId = '00000000-0000-0000-0000-000000000000'
+      }
     }
 
     console.log('🔍 Looking for agent:', id, 'for user:', userId)
@@ -73,8 +80,14 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
 export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
   try {
     if (!userId) {
-      console.warn('🔍 No userId provided for getAllAgents, using NIL UUID')
-      userId = '00000000-0000-0000-0000-000000000000'
+      const recovered = getCurrentUserId()
+      if (recovered) {
+        console.warn('� [unified-config-server] Recovered userId from request context for getAllAgents', recovered)
+        userId = recovered
+      } else {
+        console.warn('�🔍 No userId provided for getAllAgents, using NIL UUID')
+        userId = '00000000-0000-0000-0000-000000000000'
+      }
     }
 
     console.log('🔍 Getting all agents for user:', userId)

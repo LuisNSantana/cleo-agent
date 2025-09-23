@@ -19,6 +19,7 @@ import {
 } from "./api"
 import { createErrorResponse } from "./utils"
 import { ChatRequest, ChatRequestSchema } from "./schema"
+import { randomUUID } from 'crypto'
 import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
 import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
 import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
@@ -961,8 +962,11 @@ export async function POST(req: Request) {
 
   // Orchestrator-backed Cleo-supervised mode for global chat
     if (orchestratorBacked) {
-      try {
-        const orchestrator = getAgentOrchestrator() as any
+      const requestId = randomUUID()
+      return await withRequestContext({ userId: realUserId, model: normalizedModel, requestId }, async () => {
+        try {
+          console.log('[ChatAPI] 🔐 Request context established', { userId: realUserId, requestId })
+          const orchestrator = getAgentOrchestrator() as any
         const lastMsg = messages[messages.length - 1]
         const userText = Array.isArray((lastMsg as any)?.parts)
           ? ((lastMsg as any).parts.find((p: any) => p.type === 'text')?.text || '')
@@ -1253,10 +1257,11 @@ export async function POST(req: Request) {
             'Connection': 'keep-alive'
           }
         })
-      } catch (e) {
-        console.error('[ChatAPI] Orchestrator-backed path failed:', e)
-        // Fallback to normal streaming
-      }
+        } catch (e) {
+          console.error('[ChatAPI] Orchestrator-backed path failed (context active):', e)
+          // Fallback to normal streaming outside context
+        }
+      })
     }
 
     // Prepare additional parameters for reasoning models
