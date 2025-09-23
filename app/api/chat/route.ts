@@ -1136,10 +1136,46 @@ export async function POST(req: Request) {
 
                 // Handle completion
                 if (snapshot.status === 'completed' || snapshot.status === 'failed') {
-                  const finalText = String(
-                    snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content ||
-                    (snapshot.status === 'failed' ? `Could not complete delegation: ${snapshot?.error || 'unknown error'}` : '')
-                  )
+                  // Debug: Log the full snapshot structure
+                  console.log('🔍 [PIPELINE DEBUG] Execution snapshot:', {
+                    status: snapshot.status,
+                    hasMessages: !!snapshot?.messages,
+                    messagesLength: snapshot?.messages?.length || 0,
+                    hasResult: !!snapshot?.result,
+                    hasError: !!snapshot?.error,
+                    snapshotKeys: Object.keys(snapshot || {})
+                  })
+                  
+                  // Extract final text from the last assistant message in execution
+                  let finalText = ''
+                  try {
+                    if (snapshot.status === 'failed') {
+                      finalText = `Could not complete delegation: ${snapshot?.error || 'unknown error'}`
+                    } else if (snapshot?.messages && Array.isArray(snapshot.messages) && snapshot.messages.length > 0) {
+                      // Find the last assistant message with content
+                      const lastAssistantMessage = [...snapshot.messages].reverse().find((msg: any) => 
+                        msg?.role === 'assistant' && msg?.content
+                      )
+                      if (lastAssistantMessage?.content) {
+                        finalText = String(lastAssistantMessage.content)
+                      } else {
+                        // Fallback: use the last message content regardless of role
+                        const lastMessage = snapshot.messages[snapshot.messages.length - 1]
+                        finalText = String(lastMessage?.content || '')
+                      }
+                    }
+                    
+                    // Log extraction details for debugging
+                    console.log('🔍 [PIPELINE DEBUG] Final text extraction:', {
+                      status: snapshot.status,
+                      messagesCount: snapshot?.messages?.length || 0,
+                      finalTextLength: finalText.length,
+                      finalTextPreview: finalText.slice(0, 100) + (finalText.length > 100 ? '...' : '')
+                    })
+                  } catch (err) {
+                    console.error('❌ [PIPELINE DEBUG] Final text extraction failed:', err)
+                    finalText = 'Response processing completed'
+                  }
 
                   // Generate Cleo supervision step before final completion
                   const supervisionStep = {
