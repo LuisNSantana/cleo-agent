@@ -37,3 +37,36 @@ export const SAFE_AUTO_TOOLS = [
   'searchWeb',
   'readFile'
 ]
+
+// Tool execution settings types
+export type ToolExecutionMode = 'manual' | 'auto' | 'smart'
+export type ActionSensitivity = 'low' | 'medium' | 'high' | 'critical'
+
+export interface ToolExecutionSettings {
+  mode: ToolExecutionMode
+  confirmationTimeout: number
+  autoConfirm: boolean
+  requireConfirmation: boolean
+  enableSmartMode: boolean
+  enableNotifications: boolean
+  silentMode: boolean
+  categorySettings: Record<string, ActionSensitivity>
+}
+
+export const DEFAULT_TOOL_SETTINGS: ToolExecutionSettings = {
+  mode: 'smart',
+  confirmationTimeout: 30,
+  autoConfirm: false,
+  requireConfirmation: true,
+  enableSmartMode: true,
+  enableNotifications: true,
+  silentMode: false,
+  categorySettings: {
+    emailActions: 'high',
+    calendarActions: 'medium',
+    socialActions: 'high',
+    fileActions: 'medium',
+    dataModification: 'high',
+    financeActions: 'critical'
+  }
+}
