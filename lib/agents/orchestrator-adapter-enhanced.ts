@@ -243,221 +243,55 @@ function createAndRunExecutionWithContext(
 }
 
 function createAndRunExecution(input: string, agentId: string | undefined, prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): AgentExecution {
-  // Filter ToolMessages to prevent LangChain errors before delegating
-  const filteredPrior = prior ? (prior || []).filter(m => m.role !== 'tool').concat(
-    (prior || []).filter(m => m.role === 'tool').map(m => ({
-      role: 'system' as const,
-      content: `[tool:${m?.metadata?.name || m?.metadata?.tool_name || 'unknown'}] ${String(m.content).slice(0, 400)}`,
-      metadata: m.metadata
-    }))
-  ) : []
-  
-  // For full delegation functionality, use legacy orchestrator
-  let legacyOrch = (globalThis as any).__cleoOrchestrator
-  if (!legacyOrch) {
-    try {
-      legacyOrch = getLegacyOrchestrator()
-      console.log('[Enhanced Adapter] Initialized legacy orchestrator for delegation')
-    } catch (e) {
-      console.warn('[Enhanced Adapter] Failed to initialize legacy orchestrator, using basic core:', e)
+  // Delegate to unified legacy orchestrator entrypoint for consistency
+  try {
+    let legacy = (globalThis as any).__cleoOrchestrator
+    if (!legacy) {
+      const mod = require('@/lib/agents/agent-orchestrator')
+      legacy = mod.getAgentOrchestrator()
     }
-  }
-  
-  if (legacyOrch) {
-    let exec: AgentExecution | null = null
-    if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
-      exec = legacyOrch.startAgentExecutionWithHistory(input, agentId, filteredPrior)
-    } else if (typeof legacyOrch.startAgentExecution === 'function') {
-      exec = legacyOrch.startAgentExecution(input, agentId)
-    }
-    if (exec) {
-      // Ensure steps array exists and push initial synthetic step for UI polling consistency
-      try {
-        exec.steps = exec.steps || []
-        exec.steps.push({
-          id: `step_${Date.now()}_start`,
-          timestamp: new Date(),
-          agent: exec.agentId,
-          action: 'routing',
-          content: `Execution started (enhanced adapter) for ${exec.agentId}`,
-          progress: 0,
-          metadata: {
-            started: true,
-            delegation_entry: prior?.some(m => /delegate_to_/i.test(m.content)) ? 'delegation_chain' : 'direct',
-            context_user_id: exec.userId,
-            execution_mode: 'enhanced-adapter',
-            adapter: 'enhanced'
-          }
-        })
-      } catch {}
-      const attachOptions = (target: AgentExecution, attempt: number) => {
-        if (!target.options) target.options = {}
-        const opt = target.options as any // extend dynamically
-        const envDefault = parseInt(process.env.AGENT_DEFAULT_TIMEOUT_MS || '', 10)
-        const fromEnv = !isNaN(envDefault) ? envDefault : undefined
-        const agentCfg = (coreOrchestrator.getAgentConfigs().get(target.agentId)) as any
-        const agentTimeout = agentCfg?.options?.timeouts?.default || agentCfg?.timeouts?.default
-        const longRunningToolsPatterns = [/calendar/i, /schedule/i, /meeting/i, /event/i]
-        const possibleTools: string[] = Array.isArray(agentCfg?.tools) ? agentCfg.tools : []
-        const hasLongRunningTool = possibleTools.some(t => longRunningToolsPatterns.some(r => r.test(t)))
-        const bucket = hasLongRunningTool ? 90000 : 60000
-        let resolved = opt.timeoutMs || agentTimeout || fromEnv || bucket
-        const MAX_CAP = 300000
-        if (resolved > MAX_CAP) resolved = MAX_CAP
-        if (resolved < 10000) resolved = 10000
-        opt.timeoutMs = resolved
-        opt.__enhancedAttempt = attempt
-      }
-
-      const ensureRegistry = (target: AgentExecution) => {
-        if (!execRegistry.find(e => e.id === target.id)) execRegistry.push(target)
-      }
-
-      const scheduleGuards = (target: AgentExecution) => {
-  attachOptions(target, ((target.options as any)?.__enhancedAttempt as number) || 1)
-        ensureRegistry(target)
-  const timeoutMs = (target.options as any)!.timeoutMs as number
-        const startTs = Date.now()
-        ;(target as any).originalStartTime = (target as any).originalStartTime || target.startTime
-        let warned = false
-        let activityCount = 0
-        let lastActivityTs = Date.now()
-        const recordActivity = () => { lastActivityTs = Date.now(); activityCount++ }
-
-        // Hook to detect external mutations (poll every 5s)
-        const pollInterval = setInterval(() => {
-          if (target.status !== 'running') {
-            clearInterval(pollInterval)
-            clearTimeout(timeoutHandle)
-            return
-          }
-          // Detect new messages or steps growth as activity
-          if ((target.messages && target.messages.length > activityCount) || (target.steps && target.steps.length > 0)) {
-            recordActivity()
-            try {
-              listeners.forEach(fn => fn({ type: 'execution_activity', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, messages: target.messages.length, steps: target.steps?.length || 0 } }))
-            } catch {}
-          }
-          const elapsed = Date.now() - startTs
-          // Update metrics
-          try {
-            target.metrics.executionTimeMs = elapsed
-            target.metrics.executionTime = Math.round(elapsed / 1000)
-          } catch {}
-          // Warning at 80%
-            if (!warned && elapsed >= timeoutMs * 0.8) {
-              warned = true
-              target.messages.push({ id: `${target.id}_timeout_warn`, type: 'system', content: `Aviso: la ejecución se aproxima al límite de tiempo (${Math.round(timeoutMs/1000)}s).`, timestamp: new Date() })
-              listeners.forEach(fn => fn({ type: 'execution_timeout_warning', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, timeoutMs } }))
-            }
-          // Idle progress event cada 15s sin actividad
-          if (Date.now() - lastActivityTs >= 15000) {
-            listeners.forEach(fn => fn({ type: 'execution_progress', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, idle: true, elapsedMs: elapsed } }))
-            lastActivityTs = Date.now()
-          }
-        }, 5000)
-
-        const timeoutHandle = setTimeout(() => {
-          if (target.status === 'running') {
-            // Timeout
-            const attempt = ((target.options as any)?.__enhancedAttempt as number) || 1
-            if (!target.messages) target.messages = []
-            target.status = 'failed'
-            target.endTime = new Date()
-            target.error = 'timeout'
-            target.result = 'Execution timed out (legacy orchestrator no respondió a tiempo)'
-            target.messages.push({ id: `${target.id}_timeout_final`, type: 'system', content: String(target.result), timestamp: new Date() })
-            listeners.forEach(fn => fn({ type: 'execution_failed', agentId: target.agentId, timestamp: new Date(), data: { executionId: target.id, error: 'timeout', attempt } }))
-            clearInterval(pollInterval)
-
-            // Reintento automático si attempt == 1 y no hubo pasos ni mensajes AI
-            const hasAIMessage = (target.messages || []).some(m => m.type === 'ai')
-            const hasSteps = Array.isArray(target.steps) && target.steps.length > 0
-            if (attempt === 1 && !hasAIMessage && !hasSteps) {
-              const retryExec = restartExecution(target, 2)
-              listeners.forEach(fn => fn({ type: 'execution_retry', agentId: retryExec.agentId, timestamp: new Date(), data: { executionId: retryExec.id, previousExecutionId: target.id, attempt: 2 } }))
-            }
-          }
-        }, timeoutMs)
-      }
-
-      const restartExecution = (prev: AgentExecution, attempt: number): AgentExecution => {
-        // Lanzar un nuevo intento usando legacy orchestrator de nuevo
-        let newExec: AgentExecution | null = null
+    if (legacy && typeof legacy.startAgentExecutionWithHistory === 'function') {
+      const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
+      // Ensure bootstrap step exists
+      if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
         try {
-          if (typeof legacyOrch.startAgentExecutionWithHistory === 'function') {
-            // Pasamos histórico filtrado (prev.input puede existir)
-            newExec = legacyOrch.startAgentExecutionWithHistory(prev.input || input, agentId, filteredPrior)
-          } else if (typeof legacyOrch.startAgentExecution === 'function') {
-            newExec = legacyOrch.startAgentExecution(prev.input || input, agentId)
-          }
-        } catch (e) {
-          prev.messages.push({ id: `${prev.id}_retry_failed_immediate`, type: 'system', content: 'Reintento falló al iniciar: ' + (e as Error).message, timestamp: new Date() })
-          return prev
-        }
-        if (!newExec) return prev
-        newExec.metrics = newExec.metrics || prev.metrics
-        newExec.metrics.retryCount = (prev.metrics.retryCount || 0) + 1
-        newExec.messages = newExec.messages || []
-        newExec.messages.push({ id: `${newExec.id}_retry_notice`, type: 'system', content: 'Retrying execution after timeout (attempt ' + attempt + '/2)', timestamp: new Date() })
-  attachOptions(newExec, attempt)
-        ensureRegistry(newExec)
-        scheduleGuards(newExec)
-        return newExec
+          exec.steps.push({
+            id: `step_${Date.now()}_bootstrap`,
+            timestamp: new Date(),
+            agent: exec.agentId,
+            action: 'routing',
+            content: `Execution bootstrap (enhanced unified) for ${exec.agentId}`,
+            progress: 0,
+            metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId }
+          })
+        } catch {}
       }
-
-      // Inicialización del primer intento
-      exec.input = input
-      exec.metrics = exec.metrics || { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 }
-      attachOptions(exec, 1)
-      scheduleGuards(exec)
       return exec
     }
+  } catch (e) {
+    console.warn('[Enhanced Unified] Fallback path engaged', e)
   }
-  
-  // Fallback: simple core execution (without delegation)
-  const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-  const NIL_UUID = '00000000-0000-0000-0000-000000000000'
-  const ctxUser = getCurrentUserId()
-  const effectiveUserId = ctxUser || NIL_UUID
+  // Minimal fallback (rare)
   const exec: AgentExecution = {
-    id: executionId,
+    id: `exec_${Date.now()}_${Math.random().toString(36).slice(2,9)}`,
     agentId: agentId || 'cleo-supervisor',
-  threadId: 'default',
-    userId: effectiveUserId,
+    threadId: 'default',
+    userId: getCurrentUserId() || '00000000-0000-0000-0000-000000000000',
     status: 'running',
     startTime: new Date(),
     messages: [],
-    metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 },
-    steps: []
+    steps: [
+      { id: `step_${Date.now()}_bootstrap`, timestamp: new Date(), agent: agentId || 'cleo-supervisor', action: 'routing', content: 'Enhanced fallback unified execution started', progress: 0, metadata: { unified_entrypoint: true, fallback: true } }
+    ],
+    metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 }
   }
-  try {
-    exec.steps!.push({
-      id: `step_${Date.now()}_start`,
-      timestamp: new Date(),
-      agent: exec.agentId,
-      action: 'routing',
-      content: `Execution started (fallback core) for ${exec.agentId}`,
-      progress: 0,
-      metadata: {
-        started: true,
-        delegation_entry: prior?.some(m => /delegate_to_/i.test(m.content)) ? 'delegation_chain' : 'direct',
-        context_user_id: exec.userId,
-        execution_mode: 'enhanced-adapter-fallback'
-      }
-    })
-  } catch {}
-  
-  // Simple core execution (no delegation, direct response)
-  setTimeout(() => {
-  exec.status = 'completed'
-  exec.endTime = new Date()
-  exec.result = 'Core orchestrator response (basic mode - no delegation)'
-  exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result || ''), timestamp: new Date() })
-    listeners.forEach(fn => fn({ type: 'execution_completed', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id } }))
-  }, 1000)
-  
   execRegistry.push(exec)
+  setTimeout(() => {
+    exec.status = 'completed'
+    exec.endTime = new Date()
+    exec.result = 'Enhanced unified fallback response'
+    exec.messages.push({ id: `${exec.id}_final`, type: 'ai', content: String(exec.result), timestamp: new Date() })
+  }, 300)
   return exec
 }
 

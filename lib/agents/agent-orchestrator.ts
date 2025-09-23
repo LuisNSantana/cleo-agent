@@ -10,6 +10,25 @@ import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { ALL_PREDEFINED_AGENTS } from '@/lib/agents/predefined'
 import logger from '@/lib/utils/logger'
+import { safeSetState } from '@/lib/agents/execution-state'
+import { emitExecutionEvent } from '@/lib/agents/logging-events'
+
+// Helper to emit structured state change events for legacy execution objects
+function emitStateChangeEvent(execution: AgentExecution, prev: string, next: string) {
+	try {
+		emitExecutionEvent({
+			trace_id: execution.id,
+			execution_id: execution.id,
+			agent_id: execution.agentId,
+			user_id: execution.userId,
+			thread_id: execution.threadId,
+			state: next,
+			event: 'state.change',
+			level: 'debug',
+			data: { prev, next, source: 'legacy-orchestrator' }
+		})
+	} catch {}
+}
 
 // ----------------------------------------------------------------------------
 // Global singletons/state (survives route reloads)
@@ -143,6 +162,18 @@ function createAndRunExecution(
 			}
 			toolCallsUsed.push(toolCall)
 
+			emitExecutionEvent({
+				trace_id: exec.id,
+				execution_id: exec.id,
+				agent_id: exec.agentId,
+				user_id: exec.userId,
+				thread_id: exec.threadId,
+				state: exec.status,
+				event: 'tool.start',
+				level: 'debug',
+				data: { toolName: event.toolName, callId: toolCall.id }
+			})
+
 		// ------------------------------------------------------------------
 		// Initial synthetic step to ensure hasSteps=true for UI polling logic
 		// Prevents infinite polling states where no steps were ever appended.
@@ -167,6 +198,19 @@ function createAndRunExecution(
 				agentId: exec.agentId,
 				context_user_id: exec.userId
 			})
+			
+			// structured event for initial step
+			emitExecutionEvent({
+				trace_id: exec.id,
+				execution_id: exec.id,
+				agent_id: exec.agentId,
+				user_id: exec.userId,
+				thread_id: exec.threadId,
+				state: exec.status,
+				event: 'step.append',
+				level: 'debug',
+				data: { stepId: exec.steps![exec.steps!.length-1].id, action: 'routing' }
+			})
 		} catch (e) {
 			logger.warn('⚠️ Failed to push initial start step', { executionId: exec.id, error: e instanceof Error ? e.message : e })
 		}
@@ -182,6 +226,18 @@ function createAndRunExecution(
 				toolCall.result = event.result
 				toolCall.error = event.error
 			}
+			
+			emitExecutionEvent({
+				trace_id: exec.id,
+				execution_id: exec.id,
+				agent_id: exec.agentId,
+				user_id: exec.userId,
+				thread_id: exec.threadId,
+				state: exec.status,
+				event: 'tool.end',
+				level: toolCall?.error ? 'warn' : 'debug',
+				data: { toolName: event.toolName, callId: toolCall?.id, error: event.error }
+			})
 		}
 	}
 	
@@ -247,7 +303,9 @@ function createAndRunExecution(
 			resultMetadata: (res as any)?.metadata || {}
 		})
 		
-		exec.status = 'completed'
+		const prevStateBeforeComplete = (exec as any).status
+		safeSetState(exec as any, 'completed', logger as any)
+		if (prevStateBeforeComplete !== (exec as any).status) emitStateChangeEvent(exec, prevStateBeforeComplete, (exec as any).status)
 		exec.endTime = new Date()
 		const content = (res && (res as any).content) || ''
 		exec.messages = exec.messages || []
@@ -337,6 +395,19 @@ function createAndRunExecution(
 			// Update metrics with tool call count from all messages
 			exec.metrics.toolCallsCount = exec.messages.reduce((count, msg) => count + (msg.toolCalls?.length || 0), 0)
 			
+			// structured log success completion
+			emitExecutionEvent({
+				trace_id: exec.id,
+				execution_id: exec.id,
+				agent_id: exec.agentId,
+				user_id: exec.userId,
+				thread_id: exec.threadId,
+				state: exec.status,
+				event: 'execution.complete',
+				level: 'info',
+				data: { messages: exec.messages.length, toolCalls: exec.metrics.toolCallsCount }
+			})
+			
 			// Clean up listeners
 			core.off?.('tool.executing', toolExecutingListener)
 			core.off?.('tool.completed', toolCompletedListener)
@@ -354,7 +425,9 @@ function createAndRunExecution(
 		if (err.message.includes('timeout')) {
 			// Check if we have any tool calls captured during execution
 			if (toolCallsUsed.length > 0) {
-				exec.status = 'completed' // Mark as completed since we have partial results
+				const prevStatePartial = (exec as any).status
+				safeSetState(exec as any, 'completed', logger as any) // Mark as completed since we have partial results
+				if (prevStatePartial !== (exec as any).status) emitStateChangeEvent(exec, prevStatePartial, (exec as any).status)
 				exec.endTime = new Date()
 				exec.messages = exec.messages || []
 				
@@ -382,6 +455,19 @@ function createAndRunExecution(
 					core.off?.('tool.executing', toolExecutingListener)
 					core.off?.('tool.completed', toolCompletedListener)
 					
+					// structured log partial completion (timeout path)
+					emitExecutionEvent({
+						trace_id: exec.id,
+						execution_id: exec.id,
+						agent_id: exec.agentId,
+						user_id: exec.userId,
+						thread_id: exec.threadId,
+						state: exec.status,
+						event: 'execution.complete.partial',
+						level: 'warn',
+						data: { toolCalls: toolCallsUsed.length, timeoutPartial: true }
+					})
+					
 					return // Exit early since we handled the timeout gracefully
 				} catch (partialError) {
 					logger.error('🔍 [DEBUG] Error saving partial results:', partialError)
@@ -390,7 +476,9 @@ function createAndRunExecution(
 		}
 		
 		// Default error handling for non-timeout errors or when partial results failed
-		exec.status = 'failed'
+		const prevStateFailed = (exec as any).status
+		safeSetState(exec as any, 'failed', logger as any)
+		if (prevStateFailed !== (exec as any).status) emitStateChangeEvent(exec, prevStateFailed, (exec as any).status)
 		exec.endTime = new Date()
 		exec.error = err instanceof Error ? err.message : String(err)
 		
@@ -399,6 +487,31 @@ function createAndRunExecution(
 		core.off?.('tool.completed', toolCompletedListener)
 		
 		listeners.forEach(fn => fn({ type: 'error', agentId: exec.agentId, timestamp: new Date(), data: { executionId: exec.id, error: exec.error } }))
+		
+		emitExecutionEvent({
+			trace_id: exec.id,
+			execution_id: exec.id,
+			agent_id: exec.agentId,
+			user_id: exec.userId,
+			thread_id: exec.threadId,
+			state: exec.status,
+			event: 'execution.error',
+			level: 'error',
+			data: { error: exec.error }
+		})
+	})
+
+	// Structured log: execution.start
+	emitExecutionEvent({
+		trace_id: exec.id,
+		execution_id: exec.id,
+		agent_id: exec.agentId,
+		user_id: exec.userId,
+		thread_id: exec.threadId,
+		state: exec.status,
+		event: 'execution.start',
+		level: 'info',
+		data: { inputPreview: input.slice(0,200), priorCount: prior?.length || 0 }
 	})
 
 	execRegistry.push(exec)
@@ -530,7 +643,9 @@ export function getAgentOrchestrator() {
 				execRegistry.push(newExec)
 				exec = newExec
 			} else {
-				exec.status = 'completed'
+				const prevCoreState = (exec as any).status
+				safeSetState(exec as any, 'completed', logger as any)
+				if (prevCoreState !== (exec as any).status) emitStateChangeEvent(exec, prevCoreState, (exec as any).status)
 				exec.endTime = execution.endTime || new Date()
 			}
 			

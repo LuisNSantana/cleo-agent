@@ -6,6 +6,7 @@
 import { StateGraph, StateGraphArgs } from '@langchain/langgraph'
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { AgentConfig, AgentExecution, AgentState, ExecutionResult } from '../types'
+import { safeSetState } from '@/lib/agents/execution-state'
 import { GraphBuilder } from './graph-builder'
 import { ExecutionManager } from './execution-manager'
 import { ModelFactory } from './model-factory'
@@ -20,6 +21,7 @@ import { canonicalizeAgentId, getAgentDisplayName } from '../id-canonicalization
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
 import logger from '@/lib/utils/logger'
+import { emitExecutionEvent } from '@/lib/agents/logging-events'
 
 // Helper function to emit browser events for UI updates
 function emitBrowserEvent(eventName: string, detail: any) {
@@ -383,6 +385,48 @@ export class AgentOrchestrator {
       }
     }
 
+  // Track in active executions early for visibility
+  this.activeExecutions.set(execution.id, execution)
+
+    // Structured log: execution.start (core)
+    emitExecutionEvent({
+      trace_id: execution.id,
+      execution_id: execution.id,
+      agent_id: execution.agentId,
+      user_id: execution.userId,
+      thread_id: execution.threadId,
+      state: execution.status,
+      event: 'execution.start',
+      level: 'info',
+      data: { inputPreview: execution.input?.slice(0,200), mode: agentConfig.id === 'cleo-supervisor' ? 'supervisor' : 'direct' }
+    })
+
+    // Ensure at least one step exists for polling UIs
+    try {
+      execution.steps!.push({
+        id: `core_start_${Date.now()}`,
+        timestamp: new Date(),
+        agent: execution.agentId,
+        action: 'routing',
+        content: `Core execution started (${agentConfig.id})`,
+        progress: 0,
+        metadata: { mode: agentConfig.id === 'cleo-supervisor' ? 'supervisor' : 'direct' }
+      } as any)
+      emitExecutionEvent({
+        trace_id: execution.id,
+        execution_id: execution.id,
+        agent_id: execution.agentId,
+        user_id: execution.userId,
+        thread_id: execution.threadId,
+        state: execution.status,
+        event: 'step.append',
+        level: 'debug',
+        data: { stepId: execution.steps?.[0]?.id, action: 'routing' }
+      })
+    } catch (e) {
+      logger.warn('[CORE] Failed to create initial step', { executionId: execution.id, err: e instanceof Error ? e.message : e })
+    }
+
     // Wrap entire execution in AsyncLocalStorage context
     return ExecutionManager.runWithExecutionId(executionId, async () => {
       try {
@@ -419,7 +463,32 @@ export class AgentOrchestrator {
         }
       )
 
-      execution.status = 'completed'
+  {
+      const prevState = (execution as any).status
+  const changedState = safeSetState(execution as any, 'completed', logger as any)
+  if (changedState) emitExecutionEvent({
+        trace_id: execution.id,
+        execution_id: execution.id,
+        agent_id: execution.agentId,
+        user_id: execution.userId,
+        thread_id: execution.threadId,
+        state: execution.status,
+        event: 'state.change',
+        level: 'debug',
+        data: { prev: prevState, next: execution.status }
+      })
+    }
+      emitExecutionEvent({
+        trace_id: execution.id,
+        execution_id: execution.id,
+        agent_id: execution.agentId,
+        user_id: execution.userId,
+        thread_id: execution.threadId,
+        state: execution.status,
+        event: 'execution.complete',
+        level: 'info',
+        data: { steps: execution.steps?.length || 0, messages: execution.messages?.length || 0 }
+      })
       execution.endTime = new Date()
       execution.result = (result as ExecutionResult).content
       execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
@@ -450,6 +519,17 @@ export class AgentOrchestrator {
       return result as ExecutionResult
       } catch (error) {
   logger.error('🔍 [DEBUG] Core executeAgent - Error caught:', error)
+        emitExecutionEvent({
+          trace_id: execution.id,
+          execution_id: execution.id,
+          agent_id: execution.agentId,
+          user_id: execution.userId,
+          thread_id: execution.threadId,
+          state: execution.status,
+          event: 'execution.error',
+          level: 'error',
+          data: { error: error instanceof Error ? error.message : String(error) }
+        })
         await this.errorHandler.handleExecutionError(execution, error as Error)
         this.eventEmitter.emit('execution.failed', execution)
         throw error
@@ -499,7 +579,32 @@ export class AgentOrchestrator {
     )
     
     // For supervisor executions, mark as completed and clean up properly
-    execution.status = 'completed'
+  {
+    const prevState = (execution as any).status
+  const changedState = safeSetState(execution as any, 'completed', logger as any)
+  if (changedState) emitExecutionEvent({
+      trace_id: execution.id,
+      execution_id: execution.id,
+      agent_id: execution.agentId,
+      user_id: execution.userId,
+      thread_id: execution.threadId,
+      state: execution.status,
+      event: 'state.change',
+      level: 'debug',
+      data: { prev: prevState, next: execution.status }
+    })
+  }
+    emitExecutionEvent({
+      trace_id: execution.id,
+      execution_id: execution.id,
+      agent_id: execution.agentId,
+      user_id: execution.userId,
+      thread_id: execution.threadId,
+      state: execution.status,
+      event: 'execution.complete',
+      level: 'info',
+      data: { supervisor: true, steps: execution.steps?.length || 0, messages: execution.messages?.length || 0 }
+    })
     execution.endTime = new Date()
     execution.result = (result as ExecutionResult).content
     execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
@@ -533,6 +638,17 @@ export class AgentOrchestrator {
           reason: 'direct_or_clarify'
         }
       } as any)
+      emitExecutionEvent({
+        trace_id: execution.id,
+        execution_id: execution.id,
+        agent_id: execution.agentId,
+        user_id: execution.userId,
+        thread_id: execution.threadId,
+        state: execution.status,
+        event: 'step.append',
+        level: 'debug',
+        data: { stepId: execution.steps[execution.steps.length-1].id, action: 'delegating', reason: 'skipped' }
+      })
 
       this.eventEmitter.emit('delegation.skipped', {
         executionId: execution.id,
@@ -647,7 +763,7 @@ export class AgentOrchestrator {
     }
 
     try {
-      execution.status = 'cancelled' as any
+  safeSetState(execution as any, 'cancelled', logger as any)
       execution.endTime = new Date()
       
       this.activeExecutions.delete(executionId)
