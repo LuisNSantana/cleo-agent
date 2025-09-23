@@ -1,13 +1,13 @@
 // DEPRECATED: Legacy middleware for backward compatibility
 // Use lib/confirmation/unified instead
 
+import { DEFAULT_TOOL_SETTINGS, type ToolExecutionSettings } from './types'
+
 export const confirmationStore = {
   subscribe: () => () => {},
   getState: () => ({ pendingAction: null }),
   setState: () => {},
-  getSettings: () => ({
-    confirmationTimeout: 0,
-    autoConfirm: false,
-    requireConfirmation: true
-  })
+  getSettings: () => DEFAULT_TOOL_SETTINGS,
+  updateSettings: (settings: ToolExecutionSettings) => {},
+  resolveConfirmation: (id: string, result: any) => {}
 }

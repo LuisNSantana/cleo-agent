@@ -60,21 +60,19 @@ function buildPendingAction(toolName: string, parameters: Record<string, any>, p
   return {
     id: confirmationId, // reuse confirmation id so client can map 1:1
     toolName,
-    parameters,
-  description: preview.description,
+    params: parameters, // Use 'params' instead of 'parameters'
     category: TOOL_SENSITIVITY_MAP[toolName] || 'dataModification',
     sensitivity: computeSensitivity(toolName),
     undoable: isUndoable(toolName),
     preview: {
-      title: preview.title,
-      summary: preview.description,
+      title: preview.title || toolName,
+      summary: preview.summary,
       // Derive details from raw parameters since simple preview shape doesn't have structured details
       details: Object.entries(parameters).slice(0, 10).map(([key, value]) => ({
-        label: key,
-        value: typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value),
-        type: Array.isArray(value) ? 'list' : 'text'
+        key,
+        value: typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value)
       })),
-      warnings: preview.warnings,
+      warnings: preview.warnings || [],
     },
     timestamp: Date.now(),
   }

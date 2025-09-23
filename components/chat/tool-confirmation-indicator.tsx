@@ -7,8 +7,8 @@
 
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, Clock, Shield } from 'lucide-react'
-import { useToolConfirmation } from '@/hooks/use-tool-confirmation'
+import { AlertTriangle, Clock } from 'lucide-react'
+import { useUnifiedConfirmation } from '@/hooks/use-unified-confirmation'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -17,61 +17,37 @@ interface ToolConfirmationIndicatorProps {
 }
 
 export default function ToolConfirmationIndicator({ className }: ToolConfirmationIndicatorProps) {
-  const { isWaitingForConfirmation, pendingAction } = useToolConfirmation()
+  const { pendingConfirmations } = useUnifiedConfirmation()
+  
+  const pendingAction = pendingConfirmations[0] // Get first pending
 
-  if (!isWaitingForConfirmation || !pendingAction) {
+  if (!pendingAction) {
     return null
-  }
-
-  const getSensitivityColor = () => {
-    switch (pendingAction.sensitivity) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-300'
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300'
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-      case 'low': return 'bg-green-100 text-green-800 border-green-300'
-      default: return 'bg-gray-100 text-gray-800 border-gray-300'
-    }
-  }
-
-  const getSensitivityIcon = () => {
-    switch (pendingAction.sensitivity) {
-      case 'critical': return <AlertTriangle className="w-3 h-3" />
-      case 'high': return <AlertTriangle className="w-3 h-3" />
-      case 'medium': return <Clock className="w-3 h-3" />
-      case 'low': return <Shield className="w-3 h-3" />
-      default: return <Clock className="w-3 h-3" />
-    }
   }
 
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -10, scale: 0.9 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.9 }}
-        transition={{ duration: 0.2 }}
-        className={cn("flex items-center justify-center", className)}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        transition={{ duration: 0.3 }}
+        className={cn("flex items-center gap-2", className)}
       >
         <Badge 
           variant="outline" 
-          className={cn(
-            "flex items-center gap-2 px-3 py-1.5 text-xs font-medium border-2 shadow-sm",
-            getSensitivityColor()
-          )}
+          className="bg-orange-100 text-orange-800 border-orange-300 flex items-center gap-1.5 px-2.5 py-1"
         >
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >
-            {getSensitivityIcon()}
-          </motion.div>
-          <span>Acción pendiente de confirmación</span>
-          <motion.div
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 1, repeat: Infinity }}
-            className="w-2 h-2 bg-current rounded-full"
-          />
+          <AlertTriangle className="w-3.5 h-3.5" />
+          <span className="font-medium">Confirmation Required</span>
+          <Clock className="w-3 h-3 ml-1" />
         </Badge>
+        
+        <div className="flex items-center gap-1 text-xs text-orange-600">
+          <span className="font-medium">{pendingAction.toolName}</span>
+          <span>•</span>
+          <span>{new Date(pendingAction.timestamp).toLocaleTimeString()}</span>
+        </div>
       </motion.div>
     </AnimatePresence>
   )

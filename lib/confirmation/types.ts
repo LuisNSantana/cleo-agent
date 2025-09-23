@@ -6,6 +6,20 @@ export interface PendingAction {
   toolName: string
   params: any
   message?: string
+  // Legacy properties for backward compatibility
+  category?: string
+  sensitivity?: 'low' | 'medium' | 'high' | 'critical'
+  preview?: {
+    title?: string
+    summary?: string
+    details?: Array<{ key: string; value: string }>
+    warnings?: string[]
+  }
+  undoable?: boolean
+  estimatedDuration?: string
+  timestamp?: number
+  // Alias for params for backward compatibility
+  parameters?: any
 }
 
 export interface ConfirmationResult {
@@ -39,8 +53,8 @@ export const SAFE_AUTO_TOOLS = [
 ]
 
 // Tool execution settings types
-export type ToolExecutionMode = 'manual' | 'auto' | 'smart'
-export type ActionSensitivity = 'low' | 'medium' | 'high' | 'critical'
+export type ToolExecutionMode = 'manual' | 'auto' | 'smart' | 'preventive' | 'hybrid'
+export type ActionSensitivity = 'low' | 'medium' | 'high' | 'critical' | 'always_confirm' | 'auto' | 'inherit'
 
 export interface ToolExecutionSettings {
   mode: ToolExecutionMode
@@ -51,6 +65,16 @@ export interface ToolExecutionSettings {
   enableNotifications: boolean
   silentMode: boolean
   categorySettings: Record<string, ActionSensitivity>
+  // Additional properties for legacy compatibility
+  defaultMode?: ToolExecutionMode
+  allowBulkActions?: boolean
+  rememberPreferences?: boolean
+  emailActions?: ActionSensitivity
+  calendarActions?: ActionSensitivity
+  socialActions?: ActionSensitivity
+  fileActions?: ActionSensitivity
+  dataModification?: ActionSensitivity
+  financeActions?: ActionSensitivity
 }
 
 export const DEFAULT_TOOL_SETTINGS: ToolExecutionSettings = {
@@ -68,5 +92,15 @@ export const DEFAULT_TOOL_SETTINGS: ToolExecutionSettings = {
     fileActions: 'medium',
     dataModification: 'high',
     financeActions: 'critical'
-  }
+  },
+  // Default values for additional properties
+  defaultMode: 'smart',
+  allowBulkActions: false,
+  rememberPreferences: true,
+  emailActions: 'high',
+  calendarActions: 'medium',
+  socialActions: 'high',
+  fileActions: 'medium',
+  dataModification: 'high',
+  financeActions: 'critical'
 }

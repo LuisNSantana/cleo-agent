@@ -2,9 +2,12 @@
 // Use lib/confirmation/unified instead
 
 export interface ToolPreview {
-  toolName: string
-  parameters: any
-  description: string
+  toolName?: string
+  parameters?: any
+  description?: string
+  summary: string
+  title?: string
+  warnings?: string[]
 }
 
 // Legacy function for backward compatibility
@@ -12,7 +15,10 @@ export function generateToolPreview(toolName: string, parameters: any): ToolPrev
   return {
     toolName,
     parameters,
-    description: `Execute ${toolName} with provided parameters`
+    description: `Execute ${toolName} with provided parameters`,
+    summary: `Execute ${toolName} with provided parameters`,
+    title: toolName,
+    warnings: []
   }
 }
 

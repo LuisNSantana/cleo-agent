@@ -1,398 +1,173 @@
 'use client'
 
-/**
- * 🔍 In-Chat Tool Confirmation
- * Confirmation component that appears within the chat flow
- */
-
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import React, { useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { 
-  AlertTriangle, 
-  Calendar, 
-  Mail, 
-  FileX, 
-  Clock, 
-  Edit3,
-  Check,
-  X,
-  Settings,
-  Zap,
-  Shield,
-  Info
-} from 'lucide-react'
-import { PendingAction, ConfirmationResult } from '@/lib/confirmation/types'
-import { confirmationStore } from '@/lib/confirmation/middleware'
-import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronDown, ChevronUp, Settings, Clock, AlertTriangle, CheckCircle, X, Edit3 } from 'lucide-react'
+import { useUnifiedConfirmation } from '@/hooks/use-unified-confirmation'
 
 interface InChatToolConfirmationProps {
-  pendingAction: PendingAction
-  onConfirm: (result: ConfirmationResult) => void
+  onSettingsClick?: () => void
 }
 
-// Iconos por categoría de herramienta
-const CATEGORY_ICONS = {
-  emailActions: Mail,
-  calendarActions: Calendar,
-  fileActions: FileX,
-  dataModification: Settings,
-  socialActions: Zap,
-  financeActions: AlertTriangle
-} as const
+export function InChatToolConfirmation({ onSettingsClick }: InChatToolConfirmationProps) {
+  const { pendingConfirmations, approve, reject, isLoading } = useUnifiedConfirmation()
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
 
-// Colores por nivel de sensibilidad
-const SENSITIVITY_STYLES = {
-  low: 'bg-green-50 border-green-200 text-green-800',
-  medium: 'bg-yellow-50 border-yellow-200 text-yellow-800', 
-  high: 'bg-orange-50 border-orange-200 text-orange-800',
-  critical: 'bg-red-50 border-red-200 text-red-800'
-} as const
+  // Show the most recent pending confirmation
+  const pendingAction = pendingConfirmations[0]
 
-export default function InChatToolConfirmation({ 
-  pendingAction, 
-  onConfirm 
-}: InChatToolConfirmationProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedParams, setEditedParams] = useState<Record<string, any>>({})
-  const [rememberChoice, setRememberChoice] = useState(false)
-  const [bulkApproval, setBulkApproval] = useState(false)
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
-
-  // Configurar countdown timer si hay timeout
-  useEffect(() => {
-    const settings = confirmationStore.getSettings()
-    if (settings.confirmationTimeout > 0) {
-      setTimeLeft(settings.confirmationTimeout)
-      
-      const interval = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev === null || prev <= 1) {
-            clearInterval(interval)
-            handleTimeout()
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      return () => clearInterval(interval)
-    }
-  }, [pendingAction])
-
-  // Reset estado cuando cambia la acción
-  useEffect(() => {
-    setIsEditing(false)
-    setEditedParams(pendingAction.parameters)
-    setRememberChoice(false)
-    setBulkApproval(false)
-  }, [pendingAction])
-
-  const CategoryIcon = CATEGORY_ICONS[pendingAction.category as keyof typeof CATEGORY_ICONS] || Settings
-  const sensitivityStyle = SENSITIVITY_STYLES[pendingAction.sensitivity]
-
-  const handleApprove = () => {
-    const result: ConfirmationResult = {
-      action: 'approve',
-      modifiedParameters: isEditing ? editedParams : undefined,
-      rememberChoice,
-      bulkApproval
-    }
-    onConfirm(result)
+  if (!pendingAction) {
+    return null
   }
 
-  const handleReject = () => {
-    const result: ConfirmationResult = {
-      action: 'reject',
-      rememberChoice
-    }
-    onConfirm(result)
-  }
-
-  const handleEdit = () => {
-    if (isEditing) {
-      const result: ConfirmationResult = {
-        action: 'edit',
-        modifiedParameters: editedParams
-      }
-      onConfirm(result)
-    } else {
-      setIsEditing(true)
+  const handleApprove = async () => {
+    try {
+      await approve(pendingAction.id)
+    } catch (error) {
+      console.error('Failed to approve action:', error)
     }
   }
 
-  const handleTimeout = () => {
-    const result: ConfirmationResult = {
-      action: 'timeout'
+  const handleReject = async () => {
+    try {
+      await reject(pendingAction.id)
+    } catch (error) {
+      console.error('Failed to reject action:', error)
     }
-    onConfirm(result)
-  }
-
-  const handleParamChange = (key: string, value: any) => {
-    setEditedParams(prev => ({
-      ...prev,
-      [key]: value
-    }))
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -20, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="w-full max-w-2xl mx-auto my-4"
-    >
-      <Card className={cn(
-        "border-2 shadow-lg",
-        sensitivityStyle
-      )}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "p-2.5 rounded-lg border-2 bg-white/80 backdrop-blur-sm",
-              pendingAction.sensitivity === 'critical' && "border-red-300 bg-red-50",
-              pendingAction.sensitivity === 'high' && "border-orange-300 bg-orange-50",
-              pendingAction.sensitivity === 'medium' && "border-yellow-300 bg-yellow-50",
-              pendingAction.sensitivity === 'low' && "border-green-300 bg-green-50"
-            )}>
-              <CategoryIcon className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-lg">
-                  {pendingAction.preview.title}
-                </h3>
-                {timeLeft !== null && timeLeft > 0 && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground bg-white/80 px-2 py-1 rounded-full border">
-                    <Clock className="w-3 h-3" />
-                    <span>{timeLeft}s</span>
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {pendingAction.preview.summary}
-              </p>
-            </div>
+    <Card className="border-orange-200 bg-orange-50 mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <span className="font-medium text-orange-800">Action Requires Confirmation</span>
           </div>
-          
-          {/* Badges de información */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            <Badge variant="outline" className={cn("border-2", sensitivityStyle)}>
-              {pendingAction.sensitivity === 'critical' && '🚨 '}
-              {pendingAction.sensitivity === 'high' && '⚠️ '}
-              {pendingAction.sensitivity === 'medium' && '📋 '}
-              {pendingAction.sensitivity === 'low' && '✅ '}
-              {pendingAction.sensitivity.charAt(0).toUpperCase() + pendingAction.sensitivity.slice(1)}
-            </Badge>
-            
-            {pendingAction.undoable && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                🔄 Reversible
-              </Badge>
-            )}
-            
-            {pendingAction.estimatedDuration && (
-              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                ⏱️ {pendingAction.estimatedDuration}
-              </Badge>
+          <div className="flex items-center gap-1">
+            {onSettingsClick && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSettingsClick}
+                className="h-6 w-6 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-100"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
             )}
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-4">
-          {/* Action Details */}
-          <div className="bg-white/50 backdrop-blur-sm rounded-lg p-3 border">
-            <div className="flex items-center gap-2 mb-3">
-              <Info className="w-4 h-4 text-blue-600" />
-              <h4 className="font-medium text-sm">Action Details:</h4>
+        <div className="space-y-3">
+          {/* Tool Information */}
+          <div className="bg-white rounded-lg p-3 border border-orange-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-medium text-gray-900">
+                {pendingAction.toolName}
+              </h4>
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  {new Date(pendingAction.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
             </div>
             
-            <div className="space-y-2">
-              {pendingAction.preview.details.map((detail, index) => (
-                <div key={index} className="grid grid-cols-3 gap-3 py-1.5">
-                  <Label className="text-sm font-medium text-muted-foreground">
-                    {detail.label}:
-                  </Label>
-                  <div className="col-span-2">
-                    {isEditing ? (
-                      <EditableField
-                        type={detail.type}
-                        value={editedParams[detail.label.toLowerCase()] || detail.value}
-                        onChange={(value) => handleParamChange(detail.label.toLowerCase(), value)}
-                      />
-                    ) : (
-                      <DisplayField type={detail.type} value={detail.value} />
-                    )}
-                  </div>
-                </div>
-              ))}
+            {/* Message Preview */}
+            <div className="text-sm text-gray-700 whitespace-pre-line mb-2">
+              {pendingAction.message}
             </div>
           </div>
 
-          {/* Warnings */}
-          {pendingAction.preview.warnings && pendingAction.preview.warnings.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <h4 className="font-medium text-sm text-amber-800">Warnings:</h4>
-              </div>
-              <ul className="space-y-1 text-sm text-amber-700">
-                {pendingAction.preview.warnings.map((warning, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">•</span>
-                    {warning}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Opciones adicionales */}
-          <div className="bg-gray-50 rounded-lg p-3 border">
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="remember"
-                  checked={rememberChoice}
-                  onCheckedChange={(checked) => setRememberChoice(checked === true)}
-                />
-                <Label htmlFor="remember" className="text-sm">
-                  Recordar mi decisión para acciones similares
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="bulk"
-                  checked={bulkApproval}
-                  onCheckedChange={(checked) => setBulkApproval(checked === true)}
-                />
-                <Label htmlFor="bulk" className="text-sm">
-                  Auto-aprobar todas las acciones de este tipo en esta sesión
-                </Label>
-              </div>
-            </div>
-          </div>
-
-          {/* Botones de acción */}
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+          {/* Action Buttons */}
+          <div className="flex gap-2">
             <Button
-              variant="outline"
+              onClick={handleApprove}
+              disabled={isLoading}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Approve
+            </Button>
+            
+            <Button
               onClick={handleReject}
+              disabled={isLoading}
+              variant="outline"
               className="flex-1 border-red-200 text-red-700 hover:bg-red-50"
             >
               <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
-            
-            {/* Only show edit for non-critical actions */}
-            {pendingAction.sensitivity !== 'critical' && (
-              <Button
-                variant="outline"
-                onClick={handleEdit}
-                className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                <Edit3 className="w-4 h-4 mr-2" />
-                {isEditing ? 'Apply Changes' : 'Edit'}
-              </Button>
-            )}
-            
-            <Button
-              onClick={handleApprove}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Check className="w-4 h-4 mr-2" />
-              {isEditing ? 'Approve Changes' : 'Confirm & Execute'}
+              Reject
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  )
-}
 
-// Componente para mostrar campos según su tipo
-function DisplayField({ type, value }: { type?: string; value: string | string[] }) {
-  if (Array.isArray(value)) {
-    return (
-      <div className="flex flex-wrap gap-1">
-        {value.map((item, index) => (
-          <Badge key={index} variant="secondary" className="text-xs">
-            {item}
-          </Badge>
-        ))}
-      </div>
-    )
-  }
+          {/* Advanced Options */}
+          <div className="space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="w-full justify-between text-orange-700 hover:bg-orange-100"
+            >
+              <span>Advanced Options</span>
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+            
+            {isExpanded && (
+              <div className="space-y-3 mt-3">
+                {/* Parameters Preview */}
+                <div className="bg-gray-50 rounded-lg p-3 border">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="font-medium text-gray-900">Parameters</h5>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditMode(!isEditMode)}
+                      className="h-6 px-2 text-gray-600 hover:text-gray-700"
+                    >
+                      <Edit3 className="w-3 h-3 mr-1" />
+                      {isEditMode ? 'Cancel' : 'Edit'}
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {Object.entries(pendingAction.params).map(([key, value]) => (
+                      <div key={key} className="flex justify-between items-start">
+                        <span className="text-sm font-medium text-gray-600 capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}:
+                        </span>
+                        <span className="text-sm text-gray-900 max-w-xs truncate">
+                          {String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-  if (type === 'email') {
-    return (
-      <Badge variant="secondary" className="text-xs">
-        {value}
-      </Badge>
-    )
-  }
-
-  if (type === 'code') {
-    return (
-      <code className="text-xs bg-muted p-1 rounded block overflow-x-auto">
-        {value}
-      </code>
-    )
-  }
-
-  return (
-    <span className="text-sm break-words">
-      {value}
-    </span>
-  )
-}
-
-// Component for editing fields
-function EditableField({ 
-  type, 
-  value, 
-  onChange 
-}: { 
-  type?: string
-  value: string | string[]
-  onChange: (value: any) => void 
-}) {
-  if (Array.isArray(value)) {
-    return (
-      <Textarea
-        value={value.join(', ')}
-        onChange={(e) => onChange(e.target.value.split(', ').filter(Boolean))}
-        className="text-xs"
-        rows={2}
-      />
-    )
-  }
-
-  if (type === 'text' && value.length > 50) {
-    return (
-      <Textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="text-xs"
-        rows={3}
-      />
-    )
-  }
-
-  return (
-    <Input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="text-xs"
-    />
+                {/* Edit Mode Actions */}
+                {isEditMode && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleApprove}
+                      disabled={isLoading}
+                      size="sm"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Apply Changes
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
