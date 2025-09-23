@@ -985,6 +985,52 @@ export function useChatCore({
                     } catch {}
                     break
 
+                  case 'action_event': {
+                    // Unified backend event for tool lifecycle
+                    // Expected shape: { type:'action_event', actionId, kind, status, event: { meta, input?, result?, error? } }
+                    try {
+                      const { actionId, kind, status, event } = data
+                      upsertAction(actionId, {
+                        kind: kind || 'tool',
+                        status,
+                        toolName: event?.meta?.toolName,
+                        input: event?.input || event?.meta?.input || undefined,
+                        result: event?.result,
+                        error: event?.error?.message,
+                      })
+                    } catch (e) { /* silent */ }
+                    break
+                  }
+                  case 'pending-confirmation': {
+                    try {
+                      const { actionId, confirmationId } = data
+                      if (actionId) {
+                        upsertAction(actionId, {
+                          status: 'awaiting_confirmation',
+                          confirmationId,
+                          toolName: data.toolName,
+                          category: data.category,
+                          sensitivity: data.sensitivity,
+                          undoable: data.undoable,
+                          preview: data.preview,
+                        })
+                        setConfirmationQueue(q => q.includes(actionId) ? q : [...q, actionId])
+                      }
+                    } catch {}
+                    // existing legacy handling continues
+                    break
+                  }
+                  case 'confirmation-resolved': {
+                    try {
+                      const { actionId, approved } = data
+                      if (actionId) {
+                        upsertAction(actionId, { status: approved ? 'completed' : 'error' })
+                        setConfirmationQueue(q => q.filter(id => id !== actionId))
+                      }
+                    } catch {}
+                    break
+                  }
+
                   default:
                     break
                 }
@@ -1330,10 +1376,59 @@ export function useChatCore({
     }
   }, [regenerate])
 
+  // >>> Added action state types and map <<<
+interface ActionEventRecord {
+  id: string
+  kind: 'tool'
+  toolName?: string
+  status: 'started' | 'awaiting_confirmation' | 'completed' | 'error'
+  input?: any
+  result?: any
+  error?: string
+  updatedAt: number
+  confirmationId?: string
+  sensitivity?: string
+  category?: string
+  undoable?: boolean
+  preview?: any
+}
+
+// Hook state additions (place near other useState declarations)
+const [actionMap, setActionMap] = useState<Map<string, ActionEventRecord>>(new Map())
+const [confirmationQueue, setConfirmationQueue] = useState<string[]>([])
+
+const upsertAction = useCallback((id: string, patch: Partial<ActionEventRecord>) => {
+  setActionMap(prev => {
+    const next = new Map(prev)
+    const existing = next.get(id)
+    const merged: ActionEventRecord = {
+      id,
+      kind: patch.kind || existing?.kind || 'tool',
+      toolName: patch.toolName ?? existing?.toolName,
+      status: patch.status || existing?.status || 'started',
+      input: patch.input !== undefined ? patch.input : existing?.input,
+      result: patch.result !== undefined ? patch.result : existing?.result,
+      error: patch.error !== undefined ? patch.error : existing?.error,
+      updatedAt: Date.now(),
+      confirmationId: patch.confirmationId ?? existing?.confirmationId,
+      sensitivity: patch.sensitivity ?? existing?.sensitivity,
+      category: patch.category ?? existing?.category,
+      undoable: patch.undoable ?? existing?.undoable,
+      preview: patch.preview ?? existing?.preview,
+    }
+    next.set(id, merged)
+    return next
+  })
+}, [])
+
+// Selectors
+const actions = useMemo(() => Array.from(actionMap.values()).sort((a,b) => b.updatedAt - a.updatedAt), [actionMap])
+const getAction = useCallback((id: string) => actionMap.get(id), [actionMap])
+
   return {
     messages,
     input,
-  deferredInput,
+    deferredInput,
     setInput,
     handleInputChange,
     handleSubmit,
@@ -1343,7 +1438,7 @@ export function useChatCore({
     reload: handleRegenerate,
     append: sendMessage, // For backward compatibility
     isSubmitting,
-  isUiPending,
+    isUiPending,
     hasDialogAuth,
     setHasDialogAuth,
     enableSearch,
@@ -1371,6 +1466,12 @@ export function useChatCore({
       efficiency: performanceRef.current.inputChanges > 0 
         ? ((performanceRef.current.inputChanges - performanceRef.current.debouncedCalls) / performanceRef.current.inputChanges * 100).toFixed(1) + '%'
         : '0%'
-    }
+    },
+    actions,
+    getAction,
+    confirmationQueue,
+    respondToToolConfirmation,
+    // optionally expose raw map for debugging
+    _actionMap: actionMap,
   }
 }
