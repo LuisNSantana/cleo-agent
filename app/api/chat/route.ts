@@ -325,7 +325,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const userMessage = messages[messages.length - 1]
+  const userMessage = messages[messages.length - 1]
 
     // Extract text content from user message for image generation detection
     let userMessageText = ""
@@ -449,6 +449,21 @@ export async function POST(req: Request) {
         }
     }
 
+    // ------------------------------------------------------------------
+    // GLOBAL REQUEST CONTEXT (AsyncLocalStorage) - must wrap the remainder
+    // ------------------------------------------------------------------
+    const outerRequestId = randomUUID()
+    // Hoisted variables that will be populated inside globalCtxRun and used later
+  let finalSystemPrompt: string = ''
+    let convertedMessages: any
+    let toolsForRun: any
+    let providerOptions: Record<string, any> | undefined
+    let activeTools: string[] | undefined
+    let modelConfig: any
+    let apiKey: string | undefined
+    const globalCtxRun = async () => {
+      console.log('[ChatAPI] 🔐 Global request context established', { userId: realUserId, requestId: outerRequestId })
+
     if (supabase && userMessage?.role === "user") {
       // Process the content to create a clean summary for database storage
       let contentForDB = ""
@@ -536,8 +551,8 @@ export async function POST(req: Request) {
     }
 
     // Resolve model config and establish effective system prompt
-    const allModels = await getAllModels()
-    const modelConfig = allModels.find((m) => m.id === originalModel) || allModels.find((m) => m.id === normalizedModel)
+  const allModels = await getAllModels()
+  modelConfig = allModels.find((m) => m.id === originalModel) || allModels.find((m) => m.id === normalizedModel)
 
     if (!modelConfig) {
       throw new Error(`Model ${originalModel} not found`)
@@ -605,7 +620,7 @@ export async function POST(req: Request) {
     }
 
   // Convert multimodal messages to correct format for the model
-    let convertedMessages = await convertUserMultimodalMessages(
+    convertedMessages = await convertUserMultimodalMessages(
       messages,
   normalizedModel,
       Boolean(modelConfig.vision)
@@ -623,7 +638,7 @@ export async function POST(req: Request) {
     }
 
     // Log conversion summary and count images
-    const convertedMultimodal = convertedMessages.filter((msg) =>
+    const convertedMultimodal = convertedMessages.filter((msg: any) =>
       Array.isArray(msg.content)
     )
 
@@ -632,7 +647,7 @@ export async function POST(req: Request) {
 
     // Intelligent image filtering by model limits
     const totalImages = convertedMessages.reduce(
-      (acc, m) => acc + (Array.isArray(m.content) ? m.content.filter((p: any) => p.type === 'image').length : 0),
+      (acc: number, m: any) => acc + (Array.isArray(m.content) ? m.content.filter((p: any) => p.type === 'image').length : 0),
       0
     )
   console.log(`[IMAGE MGMT] Model ${normalizedModel}: ${totalImages} images found, limit: ${imageLimit}`)
@@ -647,7 +662,6 @@ export async function POST(req: Request) {
 
     // Resolve an API key for the selected provider. For unauthenticated users,
     // fall back to environment keys so models like OpenRouter work in demos.
-    let apiKey: string | undefined
     {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
   const provider = getProviderForModel(originalModel as any)
@@ -671,7 +685,7 @@ export async function POST(req: Request) {
   ;(globalThis as any).__currentModel = normalizedModel
 
       // Build final system prompt using centralized prompt builder (handles RAG, personalization, and search guidance)
-      const { finalSystemPrompt, usedContext } = await buildFinalSystemPrompt({
+  const promptBuild = await buildFinalSystemPrompt({
         baseSystemPrompt: effectiveSystemPrompt,
   model: normalizedModel,
         messages,
@@ -682,6 +696,8 @@ export async function POST(req: Request) {
         projectId,
         debugRag,
       })
+  finalSystemPrompt = promptBuild.finalSystemPrompt
+  const usedContext = promptBuild.usedContext
 
       console.log('[RAG] Using context?', usedContext, 'Final system prompt length:', finalSystemPrompt.length)
       // Feature analytics: RAG retrieval used
@@ -709,9 +725,7 @@ export async function POST(req: Request) {
 
   // Configure tools and provider options per model
     // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
-  let toolsForRun = tools as typeof tools
-  let providerOptions: Record<string, any> | undefined
-    let activeTools: string[] | undefined
+  toolsForRun = tools as typeof tools
   // Detect explicit document intent in the last user message
   const lastUserContent = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
   const docIntentRegex = /\b(open|abrir|mostrar|ver|view|edit|editar|work on|continuar|colaborar)\b.*\b(doc|document|documento|archivo|file)\b/i
@@ -720,12 +734,12 @@ export async function POST(req: Request) {
   if (normalizedModel === 'grok-3-mini') {
       try {
         const { webSearch, ...rest } = tools as any
-        toolsForRun = rest
+  toolsForRun = rest
       } catch {
-        toolsForRun = tools
+  toolsForRun = tools
       }
       // Restrict active tools to the filtered set, preventing accidental calls to removed tools
-      activeTools = Object.keys(toolsForRun)
+  activeTools = Object.keys(toolsForRun)
       // Configure xAI native Live Search based on UI toggle
       // - enableSearch true  -> mode 'auto' (model decides when to search)
       // - enableSearch false -> mode 'off'  (never search)
@@ -743,8 +757,8 @@ export async function POST(req: Request) {
     if (!explicitDocIntent) {
       try {
         const { openDocument, ...rest } = toolsForRun as any
-        toolsForRun = rest
-        activeTools = Object.keys(toolsForRun)
+  toolsForRun = rest
+  activeTools = Object.keys(toolsForRun)
       } catch {}
     }
 
@@ -757,7 +771,7 @@ export async function POST(req: Request) {
         }
       }
       // After ensuring, refresh registry reference (tools is mutated inside helper)
-      toolsForRun = tools as typeof tools
+  toolsForRun = tools as typeof tools
     } catch (e) {
       console.warn('[ChatAPI] Failed to ensure delegation tools', e)
     }
@@ -766,8 +780,8 @@ export async function POST(req: Request) {
     try {
       const provider = getProviderForModel(originalModel as any)
       if (provider === 'google' || originalModel.includes('gemini')) {
-        toolsForRun = sanitizeGeminiTools(toolsForRun as any) as any
-        activeTools = Object.keys(toolsForRun)
+  toolsForRun = sanitizeGeminiTools(toolsForRun as any) as any
+  activeTools = Object.keys(toolsForRun)
         console.log('[ChatAPI] Gemini tool names sanitized for function_declarations')
       }
     } catch {}
@@ -797,8 +811,8 @@ export async function POST(req: Request) {
             newRegistry[key] = (tools as any)[key]
           }
         }
-        toolsForRun = newRegistry as any
-        activeTools = Object.keys(toolsForRun)
+  toolsForRun = newRegistry as any
+  activeTools = Object.keys(toolsForRun)
       }
     } catch (e) {
       console.warn('[ChatAPI] Delegation-only tools setup failed:', e)
@@ -807,11 +821,11 @@ export async function POST(req: Request) {
     // If the selected model is not tool-capable, disable tools to avoid provider errors
     try {
       if (modelConfig && modelConfig.tools === false) {
-        const hadTools = Object.keys(toolsForRun || {}).length > 0
+  const hadTools = Object.keys(toolsForRun || {}).length > 0
         if (hadTools) {
           console.warn(`[ChatAPI] Model ${normalizedModel} does not support tools; disabling tools for this run`)
         }
-        toolsForRun = {} as any
+  toolsForRun = {} as any
         activeTools = []
       }
     } catch {}
@@ -962,10 +976,7 @@ export async function POST(req: Request) {
 
   // Orchestrator-backed Cleo-supervised mode for global chat
     if (orchestratorBacked) {
-      const requestId = randomUUID()
-      return await withRequestContext({ userId: realUserId, model: normalizedModel, requestId }, async () => {
         try {
-          console.log('[ChatAPI] 🔐 Request context established', { userId: realUserId, requestId })
           const orchestrator = getAgentOrchestrator() as any
         const lastMsg = messages[messages.length - 1]
         const userText = Array.isArray((lastMsg as any)?.parts)
@@ -1258,11 +1269,20 @@ export async function POST(req: Request) {
           }
         })
         } catch (e) {
-          console.error('[ChatAPI] Orchestrator-backed path failed (context active):', e)
-          // Fallback to normal streaming outside context
+          console.error('[ChatAPI] Orchestrator-backed path failed:', e)
+          // Fallback to normal streaming
         }
-      })
     }
+    // (rest of original logic continues under global context)
+    // If execution path not returned earlier, continue with direct model streaming logic below (existing code after this block)
+    
+  } // end globalCtxRun body
+
+  // Ejecutar la parte superior (hasta orquestatorBacked) dentro del contexto, luego continuar fuera reutilizando variables ya preparadas.
+  const earlyResponse = await withRequestContext({ userId: realUserId, model: normalizedModel, requestId: outerRequestId }, globalCtxRun)
+  if (earlyResponse) {
+    return earlyResponse as any
+  }
 
     // Prepare additional parameters for reasoning models
   const resultStart = Date.now()
@@ -1361,9 +1381,7 @@ export async function POST(req: Request) {
       }
     } catch {}
 
-  const result = await withRequestContext({ userId: realUserId, model: effectiveModelId, requestId: reqId }, async () => {
-    return streamText(additionalParams)
-  })
+  const result = await streamText(additionalParams)
 
     // Placeholder: High-score missed tracking (will emit after model run if no delegation tool was called)
     // We would inspect tool invocation results in onFinish handler (already wired) — if none match delegate_to_* and delegationIntent.score >= 0.75 emit event.
