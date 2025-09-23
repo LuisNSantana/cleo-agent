@@ -142,6 +142,34 @@ function createAndRunExecution(
 				args: event.args || {},
 			}
 			toolCallsUsed.push(toolCall)
+
+		// ------------------------------------------------------------------
+		// Initial synthetic step to ensure hasSteps=true for UI polling logic
+		// Prevents infinite polling states where no steps were ever appended.
+		try {
+			exec.steps!.push({
+				id: `step_${Date.now()}_start`,
+				timestamp: new Date(),
+				agent: exec.agentId,
+				action: 'routing', // closest semantic existing union member for initial phase
+				content: `Execution started for ${exec.agentId}\nInput Preview: ${String(input).slice(0,120)}`,
+				progress: 0,
+				metadata: {
+					started: true,
+					delegation_entry: prior?.some(m => /delegate_to_/i.test(m.content)) ? 'delegation_chain' : 'direct',
+					context_user_id: exec.userId,
+					execution_mode: 'legacy-orchestrator',
+					threadId: exec.threadId
+				}
+			})
+			logger.debug('🟢 [EXECUTION_START] Created initial step', {
+				executionId: exec.id,
+				agentId: exec.agentId,
+				context_user_id: exec.userId
+			})
+		} catch (e) {
+			logger.warn('⚠️ Failed to push initial start step', { executionId: exec.id, error: e instanceof Error ? e.message : e })
+		}
 		}
 	}
 	

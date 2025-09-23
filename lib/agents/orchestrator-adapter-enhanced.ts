@@ -271,6 +271,25 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       exec = legacyOrch.startAgentExecution(input, agentId)
     }
     if (exec) {
+      // Ensure steps array exists and push initial synthetic step for UI polling consistency
+      try {
+        exec.steps = exec.steps || []
+        exec.steps.push({
+          id: `step_${Date.now()}_start`,
+          timestamp: new Date(),
+          agent: exec.agentId,
+          action: 'routing',
+          content: `Execution started (enhanced adapter) for ${exec.agentId}`,
+          progress: 0,
+          metadata: {
+            started: true,
+            delegation_entry: prior?.some(m => /delegate_to_/i.test(m.content)) ? 'delegation_chain' : 'direct',
+            context_user_id: exec.userId,
+            execution_mode: 'enhanced-adapter',
+            adapter: 'enhanced'
+          }
+        })
+      } catch {}
       const attachOptions = (target: AgentExecution, attempt: number) => {
         if (!target.options) target.options = {}
         const opt = target.options as any // extend dynamically
@@ -412,6 +431,22 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     metrics: { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 },
     steps: []
   }
+  try {
+    exec.steps!.push({
+      id: `step_${Date.now()}_start`,
+      timestamp: new Date(),
+      agent: exec.agentId,
+      action: 'routing',
+      content: `Execution started (fallback core) for ${exec.agentId}`,
+      progress: 0,
+      metadata: {
+        started: true,
+        delegation_entry: prior?.some(m => /delegate_to_/i.test(m.content)) ? 'delegation_chain' : 'direct',
+        context_user_id: exec.userId,
+        execution_mode: 'enhanced-adapter-fallback'
+      }
+    })
+  } catch {}
   
   // Simple core execution (no delegation, direct response)
   setTimeout(() => {

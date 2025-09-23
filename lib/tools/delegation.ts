@@ -75,7 +75,27 @@ async function runDelegation(params: {
       ? 'high'
       : (priority || 'normal')
   const orchestrator = getAgentOrchestrator() as any
-  const userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
+  let userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
+
+  // Guard: late recovery if NIL UUID
+  try {
+    const NIL = '00000000-0000-0000-0000-000000000000'
+    if (userId === NIL) {
+      const globalUser = (globalThis as any).__activeUserId || (globalThis as any).__lastAuthenticatedUserId
+      if (globalUser && typeof globalUser === 'string' && /[0-9a-fA-F-]{36}/.test(globalUser)) {
+        userId = globalUser
+        logger.debug('🛠️ [DELEGATION] Recovered userId from global fallback', { userId })
+      }
+    }
+  } catch {}
+
+  logger.info('🔁 [DELEGATION_START]', {
+    delegation_entry: 'tool_invocation',
+    target_agent: agentId,
+    context_user_id: userId,
+    priority: normPriority,
+    task_preview: task.slice(0, 120)
+  })
 
   const input = [
     `Tarea: ${task}`,
@@ -202,6 +222,7 @@ async function runDelegation(params: {
       
       if (snapshot?.status === 'completed') {
         finalResult = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+        logger.info('✅ [DELEGATION_COMPLETE]', { executionId: execId, target_agent: agentId, context_user_id: userId })
         ActionLifecycle.result(actionId, { result: finalResult }, 'delegation completed')
         lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         // Emit completion events (legacy + new)
@@ -224,6 +245,7 @@ async function runDelegation(params: {
       }
       if (snapshot?.status === 'failed') {
         finalResult = `Delegation failed: ${snapshot?.error || 'unknown error'}`
+        logger.error('❌ [DELEGATION_FAILED]', { executionId: execId, target_agent: agentId, context_user_id: userId, error: snapshot?.error })
         ActionLifecycle.error(actionId, { message: finalResult, code: 'DELEGATION_FAILED' })
         lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         emitPipelineEvent({
@@ -251,6 +273,7 @@ async function runDelegation(params: {
   if (!finalResult) {
     const elapsed = Date.now() - startedAt
     finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
+    logger.warn('⏱️ [DELEGATION_TIMEOUT]', { executionId: execId, target_agent: agentId, context_user_id: userId, elapsedMs: elapsed })
     ActionLifecycle.timeout(actionId)
     lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
     emitPipelineEvent({
