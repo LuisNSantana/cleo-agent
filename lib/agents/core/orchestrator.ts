@@ -1000,7 +1000,10 @@ export class AgentOrchestrator {
       
       // If not a sub-agent, look in main agents
       if (!targetAgentConfig) {
-        const allAgents = await getAllAgents()
+        // Resolve userId preference chain safely (source execution > provided > current request)
+        const sourceExecUserId = delegationData.sourceExecutionId ? this.activeExecutions.get(delegationData.sourceExecutionId)?.userId : undefined
+        const candidateUserId = delegationData.userId || sourceExecUserId || getCurrentUserId()
+        const allAgents = await getAllAgents(candidateUserId)
         targetAgentConfig = allAgents.find(agent => agent.id === delegationData.targetAgent)
         
         // Legacy mappings now handled by canonicalizeAgentId()

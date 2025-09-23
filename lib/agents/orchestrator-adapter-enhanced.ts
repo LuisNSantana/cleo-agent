@@ -247,8 +247,13 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   try {
     let legacy = (globalThis as any).__cleoOrchestrator
     if (!legacy) {
-      const mod = require('@/lib/agents/agent-orchestrator')
-      legacy = mod.getAgentOrchestrator()
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require('@/lib/agents/agent-orchestrator')
+        legacy = mod.getAgentOrchestrator ? mod.getAgentOrchestrator() : (mod.default?.getAgentOrchestrator ? mod.default.getAgentOrchestrator() : null)
+      } catch (err) {
+        console.warn('[Enhanced Unified] Could not load legacy orchestrator', err)
+      }
     }
     if (legacy && typeof legacy.startAgentExecutionWithHistory === 'function') {
       const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
@@ -270,6 +275,20 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
     }
   } catch (e) {
     console.warn('[Enhanced Unified] Fallback path engaged', e)
+    // Best-effort structured log (synchronous) if logger available
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { emitExecutionEvent } = require('@/lib/agents/logging-events')
+      emitExecutionEvent({
+        trace_id: `fallback_${Date.now()}`,
+        execution_id: `fallback_${Date.now()}`,
+        agent_id: agentId || 'cleo-supervisor',
+        event: 'adapter.fallback',
+        level: 'warn',
+        state: 'running',
+        data: { error: e instanceof Error ? e.message : String(e), path: 'enhanced_adapter_createAndRunExecution' }
+      })
+    } catch {}
   }
   // Minimal fallback (rare)
   const exec: AgentExecution = {
