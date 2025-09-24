@@ -30,6 +30,7 @@ import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced
 import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
 import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
+import { isImageGenerationModel } from '@/lib/image-generation/models'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { dailyLimits } from "@/lib/daily-limits"
@@ -354,16 +355,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🎨 IMAGE GENERATION DETECTION
-    // Check if this is an image generation model
-    const isImageModel = originalModel.includes("image-preview") || 
-                        originalModel.includes("flash-lite") ||
-                        originalModel.includes("flux") ||
-                        originalModel.includes("dall-e") ||
-                        normalizedModel === "gemini-2.5-flash-image-preview" ||
-                        normalizedModel === "flux-1-schnell" ||
-                        normalizedModel === "flux-1-pro" ||
-                        normalizedModel === "dall-e-3"
+  // 🎨 IMAGE GENERATION DETECTION
+  const isImageModel = isImageGenerationModel(originalModel)
     
     if (userMessageText && isImageModel) {
       console.log('🎨 [IMAGE GENERATION] Image generation model detected, generating image for:', userMessageText)
