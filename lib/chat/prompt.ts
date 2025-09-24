@@ -5,13 +5,13 @@ import { generatePersonalizedPrompt } from '@/lib/prompts/personality'
 import { defaultPreferences, type PersonalitySettings } from '@/lib/user-preference-store/utils'
 import { getCleoPrompt } from '@/lib/prompts'
 import { pickBestAgent, analyzeDelegationIntent } from '@/lib/agents/delegation'
-import { detectEarlyIntent } from '@/lib/agents/router'
+import { detectEarlyIntent, type RouterDirective } from '@/lib/agents/router'
 import { trackFeatureUsage } from '@/lib/analytics'
 import { makeDelegationDecision, analyzeTaskComplexity } from '@/lib/agents/complexity-scorer'
 import type { AgentConfig } from '@/lib/agents/types'
 
 // Build a dynamic internal hint to steer delegation without exposing it to the user
-async function buildInternalDelegationHint(userMessage?: string, recommended?: { name: string; toolName?: string; reasons?: string[] }) {
+async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective) {
   const base = `\n\nOPTIMIZED AGENT SYSTEM ACTIVE:
 🚀 NEW ARCHITECTURE: 68% tool reduction vs legacy system
 ⚡ SMART ROUTING: Complexity-based delegation (simple=direct, complex=specialist)
@@ -87,39 +87,51 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: {
   // Fallback to provided recommendation
   if (recommended) {
     console.log(`📋 [DELEGATION] Using router recommendation:`, recommended)
-    // Map leaf tool hints (e.g., Gmail list/get) to actual delegate tools available to Cleo
     const leafToDelegateMap: Record<string, string> = {
-      // Gmail triage → Ami delegate
       listGmailMessages: 'delegate_to_ami',
       getGmailMessage: 'delegate_to_ami',
       modifyGmailLabels: 'delegate_to_ami',
       trashGmailMessage: 'delegate_to_ami',
-      // Gmail compose/send → Astra delegate
       sendGmailMessage: 'delegate_to_astra',
     }
-    let mappedTool = recommended.toolName && leafToDelegateMap[recommended.toolName]
-    // Guard: if the recommendation was a generic utility (time/weather) but the user message clearly mentions email/gmail, force Ami
+
+    const canonicalTool = recommended.toolName
+    let mappedTool = canonicalTool
+
+    if (recommended.action === 'delegate') {
+      if (recommended.leafTool && leafToDelegateMap[recommended.leafTool]) {
+        mappedTool = leafToDelegateMap[recommended.leafTool]
+      } else if (canonicalTool && leafToDelegateMap[canonicalTool]) {
+        mappedTool = leafToDelegateMap[canonicalTool]
+      }
+    }
+
     try {
       const low = (userMessage || '').toLowerCase()
       const mentionsEmail = /(email|gmail|correo|bandeja|inbox|correos)/.test(low)
-      if (!mappedTool && mentionsEmail && (recommended.toolName === 'time' || recommended.toolName === 'weather')) {
+      if (!mappedTool && mentionsEmail && canonicalTool && ['getCurrentDateTime', 'weatherInfo'].includes(canonicalTool)) {
         mappedTool = 'delegate_to_ami'
       }
     } catch {}
-    // Fallback by agent name if tool not provided
-    if (!mappedTool && /ami/i.test(recommended.name || '')) mappedTool = 'delegate_to_ami'
-    if (!mappedTool && /astra/i.test(recommended.name || '')) mappedTool = 'delegate_to_astra'
 
-    // If relative dates are present, recommend resolving time first
     const hasRelativeTime = /\b(hoy|mañana|ayer|esta semana|esta noche|today|tomorrow|yesterday|tonight|this week)\b/i.test(userMessage || '')
-    const timeNudge = hasRelativeTime ? ' First, call getCurrentDateTime to resolve the exact date/time; then proceed.' : ''
-    const toolPart = (mappedTool || recommended.toolName)
-      ? ` Prefer tool: ${mappedTool || recommended.toolName}.`
+    const needsTimeTool = canonicalTool === 'getCurrentDateTime'
+    const timeNudge = hasRelativeTime && !needsTimeTool
+      ? ' First, call getCurrentDateTime to resolve the exact date/time; then proceed.'
       : ''
-    const reasonPart = recommended.reasons && recommended.reasons.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
-    // Encourage immediate action to avoid "direct_or_clarify" fallthroughs
-    const actionPart = mappedTool ? ' Action: Call this tool now; do not answer directly.' : ''
-  return `${base}\n- Router recommendation: ${recommended.name}.${toolPart}${timeNudge}${reasonPart}${actionPart}`
+    const displayName = recommended.agentName || (mappedTool || canonicalTool || 'specialist').replace(/^delegate_to_/, '')
+    const toolPart = mappedTool ? ` Prefer tool: ${mappedTool}.` : canonicalTool ? ` Prefer tool: ${canonicalTool}.` : ''
+    const reasonPart = recommended.reasons?.length ? ` Reasons: ${recommended.reasons.join(', ')}.` : ''
+    const actionPart = recommended.action === 'delegate'
+      ? ' Action: Call this delegation tool now; do not answer directly.'
+      : canonicalTool
+        ? ' Action: Use this tool immediately; keep response concise.'
+        : ''
+    const confidencePart = typeof recommended.confidence === 'number'
+      ? ` Confidence: ${(recommended.confidence * 100).toFixed(0)}%.`
+      : ''
+
+    return `${base}\n- Router recommendation: ${displayName}.${toolPart}${timeNudge}${reasonPart}${actionPart}${confidencePart}`
   }
   
   console.log(`🔄 [DELEGATION] No delegation hints available`)
@@ -324,28 +336,25 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
   }
 
     // Phase 1: layered router hint (Capa 0 early rules -> capability-based)
-  let routerHint: { name: string; toolName?: string; reasons?: string[] } | undefined
+  let routerHint: RouterDirective | undefined
   
   // First, check if orchestrator already provided a routing hint in system messages
   const orchestratorHint = messages.find(m => 
     m.role === 'system' && 
     typeof m.content === 'string' && 
-    m.content.includes('🎯 IMMEDIATE DELEGATION REQUIRED')
+    m.content.startsWith('🎯 ROUTING DIRECTIVE ')
   )
-  
+
   if (orchestratorHint && typeof orchestratorHint.content === 'string') {
-    // Parse orchestrator hint to extract tool name
-    const hintContent = orchestratorHint.content
-    const toolMatch = hintContent.match(/You MUST use tool: ([a-zA-Z0-9_]+)/)
-    const nameMatch = hintContent.match(/User query is "([^"]+)"/)
-    
-    if (toolMatch && nameMatch) {
-      routerHint = {
-        name: nameMatch[1],
-        toolName: toolMatch[1],
-        reasons: ['Orchestrator routing hint detected']
+    const payloadText = orchestratorHint.content.replace('🎯 ROUTING DIRECTIVE ', '').trim()
+    try {
+      const parsed = JSON.parse(payloadText)
+      if (parsed?.type === 'routing-directive' && parsed?.directive) {
+        routerHint = parsed.directive as RouterDirective
+        console.log('🎯 [Prompt] Using orchestrator routing hint:', routerHint)
       }
-      console.log('🎯 [Prompt] Using orchestrator routing hint:', routerHint)
+    } catch (err) {
+      console.warn('⚠️ [Prompt] Failed to parse routing directive payload', err)
     }
   }
   
@@ -365,68 +374,72 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
       }
 
       if (userPlain.trim()) {
-      // 0) Try early intent detector first (time/weather/email)
-      const early = detectEarlyIntent(userPlain)
-      if (early) {
-        routerHint = early
-        // Fire-and-forget telemetry for early router trigger (non-blocking, guarded)
-        if (realUserId) {
-          ;(async () => {
-            try {
-              await trackFeatureUsage(realUserId, 'router.early', {
-                delta: 1,
-                metadata: {
-                  recommendation: early.name,
-                  tool: early.toolName || null,
-                  reasons: early.reasons || [],
-                },
-              })
-            } catch {}
-          })()
+        const early = detectEarlyIntent(userPlain)
+        if (early) {
+          routerHint = early
+          if (realUserId) {
+            ;(async () => {
+              try {
+                await trackFeatureUsage(realUserId, 'router.early', {
+                  delta: 1,
+                  metadata: {
+                    action: early.action,
+                    tool: early.toolName,
+                    agent: early.agentName || null,
+                    confidence: early.confidence,
+                    reasons: early.reasons,
+                  },
+                })
+              } catch {}
+            })()
+          }
+          throw new Error('__EARLY_ROUTER_HINT_FOUND__')
         }
-        // Skip further ranking; early rules are deterministic
-        // and should guide the LLM toward direct tool/clear delegation
-        throw new Error('__EARLY_ROUTER_HINT_FOUND__')
-      }
 
-      // 1) Fall back to capability-based ranking using active agents in DB
-      if (supabase && realUserId) {
-        const { data: agents } = await (supabase as any)
-          .from('agents')
-          .select('id, name, description, role, tags, tools, is_active')
-          .eq('user_id', realUserId)
-          .eq('is_active', true)
+        if (supabase && realUserId) {
+          const { data: agents } = await (supabase as any)
+            .from('agents')
+            .select('id, name, description, role, tags, tools, is_active')
+            .eq('user_id', realUserId)
+            .eq('is_active', true)
 
-        const candidates: AgentConfig[] = (agents || [])
-          .filter((a: any) => (a.role || '').toLowerCase() !== 'supervisor')
-          .map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            description: a.description || '',
-            role: 'specialist' as any,
-            model: '',
-            temperature: 0.7,
-            maxTokens: 0,
-            tools: Array.isArray(a.tools) ? a.tools : [],
-            prompt: '',
-            color: '',
-            icon: '',
-            tags: Array.isArray(a.tags) ? a.tags : [],
-          }))
+          const candidates: AgentConfig[] = (agents || [])
+            .filter((a: any) => (a.role || '').toLowerCase() !== 'supervisor')
+            .map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              description: a.description || '',
+              role: 'specialist' as any,
+              model: '',
+              temperature: 0.7,
+              maxTokens: 0,
+              tools: Array.isArray(a.tools) ? a.tools : [],
+              prompt: '',
+              color: '',
+              icon: '',
+              tags: Array.isArray(a.tags) ? a.tags : [],
+            }))
 
-        if (candidates.length) {
-          const ranked = pickBestAgent(userPlain, candidates)
-          if (ranked) {
-            // Prefer common default tool naming: delegate_to_<lowercased_name>
-            const normalized = ranked.agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-            const toolName = `delegate_to_${normalized}`
-            routerHint = { name: ranked.agent.name, toolName, reasons: ranked.reasons }
+          if (candidates.length) {
+            const ranked = pickBestAgent(userPlain, candidates)
+            if (ranked) {
+              const normalized = ranked.agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+              routerHint = {
+                source: 'early',
+                action: 'delegate',
+                toolName: `delegate_to_${normalized}`,
+                agentId: ranked.agent.id,
+                agentName: ranked.agent.name,
+                reasons: ranked.reasons,
+                confidence: Math.min(0.85, ranked.score ?? 0.85),
+              }
+            }
           }
         }
       }
+    } catch (e) {
+      // Non-blocking; ignore early-router sentinel error
     }
-  } catch (e) {
-    // Non-blocking; ignore early-router sentinel error
   }
 
   // Fetch user personality settings (if available) and build a compact personalized header
@@ -497,18 +510,19 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
     : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
 
-    // -------------------------------------------------------------
-    // Lightweight language detection & {{user_lang}} substitution
-    // -------------------------------------------------------------
+  if (
+    (typeof selectedBasePrompt === 'string' && selectedBasePrompt.includes('{{user_lang}}')) ||
+    (typeof ragSystemAddon === 'string' && ragSystemAddon.includes('{{user_lang}}'))
+  ) {
     let detectedLang = 'en'
     try {
-      const lastUser = [...messages].reverse().find(m => m.role === 'user')
-      const sampleText = typeof lastUser?.content === 'string'
-        ? lastUser?.content
-        : Array.isArray(lastUser?.content)
-          ? lastUser?.content.map((p: any) => (p?.type === 'text' ? p.text || p.content || '' : '')).join(' ') : ''
+      const lastUserDetect = [...messages].reverse().find(m => m.role === 'user')
+      const sampleText = typeof lastUserDetect?.content === 'string'
+        ? lastUserDetect?.content
+        : Array.isArray(lastUserDetect?.content)
+          ? lastUserDetect?.content.map((p: any) => (p?.type === 'text' ? p.text || p.content || '' : '')).join(' ')
+          : ''
       if (sampleText) {
-        // Very lightweight heuristics; avoids adding a dependency
         const text = sampleText.toLowerCase()
         const spanishSignals = [/\b(el|la|los|las|un|una|para|con|sobre|desde|cuando|donde)\b/, /\b(?:qué|por qué|cómo|cuándo|dónde|porque|gracias)\b/, /[áéíóúñ]/]
         const portugueseSignals = [/\b(para|como|onde|obrigado|você|não)\b/, /[ãõç]/]
@@ -519,15 +533,19 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
         else if (/\b(danke|bitte|und|nicht|warum)\b/.test(text)) detectedLang = 'de'
         else if (/\b(grazie|perché|come|dove|ciao)\b/.test(text)) detectedLang = 'it'
       }
-    } catch (e) {
+    } catch {
       // Fallback silently to 'en'
     }
 
-    selectedBasePrompt = selectedBasePrompt.replace(/\{\{user_lang\}\}/g, detectedLang)
-    ragSystemAddon = ragSystemAddon.replace(/\{\{user_lang\}\}/g, detectedLang)
+    selectedBasePrompt = typeof selectedBasePrompt === 'string'
+      ? selectedBasePrompt.replace(/\{\{user_lang\}\}/g, detectedLang)
+      : selectedBasePrompt
+    ragSystemAddon = typeof ragSystemAddon === 'string'
+      ? ragSystemAddon.replace(/\{\{user_lang\}\}/g, detectedLang)
+      : ragSystemAddon
+  }
 
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
-}
 }
 
 function ragSystemPromptIntro(ragBlock: string) {

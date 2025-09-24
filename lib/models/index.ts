@@ -62,7 +62,6 @@ const extraProviderModels: ModelConfig[] = [
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
     // Image generation models (valid OpenRouter models only)
     "openrouter:openai/dall-e-3", // 8 images/day - proven to work
-    "openrouter:google/gemini-2.5-flash-image-preview", // OpenRouter Gemini Nano Banana
     // High-end additions (paid)
     // Removed deprecated Nemotron Ultra 253B
     "openrouter:meta-llama/llama-3.1-405b-instruct",
@@ -83,7 +82,7 @@ const extraProviderModels: ModelConfig[] = [
   ]),
   // Add Google Gemini models for direct access
   ...pickById(geminiModels, [
-    "gemini-2.5-flash-image-preview", // Direct Google API for image generation
+    "gemini-2.5-flash-lite", // Restored Gemini Flash Lite model
   ]),
 ]
 

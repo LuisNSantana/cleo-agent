@@ -554,8 +554,11 @@ export class AgentOrchestrator {
     const routingHint = detectEarlyIntent(userMessage)
     
     if (routingHint) {
-      // Add routing hint as system message to guide Cleo's delegation decision
-      const hintMessage = `🎯 IMMEDIATE DELEGATION REQUIRED: User query is "${routingHint.name}" - ${routingHint.reasons.join('; ')}. You MUST use tool: ${routingHint.toolName} NOW. Do NOT answer directly. Call the delegation tool immediately.`
+      const hintPayload = {
+        type: 'routing-directive',
+        directive: routingHint,
+      }
+      const hintMessage = `🎯 ROUTING DIRECTIVE ${JSON.stringify(hintPayload)}`
       
       emitExecutionEvent({
         trace_id: execution.id,

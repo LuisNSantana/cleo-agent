@@ -9,10 +9,17 @@
  * direct tool calls or targeted delegation before invoking heavier scorers.
  */
 
-export type RouterRecommendation = {
-  name: string
-  toolName?: string
+export type RoutingAction = 'delegate' | 'tool'
+
+export interface RouterDirective {
+  source: 'early'
+  action: RoutingAction
+  toolName: string
   reasons: string[]
+  confidence: number
+  agentId?: string
+  agentName?: string
+  leafTool?: string
 }
 
 // Keyword sets (EN/ES) for early detection
@@ -79,80 +86,114 @@ function includesAny(text: string, list: string[]): boolean {
   return list.some(k => t.includes(k))
 }
 
-export function detectEarlyIntent(userText: string): RouterRecommendation | undefined {
+export function detectEarlyIntent(userText: string): RouterDirective | undefined {
   const text = (userText || '').toLowerCase().trim()
   if (!text) return undefined
 
   // 1) Email triage vs compose (PRIORITY over time/weather to avoid 'today' collisions)
   if (includesAny(text, EMAIL_TRIAGE_KEYWORDS)) {
-    // Triage stays local to Ami via Gmail tools
     return {
-      name: 'Ami (Email Triage)',
-      toolName: 'listGmailMessages',
-      reasons: ['email triage intent (read/summary/search)', 'prefer listGmailMessages/getGmailMessage']
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_ami',
+      agentId: 'ami-creative',
+      agentName: 'Ami (Email Triage)',
+      leafTool: 'listGmailMessages',
+      reasons: ['email triage intent (read/summary/search)', 'route to Ami to manage inbox safely'],
+      confidence: 0.95,
     }
   }
 
   if (includesAny(text, EMAIL_COMPOSE_KEYWORDS)) {
-    // Compose/drafting goes to Astra
     return {
-      name: 'Astra (Email Compose)',
+      source: 'early',
+      action: 'delegate',
       toolName: 'delegate_to_astra',
-      reasons: ['email compose/draft/reply intent', 'delegate to Astra for drafting/sending']
+      agentId: 'astra-email',
+      agentName: 'Astra (Email Compose)',
+      leafTool: 'sendGmailMessage',
+      reasons: ['email compose/draft/reply intent', 'Astra handles drafting and sending'],
+      confidence: 0.95,
     }
   }
 
   // If any general email/gmail mention exists (without explicit triage/compose), prefer Ami triage
   if (includesAny(text, EMAIL_GENERAL_KEYWORDS)) {
     return {
-      name: 'Ami (Email Triage)',
-      toolName: 'listGmailMessages',
-      reasons: ['general email/gmail intent detected', 'route to Ami for safe triage by default']
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_ami',
+      agentId: 'ami-creative',
+      agentName: 'Ami (Email Triage)',
+      leafTool: 'listGmailMessages',
+      reasons: ['general email intent detected', 'default to Ami for safe inbox access'],
+      confidence: 0.9,
     }
   }
 
   // 2) Utility: Time / Date
   if (includesAny(text, TIME_KEYWORDS)) {
     return {
-      name: 'Direct Utility Tooling',
-      toolName: 'time',
-      reasons: ['time/date intent detected (Capa 0)', 'use getCurrentDateTime/time tool directly']
+      source: 'early',
+      action: 'tool',
+      toolName: 'getCurrentDateTime',
+      agentName: 'Utility: Time',
+      reasons: ['time/date intent detected (Capa 0)', 'call getCurrentDateTime tool directly'],
+      confidence: 0.9,
     }
   }
 
   // 3) Utility: Weather
   if (includesAny(text, WEATHER_KEYWORDS)) {
     return {
-      name: 'Direct Utility Tooling',
-      toolName: 'weather',
-      reasons: ['weather intent detected (Capa 0)', 'use weather/weatherInfo tool directly']
+      source: 'early',
+      action: 'tool',
+      toolName: 'weatherInfo',
+      agentName: 'Utility: Weather',
+      reasons: ['weather intent detected (Capa 0)', 'call weatherInfo tool directly'],
+      confidence: 0.9,
     }
   }
 
   // 4) Calendar → Ami (manager/secretary)
   if (includesAny(text, CALENDAR_KEYWORDS)) {
     return {
-      name: 'Ami (Calendar Management)',
-      toolName: 'createCalendarEvent',
-      reasons: ['calendar intent detected (Capa 0)', 'Ami handles scheduling and calendar management']
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_ami',
+      agentId: 'ami-creative',
+      agentName: 'Ami (Calendar Management)',
+      leafTool: 'createCalendarEvent',
+      reasons: ['calendar intent detected (Capa 0)', 'Ami manages scheduling and invitations'],
+      confidence: 0.92,
     }
   }
 
   // 5) Google Workspace (Docs/Sheets/Drive/Slides) → Peter
   if (includesAny(text, GOOGLE_WORKSPACE_KEYWORDS)) {
     return {
-      name: 'Peter (Google Workspace)',
+      source: 'early',
+      action: 'delegate',
       toolName: 'delegate_to_peter',
-      reasons: ['google workspace intent detected (Docs/Sheets/Drive/Slides)', 'delegate to Peter for creation/organization']
+      agentId: 'peter-google',
+      agentName: 'Peter (Google Workspace)',
+      leafTool: 'delegate_to_peter',
+      reasons: ['google workspace intent detected (Docs/Sheets/Drive/Slides)', 'delegate to Peter for document creation/organization'],
+      confidence: 0.9,
     }
   }
 
   // 6) Notion → delegate to Notion Agent
   if (includesAny(text, NOTION_KEYWORDS)) {
     return {
-      name: 'Notion Agent (Workspace)',
+      source: 'early',
+      action: 'delegate',
       toolName: 'delegate_to_notion_agent',
-      reasons: ['notion/workspace intent detected', 'delegate to Notion Agent for workspace tasks']
+      agentId: 'notion-agent',
+      agentName: 'Notion Agent (Workspace)',
+      leafTool: 'delegate_to_notion_agent',
+      reasons: ['notion/workspace intent detected', 'delegate to Notion Agent for workspace tasks'],
+      confidence: 0.88,
     }
   }
 
