@@ -549,6 +549,37 @@ export class AgentOrchestrator {
   ): Promise<ExecutionResult> {
     const userMessage = String(context.messageHistory[context.messageHistory.length - 1]?.content || '')
     
+    // 🎯 Early Intent Detection - Provide routing hints to Cleo supervisor
+    const { detectEarlyIntent } = await import('../router')
+    const routingHint = detectEarlyIntent(userMessage)
+    
+    if (routingHint) {
+      // Add routing hint as system message to guide Cleo's delegation decision
+      const hintMessage = `🎯 ROUTING HINT: User query appears to be "${routingHint.name}" - ${routingHint.reasons.join('; ')}. Consider using tool: ${routingHint.toolName}`
+      
+      emitExecutionEvent({
+        trace_id: execution.id,
+        execution_id: execution.id,
+        agent_id: execution.agentId,
+        user_id: execution.userId,
+        thread_id: execution.threadId,
+        state: execution.status,
+        event: 'routing.hint_detected',
+        level: 'info',
+        data: { hint: routingHint, userMessage: userMessage.slice(0, 100) }
+      })
+
+      // Modify context to include routing hint
+      context = {
+        ...context,
+        messageHistory: [
+          ...context.messageHistory.slice(0, -1),
+          new SystemMessage(hintMessage),
+          context.messageHistory[context.messageHistory.length - 1] // Keep original user message last
+        ]
+      }
+    }
+    
     // Set execution context for delegation tracking throughout supervisor execution
     if (this.executionManager?.setExecutionContext) {
       this.executionManager.setExecutionContext(execution.id)

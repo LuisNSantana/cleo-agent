@@ -63,7 +63,7 @@ const CALENDAR_KEYWORDS = [
   // English
   'calendar', 'schedule', 'meeting', 'appointment', 'invite', 'event', 'book a meeting', 'calendar invite', 'set up a meeting',
   // Spanish
-  'calendario', 'agendar', 'reunión', 'reunion', 'cita', 'invitar', 'evento', 'agendar reunión', 'agendar reunion', 'programar reunión'
+  'calendario', 'agenda', 'agendar', 'reunión', 'reunion', 'cita', 'invitar', 'evento', 'agendar reunión', 'agendar reunion', 'programar reunión'
 ]
 
 // Notion intents
