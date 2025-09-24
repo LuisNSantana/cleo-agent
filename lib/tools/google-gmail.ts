@@ -128,10 +128,10 @@ function encodeRFC2047(text: string): string {
 
 // 📥 List messages
 export const listGmailMessagesTool = tool({
-  description: '📥 List Gmail messages. Supports Gmail search query, label filters, and max results. Returns lightweight metadata (From, Subject, Date, Snippet).',
+  description: '📥 List Gmail messages. Supports Gmail search query, label filters, and max results. Returns lightweight metadata (From, Subject, Date, Snippet). By default returns INBOX messages. For unread emails, use q="is:unread" or labelIds=["UNREAD"].',
   inputSchema: z.object({
-    q: z.string().optional().describe('Gmail search query, e.g. "from:foo@bar.com is:unread newer_than:7d"'),
-    labelIds: z.array(z.string()).optional().describe('Filter by label IDs (e.g., ["INBOX","UNREAD"])'),
+    q: z.string().optional().describe('Gmail search query, e.g. "from:foo@bar.com is:unread newer_than:7d". Use "is:unread" for unread messages.'),
+    labelIds: z.array(z.string()).optional().describe('Filter by label IDs (e.g., ["INBOX","UNREAD"]). Use ["UNREAD"] for unread messages.'),
     maxResults: z.number().min(1).max(20).default(10).describe('Max messages to return (1-20). Default 10.'),
     includeSpamTrash: z.boolean().optional().default(false),
   }),
@@ -145,10 +145,20 @@ export const listGmailMessagesTool = tool({
 
       const params = new URLSearchParams({ maxResults: String(maxResults), includeSpamTrash: String(includeSpamTrash) })
       if (q) params.append('q', q)
-      if (labelIds && labelIds.length) labelIds.forEach(l => params.append('labelIds', l))
+      if (labelIds && labelIds.length) {
+        labelIds.forEach(l => params.append('labelIds', l))
+      } else if (!q) {
+        // If no query and no labels specified, default to INBOX messages
+        params.append('labelIds', 'INBOX')
+      }
 
       const list = await gmailRequest(token, `users/me/messages?${params}`)
       const ids: string[] = list.messages?.map((m: any) => m.id) ?? []
+      
+      console.log(`[Gmail] Query: ${params.toString()}, Found ${ids.length} message IDs, Raw response count: ${list.messages?.length || 0}`)
+      if (ids.length === 0) {
+        console.log(`[Gmail] No messages found. Estimated count from API: ${list.resultSizeEstimate || 'not provided'}`)
+      }
 
       // Fetch metadata for each message in parallel (max 10 concurrent)
       const results: any[] = []

@@ -555,7 +555,7 @@ export class AgentOrchestrator {
     
     if (routingHint) {
       // Add routing hint as system message to guide Cleo's delegation decision
-      const hintMessage = `🎯 ROUTING HINT: User query appears to be "${routingHint.name}" - ${routingHint.reasons.join('; ')}. Consider using tool: ${routingHint.toolName}`
+      const hintMessage = `🎯 IMMEDIATE DELEGATION REQUIRED: User query is "${routingHint.name}" - ${routingHint.reasons.join('; ')}. You MUST use tool: ${routingHint.toolName} NOW. Do NOT answer directly. Call the delegation tool immediately.`
       
       emitExecutionEvent({
         trace_id: execution.id,

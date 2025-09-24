@@ -696,6 +696,9 @@ export async function POST(req: Request) {
         projectId,
         debugRag,
       })
+  if (!promptBuild) {
+    throw new Error('Failed to build final system prompt')
+  }
   finalSystemPrompt = promptBuild.finalSystemPrompt
   const usedContext = promptBuild.usedContext
 

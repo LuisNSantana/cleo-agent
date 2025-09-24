@@ -263,7 +263,43 @@ export class GraphBuilder {
           : baseModel
 
   // Prepare messages with agent prompt
-        const systemMessage = new SystemMessage(agentConfig.prompt)
+        // For Cleo supervisor agent, use dynamic prompt building to include routing hints and RAG
+        let systemMessage: SystemMessage
+        if (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') {
+          try {
+            const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
+            const { createClient } = await import('@/lib/supabase/server')
+            
+            // Extract user message for context
+            const userMessage = filteredStateMessages.find(m => m.constructor.name === 'HumanMessage')?.content
+            
+            // Convert BaseMessage to compatible format
+            const messagesForPrompt = filteredStateMessages.map(msg => ({
+              role: msg.constructor.name === 'HumanMessage' ? 'user' : 
+                    msg.constructor.name === 'AIMessage' ? 'assistant' : 
+                    msg.constructor.name === 'SystemMessage' ? 'system' : 'assistant',
+              content: msg.content
+            }))
+            
+            const promptResult = await buildFinalSystemPrompt({
+              baseSystemPrompt: agentConfig.prompt,
+              model: agentConfig.model,
+              messages: messagesForPrompt,
+              supabase: await createClient(),
+              realUserId: state.userId,
+              enableSearch: true,
+              debugRag: false
+            })
+            
+            systemMessage = new SystemMessage(promptResult?.finalSystemPrompt ?? agentConfig.prompt)
+            logger.debug('🧠 [Cleo] Using dynamic system prompt with routing hints and RAG')
+          } catch (error) {
+            logger.warn('⚠️ [Cleo] Failed to build dynamic prompt, falling back to static:', error)
+            systemMessage = new SystemMessage(agentConfig.prompt)
+          }
+        } else {
+          systemMessage = new SystemMessage(agentConfig.prompt)
+        }
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
   // Execution safety caps - higher for supervisor agents with delegation
@@ -640,7 +676,43 @@ export class GraphBuilder {
           : baseModel
 
   // Prepare messages with agent prompt
-        const systemMessage = new SystemMessage(agentConfig.prompt)
+        // For Cleo supervisor agent, use dynamic prompt building to include routing hints and RAG (legacy path)
+        let systemMessage: SystemMessage
+        if (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') {
+          try {
+            const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
+            const { createClient } = await import('@/lib/supabase/server')
+            
+            // Extract user message for context
+            const userMessage = filteredStateMessages.find(m => m.constructor.name === 'HumanMessage')?.content
+            
+            // Convert BaseMessage to compatible format
+            const messagesForPrompt = filteredStateMessages.map(msg => ({
+              role: msg.constructor.name === 'HumanMessage' ? 'user' : 
+                    msg.constructor.name === 'AIMessage' ? 'assistant' : 
+                    msg.constructor.name === 'SystemMessage' ? 'system' : 'assistant',
+              content: msg.content
+            }))
+            
+            const promptResult = await buildFinalSystemPrompt({
+              baseSystemPrompt: agentConfig.prompt,
+              model: agentConfig.model,
+              messages: messagesForPrompt,
+              supabase: await createClient(),
+              realUserId: state.userId,
+              enableSearch: true,
+              debugRag: false
+            })
+            
+            systemMessage = new SystemMessage(promptResult?.finalSystemPrompt ?? agentConfig.prompt)
+            logger.debug('🧠 [Cleo Legacy] Using dynamic system prompt with routing hints and RAG')
+          } catch (error) {
+            logger.warn('⚠️ [Cleo Legacy] Failed to build dynamic prompt, falling back to static:', error)
+            systemMessage = new SystemMessage(agentConfig.prompt)
+          }
+        } else {
+          systemMessage = new SystemMessage(agentConfig.prompt)
+        }
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
   // Execution safety caps - higher for supervisor agents with delegation

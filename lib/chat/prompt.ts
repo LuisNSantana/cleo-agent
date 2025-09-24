@@ -323,22 +323,48 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     }
   }
 
-  // Phase 1: layered router hint (Capa 0 early rules -> capability-based)
+    // Phase 1: layered router hint (Capa 0 early rules -> capability-based)
   let routerHint: { name: string; toolName?: string; reasons?: string[] } | undefined
-  try {
-    const lastUser = messages.slice().reverse().find((m) => m.role === 'user')
-    let userPlain = ''
-    if (lastUser) {
-      if (typeof lastUser.content === 'string') userPlain = lastUser.content
-      else if (Array.isArray(lastUser.content)) {
-        userPlain = lastUser.content
-          .filter((p: any) => p?.type === 'text')
-          .map((p: any) => p.text || p.content || '')
-          .join('\n')
+  
+  // First, check if orchestrator already provided a routing hint in system messages
+  const orchestratorHint = messages.find(m => 
+    m.role === 'system' && 
+    typeof m.content === 'string' && 
+    m.content.includes('🎯 IMMEDIATE DELEGATION REQUIRED')
+  )
+  
+  if (orchestratorHint && typeof orchestratorHint.content === 'string') {
+    // Parse orchestrator hint to extract tool name
+    const hintContent = orchestratorHint.content
+    const toolMatch = hintContent.match(/You MUST use tool: ([a-zA-Z0-9_]+)/)
+    const nameMatch = hintContent.match(/User query is "([^"]+)"/)
+    
+    if (toolMatch && nameMatch) {
+      routerHint = {
+        name: nameMatch[1],
+        toolName: toolMatch[1],
+        reasons: ['Orchestrator routing hint detected']
       }
+      console.log('🎯 [Prompt] Using orchestrator routing hint:', routerHint)
     }
+  }
+  
+  // If no orchestrator hint, detect from user message
+  if (!routerHint) {
+    try {
+      const lastUser = messages.slice().reverse().find((m) => m.role === 'user')
+      let userPlain = ''
+      if (lastUser) {
+        if (typeof lastUser.content === 'string') userPlain = lastUser.content
+        else if (Array.isArray(lastUser.content)) {
+          userPlain = lastUser.content
+            .filter((p: any) => p?.type === 'text')
+            .map((p: any) => p.text || p.content || '')
+            .join('\n')
+        }
+      }
 
-    if (userPlain.trim()) {
+      if (userPlain.trim()) {
       // 0) Try early intent detector first (time/weather/email)
       const early = detectEarlyIntent(userPlain)
       if (early) {
@@ -365,38 +391,38 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
 
       // 1) Fall back to capability-based ranking using active agents in DB
       if (supabase && realUserId) {
-      const { data: agents } = await (supabase as any)
-        .from('agents')
-        .select('id, name, description, role, tags, tools, is_active')
-        .eq('user_id', realUserId)
-        .eq('is_active', true)
+        const { data: agents } = await (supabase as any)
+          .from('agents')
+          .select('id, name, description, role, tags, tools, is_active')
+          .eq('user_id', realUserId)
+          .eq('is_active', true)
 
-      const candidates: AgentConfig[] = (agents || [])
-        .filter((a: any) => (a.role || '').toLowerCase() !== 'supervisor')
-        .map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          description: a.description || '',
-          role: 'specialist' as any,
-          model: '',
-          temperature: 0.7,
-          maxTokens: 0,
-          tools: Array.isArray(a.tools) ? a.tools : [],
-          prompt: '',
-          color: '',
-          icon: '',
-          tags: Array.isArray(a.tags) ? a.tags : [],
-        }))
+        const candidates: AgentConfig[] = (agents || [])
+          .filter((a: any) => (a.role || '').toLowerCase() !== 'supervisor')
+          .map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            description: a.description || '',
+            role: 'specialist' as any,
+            model: '',
+            temperature: 0.7,
+            maxTokens: 0,
+            tools: Array.isArray(a.tools) ? a.tools : [],
+            prompt: '',
+            color: '',
+            icon: '',
+            tags: Array.isArray(a.tags) ? a.tags : [],
+          }))
 
-      if (candidates.length) {
-        const ranked = pickBestAgent(userPlain, candidates)
-        if (ranked) {
-          // Prefer common default tool naming: delegate_to_<lowercased_name>
-          const normalized = ranked.agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-          const toolName = `delegate_to_${normalized}`
-          routerHint = { name: ranked.agent.name, toolName, reasons: ranked.reasons }
+        if (candidates.length) {
+          const ranked = pickBestAgent(userPlain, candidates)
+          if (ranked) {
+            // Prefer common default tool naming: delegate_to_<lowercased_name>
+            const normalized = ranked.agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+            const toolName = `delegate_to_${normalized}`
+            routerHint = { name: ranked.agent.name, toolName, reasons: ranked.reasons }
+          }
         }
-      }
       }
     }
   } catch (e) {
@@ -501,6 +527,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
     ragSystemAddon = ragSystemAddon.replace(/\{\{user_lang\}\}/g, detectedLang)
 
   return { finalSystemPrompt, usedContext: !!ragSystemAddon }
+}
 }
 
 function ragSystemPromptIntro(ragBlock: string) {
