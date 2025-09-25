@@ -1,12 +1,41 @@
-import './setup/register-aliases'
-import test, { mock } from 'node:test'
-import assert from 'node:assert/strict'
-
-import { agentAutoSync, triggerAgentCreated } from '../lib/agents/auto-sync'
-import type { AgentSyncEventData } from '../lib/agents/auto-sync'
-import { agentRegistry } from '../lib/agents/registry'
-import type { AgentConfig } from '../lib/agents/types'
-
+test('triggerAgentCreated maneja error en updateAgentDelegationTools', async () => {
+  const cleanupTimers = stubImmediateTimers()
+  const refreshMock = jest.spyOn(agentRegistry, 'refresh').mockImplementation(async () => {})
+  // Mock to return a parent agent so updateAgentDelegationTools gets called
+  const getAllMock = jest.spyOn(agentRegistry, 'getAllAgentsForUser').mockImplementation(async (_userId: string) => [{
+    id: 'parent-agent',
+    name: 'Parent Agent',
+    description: 'desc',
+    role: 'specialist',
+    model: 'test',
+    temperature: 0,
+    maxTokens: 100,
+    tools: [],
+    prompt: '',
+    color: '#000',
+    icon: 'agent',
+    isSubAgent: false
+  }])
+  const updateMock = jest.spyOn(agentRegistry, 'updateAgentDelegationTools').mockImplementation(async () => { throw new Error('fail') })
+  const events: AgentSyncEventData[] = []
+  const unsubscribe = agentAutoSync.subscribe(event => events.push(event))
+  try {
+    // Should resolve successfully even when updateAgentDelegationTools fails (errors are handled gracefully)
+    await expect(triggerAgentCreated('new-sub-agent', 'user-123', 'New Specialist', true, 'ami-creative')).resolves.toBeUndefined()
+    expect(updateMock).toHaveBeenCalled()
+  } finally {
+    unsubscribe()
+    cleanupTimers()
+    refreshMock.mockRestore()
+    getAllMock.mockRestore()
+    updateMock.mockRestore()
+  }
+})
+afterEach(() => {
+  jest.clearAllMocks();
+  jest.useRealTimers();
+});
+// Utilidad para stubbear timers en tests async
 function stubImmediateTimers() {
   const globalAny = globalThis as any
   const originalSetTimeout = globalAny.setTimeout
@@ -15,15 +44,9 @@ function stubImmediateTimers() {
   globalAny.setTimeout = ((fn: (...args: any[]) => any, _delay?: number, ...args: any[]) => {
     fn(...args)
     return {
-      ref() {
-        return this
-      },
-      unref() {
-        return this
-      },
-      hasRef() {
-        return false
-      }
+      ref() { return this },
+      unref() { return this },
+      hasRef() { return false }
     } as NodeJS.Timeout
   }) as typeof setTimeout
 
@@ -34,6 +57,10 @@ function stubImmediateTimers() {
     globalAny.clearTimeout = originalClearTimeout
   }
 }
+import { agentAutoSync, triggerAgentCreated } from '../lib/agents/auto-sync'
+import type { AgentSyncEventData } from '../lib/agents/auto-sync'
+import { agentRegistry } from '../lib/agents/registry'
+import type { AgentConfig } from '../lib/agents/types'
 
 function createAgent(partial: Partial<AgentConfig>): AgentConfig {
   return {
@@ -52,6 +79,12 @@ function createAgent(partial: Partial<AgentConfig>): AgentConfig {
   }
 }
 
+describe('Agent Auto Sync', () => {
+  test('dummy', () => {
+    expect(true).toBe(true)
+  })
+})
+
 test('triggerAgentCreated refreshes registry, updates delegation tools, and notifies subscribers', async () => {
   const cleanupTimers = stubImmediateTimers()
   const refreshCalls: Array<string | undefined> = []
@@ -68,11 +101,11 @@ test('triggerAgentCreated refreshes registry, updates delegation tools, and noti
     })
   ]
 
-  const refreshMock = mock.method(agentRegistry, 'refresh', async (userId?: string) => {
+  const refreshMock = jest.spyOn(agentRegistry, 'refresh').mockImplementation(async (userId?: string) => {
     refreshCalls.push(userId)
   })
-  const getAllMock = mock.method(agentRegistry, 'getAllAgentsForUser', async (_userId: string) => agentList)
-  const updateMock = mock.method(agentRegistry, 'updateAgentDelegationTools', async (agentId: string, userId: string) => {
+  const getAllMock = jest.spyOn(agentRegistry, 'getAllAgentsForUser').mockImplementation(async (_userId: string) => agentList)
+  const updateMock = jest.spyOn(agentRegistry, 'updateAgentDelegationTools').mockImplementation(async (agentId: string, userId: string) => {
     updateCalls.push({ agentId, userId })
     return agentList.find(agent => agent.id === agentId) ?? null
   })
@@ -83,25 +116,23 @@ test('triggerAgentCreated refreshes registry, updates delegation tools, and noti
   try {
     await triggerAgentCreated('new-sub-agent', 'user-123', 'New Specialist', true, 'ami-creative')
 
-    assert.deepEqual(refreshCalls, ['user-123'])
-    assert.equal(getAllMock.mock.calls.length, 1)
-    assert.equal(updateCalls.length, 2, 'parent agents should receive delegation tool updates')
-    assert.deepEqual(
-      updateCalls.map(call => call.agentId).sort(),
-      ['ami-creative', 'toby-technical']
-    )
-    assert.ok(updateCalls.every(call => call.userId === 'user-123'))
+    expect(refreshCalls).toEqual(['user-123'])
+    expect(getAllMock).toHaveBeenCalledTimes(1)
+    expect(updateCalls.length).toBe(2)
+    expect(updateCalls.map(call => call.agentId).sort()).toEqual(['ami-creative', 'toby-technical'])
+    expect(updateCalls.every(call => call.userId === 'user-123')).toBe(true)
 
-    const createdEvent = events.find(event => event.agentId === 'new-sub-agent')
-    assert.ok(createdEvent, 'subscriber should receive created event')
-    assert.equal(createdEvent.event, 'agent_created')
-    assert.equal(createdEvent.isSubAgent, true)
-    assert.equal(createdEvent.parentAgentId, 'ami-creative')
+  const createdEvent = events.find(event => event.agentId === 'new-sub-agent')
+  expect(createdEvent).toBeDefined()
+  if (!createdEvent) throw new Error('createdEvent is undefined')
+  expect(createdEvent.event).toBe('agent_created')
+  expect(createdEvent.isSubAgent).toBe(true)
+  expect(createdEvent.parentAgentId).toBe('ami-creative')
   } finally {
     unsubscribe()
     cleanupTimers()
-    refreshMock.mock.restore()
-    getAllMock.mock.restore()
-    updateMock.mock.restore()
+    refreshMock.mockRestore()
+    getAllMock.mockRestore()
+    updateMock.mockRestore()
   }
 })

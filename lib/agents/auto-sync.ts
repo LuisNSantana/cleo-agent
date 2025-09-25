@@ -82,6 +82,10 @@ class AgentAutoSync {
       logger.agentSync(`Agent sync completed for user ${eventData.userId}`)
     } catch (error) {
       logger.error('AGENT-SYNC', 'Error during agent sync', { error, eventData })
+      // Re-throw errors in test environment for proper testing
+      if (process.env.NODE_ENV === 'test') {
+        throw error
+      }
     }
   }
 

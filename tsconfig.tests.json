@@ -18,10 +18,10 @@
       "@/lib/tools/delegation": ["tests/stubs/lib/tools/delegation"],
       "@langchain/core/messages": ["tests/stubs/langchain/messages"]
     },
-    "types": ["node"],
+  "types": ["node", "jest"],
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["tests/**/*.ts", "lib/tools/context-wrapper.ts"],
+  "include": ["tests/global.d.ts", "tests/**/*.ts", "lib/tools/context-wrapper.ts"],
   "exclude": ["node_modules"]
 }

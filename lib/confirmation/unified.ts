@@ -1,3 +1,9 @@
+// TEST-ONLY: Expose pending confirmation IDs for testing
+export function __getLatestPendingConfirmationIdForTest(): string | undefined {
+  // Return the most recently added confirmation ID, or undefined
+  const keys = Array.from(pendingConfirmations.keys())
+  return keys.length ? keys[keys.length - 1] : undefined
+}
 /**
  * 🛡️ Unified Tool Confirmation System
  * Single source of truth - like ChatGPT, Claude, Perplexity
@@ -34,7 +40,7 @@ export interface ConfirmationRequest {
 const pendingConfirmations = new Map<string, ConfirmationRequest>()
 
 // Cleanup old confirmations (5 minute timeout)
-setInterval(() => {
+const confirmationCleanupInterval = setInterval(() => {
   const now = Date.now()
   const timeout = 5 * 60 * 1000
   
@@ -45,6 +51,11 @@ setInterval(() => {
     }
   }
 }, 60000)
+
+// TEST-ONLY: Cleanup function to clear the interval in tests
+export function __clearConfirmationIntervalForTest() {
+  clearInterval(confirmationCleanupInterval)
+}
 
 /**
  * Check if tool needs confirmation
