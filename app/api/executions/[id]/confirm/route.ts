@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server'
 import { resolveConfirmation } from '@/lib/confirmation/unified'
 
 // POST /api/executions/[id]/confirm
-export async function POST(req: NextRequest, context: { params: { id: string } }) {
+// Some Next.js versions have stricter typing for the context argument; use `any` to satisfy build-time check
+export async function POST(req: NextRequest, context: any) {
   try {
     const { params } = context
     const { approved } = await req.json()

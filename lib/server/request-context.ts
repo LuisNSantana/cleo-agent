@@ -19,8 +19,10 @@ let storage: ALS<RequestContext> | undefined
 
 if (isServer) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { AsyncLocalStorage } = require('async_hooks') as typeof import('async_hooks')
+    // Use eval to avoid static bundler resolution in client/edge builds
+    // eslint-disable-next-line no-eval
+    const nodeRequire = eval('require') as NodeRequire
+    const { AsyncLocalStorage } = nodeRequire('async_hooks') as typeof import('async_hooks')
     storage = new AsyncLocalStorage<RequestContext>()
   } catch (e) {
     console.warn('[request-context] Failed to load async_hooks; falling back to in-memory shim', e)
