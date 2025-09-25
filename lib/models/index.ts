@@ -61,7 +61,8 @@ const extraProviderModels: ModelConfig[] = [
     // Premium multimodal models with daily limits
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
     // Image generation models (valid OpenRouter models only)
-    "openrouter:openai/dall-e-3", // 8 images/day - proven to work
+  "openrouter:openai/dall-e-3", // 8 images/day - proven to work
+  "openrouter:google/gemini-2.5-flash-image-preview", // Nano Banana: Gemini text-to-image
     // High-end additions (paid)
     // Removed deprecated Nemotron Ultra 253B
     "openrouter:meta-llama/llama-3.1-405b-instruct",
