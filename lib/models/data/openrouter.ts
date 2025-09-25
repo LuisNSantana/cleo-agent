@@ -43,7 +43,7 @@ export const openrouterModels: ModelConfig[] = [
   // Google Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
   {
     id: "openrouter:google/gemini-2.5-flash-image-preview",
-    name: "Gemini 2.5 Flash Image Preview (Nano Banana)",
+  name: "Nano Banana",
     provider: "OpenRouter",
     providerId: "openrouter",
     modelFamily: "Gemini",
@@ -67,7 +67,7 @@ export const openrouterModels: ModelConfig[] = [
     apiDocs: "https://openrouter.ai/google/gemini-2.5-flash-image-preview",
     modelPage: "https://ai.google.dev/gemini-api/docs/vision",
     releasedAt: "2025-08-01",
-    dailyLimit: 5, // 5 images per day - text-to-image generation
+  dailyLimit: 100, // 100 images por día para pruebas
     icon: "gemini",
     apiSdk: (apiKey?: string) =>
       createOpenRouter({

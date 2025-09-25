@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    // Use Google Gemini 2.5 Flash Image Preview directly (Nano Banana) for actual image generation
-    const modelId = 'gemini-2.5-flash-image-preview'
+    // Usar solo el modelo Nano Banana para generación de imágenes
+    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
     console.log('🎯 [DEBUG] Using modelId:', modelId)
-    
-    // Get the actual model configuration
+
+    // Obtener la configuración del modelo
     const modelConfig = MODELS.find(m => m.id === modelId)
     console.log('🎯 [DEBUG] Model config found:', !!modelConfig)
     if (!modelConfig) {
@@ -57,14 +57,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check daily limits for authenticated users
+    // Solo aplicar daily limit para este modelo de imagen
     if (user?.id) {
       const limitCheck = await dailyLimits.canUseModel(user.id, modelId, modelConfig)
-      
       if (!limitCheck.canUse) {
         return NextResponse.json(
           { 
-            error: `Daily limit reached for image generation. You have used all ${limitCheck.limit} images for today. Try again tomorrow.`,
+            error: `Daily limit reached for Nano Banana. You have used all ${limitCheck.limit} images for today. Try again tomorrow.`,
             limitReached: true,
             limit: limitCheck.limit,
             remaining: limitCheck.remaining
