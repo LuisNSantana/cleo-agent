@@ -5,7 +5,7 @@ test('analyzeDelegationIntent retorna null si el input es vacío', () => {
 
 test('analyzeForDelegationWithCapabilities maneja error en getAllAgentCapabilities', async () => {
   const capMock = jest.spyOn(capabilityInspector, 'getAllAgentCapabilities').mockImplementation(async () => { throw new Error('fail') })
-  await expect(analyzerModule.analyzeForDelegationWithCapabilities('msg', 'ami-creative')).rejects.toThrow('fail')
+  await expect(analyzerModule.analyzeForDelegationWithCapabilities('msg', 'ami-creative', undefined, undefined, 'test-user-id')).rejects.toThrow('fail')
   capMock.mockRestore()
 })
 afterEach(() => {
@@ -78,7 +78,8 @@ test('analyzeForDelegationWithCapabilities keeps work with capable current agent
       'Need help organizing my Notion workspace and keeping tasks updated',
       'ami-creative',
       undefined,
-      null // suggestion override
+      null, // suggestion override
+      'test-user-id'
     )
 
     expect(result.shouldDelegate).toBe(false)

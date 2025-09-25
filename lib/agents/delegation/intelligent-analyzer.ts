@@ -618,10 +618,11 @@ export function getDelegationSuggestions(userText: string): string[] {
  * Integrates agent capability inspector for smarter delegation decisions
  */
 export async function analyzeForDelegationWithCapabilities(
-  userText: string, 
+  userText: string,
   currentAgentId?: string,
   context?: string,
-  _suggestionOverride?: DelegationSuggestion | null // For testing purposes
+  _suggestionOverride?: DelegationSuggestion | null, // For testing purposes
+  userId?: string
 ): Promise<{
   suggestion: DelegationSuggestion | null
   agentCapabilities: Record<string, any>
@@ -630,10 +631,10 @@ export async function analyzeForDelegationWithCapabilities(
 }> {
   // Get standard delegation suggestion (allow override for testing)
   const suggestion = _suggestionOverride !== undefined ? _suggestionOverride : analyzeDelegationIntent(userText, context)
-  
-  // Get capabilities of all available agents
-  const capabilities = await getAllAgentCapabilities()
-  
+
+  // Get capabilities of all available agents for this user
+  const capabilities = await getAllAgentCapabilities(userId)
+
   // Analyze if current agent can handle the task
   let currentAgentCaps = null
   if (currentAgentId) {
@@ -644,10 +645,10 @@ export async function analyzeForDelegationWithCapabilities(
       currentAgentCaps = null
     }
   }
-  
+
   const reasoning: string[] = []
   let shouldDelegate = false
-  
+
   if (suggestion && suggestion.confidence > 0.6) {
     // High confidence delegation
     shouldDelegate = true
@@ -666,7 +667,7 @@ export async function analyzeForDelegationWithCapabilities(
       reasoning.push(...canCurrentAgentHandle.reasons)
     }
   }
-  
+
   return {
     suggestion,
     agentCapabilities: capabilities,
