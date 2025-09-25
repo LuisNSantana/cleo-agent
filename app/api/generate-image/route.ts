@@ -204,9 +204,6 @@ export async function POST(request: NextRequest) {
       if (errorMessage.includes('api key') || errorMessage.includes('unauthorized')) {
         userMessage = "Service temporarily unavailable. Please try again later."
         statusCode = 503
-      } else if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
-        userMessage = "Daily image generation limit reached. Please try again tomorrow."
-        statusCode = 429
       } else if (errorMessage.includes('model returned text')) {
         userMessage = "Image generation service is currently unavailable. Please try again in a few minutes."
         statusCode = 503
@@ -245,11 +242,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const modelId = 'gemini-2.5-flash-image-preview'
+    // Usar el mismo modelId que en el POST
+    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
     
     // Get the actual model configuration
     const modelConfig = MODELS.find(m => m.id === modelId)
     if (!modelConfig) {
+      console.log('🎯 [DEBUG] Model not found in GET endpoint:', modelId)
       return NextResponse.json(
         { error: "Image generation model not found" },
         { status: 500 }
@@ -257,6 +256,7 @@ export async function GET(request: NextRequest) {
     }
     
     const limitCheck = await dailyLimits.canUseModel(userId, modelId, modelConfig)
+    console.log('🎯 [DEBUG] GET limit check result:', limitCheck)
     
     return NextResponse.json({
       canGenerate: limitCheck.canUse,
