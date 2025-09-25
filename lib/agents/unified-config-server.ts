@@ -4,7 +4,6 @@
  */
 
 import { getAgentByIdForUser, getAllAgentsForUser } from './unified-service'
-import { getCurrentUserId } from '@/lib/server/request-context'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 import type { UnifiedAgent } from './unified-types'
@@ -35,20 +34,21 @@ function transformToAgentConfig(unifiedAgent: UnifiedAgent): AgentConfig {
  */
 export async function getAgentById(id: string, userId?: string): Promise<AgentConfig | undefined> {
   try {
-    // Use NIL UUID to avoid non-UUID propagation; DB fetch later guarded by UUID check
-    if (!userId) {
+    let effectiveUserId = userId
+    if (!effectiveUserId) {
+      // Import here to avoid client-side import errors
+      const { getCurrentUserId } = await import('@/lib/server/request-context')
       const recovered = getCurrentUserId()
       if (recovered) {
         console.warn('🔁 [unified-config-server] Recovered userId from request context for getAgentById', recovered)
-        userId = recovered
+        effectiveUserId = recovered
       } else {
         console.warn('🔍 No userId provided for getAgentById, using NIL UUID')
-        userId = '00000000-0000-0000-0000-000000000000'
+        effectiveUserId = '00000000-0000-0000-0000-000000000000'
       }
     }
 
-    console.log('🔍 Looking for agent:', id, 'for user:', userId)
-    
+    console.log('🔍 Looking for agent:', id, 'for user:', effectiveUserId)
     // First check predefined agents (immutable system agents)
     console.log('🔍 Checking predefined agents for:', id)
     const predefinedAgent = getPredefinedAgentById(id)
@@ -56,16 +56,13 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
       console.log('🔍 Found predefined agent:', predefinedAgent.name)
       return predefinedAgent
     }
-    
     // Then check user's custom agents in database
-  const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-  const unifiedAgent = isUUID(userId) ? await getAgentByIdForUser(id, userId) : undefined
-    
+    const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+    const unifiedAgent = isUUID(effectiveUserId) ? await getAgentByIdForUser(id, effectiveUserId) : undefined
     if (unifiedAgent) {
       console.log('🔍 Found user agent in database:', unifiedAgent.name)
       return transformToAgentConfig(unifiedAgent)
     }
-
     console.warn(`🔍 Agent not found: ${id}`)
     return undefined
   } catch (error) {
@@ -79,34 +76,32 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
  */
 export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
   try {
-    if (!userId) {
+    let effectiveUserId = userId
+    if (!effectiveUserId) {
+      // Import here to avoid client-side import errors
+      const { getCurrentUserId } = await import('@/lib/server/request-context')
       const recovered = getCurrentUserId()
       if (recovered) {
-        console.warn('� [unified-config-server] Recovered userId from request context for getAllAgents', recovered)
-        userId = recovered
+        console.warn('🔁 [unified-config-server] Recovered userId from request context for getAllAgents', recovered)
+        effectiveUserId = recovered
       } else {
-        console.warn('�🔍 No userId provided for getAllAgents, using NIL UUID')
-        userId = '00000000-0000-0000-0000-000000000000'
+        console.warn('🔍 No userId provided for getAllAgents, using NIL UUID')
+        effectiveUserId = '00000000-0000-0000-0000-000000000000'
       }
     }
-
-    console.log('🔍 Getting all agents for user:', userId)
-  // If userId is not a UUID, skip DB fetch to avoid errors in server logs
-  const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-
+    console.log('🔍 Getting all agents for user:', effectiveUserId)
+    // If userId is not a UUID, skip DB fetch to avoid errors in server logs
+    const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
     // Start with all predefined agents (immutable system agents)
     const predefinedAgents: AgentConfig[] = [...ALL_PREDEFINED_AGENTS]
     console.log(`🔍 Found ${predefinedAgents.length} predefined agents`)
-    
     // Get user's custom agents from database
-  const unifiedAgents = isUUID(userId) ? await getAllAgentsForUser(userId) : []
+    const unifiedAgents = isUUID(effectiveUserId) ? await getAllAgentsForUser(effectiveUserId) : []
     const userAgents = unifiedAgents.map(transformToAgentConfig)
     console.log(`🔍 Found ${userAgents.length} user custom agents`)
-    
     // Combine both lists
     const allAgents = [...predefinedAgents, ...userAgents]
-    console.log(`🔍 Total agents for user ${userId}: ${allAgents.length}`)
-    
+    console.log(`🔍 Total agents for user ${effectiveUserId}: ${allAgents.length}`)
     return allAgents
   } catch (error) {
     console.error('🔍 Error getting all agents:', error)
