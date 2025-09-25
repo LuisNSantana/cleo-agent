@@ -93,33 +93,42 @@ class AgentTaskScheduler {
     try {
       console.log('🔍 Checking for ready scheduled tasks...');
       
-  const result = await getReadyScheduledTasksAdmin();
-      if (!result.success || !result.tasks) {
+      const result = await getReadyScheduledTasksAdmin();
+      if (!result.success || !result.tasksByUser) {
         console.error('❌ Failed to fetch scheduled tasks:', result.error);
         return;
       }
 
-      const readyTasks = result.tasks;
-      console.log(`📋 Found ${readyTasks.length} ready tasks`);
+      const tasksByUser = result.tasksByUser;
+      const totalTasks = Object.values(tasksByUser).reduce((sum, tasks) => sum + tasks.length, 0);
+      console.log(`📋 Found ${totalTasks} ready tasks for ${Object.keys(tasksByUser).length} users`);
 
-      if (readyTasks.length === 0) {
+      if (totalTasks === 0) {
         return;
       }
 
-      // Process tasks in parallel (with concurrency limit)
-      const concurrencyLimit = 3;
-      const chunks = this.chunkArray(readyTasks, concurrencyLimit);
-
-      for (const chunk of chunks) {
-        await Promise.all(chunk.map(task => this.processTask(task)));
+      // Process tasks grouped by user to maintain user context isolation
+      for (const [userId, userTasks] of Object.entries(tasksByUser)) {
+        console.log(`👤 Processing ${userTasks.length} tasks for user ${userId}`);
+        await this.processUserTasks(userId, userTasks);
       }
 
-      console.log(`✅ Processed ${readyTasks.length} scheduled tasks`);
+      console.log(`✅ Processed ${totalTasks} scheduled tasks`);
     } catch (error) {
       console.error('❌ Error in task scheduler:', error);
     } finally {
       this.isRunning = false;
       this.stats.isRunning = false;
+    }
+  }
+
+  /**
+   * Process tasks for a specific user
+   */
+  private async processUserTasks(userId: string, userTasks: AgentTask[]): Promise<void> {
+    // Process tasks sequentially for this user to maintain proper context
+    for (const task of userTasks) {
+      await this.processTask(task);
     }
   }
 

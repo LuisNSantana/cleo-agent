@@ -503,10 +503,11 @@ export async function getReadyScheduledTasks(): Promise<{
 
 /**
  * Admin: Get ready scheduled tasks using service role (bypasses RLS)
+ * SECURITY: This function now groups tasks by user_id to prevent cross-user execution
  */
 export async function getReadyScheduledTasksAdmin(): Promise<{
   success: boolean;
-  tasks?: AgentTask[];
+  tasksByUser?: Record<string, AgentTask[]>;
   error?: string;
 }> {
   try {
@@ -530,7 +531,17 @@ export async function getReadyScheduledTasksAdmin(): Promise<{
       return { success: false, error: error.message };
     }
 
-    return { success: true, tasks: (data || []) as unknown as AgentTask[] };
+    // Group tasks by user_id to prevent cross-user execution
+    const tasksByUser: Record<string, AgentTask[]> = {};
+    (data || []).forEach((task: any) => {
+      const agentTask = task as AgentTask;
+      if (!tasksByUser[agentTask.user_id]) {
+        tasksByUser[agentTask.user_id] = [];
+      }
+      tasksByUser[agentTask.user_id].push(agentTask);
+    });
+
+    return { success: true, tasksByUser };
   } catch (error) {
     console.error('❌ [ADMIN] Error in getReadyScheduledTasksAdmin:', error);
     return { 

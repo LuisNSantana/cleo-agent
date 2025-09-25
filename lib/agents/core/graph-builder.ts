@@ -435,11 +435,39 @@ export class GraphBuilder {
                   logger.debug('⏳ [DELEGATION] Waiting for delegation to complete...')
                   const delegationResult = await delegationPromise
                   
+                  const delegatedText = String((delegationResult as any)?.result || '').trim()
+                  const delegatedSender = String(delegationData.targetAgent || delegationData.agentId || '')
+                  
+                  // If running under Cleo supervisor, finalize immediately with the delegated agent's result
+                  // so the final message comes from the specialist (e.g., Toby) instead of Cleo.
+                  if (agentConfig.id === 'cleo-supervisor' && delegatedText) {
+                    logger.info('🎉 [HANDOFF] Finalizing with delegated agent result', { sender: delegatedSender })
+                    // Emit completion for UI/metrics before returning
+                    this.eventEmitter.emit('node.completed', {
+                      nodeId: agentConfig.id,
+                      agentId: delegatedSender,
+                      response: delegatedText
+                    })
+                    return {
+                      messages: [
+                        ...filteredStateMessages,
+                        new AIMessage({
+                          content: delegatedText,
+                          additional_kwargs: {
+                            sender: delegatedSender,
+                            conversation_mode: state.messages[state.messages.length - 1]?.additional_kwargs?.conversation_mode
+                          }
+                        })
+                      ]
+                    }
+                  }
+
+                  // Default behavior: add as tool result and continue model loop
                   logger.info('✅ [DELEGATION] Delegation completed, adding result to conversation')
                   messages = [
                     ...messages,
                     new ToolMessage({ 
-                      content: `✅ Task completed by ${delegationData.targetAgent || delegationData.agentId}:\n\n${(delegationResult as any).result}`, 
+                      content: `✅ Task completed by ${delegationData.targetAgent || delegationData.agentId}:\n\n${delegatedText}`, 
                       tool_call_id: String(callId) 
                     })
                   ]

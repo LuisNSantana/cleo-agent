@@ -122,7 +122,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
       'draft reply', 'borrador de respuesta', 'reply email', 'responde correo', 'manage my calendar', 'gestionar mi calendario', 
       'organize my notion', 'search online', 'news today', 'noticias de hoy', 'what happened', 'qué pasó'
     ],
-    exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda', 'tweet', 'twitter', 'social media', 'post', 'hashtag', 'social']
+    exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda', 'tweet', 'twitter', 'social media', 'post', 'hashtag', 'social', 'calendar', 'calendario', 'event', 'evento']
   },
   'peter-google': {
     primary: ['google', 'docs', 'sheets', 'drive', 'workspace', 'document', 'spreadsheet', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
