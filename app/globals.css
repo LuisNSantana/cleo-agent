@@ -91,40 +91,40 @@
 :root {
   /* Premium light theme: warm, pastel off-white that feels soft and exquisite */
   --background: #faf7f2; /* warm ivory */
-  --foreground: oklch(0.18 0.006 285.9); /* slightly darker for base text */
-  --foreground-soft: oklch(0.42 0.015 285.9); /* mid emphasis */
-  --foreground-subtle: oklch(0.55 0.018 286); /* low emphasis still readable */
-  --card: #fdfaf6;
+  --foreground: oklch(0.19 0.01 265); /* slightly cooler for sharper contrast */
+  --foreground-soft: oklch(0.38 0.022 265); /* mid emphasis */
+  --foreground-subtle: oklch(0.55 0.02 265); /* low emphasis still readable */
+  --card: #fdf9f4;
   --card-foreground: var(--foreground);
   --popover: #fefbf7;
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.27 0.010 285.9); /* increased contrast */
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: #efe9df; /* more separation */
-  --secondary-foreground: var(--foreground);
-  --muted: #f2ece4; /* align to secondary but softer */
-  --muted-foreground: var(--foreground-subtle);
-  --accent: #ece5db; /* darker for better contrast with accent-foreground */
-  --accent-foreground: var(--foreground);
+  --primary: oklch(0.42 0.06 260); /* calm navy for professional tone */
+  --primary-foreground: oklch(0.98 0.01 260);
+  --secondary: oklch(0.9 0.02 250); /* airy neutral for secondary surfaces */
+  --secondary-foreground: oklch(0.32 0.03 260);
+  --muted: oklch(0.92 0.012 250); /* softer muted backing */
+  --muted-foreground: oklch(0.48 0.03 255);
+  --accent: oklch(0.94 0.018 100); /* warm highlight for chips */
+  --accent-foreground: oklch(0.26 0.03 100);
   --destructive: oklch(0.55 0.24 27.3);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: #e2dbd1; /* slightly darker */
-  --input: #e2dbd1;
-  --ring: oklch(0.62 0.018 286);
+  --border: oklch(0.83 0.01 260); /* crisper delineation */
+  --input: oklch(0.87 0.012 260);
+  --ring: oklch(0.58 0.045 260);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: #fbf8f3;
+  --sidebar: oklch(0.97 0.01 250);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #ede7dd;
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --sidebar-primary-foreground: oklch(0.98 0.01 260);
+  --sidebar-accent: oklch(0.93 0.014 250);
+  --sidebar-accent-foreground: oklch(0.36 0.025 255);
+  --sidebar-border: oklch(0.85 0.008 255);
+  --sidebar-ring: oklch(0.6 0.04 260);
 
   /* Minimal design system tokens */
   /* Spacing scale (4/8 rhythm) */
@@ -189,29 +189,28 @@ body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering:
 
 
 .dark {
-  /* Modern neutral dark theme - warm grays instead of cool blues */
-  /* Based on best practices from Discord, GitHub, VS Code */
-  --background: #0e1013; /* Slightly deeper for contrast */
-  --foreground: #f2f5f9; /* Clean white with warmth */
-  --foreground-soft: #cbd5df;
-  --foreground-subtle: #96a3b0;
-  --card: #161b22; /* Elevated neutral */
+  /* Modern neutral dark theme – tuned for balanced contrast per Material 3 guidance */
+  --background: #0b0d10;
+  --foreground: oklch(0.95 0.01 255);
+  --foreground-soft: oklch(0.82 0.025 255);
+  --foreground-subtle: oklch(0.68 0.03 255);
+  --card: #14171d; /* Elevated neutral */
   --card-foreground: var(--foreground);
-  --popover: #161b22;
+  --popover: #14171d;
   --popover-foreground: var(--foreground);
-  --primary: #7b8390; /* Raised slightly */
-  --primary-foreground: #ffffff;
-  --secondary: #1b2026; /* More distinct from background */
-  --secondary-foreground: var(--foreground-soft);
-  --muted: #262c33;
-  --muted-foreground: var(--foreground-subtle);
-  --accent: #f8fafc; /* Light accent for chips */
-  --accent-foreground: #1f2937;
+  --primary: oklch(0.68 0.05 255);
+  --primary-foreground: oklch(0.2 0.015 255);
+  --secondary: #171b21;
+  --secondary-foreground: oklch(0.78 0.022 255);
+  --muted: #1f242c;
+  --muted-foreground: oklch(0.6 0.028 255);
+  --accent: oklch(0.62 0.02 255);
+  --accent-foreground: oklch(0.22 0.02 255);
   --destructive: #f85149;
   --destructive-foreground: #ffffff;
-  --border: #2a3138; /* Slightly darker for delineation */
-  --input: #1b2026;
-  --ring: #7b8390;
+  --border: #272d36;
+  --input: #171b21;
+  --ring: oklch(0.64 0.038 255);
   /* Charts: neutral but distinguishable colors */
   --chart-1: #79c0ff; /* Light blue */
   --chart-2: #56d364; /* Green */
@@ -219,19 +218,19 @@ body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering:
   --chart-4: #a5a5a5; /* Gray */
   --chart-5: #ff7b72; /* Red */
   /* Sidebar: slightly different from main for hierarchy */
-  --sidebar: #0f1215;
+  --sidebar: #0c1014;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1b2026;
-  --sidebar-accent-foreground: var(--foreground-soft);
+  --sidebar-primary-foreground: oklch(0.24 0.02 255);
+  --sidebar-accent: #191d24;
+  --sidebar-accent-foreground: oklch(0.74 0.025 255);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
   /* Elevation surfaces (neutral warm grays) */
-  --surface-1: #161b22; /* Slight elevation */
-  --surface-2: #20262d; /* Medium elevation (adjusted) */
-  --surface-3: #2b323a; /* High elevation clearer separation */
+  --surface-1: #14171d;
+  --surface-2: #1c2128; /* Medium elevation */
+  --surface-3: #252c35; /* High elevation clearer separation */
 
   /* Shadows (subtle for dark mode) */
   --shadow-1: 0 1px 3px rgba(0,0,0,0.4);
