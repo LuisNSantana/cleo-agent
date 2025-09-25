@@ -17,6 +17,13 @@ export function HeaderSidebarTrigger({
 }: HeaderSidebarTriggerProps) {
   const { toggleSidebar, open } = useSidebar()
   const { openMobile, isMobile } = useSidebar()
+  const label = isMobile
+    ? openMobile
+      ? "Cerrar navegación"
+      : "Abrir navegación"
+    : open
+      ? "Contraer panel lateral"
+      : "Expandir panel lateral"
 
   return (
     <Tooltip>
@@ -40,6 +47,8 @@ export function HeaderSidebarTrigger({
             className
           )}
           aria-expanded={isMobile ? openMobile : open}
+          aria-label={label}
+          title={label}
           {...props}
         >
           <PanelLeftIcon className="size-5" />
@@ -47,7 +56,10 @@ export function HeaderSidebarTrigger({
         </button>
       </TooltipTrigger>
       <TooltipContent>
-        {isMobile ? (openMobile ? "Close sidebar" : "Open sidebar") : open ? "Close sidebar" : "Open sidebar"}
+        <div className="flex flex-col">
+          <span>{label}</span>
+          <span className="text-xs text-muted-foreground/80">Accede a agentes, tareas y documentos</span>
+        </div>
       </TooltipContent>
     </Tooltip>
   )
