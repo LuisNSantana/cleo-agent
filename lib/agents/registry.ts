@@ -8,7 +8,7 @@
 import { AgentConfig } from './types'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import { getUserAgents, getSubAgentsForParent } from './dynamic'
-import { generateDelegationTools } from './delegation'
+import { generateDelegationTools } from './delegation/index'
 import { logger } from '@/lib/logger'
 
 export interface AgentRegistryEntry {

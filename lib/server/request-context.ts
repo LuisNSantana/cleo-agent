@@ -8,7 +8,7 @@ export type RequestContext = {
   requestId?: string
 }
 
-const isServer = typeof window === 'undefined'
+const isServer = typeof globalThis === 'object' && !('window' in globalThis)
 
 type ALS<T> = {
   run(ctx: T, fn: () => Promise<any> | any): any

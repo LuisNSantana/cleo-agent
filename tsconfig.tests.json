@@ -6,7 +6,18 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "target": "ES2020",
-    "isolatedModules": false,
+    "allowJs": false,
+    "lib": ["ES2020"],
+  "isolatedModules": false,
+  "incremental": false,
+  "baseUrl": ".",
+    "paths": {
+      "@supabase/supabase-js": ["tests/stubs/supabase-js"],
+      "@/lib/logger": ["tests/stubs/lib/logger"],
+      "@/lib/prompts": ["tests/stubs/lib/prompts"],
+      "@/lib/tools/delegation": ["tests/stubs/lib/tools/delegation"],
+      "@langchain/core/messages": ["tests/stubs/langchain/messages"]
+    },
     "types": ["node"],
     "declaration": false,
     "sourceMap": false

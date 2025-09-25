@@ -174,28 +174,29 @@ const AGENT_PATTERNS: KeywordPatterns = {
     exclusions: ['shopify', 'ecommerce', 'calendar']
   },
   // Social Media & Twitter Specialists
+  // Social Media & Twitter Specialists (weights tuned for ambiguity)
   'nora-community': {
     primary: ['twitter', 'tweet', 'tweets', 'x', 'social media', 'community', 'post', 'publish', 'publicar', 'redes sociales', 'hashtag', 'hashtags'],
-    secondary: ['engagement', 'community', 'brand', 'audience', 'followers', 'seguidores', 'viral', 'trending', 'tendencias', 'social', 'content'],
-    contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags'],
+    secondary: ['engagement', 'community', 'brand', 'audience', 'followers', 'seguidores', 'viral', 'trending', 'tendencias', 'social', 'content', 'analytics', 'schedule', 'publishing'],
+    contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags', 'analyze performance', 'schedule posts', 'content calendar'],
     exclusions: ['email', 'calendar', 'shopify', 'google docs', 'research only', 'technical analysis']
   },
   'luna-content-creator': {
-    primary: ['content', 'copy', 'copywriting', 'writing', 'creative', 'creativo', 'campaign', 'campaña', 'brand', 'marca'],
-    secondary: ['messaging', 'tone', 'voice', 'style', 'estilo', 'narrative', 'storytelling', 'engagement', 'caption'],
-    contextual: ['write content', 'create copy', 'social media copy', 'campaign content', 'brand messaging', 'creative writing'],
+    primary: ['content', 'copy', 'copywriting', 'writing', 'creative', 'creativo', 'campaign', 'campaña', 'brand', 'marca', 'tweet', 'twitter', 'post'],
+    secondary: ['messaging', 'tone', 'voice', 'style', 'estilo', 'narrative', 'storytelling', 'engagement', 'caption', 'hashtag', 'hashtags'],
+    contextual: ['write content', 'create copy', 'social media copy', 'campaign content', 'brand messaging', 'creative writing', 'tweet about', 'post to twitter', 'social content'],
     exclusions: ['technical', 'code', 'database', 'shopify']
   },
   'zara-analytics-specialist': {
-    primary: ['analytics', 'analíticas', 'analiticas', 'metrics', 'métricas', 'metricas', 'performance', 'rendimiento', 'data', 'datos'],
-    secondary: ['insights', 'trends', 'engagement', 'reach', 'impressions', 'clicks', 'conversion', 'roi', 'kpi'],
-    contextual: ['analyze performance', 'social media analytics', 'engagement metrics', 'performance report', 'twitter analytics'],
+    primary: ['analytics', 'analíticas', 'analiticas', 'metrics', 'métricas', 'metricas', 'performance', 'rendimiento', 'data', 'datos', 'twitter', 'tweet', 'social media'],
+    secondary: ['insights', 'trends', 'engagement', 'reach', 'impressions', 'clicks', 'conversion', 'roi', 'kpi', 'followers', 'audience', 'brand'],
+    contextual: ['analyze performance', 'social media analytics', 'engagement metrics', 'performance report', 'twitter analytics', 'tweet about', 'post to twitter'],
     exclusions: ['creation', 'writing', 'posting']
   },
   'viktor-publishing-specialist': {
-    primary: ['schedule', 'scheduling', 'publish', 'publishing', 'timing', 'automation', 'workflow', 'calendar'],
-    secondary: ['optimal', 'timing', 'frequency', 'queue', 'batch', 'strategy', 'planning', 'coordination'],
-    contextual: ['schedule posts', 'publishing strategy', 'optimal timing', 'social media scheduling', 'content calendar'],
+    primary: ['schedule', 'scheduling', 'publish', 'publishing', 'timing', 'automation', 'workflow', 'calendar', 'twitter', 'tweet', 'post', 'social media'],
+    secondary: ['optimal', 'timing', 'frequency', 'queue', 'batch', 'strategy', 'planning', 'coordination', 'analytics', 'engagement'],
+    contextual: ['schedule posts', 'publishing strategy', 'optimal timing', 'social media scheduling', 'content calendar', 'tweet about', 'post to twitter'],
     exclusions: ['creation', 'writing', 'analytics']
   }
 }
@@ -384,27 +385,27 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
     }
 
     if (TECHNICAL_REGEXES.some((regex) => regex.test(userText) || regex.test(context || ''))) {
-      applyTobyHeuristic(6, 'heuristic: technical_code_pattern')
+      applyTobyHeuristic(8, 'heuristic: technical_code_pattern')
     }
 
     if (TECH_COMMAND_HINTS.some((regex) => regex.test(fullText))) {
-      applyTobyHeuristic(4, 'heuristic: developer_command')
+      applyTobyHeuristic(6, 'heuristic: developer_command')
     }
 
     if (TECH_FILE_EXTENSIONS_REGEX.test(fullText)) {
-      applyTobyHeuristic(3, 'heuristic: technical_file_reference')
+      applyTobyHeuristic(5, 'heuristic: technical_file_reference')
     }
 
     if (LANGUAGE_KEYWORDS_REGEX.test(fullText)) {
-      applyTobyHeuristic(3, 'heuristic: language_keyword')
+      applyTobyHeuristic(5, 'heuristic: language_keyword')
     }
 
     if (ERROR_KEYWORDS_REGEX.test(fullText)) {
-      applyTobyHeuristic(4, 'heuristic: error_debugging')
+      applyTobyHeuristic(6, 'heuristic: error_debugging')
     }
 
     if ((context && CONTEXT_HINT_REGEX.test(context)) || CONTEXT_HINT_REGEX.test(userText)) {
-      applyTobyHeuristic(2, 'heuristic: prior_toby_context')
+      applyTobyHeuristic(3, 'heuristic: prior_toby_context')
     }
 
     // Ensure score remains non-negative
@@ -433,9 +434,34 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
   // Determine if clarification is needed
   let needsClarification = confidence < CONFIDENCE.medium || (secondBest && (score - secondBest[1].score) < 2)
 
+  // Special case: social media overlap (Nora, Viktor, Zara)
+  const socialMediaAgents = ['nora-community', 'zara-analytics-specialist', 'viktor-publishing-specialist']
+  // Find all social media agents in the top 3
+  const topSocial = sortedAgents
+    .slice(0, 3)
+    .filter(([id, s]) => socialMediaAgents.includes(id) && s.score > 0)
+  if (topSocial.length > 1) {
+    // Always trigger clarification if two or more social media agents are in the top 3
+    needsClarification = true
+  }
+
   if (bestAgentId === 'toby-technical' && score >= 8 && (!secondBest || (score - secondBest[1].score) >= 3)) {
     confidence = Math.max(confidence, 0.88)
     needsClarification = false
+  }
+
+  // If clarification is needed and two or more top agents are social media, mention all relevant
+  let clarificationQuestion: string | undefined = undefined
+  if (needsClarification) {
+    const relevantSocial = sortedAgents
+      .slice(0, 3)
+      .filter(([id, s]) => socialMediaAgents.includes(id) && s.score > 0)
+    if (relevantSocial.length > 1) {
+      const names = relevantSocial.map(([id]) => getAgentMetadata(id).name).join(', ')
+      clarificationQuestion = `Should this go to ${names}? Please clarify which social media specialist is best for this task.`
+    } else {
+      clarificationQuestion = generateClarificationQuestion(bestAgentId, secondBest?.[0])
+    }
   }
 
   return {
@@ -446,7 +472,7 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
     toolName: metadata.toolName,
     suggestedTask: extractTaskFromText(userText),
     needsClarification,
-    clarificationQuestion: needsClarification ? generateClarificationQuestion(bestAgentId, secondBest?.[0]) : undefined
+    clarificationQuestion
   }
 }
 
@@ -594,21 +620,30 @@ export function getDelegationSuggestions(userText: string): string[] {
 export async function analyzeForDelegationWithCapabilities(
   userText: string, 
   currentAgentId?: string,
-  context?: string
+  context?: string,
+  _suggestionOverride?: DelegationSuggestion | null // For testing purposes
 ): Promise<{
   suggestion: DelegationSuggestion | null
   agentCapabilities: Record<string, any>
   shouldDelegate: boolean
   reasoning: string[]
 }> {
-  // Get standard delegation suggestion
-  const suggestion = analyzeDelegationIntent(userText, context)
+  // Get standard delegation suggestion (allow override for testing)
+  const suggestion = _suggestionOverride !== undefined ? _suggestionOverride : analyzeDelegationIntent(userText, context)
   
   // Get capabilities of all available agents
   const capabilities = await getAllAgentCapabilities()
   
   // Analyze if current agent can handle the task
-  const currentAgentCaps = currentAgentId ? await getAgentCapabilities(currentAgentId) : null
+  let currentAgentCaps = null
+  if (currentAgentId) {
+    try {
+      currentAgentCaps = await getAgentCapabilities(currentAgentId)
+    } catch (error) {
+      console.error('Error getting agent capabilities:', error)
+      currentAgentCaps = null
+    }
+  }
   
   const reasoning: string[] = []
   let shouldDelegate = false
@@ -653,9 +688,10 @@ function canAgentHandleTask(userText: string, agentCaps: {
   const reasons: string[] = []
   
   // Check if task matches agent's specializations
-  const matchedSpecs = agentCaps.specializations.filter(spec => 
-    text.includes(spec.toLowerCase())
-  )
+  const matchedSpecs = agentCaps.specializations.filter(spec => {
+    const specWords = spec.toLowerCase().split(' ')
+    return specWords.some(word => text.includes(word)) || text.includes(spec.toLowerCase())
+  })
   
   if (matchedSpecs.length > 0) {
     reasons.push(`Matches specializations: ${matchedSpecs.join(', ')}`)

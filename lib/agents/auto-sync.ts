@@ -45,6 +45,11 @@ class AgentAutoSync {
    */
   async triggerSync(eventData: AgentSyncEventData): Promise<void> {
     logger.agentSync(`Agent sync triggered: ${eventData.event} for agent ${eventData.agentName} (${eventData.agentId})`)
+
+    if (process.env.NODE_ENV === 'test') {
+      await this.performSync(eventData)
+      return
+    }
     
     // Debounce rapid updates for the same user
     const debounceKey = `${eventData.userId}_${eventData.event}`
@@ -87,16 +92,18 @@ class AgentAutoSync {
     const allAgents = await agentRegistry.getAllAgentsForUser(userId)
     
     // Find all potential parent agents (non-sub-agents)
-    const parentAgents = allAgents.filter(agent => !agent.isSubAgent)
-    
-    for (const parentAgent of parentAgents) {
-      try {
-        await agentRegistry.updateAgentDelegationTools(parentAgent.id, userId)
-        logger.agentSync(`Updated delegation tools for ${parentAgent.name}`)
-      } catch (error) {
-        logger.error('AGENT-SYNC', `Failed to update delegation tools for ${parentAgent.name}`, error)
-      }
-    }
+  const parentAgents = allAgents.filter(agent => !agent.isSubAgent)
+
+    await Promise.allSettled(
+      parentAgents.map(async parentAgent => {
+        try {
+          await agentRegistry.updateAgentDelegationTools(parentAgent.id, userId)
+          logger.agentSync(`Updated delegation tools for ${parentAgent.name}`)
+        } catch (error) {
+          logger.error('AGENT-SYNC', `Failed to update delegation tools for ${parentAgent.name}`, error)
+        }
+      })
+    )
   }
 
   /**

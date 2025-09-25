@@ -35,7 +35,12 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     'shopify','ecommerce','tienda','producto','inventario','ventas','carrito','sku','catalogo','checkout'
   ],
   'toby-technical': [
-    'debug','código','code','api','endpoint','deploy','docker','typescript','javascript','error stack','refactor', 'architecture','base de código'
+    { k: 'debug', w: 2 }, { k: 'código', w: 2 }, { k: 'code', w: 2 }, { k: 'api', w: 2 }, 
+    { k: 'endpoint', w: 2 }, { k: 'deploy', w: 2 }, { k: 'docker', w: 2 }, 
+    { k: 'typescript', w: 3 }, { k: 'javascript', w: 3 }, { k: 'next.js', w: 3 },
+    { k: 'error stack', w: 2 }, { k: 'refactor', w: 2 }, { k: 'architecture', w: 2 },
+    { k: 'base de código', w: 2 }, { k: 'build error', w: 3 }, { k: 'integration tests', w: 2 },
+    { k: 'docker compose', w: 2 }, { k: 'fix', w: 2 }, { k: 'failing', w: 2 }
   ],
   'astra-email': [
     'enviar correo','compose email','draft email','responder correo','firma','inbox zero'

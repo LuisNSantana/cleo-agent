@@ -3,6 +3,7 @@
  * Defines the structure for LangGraph-based agent orchestration
  */
 
+import type { CSSProperties } from 'react'
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 
 // Base agent types
@@ -167,7 +168,7 @@ export interface AgentNode {
   type: 'agent' | 'decision' | 'tool' | 'memory'
   position: { x: number; y: number }
   data: AgentNodeData
-  style?: React.CSSProperties
+  style?: CSSProperties
 }
 
 export interface AgentNodeData {

@@ -7,7 +7,7 @@
 
 export * from './predefined'
 export * from './dynamic'
-export * from './delegation'
+export * from './delegation/index'
 export * from './registry'
 export * from './dynamic-prompts'
 export * from './types'
