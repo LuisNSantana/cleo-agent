@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server"
 import { dailyLimits } from "@/lib/daily-limits"
 import { z } from "zod"
 import { MODELS } from "@/lib/models"
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Schema for image generation response
 const ImageGenerationSchema = z.object({
@@ -43,18 +42,23 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    // Usar solo el modelo Nano Banana para generación de imágenes
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    // Usar FLUX.1 Schnell via DeepInfra - compatible con OpenAI SDK
+    const modelId = 'deepinfra:flux-1-schnell'
     console.log('🎯 [DEBUG] Using modelId:', modelId)
 
-    // Obtener la configuración del modelo
-    const modelConfig = MODELS.find(m => m.id === modelId)
-    console.log('🎯 [DEBUG] Model config found:', !!modelConfig)
-    if (!modelConfig) {
-      return NextResponse.json(
-        { error: "Image generation model not found" },
-        { status: 500 }
-      )
+    // Para imagen, usamos un modelo compatible con ModelConfig
+    const modelConfig = {
+      id: modelId,
+      name: 'FLUX.1 Schnell',
+      provider: 'DeepInfra',
+      providerId: 'deepinfra',
+      baseProviderId: 'deepinfra',
+      dailyLimit: 50,
+      vision: false,
+      tools: false,
+      openSource: true,
+      speed: "Fast" as const,
+      intelligence: "Medium" as const
     }
 
     // Solo aplicar daily limit para este modelo de imagen
@@ -63,7 +67,7 @@ export async function POST(request: NextRequest) {
       if (!limitCheck.canUse) {
         return NextResponse.json(
           { 
-            error: `Daily limit reached for Nano Banana. You have used all ${limitCheck.limit} images for today. Try again tomorrow.`,
+            error: `Daily limit reached for FLUX.1 Schnell. You have used all ${limitCheck.limit} images for today. Try again tomorrow.`,
             limitReached: true,
             limit: limitCheck.limit,
             remaining: limitCheck.remaining
@@ -73,68 +77,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get Google API key (accept both legacy GOOGLE_API_KEY and preferred GOOGLE_GENERATIVE_AI_API_KEY)
-    const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY
-    if (!googleApiKey) {
-      console.log('❌ [DEBUG] Google API key not configured (tried GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_API_KEY)')
+    // Get DeepInfra API key
+    const deepinfraApiKey = process.env.DEEPINFRA_API_TOKEN
+    if (!deepinfraApiKey) {
+      console.log('❌ [DEBUG] DeepInfra API key not configured')
       return NextResponse.json(
-        { error: "Missing Google Gemini API key. Set env var GOOGLE_GENERATIVE_AI_API_KEY." },
+        { error: "Missing DeepInfra API key. Set env var DEEPINFRA_API_TOKEN." },
         { status: 500 }
       )
     }
 
-    // Initialize Google Gemini AI
-    const genAI = new GoogleGenerativeAI(googleApiKey)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" })
+    // Enhanced prompt for better image generation
+    const enhancedPrompt = `${prompt}. High quality, detailed, professional.`
 
-    // Enhanced prompt for better image generation in English (works better according to docs)
-    const enhancedPrompt = `Generate a high-quality image: ${prompt}. Make it visually appealing, well-composed, and detailed.`
+    console.log('🎨 Generating image with FLUX.1 Schnell via DeepInfra:', enhancedPrompt)
 
-    console.log('🎨 Generating image with Google Gemini SDK:', enhancedPrompt)
-
-    // Generate image using official Google Gemini SDK
+    // Generate image using DeepInfra with OpenAI compatible API
     let imageData
     
     try {
-      console.log('🎯 [DEBUG] Making direct call to Google Gemini API')
+      console.log('🎯 [DEBUG] Making call to DeepInfra API for image generation')
       
-      const result = await model.generateContent([enhancedPrompt])
-      const response = await result.response
+      // Import OpenAI client
+      const { OpenAI } = await import('openai')
       
-      console.log('🎯 [DEBUG] Google API response received')
-      console.log('🔍 Response candidates length:', response.candidates?.length || 0)
-      
-      if (response.candidates && response.candidates[0]) {
-        const candidate = response.candidates[0]
-        console.log('🔍 Candidate content parts:', candidate.content?.parts?.length || 0)
-        
-        // Look for image data in the response parts
-        for (const part of candidate.content?.parts || []) {
-          console.log('🔍 Part type:', typeof part)
-          console.log('🔍 Part keys:', Object.keys(part))
-          
-          if (part.text) {
-            console.log('🔍 Part text (first 100 chars):', part.text.substring(0, 100))
-          }
-          
-          if (part.inlineData && part.inlineData.data) {
-            console.log('✅ Found image data in inlineData')
-            imageData = part.inlineData.data
-            break
-          }
-        }
-        
-        if (!imageData) {
-          console.error('❌ No image data found in response parts')
-          throw new Error('No image data found in Gemini response')
-        }
+      const client = new OpenAI({
+        apiKey: deepinfraApiKey,
+        baseURL: "https://api.deepinfra.com/v1/openai",
+      })
+
+      const response = await client.images.generate({
+        prompt: enhancedPrompt,
+        size: "1024x1024",
+        quality: "standard",
+        n: 1,
+      })
+
+      if (!response.data || response.data.length === 0) {
+        throw new Error('No image data returned from DeepInfra')
+      }
+
+      const image = response.data[0]
+      if (image.b64_json) {
+        imageData = image.b64_json
+        console.log('✅ Found image data in b64_json format')
+      } else if (image.url) {
+        // If URL is returned, we'll need to fetch it and convert to base64
+        console.log('🔄 Image returned as URL, fetching to convert to base64')
+        const imageResponse = await fetch(image.url)
+        const imageBuffer = await imageResponse.arrayBuffer()
+        imageData = Buffer.from(imageBuffer).toString('base64')
+        console.log('✅ Successfully converted URL to base64')
       } else {
-        console.error('❌ [DEBUG] No candidates in response')
-        throw new Error('No candidates in Gemini response')
+        throw new Error('No valid image data format found in DeepInfra response')
       }
       
     } catch (modelError) {
-      console.error('Google Gemini API failed:', modelError)
+      console.error('DeepInfra API failed:', modelError)
       throw new Error(`Image generation model failed: ${modelError instanceof Error ? modelError.message : 'Unknown model error'}`)
     }
 
@@ -143,7 +142,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Model returned invalid image data')
     }
 
-    // The imageData from Google Gemini should be base64 encoded
+    // The imageData should be base64 encoded
     let imageUrl = ''
     
     if (imageData.startsWith('data:image')) {
@@ -225,7 +224,7 @@ export async function POST(request: NextRequest) {
         canRetry: statusCode !== 429, // Don't retry if it's a rate limit error
         details: process.env.NODE_ENV === 'development' 
           ? (error instanceof Error ? error.message : "Unknown error")
-          : undefined // Only show technical details in development
+          : undefined
       },
       { status: statusCode }
     )
@@ -243,16 +242,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Usar el mismo modelId que en el POST
-    const modelId = 'openrouter:google/gemini-2.5-flash-image-preview'
+    const modelId = 'deepinfra:flux-1-schnell'
     
-    // Get the actual model configuration
-    const modelConfig = MODELS.find(m => m.id === modelId)
-    if (!modelConfig) {
-      console.log('🎯 [DEBUG] Model not found in GET endpoint:', modelId)
-      return NextResponse.json(
-        { error: "Image generation model not found" },
-        { status: 500 }
-      )
+    // Usar la misma configuración de modelo que en el POST
+    const modelConfig = {
+      id: modelId,
+      name: 'FLUX.1 Schnell',
+      provider: 'DeepInfra',
+      providerId: 'deepinfra',
+      baseProviderId: 'deepinfra',
+      dailyLimit: 50,
+      vision: false,
+      tools: false,
+      openSource: true,
+      speed: "Fast" as const,
+      intelligence: "Medium" as const
     }
     
     const limitCheck = await dailyLimits.canUseModel(userId, modelId, modelConfig)

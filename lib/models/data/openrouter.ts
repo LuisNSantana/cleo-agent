@@ -40,10 +40,50 @@ export const openrouterModels: ModelConfig[] = [
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("x-ai/grok-code-fast-1"),
   },
-  // Google Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
+  // FLUX.1-schnell - Best Open Source Image Generation Model
+  {
+    id: "openrouter:black-forest-labs/flux-1-schnell",
+    name: "FLUX.1 Schnell",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "FLUX",
+    baseProviderId: "black-forest-labs",
+    description:
+      "FLUX.1 Schnell - The fastest open-source image generation model from Black Forest Labs. Excellent prompt adherence, can incorporate text into images, and produces high-quality results with amazing aesthetic.",
+    tags: ["text-to-image", "image-generation", "creative", "flux", "open-source", "fast"],
+    contextWindow: 77, // Prompt length limit
+    inputCost: 0.003, // $0.003 per image
+    outputCost: 0.003,
+    priceUnit: "per image",
+    vision: false,
+    tools: false,
+    audio: false,
+    reasoning: false,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai",
+    apiDocs: "https://openrouter.ai/black-forest-labs/flux-1-schnell",
+    modelPage: "https://github.com/black-forest-labs/flux",
+    releasedAt: "2024-08-01",
+    dailyLimit: 50, // Reasonable limit for testing
+    icon: "flux",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("black-forest-labs/flux-1-schnell"),
+  },
+  /*
+  // Google Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation (OCULTO HASTA TENER CRÉDITOS)
   {
     id: "openrouter:google/gemini-2.5-flash-image-preview",
-  name: "Nano Banana",
+    name: "Nano Banana",
     provider: "OpenRouter",
     providerId: "openrouter",
     modelFamily: "Gemini",
@@ -67,7 +107,7 @@ export const openrouterModels: ModelConfig[] = [
     apiDocs: "https://openrouter.ai/google/gemini-2.5-flash-image-preview",
     modelPage: "https://ai.google.dev/gemini-api/docs/vision",
     releasedAt: "2025-08-01",
-  dailyLimit: 100, // 100 images por día para pruebas
+    dailyLimit: 100, // 100 images por día para pruebas
     icon: "gemini",
     apiSdk: (apiKey?: string) =>
       createOpenRouter({
@@ -79,6 +119,7 @@ export const openrouterModels: ModelConfig[] = [
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("google/gemini-2.5-flash-image-preview"),
   },
+  */
   // Venice Uncensored: Dolphin Mistral 24B Venice Edition (free)
   {
     id: "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -886,7 +927,8 @@ export const openrouterModels: ModelConfig[] = [
         }),
       }).chat("google/gemini-2.5-flash"),
   },
-  // Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
+  /*
+  // Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation (OCULTO HASTA TENER CRÉDITOS)
   {
     id: "openrouter:google/gemini-2.5-flash-image-preview",
     name: "Gemini 2.5 Flash Image Preview (Nano Banana)",
@@ -925,6 +967,7 @@ export const openrouterModels: ModelConfig[] = [
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("google/gemini-2.5-flash-image-preview"),
   },
+  */
   // Gemini 2.5 Flash Lite - Economical multimodal option for vision fallback
   {
     id: "openrouter:google/gemini-2.5-flash-lite",

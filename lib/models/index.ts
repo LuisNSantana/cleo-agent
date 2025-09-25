@@ -61,6 +61,7 @@ const extraProviderModels: ModelConfig[] = [
     // Premium multimodal models with daily limits
     "openrouter:anthropic/claude-sonnet-4", // 7 uses/day - premium multimodal
     // Image generation models (valid OpenRouter models only)
+    "openrouter:black-forest-labs/flux-1-schnell", // FLUX.1 Schnell: Best open-source image generation
   "openrouter:openai/dall-e-3", // 8 images/day - proven to work
   "openrouter:google/gemini-2.5-flash-image-preview", // Nano Banana: Gemini text-to-image
     // High-end additions (paid)
