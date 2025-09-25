@@ -24,30 +24,35 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMultiModelEnabled = preferences.multiModelEnabled
 
   const isLoggedIn = !!user
+  const canToggleSidebar = isLoggedIn && (hasSidebar || isMobile)
 
   return (
     <header className="app-fixed-header">
       <div className="relative mx-auto flex h-full max-w-full items-center justify-between bg-transparent px-4 sm:px-6 lg:bg-transparent lg:px-8">
         <div className="flex flex-1 items-center justify-between">
-          <div className="-ml-0.5 flex flex-1 items-center gap-2 lg:-ml-2.5">
+          <div className="-ml-0.5 flex flex-1 items-center gap-3 lg:-ml-2.5">
             <div className="flex flex-1 items-center gap-2">
-              <Link
-                href="/"
-                className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
-              >
-                <CleoIcon size={56} src="/img/agents/logocleo4.png" className="" />
-                <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
-                  Cleo
-                </span>
-                <span
-                  aria-label="Beta"
-                  title="Cleo is in Beta"
-                  className="mt-1 hidden select-none items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-foreground/80 sm:inline-flex bg-secondary/70 border-border/60 backdrop-blur-sm"
+              <div className="flex items-center gap-2">
+                {canToggleSidebar && (
+                  <HeaderSidebarTrigger className="-ml-1 size-9 border border-border/40 bg-background/80 shadow-sm backdrop-blur-sm" />
+                )}
+                <Link
+                  href="/"
+                  className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
                 >
-                  BETA
-                </span>
-              </Link>
-              {hasSidebar && isMobile && <HeaderSidebarTrigger />}
+                  <CleoIcon size={56} src="/img/agents/logocleo4.png" className="" />
+                  <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
+                    Cleo
+                  </span>
+                  <span
+                    aria-label="Beta"
+                    title="Cleo is in Beta"
+                    className="mt-1 hidden select-none items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-foreground/80 sm:inline-flex bg-secondary/70 border-border/60 backdrop-blur-sm"
+                  >
+                    BETA
+                  </span>
+                </Link>
+              </div>
             </div>
           </div>
           <div />
@@ -95,8 +100,6 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
               >
                 {hasSidebar ? <FullscreenIcon className="size-4" /> : <PanelLeftIcon className="size-4" />}
               </button>
-              {/* Always show explicit sidebar trigger on mobile when layout is fullscreen */}
-              {isMobile && !hasSidebar && <HeaderSidebarTrigger />}
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
               <NotificationBell />

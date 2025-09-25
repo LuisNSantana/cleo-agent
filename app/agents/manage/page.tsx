@@ -41,110 +41,110 @@ export default function AgentsManagePage() {
   ]
 
   return (
-    <div className="flex h-full">
-      {/* Sidebar Navigation */}
-      <aside className="w-80 border-r border-border/40 bg-muted/20 p-6 hidden lg:block">
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Agent Management</h2>
-            <p className="text-sm text-muted-foreground">
-              Configure and manage your AI agents and their integrations
-            </p>
-          </div>
+    <section className="space-y-6">
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Control Center</span>
+        <h1 className="text-2xl font-semibold text-foreground">Manage your agents</h1>
+        <p className="text-sm text-muted-foreground">
+          Configure capabilities, prompts, and credentials from a single, consistent workspace.
+        </p>
+      </div>
 
-          <nav className="space-y-2">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeSection === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  className={cn(
-                    'w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors',
-                    isActive
-                      ? 'bg-primary/10 border border-primary/20 text-primary'
-                      : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm">{item.label}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
-                  </div>
-                </button>
-              )
-            })}
-          </nav>
-
-          {/* Quick Stats */}
-          <div className="pt-4 border-t border-border/40">
-            <div className="text-xs text-muted-foreground mb-2">Overview</div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Total Agents</span>
-                <span className="text-sm font-medium">{agents.length}</span>
+      <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <div className="space-y-6 rounded-2xl border border-border/60 bg-card/50 p-5 shadow-sm">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold text-foreground">Agent Management</h2>
+              <p className="text-xs text-muted-foreground">
+                Configure and manage your AI agents and their integrations.
+              </p>
+            </div>
+            <nav className="space-y-2">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon
+                const isActive = activeSection === item.id
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      'w-full rounded-xl border border-transparent px-3 py-2 text-left transition-colors',
+                      isActive
+                        ? 'border-border bg-foreground/5 text-foreground'
+                        : 'text-muted-foreground hover:border-border/60 hover:bg-muted/40 hover:text-foreground'
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Icon className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">{item.label}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </nav>
+            <div className="rounded-xl border border-dashed border-border/60 p-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Agents</span>
+                <span className="font-medium text-foreground">{agents.length}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Active Credentials</span>
-                <span className="text-sm font-medium">5</span>
+              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+                <span>Active credentials</span>
+                <span className="font-medium text-foreground">5</span>
               </div>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Mobile Navigation */}
-      <div className="lg:hidden border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-[calc(var(--app-header-height)+var(--agents-subnav-height))] z-30">
-        <div className="flex">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon
-            const isActive = activeSection === item.id
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={cn(
-                  'flex-1 flex flex-col items-center gap-1 py-3 px-2 text-center transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary border-b-2 border-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-xs font-medium">{item.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2 rounded-2xl border border-border/50 bg-card/40 p-2 shadow-sm lg:hidden">
+            <div className="grid grid-cols-2 gap-1">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon
+                const isActive = activeSection === item.id
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      'flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-foreground/10 text-foreground'
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 overflow-auto">
-        {activeSection === 'agents' && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            key={activeSection}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-6xl mx-auto space-y-6"
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm sm:p-6"
           >
-            {/* Agents Management Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold text-foreground">Manage Agents</h1>
-                  <p className="text-muted-foreground mt-1">
-                    Create, edit, and organize your specialized agents. Keep things simple and focused.
-                  </p>
-                </div>
-                <div className="hidden sm:flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
+            {activeSection === 'agents' ? (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">Manage agents</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Create, edit, and organize your specialized agents. Keep things simple and focused.
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium tracking-wide text-muted-foreground">
                     {agents.length} agent{agents.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-              </div>
 
-              <AgentCRUDPanel
+                <AgentCRUDPanel
                 agents={agents}
                 onCreateAgent={async (agent) => {
                   try {
@@ -286,70 +286,52 @@ export default function AgentsManagePage() {
                     })
                   }
                 }}
-              />
-            </div>
+                />
 
-            {/* Empty State for Agents */}
-            {agents.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="panel flex flex-col items-center justify-center py-16"
-              >
-                <div className="w-20 h-20 radius-lg bg-muted/30 border border-border flex items-center justify-center mb-6">
-                  <RobotIcon className="w-10 h-10 text-muted-foreground" />
+                {agents.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 px-6 py-16 text-center"
+                  >
+                    <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-border/60 bg-card/70">
+                      <RobotIcon className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Create your first agent</h3>
+                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                      Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.
+                    </p>
+                    <Button
+                      size="lg"
+                      className="mt-6 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                    >
+                      <PlusIcon className="mr-2 h-5 w-5" />
+                      Create my first agent
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold text-foreground">Agent credentials</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Manage API keys and credentials for your specialized agents. Each agent requires specific credentials to access external services.
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-1">Create your first agent</h3>
-                <p className="text-sm text-muted-foreground text-center max-w-md mb-6">Create specialized agents for different tasks. Each agent can have its own model, tools, and unique personality.</p>
-                <Button
-                  size="lg"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
-                >
-                  <PlusIcon className="w-5 h-5 mr-2" />
-                  Create my first agent
-                </Button>
-              </motion.div>
+                <div className="grid gap-5 lg:grid-cols-1 xl:grid-cols-2">
+                  <ShopifyCredentialsManager />
+                  <SkyvernCredentialsManager />
+                  <SerpapiCredentialsManager />
+                  <NotionCredentialsManager />
+                  <TwitterCredentialsManager />
+                </div>
+              </div>
             )}
           </motion.div>
-        )}
-
-        {activeSection === 'credentials' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-6xl mx-auto space-y-6"
-          >
-            {/* Agent Credentials Section */}
-            <div className="space-y-4">
-              <div>
-                <h1 className="text-2xl font-semibold text-foreground">Agent Credentials</h1>
-                <p className="text-muted-foreground mt-1">
-                  Manage API keys and credentials for your specialized agents. Each agent requires specific credentials to access external services.
-                </p>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-1 xl:grid-cols-2">
-                {/* Shopify Credentials for Emma */}
-                <ShopifyCredentialsManager />
-
-                {/* Skyvern Credentials for Wex */}
-                <SkyvernCredentialsManager />
-
-                {/* SerpAPI Credentials for Apu */}
-                <SerpapiCredentialsManager />
-
-                {/* Notion Credentials for Workspace Management */}
-                <NotionCredentialsManager />
-
-                {/* Twitter Credentials for Nora */}
-                <TwitterCredentialsManager />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </main>
-    </div>
+        </div>
+      </div>
+    </section>
   )
 }

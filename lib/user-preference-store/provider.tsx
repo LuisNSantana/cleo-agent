@@ -207,9 +207,7 @@ export function UserPreferencesProvider({
   const updatePreferences = mutation.mutate
 
   const setLayout = (layout: LayoutType) => {
-    if (isAuthenticated || layout === "fullscreen") {
-      updatePreferences({ layout })
-    }
+    updatePreferences({ layout })
   }
 
   const setPromptSuggestions = (enabled: boolean) => {

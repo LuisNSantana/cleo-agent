@@ -24,7 +24,7 @@ export async function GET() {
       // In production, auth might fail silently - return defaults to avoid blocking UI
       console.warn("Auth failed in user-preferences GET, likely SSR issue in production:", authError?.message)
       return NextResponse.json({
-        layout: "fullscreen",
+        layout: "sidebar",
         prompt_suggestions: true,
         show_tool_invocations: true,
         show_conversation_previews: true,
@@ -55,7 +55,7 @@ export async function GET() {
       if (error.code === "PGRST116") {
     console.log('[Prefs][GET] No stored preferences found, returning defaults with personalityType=empathetic')
         return NextResponse.json({
-          layout: "fullscreen",
+          layout: "sidebar",
           prompt_suggestions: true,
           show_tool_invocations: true,
           show_conversation_previews: true,
@@ -203,7 +203,7 @@ export async function PUT(request: NextRequest) {
       console.warn("[Prefs][PUT] DB upsert failed, degrading to success response:", error.message)
       // Build a graceful success response echoing the intended preferences so UI can proceed
       const defaults = {
-        layout: "fullscreen",
+        layout: "sidebar",
         prompt_suggestions: true,
         show_tool_invocations: true,
         show_conversation_previews: true,
