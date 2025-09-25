@@ -500,29 +500,106 @@ export class GraphBuilder {
           }
         }
 
-        // If still empty, synthesize from last ToolMessage (e.g., Notion URL)
+        // If still empty, synthesize from the latest tool output (Drive/Notion/etc.)
         if (!textContent || !String(textContent).trim()) {
-          let url: string | undefined
+          const summarizePayload = (payload: any): { summary?: string; link?: string } => {
+            if (!payload || typeof payload !== 'object') return {}
+
+            const lines: string[] = []
+            let link: string | undefined
+
+            if (typeof payload.message === 'string' && payload.message.trim()) {
+              lines.push(payload.message.trim())
+            }
+
+            if (payload.success === false && typeof payload.error === 'string' && payload.error.trim()) {
+              lines.push(payload.error.trim())
+            }
+
+            if (Array.isArray(payload.files)) {
+              const files = payload.files
+              const count = files.length
+              const names = files
+                .map((f: any) => (f && typeof f.name === 'string' ? f.name : null))
+                .filter(Boolean)
+                .slice(0, 5) as string[]
+              const plural = count === 1 ? 'archivo' : 'archivos'
+              const base = count === 0
+                ? 'No se encontraron archivos en Google Drive.'
+                : `Encontré ${count} ${plural} en Google Drive` + (names.length ? `: ${names.join(', ')}` : '')
+              lines.push(base)
+
+              const firstWithLink = files.find((f: any) => f?.webViewLink || f?.webContentLink)
+              if (firstWithLink?.webViewLink) link = firstWithLink.webViewLink
+              else if (firstWithLink?.webContentLink) link = firstWithLink.webContentLink
+            }
+
+            if (payload.query && typeof payload.query === 'string' && payload.query.trim()) {
+              lines.push(`Consulta utilizada: "${payload.query.trim()}".`)
+            }
+
+            const candidateFile = payload.file && typeof payload.file === 'object' ? payload.file : undefined
+            if (candidateFile) {
+              const details: string[] = []
+              if (candidateFile.name || candidateFile.title) {
+                details.push(`Archivo: ${candidateFile.name || candidateFile.title}`)
+              }
+              if (candidateFile.mimeType) {
+                details.push(`Tipo: ${candidateFile.mimeType}`)
+              }
+              if (candidateFile.modifiedTime) {
+                details.push(`Última edición: ${candidateFile.modifiedTime}`)
+              }
+              if (details.length) {
+                lines.push(details.join(' · '))
+              }
+              if (candidateFile.webViewLink) link = candidateFile.webViewLink
+              else if (candidateFile.webContentLink) link = candidateFile.webContentLink
+            }
+
+            if (typeof payload.summary === 'string' && payload.summary.trim()) {
+              lines.push(payload.summary.trim())
+            }
+
+            const summary = lines.length ? lines.join(' ') : undefined
+            return { summary, link }
+          }
+
+          let synthesizedSummary: string | undefined
+          let extractedLink: string | undefined
+
           for (let i = messages.length - 1; i >= 0; i--) {
             const m = messages[i]
             if (m instanceof ToolMessage) {
               const c = toText((m as any).content)
               try {
                 const parsed = JSON.parse(c)
-                if (parsed?.url && typeof parsed.url === 'string') { url = parsed.url; break }
-                // Sometimes nested
-                if (parsed?.page?.url) { url = String(parsed.page.url); break }
-                if (parsed?.database?.url) { url = String(parsed.database.url); break }
+                const { summary, link } = summarizePayload(parsed)
+                if (!synthesizedSummary && summary) synthesizedSummary = summary
+                if (!extractedLink && link) extractedLink = link
+                if (parsed?.url && typeof parsed.url === 'string') extractedLink = parsed.url
+                if (parsed?.page?.url) extractedLink = String(parsed.page.url)
+                if (parsed?.database?.url) extractedLink = String(parsed.database.url)
               } catch {
-                // not JSON; attempt simple URL regex
                 const match = c.match(/https?:\/\/[\w.-]+\.[\w.-]+[^\s)\]}]*/)
-                if (match) { url = match[0]; break }
+                if (match && !extractedLink) extractedLink = match[0]
+                if (!synthesizedSummary && c && c.trim()) {
+                  synthesizedSummary = c.trim()
+                }
               }
             }
           }
-          textContent = url
-            ? `Listo. He completado la acción solicitada y aquí tienes el enlace: ${url}`
-            : 'Listo. He completado la acción solicitada.'
+
+          if (synthesizedSummary) {
+            textContent = synthesizedSummary
+            if (extractedLink && !synthesizedSummary.includes(extractedLink)) {
+              textContent = `${textContent} ${extractedLink}`.trim()
+            }
+          } else {
+            textContent = extractedLink
+              ? `Listo. He completado la acción solicitada y aquí tienes el enlace: ${extractedLink}`
+              : 'Listo. He completado la acción solicitada.'
+          }
         }
 
         // Ensure we always have non-empty final text content
