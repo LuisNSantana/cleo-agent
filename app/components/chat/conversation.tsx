@@ -42,28 +42,31 @@ export function Conversation({
         // Use any casting to handle custom execution-step type
         const anyPart = part as any
         if (anyPart && anyPart.type === 'execution-step' && anyPart.step) {
-          const step = anyPart.step as PipelineStep
-          // Add a unique ID for each step based on message and part index
-          step.id = `${msg.id}-step-${partIndex}`
-          // Add timestamp from the message if available
-          if ((msg as any).createdAt) {
-            step.timestamp = (msg as any).createdAt
+          const raw = anyPart.step as PipelineStep
+          // Build a stable, unique id per step occurrence, prefer backend-provided id
+          const stepId = (raw as any).id || `${msg.id}-step-${partIndex}`
+          // Build a deterministic timestamp per part (base createdAt + part index)
+          const baseCreatedAt = (msg as any).createdAt ? new Date((msg as any).createdAt).getTime() : Date.now()
+          const derivedTs = new Date(baseCreatedAt + partIndex)
+          const ts = (raw as any).timestamp ? (raw as any).timestamp : derivedTs.toISOString()
+
+          const step: PipelineStep = {
+            id: stepId,
+            timestamp: ts,
+            agent: raw.agent,
+            action: raw.action,
+            content: raw.content,
+            progress: raw.progress,
+            metadata: raw.metadata,
           }
           steps.push(step)
         }
       })
 
-      // Sort by timestamp and deduplicate
-      const sortedSteps = steps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      const uniqueSteps = sortedSteps.filter((step, index, arr) => {
-        if (step.id) {
-          return arr.findIndex(s => s.id === step.id) === index
-        }
-        const key = `${step.agent}-${step.action}-${step.content?.slice(0, 50)}-${step.timestamp}`
-        return arr.findIndex(s => 
-          `${s.agent}-${s.action}-${s.content?.slice(0, 50)}-${s.timestamp}` === key
-        ) === index
-      })
+      // Sort by timestamp and keep steps in order; do not over-dedupe by agent/action (keeps majority of steps)
+      const uniqueSteps = steps
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .filter((step, index, arr) => arr.findIndex(s => s.id === step.id) === index)
       
       if (uniqueSteps.length > 0) {
         messageSteps.set(msg.id, uniqueSteps)

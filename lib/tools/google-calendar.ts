@@ -272,7 +272,7 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-    const { requestConfirmation } = await import('../confirmation/unified')
+  const { requestConfirmation } = await import('../confirmation/unified')
     // Title refinement heuristics
     function refineTitle(raw: string, desc?: string): string {
       if (!raw) return 'Untitled Event'
@@ -332,9 +332,11 @@ export const createCalendarEventTool = tool({
         eventData.conferenceData = { createRequest: { conferenceSolutionKey: { type: 'hangoutsMeet' }, requestId: `random-${Date.now()}` } }
       }
 
+      // Always use primary to avoid 403 on unknown calendars
+      const safeCalendarId = 'primary'
       const data = await makeGoogleCalendarRequest(
         accessToken,
-        `calendars/${calendarId}/events${needsConference ? '?conferenceDataVersion=1' : ''}`,
+        `calendars/${safeCalendarId}/events${needsConference ? '?conferenceDataVersion=1' : ''}`,
         {
           method: 'POST',
           body: JSON.stringify(eventData),

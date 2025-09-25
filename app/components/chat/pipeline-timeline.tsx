@@ -75,24 +75,13 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     })
   }, [steps])
 
-  // Filter out duplicates and keep only the most recent step per agent+action combination
+  // Keep majority of steps; only dedupe by exact id to avoid dropping stages
   const uniqueSteps = useMemo(() => {
-    const stepMap = new Map<string, typeof normalized[0]>()
-    
-    // Group by agent+action and keep the latest timestamp
+    const byId = new Map<string, typeof normalized[0]>()
     normalized.forEach(step => {
-      const key = `${step.agent}-${step.action}`
-      const existing = stepMap.get(key)
-      
-      if (!existing || new Date(step.timestamp) > new Date(existing.timestamp)) {
-        stepMap.set(key, step)
-      }
+      byId.set(step.id, step)
     })
-    
-    // Convert back to array and sort by timestamp
-    return Array.from(stepMap.values()).sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    )
+    return Array.from(byId.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [normalized])
 
   // Identify the latest step overall for collapsed preview
@@ -108,10 +97,11 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     return latest
   }, [normalized])
 
-  // Show all unique steps when expanded; show none when collapsed for minimal footprint
+  // Show all unique steps when expanded; when collapsed show just the latest live step
   const hasSteps = uniqueSteps.length > 0
-  const visibleSteps = isExpanded ? uniqueSteps : []
-  const hiddenCount = uniqueSteps.length
+  const VISIBLE_LIMIT = 12
+  const visibleSteps = isExpanded ? uniqueSteps.slice(-VISIBLE_LIMIT) : []
+  const hiddenCount = Math.max(0, uniqueSteps.length - VISIBLE_LIMIT)
 
   if (!hasSteps) return null
 
@@ -139,7 +129,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                 </>
               ) : (
                 <>
-                  <span>Show all (+{hiddenCount})</span>
+                  <span>Show steps{hiddenCount > 0 ? ` (+${hiddenCount} more)` : ''}</span>
                   <CaretDownIcon size={14} />
                 </>
               )}
@@ -227,6 +217,7 @@ function StatusDot({ action }: { action: PipelineStep['action'] }) {
       case 'delegating': return 'bg-cyan-500'
       case 'delegation': return 'bg-indigo-500'
       case 'responding': return 'bg-emerald-500'
+      case 'executing': return 'bg-sky-500'
       case 'completing': return 'bg-slate-500'
       default: return 'bg-slate-400'
     }

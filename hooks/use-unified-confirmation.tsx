@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { getPendingConfirmations, resolveConfirmation } from '@/lib/confirmation/unified'
 
 export interface PendingConfirmation {
   id: string
@@ -19,9 +18,15 @@ export function useUnifiedConfirmation() {
   const [isLoading, setIsLoading] = useState(false)
 
   // Fetch pending confirmations
-  const refreshConfirmations = useCallback(() => {
-    const pending = getPendingConfirmations()
-    setPendingConfirmations(pending)
+  const refreshConfirmations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/confirmations', { cache: 'no-store' })
+      if (!res.ok) throw new Error(`Failed to fetch confirmations: ${res.status}`)
+      const data = await res.json()
+      setPendingConfirmations(data.pending || [])
+    } catch (e) {
+      console.error('[useUnifiedConfirmation] fetch error', e)
+    }
   }, [])
 
   // Poll for updates (simple approach for now)
@@ -36,7 +41,12 @@ export function useUnifiedConfirmation() {
   const handleConfirmation = useCallback(async (confirmationId: string, approved: boolean) => {
     setIsLoading(true)
     try {
-      const result = await resolveConfirmation(confirmationId, approved)
+      const res = await fetch('/api/confirmations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: confirmationId, approved })
+      })
+      const result = await res.json()
       
       if (result.success) {
         // Remove from local state immediately

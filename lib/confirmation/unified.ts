@@ -36,8 +36,12 @@ export interface ConfirmationRequest {
   executeFunction: () => Promise<any>
 }
 
-// SINGLE pending confirmations store
-const pendingConfirmations = new Map<string, ConfirmationRequest>()
+// SINGLE pending confirmations store — keep in globalThis to survive module reloads and serverless instance nuances
+const globalAny = globalThis as any
+if (!globalAny.__pendingConfirmations) {
+  globalAny.__pendingConfirmations = new Map<string, ConfirmationRequest>()
+}
+const pendingConfirmations: Map<string, ConfirmationRequest> = globalAny.__pendingConfirmations
 
 // Cleanup old confirmations (5 minute timeout)
 const confirmationCleanupInterval = setInterval(() => {
@@ -215,6 +219,11 @@ export function getPendingConfirmations() {
     message: data.message,
     timestamp: data.timestamp
   }))
+}
+
+// Small helper for other modules needing direct access (SSR/API)
+export function __getPendingConfirmationsMap() {
+  return pendingConfirmations
 }
 
 // Legacy compatibility - will be removed
