@@ -99,6 +99,8 @@ export class AgentOrchestrator {
 
   private graphs = new Map<string, StateGraph<AgentState>>()
   private activeExecutions = new Map<string, AgentExecution>()
+  // Store interval references for cleanup
+  private metricsIntervals: NodeJS.Timeout[] = []
 
   constructor(config: OrchestratorConfig = {}) {
     this.config = {
@@ -292,13 +294,14 @@ export class AgentOrchestrator {
     if (!this.metricsCollector) return
 
     // Collect error metrics
-    setInterval(() => {
+    const errorMetricsInterval = setInterval(() => {
       const errorMetrics = this.errorHandler.getErrorMetrics()
       this.metricsCollector!.updateErrorMetrics(errorMetrics)
     }, 60000) // Every minute
+    this.metricsIntervals.push(errorMetricsInterval)
 
     // Collect system metrics
-    setInterval(() => {
+    const systemMetricsInterval = setInterval(() => {
       this.metricsCollector!.recordSystemMetrics({
         activeExecutions: this.activeExecutions.size,
         totalGraphs: this.graphs.size,
@@ -306,6 +309,7 @@ export class AgentOrchestrator {
         uptime: process.uptime()
       })
     }, 30000) // Every 30 seconds
+    this.metricsIntervals.push(systemMetricsInterval)
   }
 
   /**
@@ -834,6 +838,10 @@ export class AgentOrchestrator {
     if (this.metricsCollector) {
       await this.metricsCollector.flush()
     }
+
+    // Clear all metrics intervals
+    this.metricsIntervals.forEach(interval => clearInterval(interval))
+    this.metricsIntervals = []
 
     this.eventEmitter.removeAllListeners()
 

@@ -1,9 +1,11 @@
+
 import { NextRequest } from 'next/server'
 import { resolveConfirmation } from '@/lib/confirmation/unified'
 
 // POST /api/executions/[id]/confirm
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, context: { params: { id: string } }) {
   try {
+    const { params } = context
     const { approved } = await req.json()
     if (typeof approved !== 'boolean') {
       return new Response(JSON.stringify({ success: false, message: 'Missing or invalid approved field' }), { status: 400 })
