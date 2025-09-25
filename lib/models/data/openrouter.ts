@@ -2,6 +2,83 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { ModelConfig } from "../types"
 
 export const openrouterModels: ModelConfig[] = [
+  // xAI: Grok Code Fast 1 (nuevo, para tareas técnicas y de programación)
+  {
+    id: "openrouter:x-ai/grok-code-fast-1",
+    name: "Grok Code Fast 1",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Grok",
+    baseProviderId: "x-ai",
+    description:
+      "Grok Code Fast 1 es un modelo de razonamiento rápido y económico, ideal para tareas de programación y flujos de trabajo técnicos de alta calidad.",
+    tags: ["programming", "technology", "fast", "reasoning", "code", "xai"],
+    contextWindow: 256000,
+    inputCost: 0.20, // $0.20 por 1M tokens de entrada
+    outputCost: 1.50, // $1.50 por 1M tokens de salida
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/x-ai/grok-code-fast-1",
+    apiDocs: "https://openrouter.ai/x-ai/grok-code-fast-1",
+    modelPage: "https://openrouter.ai/x-ai/grok-code-fast-1",
+    releasedAt: "2025-08-26",
+    icon: "xai",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("x-ai/grok-code-fast-1"),
+  },
+  // Google Gemini 2.5 Flash Image Preview (Nano Banana) - Text-to-Image Generation
+  {
+    id: "openrouter:google/gemini-2.5-flash-image-preview",
+    name: "Gemini 2.5 Flash Image Preview (Nano Banana)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Gemini",
+    baseProviderId: "google",
+    description:
+      "Gemini's text-to-image generation model (Nano Banana). Creates high-quality images from text descriptions with fast processing and good value for money.",
+    tags: ["text-to-image", "image-generation", "creative", "nano-banana", "affordable"],
+    contextWindow: 128000,
+    inputCost: 0.30, // $0.30 per 1M text tokens
+    outputCost: 0.039, // $0.039 per image (very competitive)
+    priceUnit: "per image/1M tokens",
+    vision: false,
+    tools: false,
+    audio: false,
+    reasoning: false,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai",
+    apiDocs: "https://openrouter.ai/google/gemini-2.5-flash-image-preview",
+    modelPage: "https://ai.google.dev/gemini-api/docs/vision",
+    releasedAt: "2025-08-01",
+    dailyLimit: 5, // 5 images per day - text-to-image generation
+    icon: "gemini",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("google/gemini-2.5-flash-image-preview"),
+  },
   // Venice Uncensored: Dolphin Mistral 24B Venice Edition (free)
   {
     id: "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
