@@ -18,6 +18,8 @@
     "docker:dev-down": "docker-compose -f docker-compose.yml -f docker-compose.override.yml down --volumes --remove-orphans && docker volume prune -f",
     "docker:dev-restart": "docker-compose -f docker-compose.yml -f docker-compose.override.yml restart cleo && docker-compose logs -f cleo",
     "docker:prod": "docker-compose -f docker-compose.yml up --build",
+  "test:context": "pnpm exec tsc -p tsconfig.tests.json && node --test $(find .tmp-tests/tests -type f -name '*.js')",
+  "docker:test": "docker-compose run --rm cleo pnpm test:context",
     "docker:logs": "docker-compose logs -f cleo",
     "docker:logs-all": "docker-compose logs -f",
     "docker:clean": "docker-compose down --volumes --remove-orphans && docker system prune -f && docker volume prune -f",

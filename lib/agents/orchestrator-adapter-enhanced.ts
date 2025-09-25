@@ -238,7 +238,11 @@ function createAndRunExecutionWithContext(
   const { withRequestContext } = require('@/lib/server/request-context')
   
   // Run execution within the specified user context
-  return withRequestContext({ userId, requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }, () => {
+  return withRequestContext({
+    userId,
+    model: agentId || 'agent:unknown',
+    requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }, () => {
     return createAndRunExecution(input, agentId, prior)
   })
 }

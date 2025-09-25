@@ -87,7 +87,7 @@ export class ExecutionManager {
 
       // Compile graph and execute within request context so tools can read userId
       const compiledGraph = graph.compile()
-      const result = await withRequestContext({ userId: context.userId, requestId: execution.id }, async () => {
+      const result = await withRequestContext({ userId: context.userId, model: agentConfig.id, requestId: execution.id }, async () => {
         return compiledGraph.invoke(initialState)
       })
 

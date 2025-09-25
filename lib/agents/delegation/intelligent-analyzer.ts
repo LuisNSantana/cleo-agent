@@ -36,19 +36,32 @@ const AGENT_PATTERNS: KeywordPatterns = {
     primary: [
       // Core software/IoT technical
       'code', 'debug', 'api', 'database', 'sql', 'script', 'programming', 'development', 'technical', 'bug', 'fix', 'backend', 'frontend',
-      // Stack-specific
-      'typescript', 'react', 'next.js', 'nextjs', 'tailwind', 'node', 'npm', 'pnpm', 'docker', 'kubernetes', 'k8s', 'redis', 'websocket', 'sse',
-      'supabase', 'postgres', 'rls', 'trigger', 'migration', 'endpoint', 'api route',
+      // Languages & runtimes
+      'typescript', 'javascript', 'python', 'java', 'c++', 'c#', 'go', 'golang', 'rust', 'swift', 'kotlin', 'php', 'ruby', 'scala', 'elixir', 'haskell', 'dart', 'bash', 'shell', 'powershell', 'sql', 'graphql', 'openapi', 'swagger',
+      // Frameworks & tooling
+      'react', 'next.js', 'nextjs', 'tailwind', 'vue', 'svelte', 'angular', 'node', 'npm', 'pnpm', 'yarn', 'vite', 'webpack', 'jest', 'playwright', 'cypress', 'vitest', 'eslint', 'prettier', 'babel', 'storybook',
+      'docker', 'dockerfile', 'docker-compose', 'kubernetes', 'k8s', 'helm', 'terraform', 'ansible', 'cloudformation', 'serverless',
+      'redis', 'kafka', 'rabbitmq', 'websocket', 'sse', 'grpc', 'rest', 'soap', 'graphql',
+      'supabase', 'postgres', 'mysql', 'sqlite', 'prisma', 'typeorm', 'mongoose', 'redis', 'rls', 'trigger', 'migration', 'endpoint', 'api route',
       // IoT/embedded
-      'iot', 'embedded', 'firmware', 'esp32', 'arduino', 'raspberry pi', 'mqtt', 'ble', 'zigbee', 'z-wave', 'modbus', 'can', 'opc-ua', 'coap', 'lwM2M', 'sensor'
+      'iot', 'embedded', 'firmware', 'esp32', 'arduino', 'raspberry pi', 'mqtt', 'ble', 'zigbee', 'z-wave', 'modbus', 'can', 'opc-ua', 'coap', 'lwm2m', 'sensor'
     ],
     secondary: [
       'performance', 'optimization', 'security', 'deployment', 'server', 'framework', 'library', 'algorithm', 'cache', 'latency', 'timeout',
-      'refactor', 'testing', 'unit test', 'integration test', 'e2e', 'observability', 'ci/cd'
+      'refactor', 'testing', 'unit test', 'integration test', 'e2e', 'observability', 'ci/cd', 'pipeline', 'build failure', 'compile error',
+      'stack trace', 'traceback', 'exception', 'typeerror', 'referenceerror', 'segfault', 'core dump', 'memory leak', 'deadlock',
+      'lint', 'formatter', 'coverage', 'code review', 'merge conflict', 'pull request', 'gitlab', 'github actions', 'bitbucket',
+      'ssl', 'tls', 'oauth', 'jwt', 'sso', 'oidc', 'webhook', 'rate limit', 'idempotency',
+      'observability', 'otel', 'prometheus', 'grafana', 'sentry', 'datadog'
     ],
     contextual: [
       'how to build', 'how to implement', 'error', 'not working', 'crash', 'slow', 'integrate', 'setup', 'type error', 'compile error', 'failed build',
-      'connect device', 'pair bluetooth', 'flash firmware', 'ota update', 'device not connecting'
+      'why does this error', 'unit tests failing', 'deployment failed', 'build pipeline broken', 'ci is red', 'cannot connect to database',
+      'connect device', 'pair bluetooth', 'flash firmware', 'ota update', 'device not connecting',
+      'read the docs', 'follow the documentation', 'api response 500', 'http 4xx', 'timeout when calling',
+      'stack trace shows', 'traceback says', 'exception thrown', 'segmentation fault', 'memory overflow',
+      'how to configure', 'set up environment variables', 'docker build fails', 'kubectl', 'helm install', 'terraform apply',
+      'analyze logs', 'profiling results', 'optimize query', 'improve performance'
     ],
     exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'calendar', 'meeting', 'google docs', 'google sheets', 'tweet', 'twitter', 'social media']
   },
@@ -189,6 +202,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
 
 // Agent display names and tool mappings
 const AGENT_METADATA = {
+  'toby-technical': { name: 'Toby', toolName: 'delegate_to_toby' },
   'apu-research': { name: 'Apu', toolName: 'delegate_to_apu' },
   'ami-creative': { name: 'Ami', toolName: 'delegate_to_ami' },
   'peter-google': { name: 'Peter', toolName: 'delegate_to_peter' },
@@ -215,6 +229,16 @@ const WEIGHTS = {
 const CONFIDENCE = {
   high: 0.8, // above this: auto-delegate
   medium: 0.6, // between medium & high: delegate but consider clarifying
+}
+
+function getAgentMetadata(agentId: string): { name: string; toolName: string } {
+  const metadata = AGENT_METADATA[agentId as keyof typeof AGENT_METADATA]
+  if (metadata) return metadata
+
+  const fallbackName = toTitleCaseFromId(agentId)
+  const shortId = agentId.split(/[-_]/)[0] || agentId
+  const fallbackTool = agentId.startsWith('delegate_to_') ? agentId : `delegate_to_${shortId}`
+  return { name: fallbackName, toolName: fallbackTool }
 }
 
 // Basic Levenshtein distance for fuzzy matching
@@ -249,6 +273,51 @@ function fuzzyIncludes(haystack: string, needle: string, tolerance = 0.85): bool
   const similarity = 1 - dist / maxLen
   return similarity >= tolerance
 }
+
+function toTitleCaseFromId(agentId: string): string {
+  return agentId
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ')
+}
+
+const TECHNICAL_REGEXES: RegExp[] = [
+  /```[\s\S]*?```/, // fenced code blocks
+  /\b(import|export)\s+[^;]+from\s+['"]/,
+  /\b(function|def|class)\s+[a-zA-Z0-9_]+/, 
+  /\bconst\s+[a-zA-Z0-9_]+\s*=\s*async/,
+  /\btry\s*\{?/,
+  /traceback\s*\(most recent call last\)/i,
+  /exception[:\s]/i,
+  /typeerror/i,
+  /referenceerror/i,
+  /nullpointerexception/i,
+  /segmentation fault/i,
+  /module not found/i,
+  /syntaxerror/i
+]
+
+const TECH_COMMAND_HINTS: RegExp[] = [
+  /\b(npm|pnpm|yarn)\s+(install|run|test|build|lint)/,
+  /\bpip\s+install/,
+  /\buv\s+run/, 
+  /\b(poetry|pipenv)\s+/, 
+  /\bkubectl\b/,
+  /\bdocker\s+(build|compose|run|push)/,
+  /\bhelm\s+(install|upgrade|template)/,
+  /\bterraform\s+(plan|apply|destroy)/,
+  /\bansible\s+playbook/,
+  /\bgit\s+(commit|merge|rebase|push|pull)/
+]
+
+const TECH_FILE_EXTENSIONS_REGEX = /\.(ts|tsx|js|jsx|mjs|cjs|py|java|cs|cpp|cxx|hpp|h|go|rs|rb|php|swift|kt|dart|m|mm|ps1|sh|bash|zsh|yaml|yml|json|toml|lock|gradle|swiftpm)\b/i
+
+const LANGUAGE_KEYWORDS_REGEX = /\b(typescript|javascript|python|java|c\+\+|c#|go|golang|rust|swift|kotlin|php|ruby|scala|elixir|haskell|dart|bash|shell|powershell|sql|postgres|mysql|sqlite|mongodb|prisma|graphql|openapi|swagger|docker|kubernetes|helm|terraform|ansible|devops|sre|observability)\b/i
+
+const ERROR_KEYWORDS_REGEX = /\b(error|exception|stack trace|traceback|build failed|deployment failed|ci failed|test failed|timeout|500 error|http 500|http 502|crash|core dump|memory leak|oom killer)\b/i
+
+const CONTEXT_HINT_REGEX = /\b(delegate_to_toby|toby-technical|toby)\b/i
 
 /**
  * Analyze user text and suggest the best specialist agent
@@ -305,6 +374,42 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
     
     scores[agentId] = { score: Math.max(0, agentScore), reasons }
   })
+
+  // Heuristic boosts for Toby with explicit technical signals
+  const tobyScore = scores['toby-technical']
+  if (tobyScore) {
+    const applyTobyHeuristic = (amount: number, reason: string) => {
+      tobyScore.score += amount
+      tobyScore.reasons.push(reason)
+    }
+
+    if (TECHNICAL_REGEXES.some((regex) => regex.test(userText) || regex.test(context || ''))) {
+      applyTobyHeuristic(6, 'heuristic: technical_code_pattern')
+    }
+
+    if (TECH_COMMAND_HINTS.some((regex) => regex.test(fullText))) {
+      applyTobyHeuristic(4, 'heuristic: developer_command')
+    }
+
+    if (TECH_FILE_EXTENSIONS_REGEX.test(fullText)) {
+      applyTobyHeuristic(3, 'heuristic: technical_file_reference')
+    }
+
+    if (LANGUAGE_KEYWORDS_REGEX.test(fullText)) {
+      applyTobyHeuristic(3, 'heuristic: language_keyword')
+    }
+
+    if (ERROR_KEYWORDS_REGEX.test(fullText)) {
+      applyTobyHeuristic(4, 'heuristic: error_debugging')
+    }
+
+    if ((context && CONTEXT_HINT_REGEX.test(context)) || CONTEXT_HINT_REGEX.test(userText)) {
+      applyTobyHeuristic(2, 'heuristic: prior_toby_context')
+    }
+
+    // Ensure score remains non-negative
+    tobyScore.score = Math.max(0, tobyScore.score)
+  }
   
   // Find the best scoring agent
   const sortedAgents = Object.entries(scores)
@@ -319,15 +424,20 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
   const secondBest = sortedAgents[1]
   
   // Calculate confidence based on score difference (normalized)
-  const confidence = secondBest
+  let confidence = secondBest
     ? Math.min(0.95, score / Math.max(1, score + secondBest[1].score))
     : Math.min(0.95, Math.max(0.5, score / 8))
-  
-  const metadata = AGENT_METADATA[bestAgentId as keyof typeof AGENT_METADATA]
-  
+
+  const metadata = getAgentMetadata(bestAgentId)
+
   // Determine if clarification is needed
-  const needsClarification = confidence < CONFIDENCE.medium || (secondBest && (score - secondBest[1].score) < 2)
-  
+  let needsClarification = confidence < CONFIDENCE.medium || (secondBest && (score - secondBest[1].score) < 2)
+
+  if (bestAgentId === 'toby-technical' && score >= 8 && (!secondBest || (score - secondBest[1].score) >= 3)) {
+    confidence = Math.max(confidence, 0.88)
+    needsClarification = false
+  }
+
   return {
     agentId: bestAgentId,
     agentName: metadata.name,
@@ -426,13 +536,13 @@ function extractTaskFromText(userText: string): string {
  * Generate a clarification question when intent is ambiguous
  */
 function generateClarificationQuestion(primaryAgent: string, secondaryAgent?: string): string {
-  const primary = AGENT_METADATA[primaryAgent as keyof typeof AGENT_METADATA]
+  const primary = getAgentMetadata(primaryAgent)
   
   if (!secondaryAgent) {
     return `I think ${primary.name} might be able to help with this. Should I delegate this task to them?`
   }
   
-  const secondary = AGENT_METADATA[secondaryAgent as keyof typeof AGENT_METADATA]
+  const secondary = getAgentMetadata(secondaryAgent)
   
   const clarifications = {
     'apu-research_ami-creative': "Are you looking for technical/research implementation or practical assistance like scheduling and coordination?",
@@ -444,6 +554,8 @@ function generateClarificationQuestion(primaryAgent: string, secondaryAgent?: st
     'astra-email_ami-creative': "Is this specifically about email management or broader administrative tasks?",
     'notion-agent_ami-creative': "Is this about Notion workspace organization or general administrative coordination?",
     'apu-markets_apu-research': "Are you looking for financial market analysis or broader research and intelligence?",
+    'toby-technical_ami-creative': "Is this a technical coding/devops issue or more of an administrative/productivity request?",
+    'toby-technical_apu-research': "Do you need hands-on implementation/debugging or broader research and market insights?",
   }
   
   const key = `${primaryAgent}_${secondaryAgent}` as keyof typeof clarifications

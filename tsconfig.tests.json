@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".tmp-tests",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "isolatedModules": false,
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["tests/**/*.ts", "lib/tools/context-wrapper.ts"],
+  "exclude": ["node_modules"]
+}

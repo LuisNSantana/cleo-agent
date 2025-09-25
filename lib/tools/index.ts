@@ -4,6 +4,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
 import { getCurrentUserId } from '@/lib/server/request-context'
+import { ensureToolsHaveRequestContext, wrapToolExecuteWithRequestContext } from './context-wrapper'
 
 // Core single tools
 import { webSearchTool } from './web-search'
@@ -333,6 +334,8 @@ export const tools = {
 	...serpapiCredentialTools,
 }
 
+ensureToolsHaveRequestContext(tools)
+
 // Export tool metadata maps for UI consumption
 export const toolMeta = {
 	twitter: twitterToolMeta,
@@ -446,6 +449,7 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				}
 			}
 		})
+		wrapToolExecuteWithRequestContext(toolName, newTool)
 		;(tools as any)[toolName] = newTool
 	}
 	return toolName

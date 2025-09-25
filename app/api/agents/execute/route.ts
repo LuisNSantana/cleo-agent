@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
       // Execute within request context to ensure proper context propagation during delegation
       const result = await withRequestContext({ 
         userId: authedUserId || '00000000-0000-0000-0000-000000000000',
+        model: agentId || 'agent:cleo-supervisor',
         requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       }, async () => {
         // Start execution with enhanced dual-mode support
