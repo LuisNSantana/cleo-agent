@@ -247,86 +247,91 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
       }
 
       if (userPlain.trim()) {
-        try {
-          const { data: userDocs } = await (supabase as any)
-            .from('documents')
-            .select('id')
-            .eq('user_id', realUserId)
-            .limit(1)
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[RAG] DEBUG - Has docs?', Boolean(userDocs?.length))
-          }
-        } catch {}
-
-        // Dynamic sizing: faster models get smaller budgets for speed
-        const fastModel = model === 'grok-3-mini'
-        const topK = fastModel ? 4 : 6
-        let retrieved = await retrieveRelevant({
-          userId: realUserId!,
-          query: userPlain,
-          topK,
-          documentId,
-          projectId,
-          useHybrid: true,
-          useReranking: true,
-        })
-
-        if (retrieved.length) {
-          ragSystemAddon = buildContextBlock(retrieved)
-          if (debugRag) console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0, 400))
+        if (!realUserId || !realUserId.trim()) {
+          console.warn('[RAG] Skipping retrieval because realUserId is missing in buildFinalSystemPrompt.')
         } else {
-          if (!documentId && supabase && !fastModel) {
-            try {
-              const { data: docs } = await (supabase as any)
-                .from('documents')
-                .select('id, updated_at')
-                .eq('user_id', realUserId)
-                .order('updated_at', { ascending: false })
-                .limit(3)
-              if (docs?.length) {
-                for (const d of docs) {
-                  const { count } = await (supabase as any)
-                    .from('document_chunks')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('document_id', d.id)
-                  if (!count || count === 0) {
-                    try { await indexDocument(d.id, { force: true }) } catch {}
+          const normalizedUserId = realUserId.trim()
+          try {
+            const { data: userDocs } = await (supabase as any)
+              .from('documents')
+              .select('id')
+              .eq('user_id', normalizedUserId)
+              .limit(1)
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[RAG] DEBUG - Has docs?', Boolean(userDocs?.length))
+            }
+          } catch {}
+
+          // Dynamic sizing: faster models get smaller budgets for speed
+          const fastModel = model === 'grok-3-mini'
+          const topK = fastModel ? 4 : 6
+          let retrieved = await retrieveRelevant({
+            userId: normalizedUserId,
+            query: userPlain,
+            topK,
+            documentId,
+            projectId,
+            useHybrid: true,
+            useReranking: true,
+          })
+
+          if (retrieved.length) {
+            ragSystemAddon = buildContextBlock(retrieved)
+            if (debugRag) console.log('[RAG] Context preview:\n' + ragSystemAddon.slice(0, 400))
+          } else {
+            if (!documentId && supabase && !fastModel) {
+              try {
+                const { data: docs } = await (supabase as any)
+                  .from('documents')
+                  .select('id, updated_at')
+                  .eq('user_id', normalizedUserId)
+                  .order('updated_at', { ascending: false })
+                  .limit(3)
+                if (docs?.length) {
+                  for (const d of docs) {
+                    const { count } = await (supabase as any)
+                      .from('document_chunks')
+                      .select('id', { count: 'exact', head: true })
+                      .eq('document_id', d.id)
+                    if (!count || count === 0) {
+                      try { await indexDocument(d.id, { force: true }) } catch {}
+                    }
                   }
+                  // retry
+                  retrieved = await retrieveRelevant({
+                    userId: normalizedUserId,
+                    query: userPlain,
+                    topK,
+                    projectId,
+                    useHybrid: true,
+                    useReranking: true,
+                  })
+                  if (retrieved.length) ragSystemAddon = buildContextBlock(retrieved)
                 }
-                // retry
-                retrieved = await retrieveRelevant({
-                  userId: realUserId!,
-                  query: userPlain,
+              } catch {}
+            }
+          }
+
+          if (!fastModel && ragSystemAddon && ragSystemAddon.trim().length > 0) {
+            const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
+            if (currentChunkCount < 3) {
+              try {
+                const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales'
+                const extra = await retrieveRelevant({
+                  userId: normalizedUserId,
+                  query: profileQuery,
                   topK,
+                  documentId,
                   projectId,
                   useHybrid: true,
                   useReranking: true,
                 })
-                if (retrieved.length) ragSystemAddon = buildContextBlock(retrieved)
-              }
-            } catch {}
-          }
-        }
-
-  if (!fastModel && ragSystemAddon && ragSystemAddon.trim().length > 0) {
-          const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
-          if (currentChunkCount < 3) {
-            try {
-              const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales'
-              const extra = await retrieveRelevant({
-                userId: realUserId!,
-                query: profileQuery,
-    topK,
-                documentId,
-                projectId,
-                useHybrid: true,
-                useReranking: true,
-              })
-              if (extra.length) {
-                const extraBlock = buildContextBlock(extra)
-                if (extraBlock && extraBlock.length > 0) ragSystemAddon += '\n' + extraBlock
-              }
-            } catch {}
+                if (extra.length) {
+                  const extraBlock = buildContextBlock(extra)
+                  if (extraBlock && extraBlock.length > 0) ragSystemAddon += '\n' + extraBlock
+                }
+              } catch {}
+            }
           }
         }
       }

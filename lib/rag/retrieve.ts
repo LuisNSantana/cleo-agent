@@ -47,6 +47,11 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   } = opts
   
   if (!query.trim()) return []
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
+  if (!normalizedUserId) {
+    console.warn('[RAG] retrieveRelevant called without a valid userId. Skipping search to avoid RPC errors.')
+    return []
+  }
   
   // Adaptive sizing: derive topK and chunkLimit from query size and budget
   const approxQueryTokens = Math.ceil(query.length / 4)
@@ -84,7 +89,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     for (const q of uniqueQueries) {
       const [qEmbedding] = await defaultEmbeddingProvider.embed([q])
       const { data, error } = await (supabase as any).rpc('hybrid_search_document_chunks', {
-        p_user_id: userId,
+        p_user_id: normalizedUserId,
         p_query_embedding: qEmbedding,
         p_query_text: q,
         p_match_count: perQueryMatch,
@@ -167,6 +172,11 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
 // Fallback function for vector-only search
 async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
   const { userId, query, documentId, projectId, topK = 15, minSimilarity = 0 } = opts // Ajustado para 1M context
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
+  if (!normalizedUserId) {
+    console.warn('[RAG] retrieveVectorOnly called without a valid userId. Returning empty results.')
+    return []
+  }
   const supabase = await createClient()
   if (!supabase) return []
   
@@ -174,7 +184,7 @@ async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk
   if (!embedding) return []
   
   const { data, error } = await (supabase as any).rpc('match_document_chunks', {
-    p_user_id: userId,
+    p_user_id: normalizedUserId,
     p_query_embedding: embedding,
     p_match_count: topK,
     p_document_id: documentId || null,
