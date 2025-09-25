@@ -146,7 +146,7 @@ function analyzeFactors(message: string): ComplexityFactors {
   const unclearPattern = /(maybe|perhaps|might|could|not sure|help me with|figure out|anything)/;
   
   // Domain-specific patterns
-  const technicalPattern = /(code|programming|api|database|server|debug|git|deploy|sql)/;
+  const technicalPattern = /(code|programming|programación|desarrollo|developer|dev|api|rest|fastapi|django|flask|express|node|typescript|javascript|database|db|sql|postgres|server|backend|debug|git|deploy|deployment|ci|cd)/;
   const notionPattern = /(notion|workspace|page|database|organize|notes)/;
   const googlePattern = /(google\s+(docs|sheets|drive|calendar)|document|spreadsheet)/;
   const calendarPattern = /(reunión|meeting|calendar|evento|appointment|schedule|cita)/;
@@ -219,6 +219,10 @@ export async function suggestAgent(message: string): Promise<string | null> {
  * Static agent suggestions for performance (synchronous)
  */
 function suggestAgentStatic(lowMessage: string): string | null {
+  // Technical/engineering patterns -> Toby (fast path)
+  if (/(fastapi|endpoint|api|programa|programación|programming|typescript|javascript|node|python|backend|database|sql|deploy|docker|git|bug|error|stacktrace|exception)/.test(lowMessage)) {
+    return 'toby';
+  }
   
   // Research and intelligence patterns (consolidated)
   if (/(research|analyze|investigate|news|market|stock|search|academic|scholar|serpapi)/.test(lowMessage)) {
@@ -292,7 +296,17 @@ export async function makeDelegationDecision(userMessage: string): Promise<{
     };
   }
   
-  // For 'clarify' or no clear agent match
+  // If analysis suggests clarification but we have a clear specialist suggestion, prefer delegation
+  if (complexity.recommendation === 'clarify' && suggestedAgent) {
+    return {
+      shouldDelegate: true,
+      targetAgent: suggestedAgent,
+      reasoning: `Moderate complexity (score: ${complexity.score}). Clear specialist detected: ${suggestedAgent}. Delegating for better accuracy.`,
+      complexity
+    };
+  }
+
+  // For remaining 'clarify' or no clear agent match
   return {
     shouldDelegate: false,
     reasoning: `Moderate complexity (score: ${complexity.score}): ${complexity.reasoning}. Will handle directly with potential follow-up.`,

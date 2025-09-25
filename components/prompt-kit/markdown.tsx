@@ -50,7 +50,9 @@ const INITIAL_COMPONENTS: Partial<Components> = {
       return (
         <span
           className={cn(
-            "bg-primary-foreground rounded-sm px-1 font-mono text-sm",
+            // Use a neutral contrast-safe style for inline code to avoid white-on-white in some themes
+            // text-foreground ensures readable contrast; fallback to currentColor if CSS vars unavailable
+            "bg-muted text-foreground rounded-sm px-1 font-mono text-sm",
             className
           )}
           {...props}

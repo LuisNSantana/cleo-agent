@@ -60,7 +60,8 @@ function CodeBlockCode({
   }, [code, language, appTheme])
 
   const classNames = cn(
-    "w-full overflow-x-auto text-[13px] [&>pre]:px-4 [&>pre]:py-4 [&>pre]:!bg-background",
+    // Ensure good contrast regardless of theme by using card colors instead of raw background
+    "w-full overflow-x-auto text-[13px] [&>pre]:px-4 [&>pre]:py-4 [&>pre]:!bg-card [&>pre]:!text-card-foreground",
     className
   )
 
