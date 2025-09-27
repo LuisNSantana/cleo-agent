@@ -37,12 +37,14 @@ export const TOOL_SENSITIVITY_MAP: Record<string, string> = {
   deleteDriveFile: 'fileActions'
 }
 
+// TEMPORARILY EMPTY - System being refined for production
 export const ALWAYS_CONFIRM_TOOLS = [
-  'sendGmailMessage',
-  'createCalendarEvent',
-  'postTweet',
-  'uploadToDrive',
-  'createDriveFile',
+  // All tools disabled until confirmation system is fully polished
+  // 'sendGmailMessage',
+  // 'createCalendarEvent',
+  // 'postTweet',
+  // 'uploadToDrive',
+  // 'createDriveFile',
   'deleteDriveFile'
 ]
 

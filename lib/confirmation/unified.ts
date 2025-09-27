@@ -12,13 +12,15 @@ export function __getLatestPendingConfirmationIdForTest(): string | undefined {
  */
 
 // SINGLE list of tools requiring confirmation
+// TEMPORARILY EMPTY - System being refined for production
 export const CONFIRMATION_REQUIRED_TOOLS = [
-  'createCalendarEvent',
-  'sendGmailMessage', 
-  'postTweet',
-  'uploadToDrive',
-  'createDriveFile',
-  'deleteDriveFile'
+  // All tools disabled until confirmation system is fully polished
+  // 'createCalendarEvent',
+  // 'sendGmailMessage', 
+  // 'postTweet',
+  // 'uploadToDrive',
+  // 'createDriveFile',
+  // 'deleteDriveFile'
 ] as const
 
 // SINGLE type for tool names

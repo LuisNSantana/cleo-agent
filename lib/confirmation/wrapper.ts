@@ -48,12 +48,15 @@ function computeSensitivity(toolName: string): 'low' | 'medium' | 'high' | 'crit
 }
 
 function isUndoable(toolName: string): boolean {
-  return [
-    'sendGmailMessage',
-    'createCalendarEvent',
-    'postTweet',
-    'sendSlackMessage'
-  ].includes(toolName)
+  // TEMPORARILY EMPTY - System being refined for production
+  const undoableTools: string[] = [
+    // All tools disabled until confirmation system is fully polished
+    // 'sendGmailMessage',
+    // 'createCalendarEvent',
+    // 'postTweet',
+    // 'sendSlackMessage'
+  ]
+  return undoableTools.includes(toolName)
 }
 
 function buildPendingAction(toolName: string, parameters: Record<string, any>, preview: ToolPreview, confirmationId: string): PendingAction {

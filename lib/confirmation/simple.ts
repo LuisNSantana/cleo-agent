@@ -25,13 +25,15 @@ export function generateToolPreview(toolName: string, parameters: any): ToolPrev
 // Legacy function for backward compatibility
 export function requiresConfirmation(toolName: string): boolean {
   // Basic list of tools that require confirmation
-  const confirmationTools = [
-    'sendGmailMessage',
-    'createCalendarEvent', 
-    'postTweet',
-    'uploadToDrive',
-    'createDriveFile',
-    'deleteDriveFile'
+  // TEMPORARILY EMPTY - System being refined for production
+  const confirmationTools: string[] = [
+    // All tools disabled until confirmation system is fully polished
+    // 'sendGmailMessage',
+    // 'createCalendarEvent', 
+    // 'postTweet',
+    // 'uploadToDrive',
+    // 'createDriveFile',
+    // 'deleteDriveFile'
   ]
   return confirmationTools.includes(toolName)
 }
