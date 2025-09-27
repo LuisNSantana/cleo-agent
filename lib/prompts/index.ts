@@ -48,9 +48,11 @@ const AGENT_DELEGATION_RULES = {
     role: "Community Manager: Expert in social media strategy, content creation, and community engagement."
   },
   Wex: {
-    keywords: ["automation", "automatización", "web scraping", "browser", "navegador", "skyvern", "form", "formulario", "extract", "extraer", "workflow", "automation workflow", "web automation", "scrape"],
-    description: "web automation, browser orchestration, Skyvern automation, form filling, data extraction, workflow automation",
-    role: "Automation Specialist: Expert in browser automation, web scraping, and automated workflow execution."
+    keywords: [
+      "competitor","competitive","benchmark","market research","industry analysis","industry trends","pricing page","pricing analysis","differentiation","positioning","market size","tam","sam","som","seo","keyword research","serp","content gap","topic cluster","pillar page","backlink","prospect list","lead generation","prospecting","icp","ideal customer profile","buyer persona","opportunity matrix","white space"
+    ],
+    description: "market & competitor intelligence, SEO/keyword & SERP analysis, positioning, pricing deltas, prospect/ICP signal discovery, opportunity & white space mapping, INSIGHT SYNTHESIS (SWOT, Five Forces, Opportunity Matrix, ICE/RICE)",
+    role: "Intelligence & Insights Specialist: Multi-phase sourcing + structured synthesis turning fragmented research into actionable insights (insights accionables), frameworks, ranked opportunities, risks, and executive summaries."
   },
 
   // === SUB-AGENTS ===
@@ -196,6 +198,8 @@ ORCHESTRATION INTELLIGENCE:
 - Analyze verbs, objects, and implied needs.
 - Map domains: email→Ami/Astra, workspace→Peter/Notion Agent, research→Apu, ecommerce→Emma.
 - Chain specialists with clean handoffs.`;
+// Inject explicit Wex routing guidance
+const SPECIALISTS_AWARENESS_ENHANCED = SPECIALISTS_AWARENESS + `\n- For strategic market / competitor / SEO / prospect intelligence (pricing comparisons, TAM sizing, SERP & keyword analysis, positioning matrices, opportunity/white space discovery, actionable insight synthesis / "insights accionables", executive summaries, frameworks like SWOT/Five Forces/Opportunity Matrix/ICE-RICE) → delegate to Wex early if high-signal context is present.`
 
 const JOURNALISM_COMMUNITY_MANAGER_SPECIALIZATION = `SPECIALIZATION: JOURNALISM & COMMUNITY
 - Tailor content to platform/audience with hooks, calendars, hashtags.
@@ -314,7 +318,7 @@ ${REASONING_GUIDELINES}
 TASKS & DELEGATION
 ${DELEGATION_AND_SPEED}
 ${STRICT_DELEGATION_HEURISTICS}
-${SPECIALISTS_AWARENESS}
+${SPECIALISTS_AWARENESS_ENHANCED}
 
 TOOLS & VALIDATION
 ${TOOLS_INTEGRATION}

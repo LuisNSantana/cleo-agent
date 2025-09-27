@@ -55,8 +55,8 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     color: '#4285F4',
     emoji: '📊'
   },
-  'wex-automation': {
-    id: 'wex-automation',
+  'wex-intelligence': {
+    id: 'wex-intelligence',
     name: 'Wex',
     avatar: '/img/agents/wex4.png',
     color: '#10B981',
@@ -127,7 +127,7 @@ function normalizeAgentId(agentId: string): string {
     'ami': 'ami-creative',
   'peter': 'peter-google',
   'peter-workspace': 'peter-google',
-    'wex': 'wex-automation',
+  'wex': 'wex-intelligence',
     'skyvern': 'skyvern-agent',
     'nora': 'nora-community',
   'luna': 'luna-content',

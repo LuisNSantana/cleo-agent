@@ -164,7 +164,7 @@ export async function createAgentTask(
       'peter': 'peter-google',
       'toby': 'toby-technical',
       'apu': 'apu-research',
-      'wex': 'wex-automation'
+  'wex': 'wex-intelligence'
     }
     const normalizeAgentId = (id: string, name?: string) => {
       // If already a known built-in id, keep it

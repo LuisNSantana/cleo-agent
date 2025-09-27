@@ -134,17 +134,34 @@ function FileUploadTrigger({
   const handleClick = () => context?.inputRef.current?.click()
 
   if (asChild) {
-    const child = Children.only(children) as React.ReactElement<
-      React.HTMLAttributes<HTMLElement>
-    >
-    return cloneElement(child, {
+    const childArray = Children.toArray(children) as React.ReactElement[]
+    if (childArray.length === 0) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[FileUploadTrigger] asChild=true but no children provided.')
+      }
+      return null
+    }
+    // If more than one child, wrap them to avoid React.Children.only crash
+    let target: React.ReactElement
+    if (childArray.length > 1) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[FileUploadTrigger] Multiple children detected with asChild. Wrapping them in a span. Provide a single element to avoid extra wrapper.')
+      }
+      target = <span className={cn('inline-flex items-center gap-1', className)}>{childArray}</span>
+    } else {
+      target = childArray[0]
+    }
+    const targetEl = target as React.ReactElement<React.HTMLAttributes<HTMLElement>>
+    const { onClick: originalOnClick, className: originalClassName, role: originalRole, tabIndex: originalTabIndex } = (targetEl.props || {}) as React.HTMLAttributes<HTMLElement>
+    return cloneElement(targetEl, {
       ...props,
-      role: "button",
-      className: cn(className, child.props.className),
+      role: originalRole || 'button',
+      className: cn(originalClassName, className),
       onClick: (e: React.MouseEvent) => {
         handleClick()
-        child.props.onClick?.(e as React.MouseEvent<HTMLElement>)
+        originalOnClick?.(e as React.MouseEvent<HTMLElement>)
       },
+      tabIndex: originalTabIndex ?? 0,
     })
   }
 

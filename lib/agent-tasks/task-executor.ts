@@ -278,7 +278,7 @@ Execute immediately with provided query/topic. Provide a comprehensive research 
 
 When you have completed your research, call complete_task with your final report.`;
 
-    case 'wex-automation':
+  case 'wex-intelligence':
       return `${basePrompt}
 
 As Wex (Web Automation Specialist), execute the automation task using your Skyvern tools:
@@ -359,7 +359,7 @@ export function validateTaskConfig(task: AgentTask): { valid: boolean; error?: s
       }
       break;
     
-    case 'wex-automation':
+  case 'wex-intelligence':
       if (!task.task_config.url && !task.task_config.instructions) {
         return { 
           valid: false, 
@@ -406,7 +406,7 @@ export function getExampleTaskConfigs() {
         time_range: "24 hours"
       }
     },
-    'wex-automation': {
+  'wex-intelligence': {
       form_filling: {
         url: "https://example.com/contact",
         instructions: "Fill out the contact form with provided information",

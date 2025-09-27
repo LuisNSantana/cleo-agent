@@ -32,6 +32,27 @@ interface KeywordPatterns {
 
 // Enhanced keyword patterns for each specialist
 const AGENT_PATTERNS: KeywordPatterns = {
+  'wex-intelligence': {
+    primary: [
+  'competitor', 'competitive', 'benchmark', 'market research', 'industry analysis', 'industry trends', 'tendencias industria', 'seo audit', 'seo analysis', 'keyword research', 'search intent', 'serp analysis', 'organic traffic', 'backlink profile', 'content gap', 'top keywords',
+      'tam', 'sam', 'som', 'total addressable market', 'market size', 'go to market', 'gtm', 'positioning', 'differentiation',
+  'prospect list', 'prospecting', 'lead generation', 'lead list', 'b2b leads', 'ideal customer profile', 'icp', 'persona signals', 'buyer persona',
+      'funding round', 'fundraising', 'valuation', 'pricing page', 'feature comparison', 'pricing comparison', 'moat', 'white space',
+      'strategic analysis', 'market gap', 'opportunity matrix', 'insight', 'insights', 'insights accionables', 'síntesis ejecutiva', 'sintesis ejecutiva', 'key takeaways', 'takeaways'
+    ],
+    secondary: [
+      'linkedin search', 'linkedin prospects', 'find decision makers', 'software vendors', 'customer acquisition', 'retention strategy',
+      'growth levers', 'expansion strategy', 'churn drivers', 'messaging map', 'seo angle map', 'content gap', 'competitive content',
+  'feature parity', 'product differentiation', 'risk factors', 'regulatory landscape', 'seo strategy', 'topic clusters', 'pillar pages', 'executive summary', 'resumen ejecutivo', 'white space analysis', 'opportunity analysis'
+    ],
+    contextual: [
+  'analyze competitors', 'compare competitors', 'find potential clients', 'find potential customers', 'find b2b clients', 'technical seo audit', 'analyze serp', 'keyword difficulty', 'identify ranking opportunities', 'improve organic visibility',
+      'research target accounts', 'map the market', 'who are the main players', 'market landscape', 'industry landscape',
+      'build a prospect list', 'generate a lead list', 'analyze pricing strategy', 'how big is the market', 'estimate market size',
+      'what are emerging trends', 'identify opportunities', 'identify gaps', 'positioning analysis', 'opportunity analysis', 'dame insights', 'dame insights accionables', 'genera insights', 'síntesis ejecutiva del mercado', 'resumen ejecutivo del mercado', 'key takeaways for the market'
+    ],
+    exclusions: ['shopify', 'ecommerce', 'tweet', 'twitter', 'code', 'programming']
+  },
   'toby-technical': {
     primary: [
       // Core software/IoT technical
@@ -69,16 +90,15 @@ const AGENT_PATTERNS: KeywordPatterns = {
     primary: [
       // Research and intelligence
       'research', 'investigación', 'investigar', 'analyze', 'analizar', 'investigate', 'trends', 'tendencias', 'data', 'datos', 'market', 'mercado', 
-      'news', 'intelligence', 'study', 'estudio', 'benchmark', 'competitor', 'competidores', 'stock', 'stocks'
+      'news', 'intelligence', 'study', 'estudio', 'stock', 'stocks'
     ],
     secondary: [
-      'competitive', 'competencia', 'industry', 'industria', 'insights', 'report', 'reporte', 'statistics', 'estadísticas', 'forecast', 
-      'pronóstico', 'comparison', 'comparación', 'whitepaper', 'paper', 'journal', 'citation', 'source', 'dataset', 'press release', 
-      'market size', 'tam', 'sam', 'som'
+      'industry', 'industria', 'insights', 'report', 'reporte', 'statistics', 'estadísticas', 'forecast', 
+      'pronóstico', 'whitepaper', 'paper', 'journal', 'citation', 'source', 'dataset', 'press release'
     ],
     contextual: [
       'what are the trends', 'analyze the market', 'analizar el mercado', 'research shows', 'latest data', 'industry analysis', 
-      'análisis de la industria', 'compare competitors', 'analizar competidores', 'find sources', 'encontrar fuentes'
+      'análisis de la industria', 'find sources', 'encontrar fuentes'
     ],
     exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'tienda', 'ventas', 'calendar', 'meeting', 'google docs', 'google sheets']
   },
@@ -203,6 +223,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
 
 // Agent display names and tool mappings
 const AGENT_METADATA = {
+  'wex-intelligence': { name: 'Wex', toolName: 'delegate_to_wex' },
   'toby-technical': { name: 'Toby', toolName: 'delegate_to_toby' },
   'apu-research': { name: 'Apu', toolName: 'delegate_to_apu' },
   'ami-creative': { name: 'Ami', toolName: 'delegate_to_ami' },

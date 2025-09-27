@@ -335,7 +335,7 @@ export function ChatInput({
                 <Button
                   size="sm"
                   variant={imageMode ? 'secondary' : 'outline'}
-                  className="size-9 p-0 rounded-full transition-colors data-[active=true]:ring-2 data-[active=true]:ring-blue-400"
+                  className={`size-9 p-0 rounded-full transition-colors data-[active=true]:ring-2 data-[active=true]:ring-blue-400 ${imageMode ? 'animate-pulse shadow-[0_0_0_3px_rgba(59,130,246,0.35)] bg-gradient-to-br from-blue-500/90 to-indigo-600/90 text-white' : ''}`}
                   data-active={imageMode}
                   type="button"
                   aria-pressed={imageMode}

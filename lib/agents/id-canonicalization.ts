@@ -17,7 +17,7 @@ const AGENT_ID_ALIASES: Record<string, string> = {
   'nora': 'nora-community',
   'astra': 'astra-email',
   'notion': 'notion-agent',
-  'wex': 'wex-automation',
+  'wex': 'wex-intelligence',
 }
 
 export function canonicalizeAgentId(id: string): string {
@@ -33,7 +33,7 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   'peter-google': 'Peter',
   'emma-ecommerce': 'Emma',
   'apu-research': 'Apu',
-  'wex-automation': 'Wex',
+  'wex-intelligence': 'Wex',
   'nora-community': 'Nora',
   // Sub-agents
   'apu-markets': 'Apu Markets',
