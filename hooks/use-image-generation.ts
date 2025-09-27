@@ -2,6 +2,21 @@ import { useState, useCallback } from "react"
 
 // Global (module-level) sentinel to prevent parallel image generations from different hook instances
 let globalGenerationLock = false
+let globalLockTimestamp = 0
+const MAX_LOCK_DURATION = 300000 // 5 minutes max lock duration
+
+// Auto-cleanup stuck locks
+setInterval(() => {
+  if (globalGenerationLock && globalLockTimestamp > 0) {
+    const lockAge = Date.now() - globalLockTimestamp
+    if (lockAge > MAX_LOCK_DURATION) {
+      console.warn('🔓 [AUTO-CLEANUP] Clearing stuck global image generation lock (age:', lockAge, 'ms)')
+      globalGenerationLock = false
+      globalLockTimestamp = 0
+    }
+  }
+}, 60000) // Check every minute
+
 import { detectImageGenerationIntent } from "@/lib/image-generation/intent-detection"
 
 interface GeneratedImageData {
@@ -77,6 +92,7 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
     console.log('🎯 [DEBUG] Setting isGenerating/globalGenerationLock to true')
     setIsGenerating(true)
     globalGenerationLock = true
+    globalLockTimestamp = Date.now()
 
     try {
       // Check if user can generate images
@@ -164,6 +180,7 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
       console.log('🎯 [DEBUG] Setting isGenerating to false in finally block')
       setIsGenerating(false)
       globalGenerationLock = false
+      globalLockTimestamp = 0
     }
   }, [isGenerating, userId, checkCanGenerate, onImageGenerated, showToast])
 
@@ -202,12 +219,16 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
       console.log('🎯 [DEBUG] Resetting image generation state')
       setLastGenerated(null)
       setIsGenerating(false)
+      globalGenerationLock = false // Also reset global lock
+      globalLockTimestamp = 0
     },
     // Emergency reset for stuck states
     forceReset: () => {
-      console.log('🆘 [DEBUG] Force resetting image generation state')
+      console.log('🆘 [DEBUG] Force resetting image generation state and global lock')
       setLastGenerated(null)
       setIsGenerating(false)
+      globalGenerationLock = false // Ensure global lock is cleared
+      globalLockTimestamp = 0
     }
   }
 }

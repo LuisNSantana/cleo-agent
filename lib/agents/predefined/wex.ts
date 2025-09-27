@@ -10,7 +10,7 @@ export const WEX_AGENT: AgentConfig = {
   name: 'Wex',
   description: 'Advanced market, competitor, SEO & prospect intelligence (Perplexity + Firecrawl + SERP multi-phase synthesis)',
   role: 'specialist',
-  model: 'gpt-5-mini', // Long-context reasoning for synthesis & multi-source blending
+  model: 'grok-4-fast-reasoning', // Cost-effective reasoning for synthesis & multi-source blending
   temperature: 0.25,
   maxTokens: 32000,
   tools: (() => {

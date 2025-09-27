@@ -1060,11 +1060,35 @@ export async function POST(req: Request) {
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
             const POLL_MS = 400
+            const MAX_POLL_TIME = 60000 // Maximum polling time: 60 seconds
+            const pollStartTime = Date.now()
 
             const interval = setInterval(async () => {
+              // Add timeout protection to prevent infinite loops
+              if (Date.now() - pollStartTime > MAX_POLL_TIME) {
+                console.warn('⚠️ [POLLING] Maximum polling time reached, stopping polling')
+                clearInterval(interval)
+                return
+              }
               try {
                 const snapshot = execId ? orchestrator.getExecution?.(execId) : null
                 if (!snapshot) return
+
+                // Check for hung executions (running for >30 seconds without status change)
+                if (snapshot.status === 'running') {
+                  const executionAge = Date.now() - pollStartTime
+                  if (executionAge > 30000) { // 30 seconds
+                    console.warn('⚠️ [POLLING] Execution appears to be hung, attempting to complete:', {
+                      executionId: execId,
+                      age: executionAge,
+                      status: snapshot.status,
+                      stepsCount: snapshot.steps?.length || 0
+                    })
+                    // Stop polling for hung executions
+                    clearInterval(interval)
+                    return
+                  }
+                }
 
                 // Stream new steps as execution-step events
                 const steps = Array.isArray(snapshot.steps) ? snapshot.steps : []

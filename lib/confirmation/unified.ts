@@ -43,13 +43,14 @@ if (!globalAny.__pendingConfirmations) {
 }
 const pendingConfirmations: Map<string, ConfirmationRequest> = globalAny.__pendingConfirmations
 
-// Cleanup old confirmations (5 minute timeout)
+// Cleanup old confirmations (2 minute timeout to prevent long running loops)
 const confirmationCleanupInterval = setInterval(() => {
   const now = Date.now()
-  const timeout = 5 * 60 * 1000
+  const timeout = 2 * 60 * 1000 // Reduced from 5 to 2 minutes
   
   for (const [id, confirmation] of pendingConfirmations.entries()) {
     if (now - confirmation.timestamp > timeout) {
+      console.log(`⏰ [CONFIRMATION] Timing out confirmation: ${id} (${confirmation.toolName}) after ${Math.round((now - confirmation.timestamp) / 1000)}s`)
       confirmation.reject(new Error('Confirmation timeout'))
       pendingConfirmations.delete(id)
     }

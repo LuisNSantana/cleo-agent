@@ -1,6 +1,7 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { ModelConfig } from "./types"
 import { grokModels } from "./data/grok"
+import { openaiModels } from "./data/openai.clean"
 
 /**
  * Modelo unificado simplificado
@@ -30,11 +31,11 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Lista final (solo los dos modelos permitidos)
-let STATIC_MODELS: ModelConfig[] = pickById(grokModels, [
-  'grok-4-free',
-  'grok-4-fast-reasoning',
-])
+// Lista final: Faster (grok-4-free), Smarter (grok-4-fast-reasoning + gpt-5-mini)
+let STATIC_MODELS: ModelConfig[] = [
+  ...pickById(grokModels, ['grok-4-free', 'grok-4-fast-reasoning']),
+  ...pickById(openaiModels, ['gpt-5-mini-2025-08-07'])
+]
 
 // Post-processing rules to prevent confusing duplicates in selector.
 // 1. Prefer direct Google Gemini image model over OpenRouter proxy when both exist.
