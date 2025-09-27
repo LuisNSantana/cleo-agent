@@ -15,6 +15,7 @@ import logger from '@/lib/utils/logger'
 // import { createMistral } from '@ai-sdk/mistral'
 import { ChatMistralAI } from '@langchain/mistralai'
 import { createXai } from '@ai-sdk/xai'
+import { generateText } from 'ai'
 import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
 
 export interface ModelConfig {
@@ -78,7 +79,8 @@ class AISdkChatModel extends BaseChatModel {
 
     try {
       const safeMax = clampMaxOutputTokens(this.modelName, options?.maxTokens ?? this.maxTokens)
-      const result = await this.model.generateText({
+      const result = await generateText({
+        model: this.model,
         messages: convertedMessages,
         temperature: this.temperature,
         maxTokens: safeMax,
