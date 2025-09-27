@@ -145,7 +145,7 @@ export const listCalendarEventsTool = tool({
       if (!accessToken) return { success: false, message: 'Connect Google Calendar in Settings', events: [], total: 0 }
 
       const now = DateTime.now().setZone(timeZone)
-      
+
       // Ensure proper RFC3339 formatting with timezone
       let defaultMin: string, defaultMax: string
       if (timeMin) {
@@ -155,7 +155,7 @@ export const listCalendarEventsTool = tool({
       } else {
         defaultMin = now.toISO() || now.toISO()!
       }
-      
+
       if (timeMax) {
         // Parse provided timeMax and ensure it has timezone info
         const parsedMax = DateTime.fromISO(timeMax, { zone: timeZone })
@@ -234,7 +234,7 @@ export const listCalendarEventsTool = tool({
     } catch (error) {
       console.error('[GCal List Error]:', error)
       const msg = error instanceof Error ? error.message : String(error)
-  const userId = getCurrentUserId()
+      const userId = getCurrentUserId()
       if (userId) await trackToolUsage(userId, 'googleCalendar.listEvents', { ok: false, execMs: 0, errorType: 'list_error' })
       return { success: false, message: `Failed: ${msg}`, events: [], total_count: 0 }
     }

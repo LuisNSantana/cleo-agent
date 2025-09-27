@@ -451,33 +451,30 @@ export const createDriveFolderTool = tool({
     description: z.string().optional().describe('Optional description for the folder'),
   }),
   execute: async ({ name, parentFolderId, description }) => {
+    // Validate token before confirmation
+    const userId = getCurrentUserId()
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Authentication required to create folders in Google Drive',
+        folder: null
+      }
+    }
+    const accessToken = await getGoogleDriveAccessToken(userId)
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Connect Google Drive in Settings',
+        folder: null
+      }
+    }
     const { requestConfirmation } = await import('../confirmation/unified')
     return requestConfirmation(
       'createDriveFolder',
       { name, parentFolderId, description },
       async () => {
-        // Get userId from request-scoped context
-        const userId = getCurrentUserId()
-    
-    try {
-      if (!userId) {
-        return {
-          success: false,
-          message: 'Authentication required to create folders in Google Drive',
-          folder: null
-        }
-      }
-
-      const accessToken = await getGoogleDriveAccessToken(userId)
-      if (!accessToken) {
-        return {
-          success: false,
-          message: 'Connect Google Drive in Settings',
-          folder: null
-        }
-      }
-
-      const folderData = {
+        try {
+          const folderData = {
         name,
         mimeType: 'application/vnd.google-apps.folder',
         description,
@@ -533,36 +530,34 @@ export const uploadFileToDriveTool = tool({
     folderId: z.string().optional().describe('Optional destination folder ID in Drive'),
   }),
   execute: async ({ filename, content, mimeType = 'text/markdown', folderId }) => {
+    // Validate token before confirmation
+    const userId = getCurrentUserId()
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Authentication required to upload to Google Drive',
+        file: null,
+      }
+    }
+    let accessToken = await getGoogleDriveAccessToken(userId)
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Connect Google Drive in Settings',
+        file: null,
+      }
+    }
     const { requestConfirmation } = await import('../confirmation/unified')
     return requestConfirmation(
       'uploadToDrive',
       { filename, content, mimeType, folderId },
       async () => {
-        const userId = getCurrentUserId()
         try {
           const started = Date.now()
-          if (!userId) {
-            return {
-              success: false,
-              message: 'Authentication required to upload to Google Drive',
-              file: null,
-            }
-          }
-
-          // Get (and refresh if needed) the access token
-          let accessToken = await getGoogleDriveAccessToken(userId)
-          if (!accessToken) {
-            return {
-              success: false,
-              message: 'Connect Google Drive in Settings',
-          file: null,
-        }
-      }
-
-      // Build multipart/related body per Drive API
-      const boundary = 'gcpmultipart' + Math.random().toString(36).slice(2)
-      const metadata: Record<string, any> = { name: filename }
-      if (folderId) metadata.parents = [folderId]
+          // Build multipart/related body per Drive API
+          const boundary = 'gcpmultipart' + Math.random().toString(36).slice(2)
+          const metadata: Record<string, any> = { name: filename }
+          if (folderId) metadata.parents = [folderId]
 
       const bodyParts = [
         `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
@@ -585,6 +580,14 @@ export const uploadFileToDriveTool = tool({
         return res
       }
 
+      if (!accessToken) {
+        if (userId) await trackToolUsage(userId, 'googleDrive.uploadFile', { ok: false, execMs: 0, errorType: 'upload_error' })
+        return {
+          success: false,
+          message: 'Drive upload failed: missing access token.',
+          file: null,
+        }
+      }
       let res = await attemptUpload(accessToken)
       // If unauthorized, try fetching a fresh token once and retry
       if (res.status === 401 || res.status === 403) {

@@ -39,4 +39,5 @@ export function requiresConfirmation(toolName: string): boolean {
 export interface ConfirmationResponse {
   approved: boolean
   modifiedParameters?: any
+  userId?: string // For context propagation in delegation tools
 }

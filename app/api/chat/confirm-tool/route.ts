@@ -13,8 +13,10 @@ export async function POST(request: NextRequest) {
     console.log(`[TOOL CONFIRMATION] Processing confirmation ${confirmationId}: ${approved ? 'APPROVED' : 'REJECTED'}`)
 
     // Execute the confirmed tool
+    // Pass userId to the confirmed tool execution for context propagation
     const result = await executeConfirmedTool(confirmationId, { 
-      approved: Boolean(approved)
+      approved: Boolean(approved),
+      userId: userId
     })
 
     // Clean up from global storage

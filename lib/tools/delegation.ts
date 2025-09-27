@@ -53,7 +53,8 @@ const delegationSchema = z.object({
     .default('normal')
     .transform((v) => (v === 'medium' ? 'normal' : v === 'urgent' ? 'high' : v))
     .describe('Task priority level'),
-  requirements: z.string().optional().describe('Specific requirements or constraints for the task')
+  requirements: z.string().optional().describe('Specific requirements or constraints for the task'),
+  userId: z.string().optional().describe('Explicit userId for context propagation (internal use)')
 });
 
 // Individual delegation tools for each specialist agent
@@ -65,8 +66,10 @@ async function runDelegation(params: {
   context?: string
   priority?: 'low'|'normal'|'high'|'medium'|'urgent'
   requirements?: string
+  userId?: string
 }) {
   const { agentId: rawAgentId, task, context, priority, requirements } = params
+
   const agentId = await resolveAgentCanonicalKey(rawAgentId)
   // Normalize to valid set used by orchestrator/tools
   const normPriority: 'low'|'normal'|'high' = (priority === 'medium')
@@ -75,7 +78,7 @@ async function runDelegation(params: {
       ? 'high'
       : (priority || 'normal')
   const orchestrator = getAgentOrchestrator() as any
-  let userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
+  let userId = params.userId || getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
 
   // Guard: late recovery if NIL UUID
   try {
@@ -304,63 +307,63 @@ async function runDelegation(params: {
 export const delegateToTobyTool = tool({
   description: 'Delegate software/programming and IoT tasks to Toby: coding, debugging, architecture, APIs, databases, DevOps, and embedded/IoT (ESP32, Arduino, Raspberry Pi, MQTT, BLE). Use this for any technical question or implementation request related to software systems.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'toby-technical', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'toby-technical', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToAmiTool = tool({
   description: 'Delegate executive assistant, organization, productivity, research, calendar, email management, or creative tasks to Ami specialist. Ami handles: scheduling, email triage, research, organization, productivity workflows, creative projects, and general assistance tasks. Use for anything requiring coordination, planning, or general assistant work.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'ami-creative', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'ami-creative', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToPeterTool = tool({
   description: 'Delegate Google Workspace tasks to Peter specialist. ONLY use for: Google Docs creation, Google Sheets creation, Google Slides, Drive file management. Peter has tools: createGoogleDoc, createGoogleSheet, createGoogleSlides, updateGoogleDoc, updateGoogleSheet, listDriveFiles, searchDriveFiles, getDriveFileDetails. DO NOT delegate email, calendar, scheduling, research, or general organization tasks.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'peter-google', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'peter-google', task, context, priority, requirements, userId })
   }
 });
 export const delegateToEmmaTool = tool({
   description: 'Delegate e-commerce and Shopify management tasks to Emma specialist. Use for online store operations, e-commerce sales analytics, Shopify product management, inventory optimization, or business operations related to online retail.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'emma-ecommerce', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'emma-ecommerce', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToApuTool = tool({
   description: 'Delegate advanced web research, financial market analysis, and comprehensive information gathering tasks to Apu specialist. Use for stock market research, financial analysis, competitive intelligence, web scraping, news analysis, academic research, or real-time information gathering about markets, companies, and trends.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'apu-research', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'apu-research', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToApuMarketsTool = tool({
   description: 'Delegate financial market analysis, stock research, and real-time market data tasks to Apu Markets sub-agent specialist. Use for stock quotes, market trends, financial news, investment analysis, portfolio tracking, and market intelligence.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'apu-markets', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'apu-markets', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToAstraTool = tool({
   description: 'Delegate email management, composition, and communication tasks to Astra email specialist. Use for sending emails, drafting messages, managing inbox, email automation, and correspondence handling.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'astra-email', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'astra-email', task, context, priority, requirements, userId })
   }
 });
 
 export const delegateToNotionTool = tool({
   description: 'Delegate Notion workspace management, page creation, database operations, and knowledge organization tasks to Notion specialist. Use for creating pages, managing databases, organizing content, and workspace administration.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'notion-agent', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'notion-agent', task, context, priority, requirements, userId })
   }
 });
 

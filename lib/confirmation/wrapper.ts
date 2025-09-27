@@ -139,10 +139,10 @@ export async function executeConfirmedTool(confirmationId: string, response: Con
   if (!pending) {
     throw new Error('Confirmation not found or expired')
   }
-  
+
   // Remove from pending
   pendingConfirmations.delete(confirmationId)
-  
+
   if (!response.approved) {
     return {
       success: false,
@@ -150,7 +150,13 @@ export async function executeConfirmedTool(confirmationId: string, response: Con
       cancelled: true
     }
   }
-  
+
+  // If the tool is a delegation tool, inject userId into parameters if available
+  if (pending.toolName && pending.toolName.startsWith('delegate_to_') && (response as any).userId) {
+    // Patch the parameters object to include userId
+    pending.parameters.userId = (response as any).userId
+  }
+
   // Execute the function
   try {
     return await pending.executeFunction()
