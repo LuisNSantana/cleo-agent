@@ -1,4 +1,7 @@
 import { useState, useCallback } from "react"
+
+// Global (module-level) sentinel to prevent parallel image generations from different hook instances
+let globalGenerationLock = false
 import { detectImageGenerationIntent } from "@/lib/image-generation/intent-detection"
 
 interface GeneratedImageData {
@@ -66,13 +69,14 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
   const generateImage = useCallback(async (prompt: string): Promise<ImageGenerationResult> => {
     console.log('🎯 [DEBUG] generateImage called, isGenerating:', isGenerating, 'prompt:', prompt.substring(0, 50))
     
-    if (isGenerating) {
-      console.warn('⚠️ [DEBUG] Image generation already in progress, returning early')
+    if (isGenerating || globalGenerationLock) {
+      console.warn('⚠️ [DEBUG] Image generation already in progress (local or global), returning early')
       return { success: false, error: "Image generation already in progress" }
     }
 
-    console.log('🎯 [DEBUG] Setting isGenerating to true')
+    console.log('🎯 [DEBUG] Setting isGenerating/globalGenerationLock to true')
     setIsGenerating(true)
+    globalGenerationLock = true
 
     try {
       // Check if user can generate images
@@ -159,6 +163,7 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
     } finally {
       console.log('🎯 [DEBUG] Setting isGenerating to false in finally block')
       setIsGenerating(false)
+      globalGenerationLock = false
     }
   }, [isGenerating, userId, checkCanGenerate, onImageGenerated, showToast])
 

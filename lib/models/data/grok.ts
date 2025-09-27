@@ -29,7 +29,8 @@ const grokModels: ModelConfig[] = [
     priceUnit: "per 1M tokens",
     tags: ["fast","free","tools","text"],
     contextWindow: 262144,
-    vision: false,
+  // Marcado como vision true (híbrido) para permitir adjuntar archivos y análisis básico de imágenes
+  vision: true,
     tools: true,
     audio: false,
     reasoning: false,
@@ -76,7 +77,7 @@ const grokModels: ModelConfig[] = [
   },
   {
     id: "grok-4-fast-reasoning",
-    name: "Grok 4 Fast (Reasoning)",
+    name: "Smarter",
     provider: "xAI",
     providerId: "xai",
     modelFamily: "Grok",

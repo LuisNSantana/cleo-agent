@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
   console.log('🎯 [DEBUG] POST /api/generate-image endpoint called')
   
   try {
-    const { prompt, userId } = await request.json()
-    console.log('🎯 [DEBUG] Request data:', { prompt: prompt?.substring(0, 50), userId })
+  const { prompt, userId, modelVariant } = await request.json()
+  console.log('🎯 [DEBUG] Request data:', { prompt: prompt?.substring(0, 60), userId, modelVariant })
 
     if (!prompt) {
       console.log('❌ [DEBUG] No prompt provided')
@@ -45,14 +45,20 @@ export async function POST(request: NextRequest) {
   // Primary model attempt: DeepInfra FLUX-pro (higher quality). Fallback chain (DeepInfra variants) then OpenAI gpt-image-1 final fallback.
   // Sequence: 1) black-forest-labs/FLUX-pro 2) black-forest-labs/flux-pro 3) black-forest-labs/flux-1-schnell 4) flux-1-schnell 5) (final) openai:gpt-image-1
   // Attempt metadata returned to client for observability.
-    const deepInfraCandidates = [
-      'black-forest-labs/FLUX-pro',
-      'black-forest-labs/flux-pro',
-      'black-forest-labs/flux-1-schnell',
-      'flux-1-schnell'
-    ]
+    const allowSchnellFallback = process.env.IMAGE_ALLOW_SCHNELL_FALLBACK !== 'false'
+    // Primary enforced candidates: FLUX-pro (case variants). Fallback to schnell only if enabled.
+    const baseFlux = ['black-forest-labs/FLUX-pro', 'black-forest-labs/flux-pro']
+    const schnellFallback = allowSchnellFallback ? ['black-forest-labs/flux-1-schnell', 'flux-1-schnell'] : []
+    let deepInfraCandidates = [...baseFlux, ...schnellFallback]
+
+    // Optional client override: force 'schnell' or 'flux-pro'
+    if (modelVariant === 'schnell') {
+      deepInfraCandidates = allowSchnellFallback ? ['black-forest-labs/flux-1-schnell', 'flux-1-schnell'] : baseFlux
+    } else if (modelVariant === 'flux-pro') {
+      deepInfraCandidates = baseFlux
+    }
     let modelId = 'deepinfra:black-forest-labs/FLUX-pro'
-    console.log('🎯 [DEBUG] Image generation candidate sequence:', deepInfraCandidates)
+    console.log('🎯 [DEBUG] Image generation candidate sequence:', deepInfraCandidates, 'allowSchnellFallback:', allowSchnellFallback, 'variantOverride:', modelVariant)
 
     // Para imagen, usamos un modelo compatible con ModelConfig
     const modelConfig = {
@@ -102,13 +108,15 @@ export async function POST(request: NextRequest) {
 
     // Multi-attempt DeepInfra (and optional OpenRouter) strategy
     let imageData: string | undefined
-    const attempts: Array<{ model: string; provider: string; success: boolean; error?: string }> = []
+  const attempts: Array<{ model: string; provider: string; success: boolean; error?: string; ms: number }> = []
     const { OpenAI } = await import('openai')
 
-    for (const candidate of deepInfraCandidates) {
+    for (let i = 0; i < deepInfraCandidates.length; i++) {
+      const candidate = deepInfraCandidates[i]
       const attemptLabel = candidate
+      const start = Date.now()
       try {
-        console.log(`🧪 [IMG] Attempting DeepInfra model: ${attemptLabel}`)
+        console.log(`🧪 [IMG] Attempt ${i+1}/${deepInfraCandidates.length} -> ${attemptLabel}`)
         const client = new OpenAI({
           apiKey: deepinfraApiKey,
           baseURL: 'https://api.deepinfra.com/v1/openai'
@@ -131,13 +139,20 @@ export async function POST(request: NextRequest) {
         } else {
           throw new Error('Unsupported image format in response')
         }
-        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: true })
+        const ms = Date.now() - start
+        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: true, ms })
         modelId = `deepinfra:${attemptLabel}`
-        console.log(`✅ [IMG] Success with ${attemptLabel}`)
+        console.log(`✅ [IMG] Success with ${attemptLabel} in ${ms}ms`)
         break
       } catch (err: any) {
-        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: false, error: err?.message || String(err) })
-        console.warn(`⚠️ [IMG] Failed with ${attemptLabel}:`, err?.message || err)
+        const ms = Date.now() - start
+        const message = err?.message || String(err)
+        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: false, error: message, ms })
+        console.warn(`⚠️ [IMG] Failed ${attemptLabel} in ${ms}ms: ${message}`)
+        // If 422 and there are more candidates, continue immediately (fast skip)
+        if (message.includes('422') || message.includes('no body')) {
+          continue
+        }
       }
     }
 
@@ -149,6 +164,7 @@ export async function POST(request: NextRequest) {
           console.log('🛟 [IMG] DeepInfra attempts failed. Trying OpenAI gpt-image-1 fallback')
           const { OpenAI: OpenAIStandard } = await import('openai')
           const openaiClient = new OpenAIStandard({ apiKey: openaiKey })
+          const startOpenAI = Date.now()
           const resp = await openaiClient.images.generate({
             model: 'gpt-image-1',
             prompt: enhancedPrompt,
@@ -163,10 +179,11 @@ export async function POST(request: NextRequest) {
             const buf = await r.arrayBuffer()
             imageData = Buffer.from(buf).toString('base64')
           } else throw new Error('Unsupported image format from OpenAI')
-          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: true })
+          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: true, ms: Date.now() - startOpenAI })
           modelId = 'openai:gpt-image-1'
         } catch (openaiErr: any) {
-          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: false, error: openaiErr?.message || String(openaiErr) })
+          // startOpenAI not in scope here previously; approximate fallback duration by 0
+          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: false, error: openaiErr?.message || String(openaiErr), ms: 0 })
         }
       }
     }
@@ -219,11 +236,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const canonicalModel = modelId.replace('deepinfra:', '')
     return NextResponse.json({
       success: true,
       result: imageResponse,
       model: modelId,
-  attempts: attempts.map(a => ({...a, provider: a.provider })),
+      canonicalModel,
+      fallbackUsed: canonicalModel.toLowerCase().includes('schnell'),
+      attempts: attempts.map(a => ({...a, provider: a.provider })),
       usage: user?.id ? {
         userId: user.id,
         remaining: (await dailyLimits.canUseModel(user.id, modelId, modelConfig)).remaining - 1
