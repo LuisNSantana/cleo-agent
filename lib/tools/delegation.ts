@@ -321,10 +321,10 @@ export const delegateToAmiTool = tool({
 });
 
 export const delegateToPeterTool = tool({
-  description: 'Delegate Google Workspace tasks to Peter specialist. ONLY use for: Google Docs creation, Google Sheets creation, Google Slides, Drive file management. Peter has tools: createGoogleDoc, createGoogleSheet, createGoogleSlides, updateGoogleDoc, updateGoogleSheet, listDriveFiles, searchDriveFiles, getDriveFileDetails. DO NOT delegate email, calendar, scheduling, research, or general organization tasks.',
+  description: 'Delegate financial analysis and business strategy tasks to Peter, your financial advisor. ONLY use for: financial modeling, business plans, budgeting, investment analysis, crypto research, accounting support, tax planning, ROI calculations. Peter has tools: createGoogleSheet, readGoogleSheet, updateGoogleSheet, appendGoogleSheet, webSearch, cryptoPrices. DO NOT delegate general document creation, email, calendar, or non-financial tasks.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'peter-google', task, context, priority, requirements, userId })
+    return runDelegation({ agentId: 'peter-financial', task, context, priority, requirements, userId })
   }
 });
 export const delegateToEmmaTool = tool({
@@ -339,17 +339,11 @@ export const delegateToApuTool = tool({
   description: 'Delegate web research, data gathering, news monitoring, and academic search tasks to Apu specialist. Use for collecting raw data, news articles, academic papers, company information, trend data, and structured findings. For strategic analysis or business insights synthesis, use delegate_to_wex instead.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'apu-research', task, context, priority, requirements, userId })
+    return runDelegation({ agentId: 'apu-support', task, context, priority, requirements, userId })
   }
 });
 
-export const delegateToApuMarketsTool = tool({
-  description: 'Delegate financial market analysis, stock research, and real-time market data tasks to Apu Markets sub-agent specialist. Use for stock quotes, market trends, financial news, investment analysis, portfolio tracking, and market intelligence.',
-  inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'apu-markets', task, context, priority, requirements, userId })
-  }
-});
+
 
 export const delegateToWexTool = tool({
   description: 'Delegate strategic market analysis, competitive intelligence, and actionable business insights synthesis to Wex specialist. Use for strategic analysis, market insights ("insights accionables"), executive summaries, SWOT analysis, competitive positioning, business frameworks (Porter Forces, opportunity matrices), and synthesis of complex market research into actionable recommendations.',
@@ -415,7 +409,6 @@ export const delegationTools = {
   delegate_to_peter: delegateToPeterTool,
   delegate_to_emma: delegateToEmmaTool,
   delegate_to_apu: delegateToApuTool,
-  delegate_to_apu_markets: delegateToApuMarketsTool,
   delegate_to_wex: delegateToWexTool,
   delegate_to_astra: delegateToAstraTool,
   delegate_to_notion_agent: delegateToNotionTool,

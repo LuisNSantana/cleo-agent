@@ -86,7 +86,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
     ],
     exclusions: ['design', 'creative', 'marketing', 'shopify', 'ecommerce', 'calendar', 'meeting', 'google docs', 'google sheets', 'tweet', 'twitter', 'social media']
   },
-  'apu-research': {
+  'apu-support': {
     primary: [
       // Research and intelligence
       'research', 'investigación', 'investigar', 'analyze', 'analizar', 'investigate', 'trends', 'tendencias', 'data', 'datos', 'market', 'mercado', 
@@ -144,11 +144,11 @@ const AGENT_PATTERNS: KeywordPatterns = {
     ],
     exclusions: ['technical', 'code', 'database', 'programming', 'api', 'sql', 'shopify', 'ecommerce', 'tienda', 'tweet', 'twitter', 'social media', 'post', 'hashtag', 'social', 'calendar', 'calendario', 'event', 'evento']
   },
-  'peter-google': {
-    primary: ['google', 'docs', 'sheets', 'drive', 'workspace', 'document', 'spreadsheet', 'meet', 'slides', 'forms', 'apps script', 'appsscript'],
-    secondary: ['template', 'collaborate', 'permissions', 'share', 'invite', 'compartir', 'permisos'],
-    contextual: ['create a doc', 'share file', 'track progress', 'organize data', 'create a sheet', 'build a form'],
-    exclusions: ['shopify', 'ecommerce', 'email', 'gmail', 'correo', 'inbox', 'bandeja', 'calendar', 'calendario', 'meeting', 'reunión', 'reunion', 'appointment', 'cita', 'invite', 'schedule', 'planning', 'research', 'investigar', 'buscar', 'search', 'productivity', 'workflow', 'automation', 'organize']
+  'peter-financial': {
+    primary: ['finance', 'financial', 'budget', 'accounting', 'money', 'investment', 'business model', 'roi', 'profit', 'revenue', 'expense', 'crypto', 'cryptocurrency', 'bitcoin', 'portfolio', 'tax', 'taxes'],
+    secondary: ['cash flow', 'balance sheet', 'p&l', 'financial analysis', 'business plan', 'strategy', 'pricing', 'valuation', 'bookkeeping', 'financial statement', 'model', 'projection', 'forecast'],
+    contextual: ['financial planning', 'investment analysis', 'crypto prices', 'business strategy', 'financial model', 'budget analysis', 'tax planning', 'accounting help', 'financial advice'],
+    exclusions: ['email', 'gmail', 'correo', 'inbox', 'bandeja', 'calendar', 'calendario', 'meeting', 'reunión', 'reunion', 'shopify', 'ecommerce', 'tienda', 'technical', 'code', 'programming']
   },
   'emma-ecommerce': {
     primary: [
@@ -187,12 +187,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
     contextual: ['create notion page', 'organize workspace', 'notion database', 'knowledge base', 'take notes'],
     exclusions: ['email', 'calendar', 'google']
   },
-  'apu-markets': {
-    primary: ['stock', 'stocks', 'market', 'markets', 'finance', 'financial', 'investment', 'trading', 'precio', 'price'],
-    secondary: ['portfolio', 'ticker', 'analysis', 'forecast', 'bull', 'bear', 'dividend', 'earnings', 'quarterly'],
-    contextual: ['stock price', 'market analysis', 'financial data', 'investment research', 'market trends'],
-    exclusions: ['shopify', 'ecommerce', 'calendar']
-  },
+
   // Social Media & Twitter Specialists
   // Social Media & Twitter Specialists (weights tuned for ambiguity)
   'nora-community': {
@@ -225,14 +220,14 @@ const AGENT_PATTERNS: KeywordPatterns = {
 const AGENT_METADATA = {
   'wex-intelligence': { name: 'Wex', toolName: 'delegate_to_wex' },
   'toby-technical': { name: 'Toby', toolName: 'delegate_to_toby' },
-  'apu-research': { name: 'Apu', toolName: 'delegate_to_apu' },
+  'apu-support': { name: 'Apu', toolName: 'delegate_to_apu' },
   'ami-creative': { name: 'Ami', toolName: 'delegate_to_ami' },
-  'peter-google': { name: 'Peter', toolName: 'delegate_to_peter' },
+  'peter-financial': { name: 'Peter', toolName: 'delegate_to_peter' },
   'emma-ecommerce': { name: 'Emma', toolName: 'delegate_to_emma' },
   // Sub-agents
   'astra-email': { name: 'Astra', toolName: 'delegate_to_astra' },
   'notion-agent': { name: 'Notion Agent', toolName: 'delegate_to_notion_agent' },
-  'apu-markets': { name: 'Apu Markets', toolName: 'delegate_to_apu_markets' },
+
   // Social Media & Twitter Specialists
   'nora-community': { name: 'Nora', toolName: 'delegate_to_nora' },
   'luna-content-creator': { name: 'Luna', toolName: 'delegate_to_luna' },
@@ -592,17 +587,17 @@ function generateClarificationQuestion(primaryAgent: string, secondaryAgent?: st
   const secondary = getAgentMetadata(secondaryAgent)
   
   const clarifications = {
-    'apu-research_ami-creative': "Are you looking for technical/research implementation or practical assistance like scheduling and coordination?",
-    'peter-google_emma-ecommerce': "Is this for general productivity (Docs/Sheets/Drive) or specifically for your store management and analytics?",
-    'ami-creative_apu-research': "Do you need practical help (finding places, contacts, scheduling) or deeper research and analysis?",
-    'apu-research_emma-ecommerce': "Are you looking for technical/research analysis or store-specific analytics and business questions?",
+    'apu-support_ami-creative': "Are you looking for technical support/troubleshooting or practical assistance like scheduling and coordination?",
+    'peter-financial_emma-ecommerce': "Is this for financial analysis and business strategy or specifically for your store management and e-commerce analytics?",
+    'ami-creative_apu-support': "Do you need practical help (finding places, contacts, scheduling) or technical support and troubleshooting?",
+    'apu-support_emma-ecommerce': "Are you looking for technical support/troubleshooting or store-specific analytics and business questions?",
     'ami-creative_emma-ecommerce': "Is this about general lifestyle/organization or about your Shopify store?",
-    'peter-google_ami-creative': "Do you want Workspace help (Docs/Sheets/Calendar) or broader assistance like reservations and local recommendations?",
+    'peter-financial_ami-creative': "Do you need financial advice and business planning or broader assistance like reservations and local recommendations?",
     'astra-email_ami-creative': "Is this specifically about email management or broader administrative tasks?",
     'notion-agent_ami-creative': "Is this about Notion workspace organization or general administrative coordination?",
-    'apu-markets_apu-research': "Are you looking for financial market analysis or broader research and intelligence?",
+
     'toby-technical_ami-creative': "Is this a technical coding/devops issue or more of an administrative/productivity request?",
-    'toby-technical_apu-research': "Do you need hands-on implementation/debugging or broader research and market insights?",
+    'toby-technical_apu-support': "Do you need hands-on implementation/debugging or customer support and service assistance?",
   }
   
   const key = `${primaryAgent}_${secondaryAgent}` as keyof typeof clarifications

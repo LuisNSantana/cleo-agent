@@ -68,10 +68,10 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
   },
   {
     name: 'delegate_to_apu',
-    description: 'Delegate financial research, market analysis & web intelligence tasks to Apu',
+    description: 'Delegate customer support, technical troubleshooting, documentation and service workflow tasks to Apu',
     fromAgent: 'cleo-supervisor',
-    toAgent: 'apu-research',
-    condition: 'research OR market OR news OR scholar OR web_intel'
+    toAgent: 'apu-support',
+    condition: 'support OR customer OR troubleshoot OR documentation OR service OR help OR issue OR problem OR ticket'
   }
 ]
 
@@ -90,19 +90,19 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
       { id: 'ami-creative', name: 'Ami Creative', type: 'agent', config: { agent: AMI_AGENT } },
       { id: 'peter-google', name: 'Peter Google', type: 'agent', config: { agent: PETER_AGENT } },
       { id: 'emma-ecommerce', name: 'Emma E-commerce', type: 'agent', config: { agent: EMMA_AGENT } },
-      { id: 'apu-research', name: 'Apu Research', type: 'agent', config: { agent: APU_AGENT } },
+      { id: 'apu-support', name: 'Apu Support', type: 'agent', config: { agent: APU_AGENT } },
     ],
     edges: [
       { from: 'cleo-supervisor', to: 'toby-technical', condition: 'technical', label: 'Technical Task' },
       { from: 'cleo-supervisor', to: 'ami-creative', condition: 'creative', label: 'Creative Task' },
       { from: 'cleo-supervisor', to: 'peter-google', condition: 'google_workspace', label: 'Google Workspace Task' },
       { from: 'cleo-supervisor', to: 'emma-ecommerce', condition: 'ecommerce', label: 'E-commerce Task' },
-      { from: 'cleo-supervisor', to: 'apu-research', condition: 'research', label: 'Research Task' },
+      { from: 'cleo-supervisor', to: 'apu-support', condition: 'support', label: 'Support Task' },
       { from: 'toby-technical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'ami-creative', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'peter-google', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
-      { from: 'apu-research', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
+      { from: 'apu-support', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
     ],
     startNode: 'cleo-supervisor',
     endNodes: []

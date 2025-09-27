@@ -14,7 +14,7 @@ export { EMMA_AGENT } from './emma'
 export { APU_AGENT } from './apu'
 export { ASTRA_AGENT } from './astra'
 export { KHIPU_AGENT } from './khipu'
-export { APU_MARKETS_AGENT } from './apu-markets'
+
 export { NOTION_AGENT } from './notion-agent'
 export { NORA_AGENT } from './nora'
 export { LUNA_AGENT } from './luna'
@@ -31,7 +31,7 @@ import { EMMA_AGENT } from './emma'
 import { APU_AGENT } from './apu'
 import { ASTRA_AGENT } from './astra'
 import { KHIPU_AGENT } from './khipu'
-import { APU_MARKETS_AGENT } from './apu-markets'
+
 import { NOTION_AGENT } from './notion-agent'
 import { NORA_AGENT } from './nora'
 import { LUNA_AGENT } from './luna'
@@ -52,7 +52,6 @@ export const ALL_PREDEFINED_AGENTS = [
   APU_AGENT,
   ASTRA_AGENT,
   KHIPU_AGENT,
-  APU_MARKETS_AGENT,
   NOTION_AGENT,
   NORA_AGENT,
   LUNA_AGENT,

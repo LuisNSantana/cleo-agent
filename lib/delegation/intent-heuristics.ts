@@ -25,12 +25,10 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'peter-google': [
     'google doc','documento','docs','sheet','hoja de cálculo','spreadsheet','slides','presentación','drive','archivo drive'
   ],
-  'apu-research': [
+  'apu-support': [
     'investiga','research','buscar','trend','tendencia','web','news','noticias','análisis','comparar','fuentes'
   ],
-  'apu-markets': [
-    'stock','acciones','ticker','precio','mercado','markets','cotización','nasdaq','nyse','earnings','dividendo'
-  ],
+
   'emma-ecommerce': [
     'shopify','ecommerce','tienda','producto','inventario','ventas','carrito','sku','catalogo','checkout'
   ],

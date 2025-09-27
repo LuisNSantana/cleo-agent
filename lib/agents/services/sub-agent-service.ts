@@ -136,7 +136,7 @@ export class SubAgentService {
    * Get a specific sub-agent by ID
    */
   static async getSubAgent(agentId: string, userId: string): Promise<SubAgent | null> {
-    // If agentId is not a valid UUID, it's likely a built-in agent name like "apu-research"
+    // If agentId is not a valid UUID, it's likely a built-in agent name like "apu-support"
     // Return null as it's not a sub-agent in the database
     if (!this.isValidUUID(agentId)) {
       // Skipping sub-agent lookup for non-UUID agent

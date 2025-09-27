@@ -259,10 +259,10 @@ ${JSON.stringify(task.context_data, null, 2)}
 
   // Add agent-specific instructions
   switch (task.agent_id) {
-    case 'apu-research':
+    case 'apu-support':
       return `${basePrompt}
 
-As Apu (Research & Intelligence Specialist), conduct thorough research using your available tools:
+As Apu (Customer Success & Technical Support Specialist), provide excellent customer support using your available tools:
 - Use serpNewsSearch for recent news and updates
 - Use serpScholarSearch for academic research and papers  
 - Use serpGeneralSearch for background information
@@ -309,15 +309,18 @@ Execute immediately with provided parameters. Deliver results with:
 
 When analysis is complete, call complete_task with your findings.`;
 
-    case 'peter-google':
+    case 'peter-financial':
       return `${basePrompt}
 
-As Peter (Google Workspace Specialist), create actual Google documents/files:
-- Use createGoogleDoc/createGoogleSheet to create REAL files with shareable links
-- Never provide just text content - create actual downloadable files
+As Peter (Financial Advisor), provide comprehensive financial analysis and business strategy:
+- Create detailed financial models and analysis using Google Sheets
+- Research market data and crypto prices for investment decisions
+- Develop business strategies, budgets, and financial projections
 
-Execute immediately with provided content. Deliver:
-1. Created document with direct Google Workspace link
+Execute immediately with provided information. Deliver:
+1. Comprehensive financial analysis with supporting data
+2. Actionable recommendations and strategic insights
+3. Professional financial models in Google Sheets when applicable
 2. Brief explanation of document structure
 3. Access instructions
 
@@ -350,11 +353,11 @@ Execute this task immediately using your available tools and expertise. When fin
  */
 export function validateTaskConfig(task: AgentTask): { valid: boolean; error?: string } {
   switch (task.agent_id) {
-    case 'apu-research':
-      if (!task.task_config.query && !task.task_config.research_topic) {
+    case 'apu-support':
+      if (!task.task_config.issue && !task.task_config.support_request) {
         return { 
           valid: false, 
-          error: 'Apu research tasks require either "query" or "research_topic" in task_config' 
+          error: 'Apu support tasks require either "issue" or "support_request" in task_config' 
         };
       }
       break;
@@ -386,15 +389,15 @@ export function validateTaskConfig(task: AgentTask): { valid: boolean; error?: s
  */
 export function getExampleTaskConfigs() {
   return {
-    'apu-research': {
-      basic_research: {
-        query: "latest AI agent developments 2025",
-        sources: ["news", "scholar", "web"],
-        time_range: "1 week",
-        max_results: 10
+    'apu-support': {
+      customer_support: {
+        issue: "user login problems",
+        priority: "high",
+        customer_info: "Premium customer",
+        affected_features: ["authentication", "dashboard"]
       },
-      market_analysis: {
-        research_topic: "electric vehicle market trends",
+      technical_troubleshooting: {
+        support_request: "API integration failing",
         geographical_focus: "North America",
         include_competitor_analysis: true,
         sources: ["news", "web", "scholar"]

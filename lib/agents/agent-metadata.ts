@@ -20,8 +20,8 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     color: '#7C3AED',
     emoji: '🤖'
   },
-  'apu-research': {
-    id: 'apu-research',
+  'apu-support': {
+    id: 'apu-support',
     name: 'Apu',
     avatar: '/img/agents/apu4.png',
     color: '#059669',
@@ -48,12 +48,12 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     color: '#F59E0B',
     emoji: '🎨'
   },
-  'peter-google': {
-    id: 'peter-google',
+  'peter-financial': {
+    id: 'peter-financial', 
     name: 'Peter',
     avatar: '/img/agents/peter4.png',
-    color: '#4285F4',
-    emoji: '📊'
+    color: '#10B981',
+    emoji: '�'
   },
   'wex-intelligence': {
     id: 'wex-intelligence',
@@ -120,13 +120,16 @@ function normalizeAgentId(agentId: string): string {
   // Map common variations to standard IDs
   const idMap: Record<string, string> = {
     'cleo': 'cleo-supervisor',
-    'apu': 'apu-research',
-  'apu-markets': 'apu-research',
+    'apu': 'apu-support',
+
     'emma': 'emma-ecommerce',
     'toby': 'toby-technical',
     'ami': 'ami-creative',
-  'peter': 'peter-google',
-  'peter-workspace': 'peter-google',
+  'peter': 'peter-financial',
+  'peter-workspace': 'peter-financial',
+  'peter-google': 'peter-financial',
+  'peter-advisor': 'peter-financial',
+  'peter-finance': 'peter-financial',
   'wex': 'wex-intelligence',
     'skyvern': 'skyvern-agent',
     'nora': 'nora-community',
@@ -136,7 +139,7 @@ function normalizeAgentId(agentId: string): string {
   'zara-analytics-specialist': 'zara-analytics',
   'viktor': 'viktor-publisher',
   'viktor-publishing-specialist': 'viktor-publisher',
-  'apu-research': 'apu-research',
+  'apu-support': 'apu-support',
   'nora-community': 'nora-community',
   'ami-creative': 'ami-creative',
   'emma-ecommerce': 'emma-ecommerce',
@@ -151,7 +154,7 @@ function normalizeAgentId(agentId: string): string {
  * Format agent ID to human-readable name
  */
 function formatAgentName(agentId: string): string {
-  // Extract name from ID patterns like "apu-research" -> "Apu"
+  // Extract name from ID patterns like "apu-support" -> "Apu"
   const name = agentId.split('-')[0]
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
 }

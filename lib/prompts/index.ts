@@ -28,9 +28,9 @@ const AGENT_DELEGATION_RULES = {
     role: "Technical Specialist: Expert in software engineering, programming, debugging, and technical architecture."
   },
   Peter: {
-    keywords: ["docs", "sheets", "drive", "calendar", "google", "workspace", "template", "productivity", "document", "documento", "hoja", "plantilla", "spreadsheet", "presentación", "presentation"],
-    description: "Google Workspace (Docs/Sheets/Drive/Calendar), productivity workflows, templates (NO EMAIL)",
-    role: "Productivity Orchestrator: Optimize Google Workspace for efficient workflows (delegates emails to Ami/Astra)."
+    keywords: ["finance", "financial", "budget", "accounting", "money", "investment", "business model", "roi", "profit", "revenue", "crypto", "cryptocurrency", "bitcoin", "tax", "finanzas", "financiero", "presupuesto", "contabilidad", "dinero", "inversión", "inversion", "criptomoneda", "impuestos"],
+    description: "Financial advisor, business strategy, accounting, investment analysis, crypto research, tax planning",
+    role: "Financial Advisor: Expert in financial modeling, business strategy, accounting support, and investment analysis."
   },
   Emma: {
     keywords: ["shopify", "store", "products", "sales", "inventory", "ecommerce", "catalog", "analytics", "orders", "tienda", "productos", "ventas", "inventario", "e-commerce", "comercio electrónico"],
@@ -38,9 +38,9 @@ const AGENT_DELEGATION_RULES = {
     role: "E-commerce Manager: Analyze and optimize store operations for sales growth."
   },
   Apu: {
-    keywords: ["research", "analyze", "investigate", "trends", "data", "market", "news", "intelligence", "study", "investigar", "analizar", "investigación", "mercado", "noticias", "buscar", "search","crypto","cryptocurrency","blockchain"],
-    description: "web research, news/finance analysis, intelligence, competitive analysis, market trends, general research",
-    role: "Research Analyst: Provide data-driven insights from reliable sources and comprehensive research."
+    keywords: ["support", "help", "customer", "issue", "problem", "troubleshoot", "fix", "resolve", "ticket", "bug", "error", "soporte", "ayuda", "cliente", "problema", "resolver", "solución", "técnico", "documentation", "guide", "tutorial", "manual", "faq", "walkthrough", "service", "servicio", "assistance", "asistencia"],
+    description: "customer support, technical troubleshooting, issue resolution, documentation, service workflows, ticket management, help desk operations",
+    role: "Customer Success & Technical Support Specialist: Expert in troubleshooting, customer service, documentation, and support workflow optimization."
   },
   Nora: {
     keywords: ["social media", "redes sociales", "community", "comunidad", "twitter", "content", "contenido", "post", "publicar", "engagement", "audience", "audiencia", "trends", "tendencias", "hashtags", "viral", "social", "community management"],
@@ -56,11 +56,6 @@ const AGENT_DELEGATION_RULES = {
   },
 
   // === SUB-AGENTS ===
-  "Apu-Markets": {
-    keywords: ["stocks", "acciones", "market", "mercado", "finance", "finanzas", "investment", "inversión", "portfolio", "cartera", "trading", "stock quote", "cotización", "financial news", "noticias financieras"],
-    description: "financial markets, stock analysis, market data, investment insights, financial news",
-    role: "Financial Markets Analyst: Real-time market data and investment insights (sub-agent of Apu)."
-  },
   Khipu: {
     keywords: ["sheets", "hojas", "spreadsheet", "budget", "presupuesto", "formula", "fórmula", "calculation", "cálculo", "finance", "finanzas", "finanzas personales", "gastos", "ahorro", "google sheets", "personal finance", "expenses", "savings"],
     description: "Google Sheets operations for personal finance: budgets, expense tracking, savings planning, formulas, financial calculations, spreadsheet management",
@@ -148,7 +143,7 @@ ROLE: Analyze intent and delegate by context (not only keywords).
 
 DECISION TREE (examples):
 - Email → Ami (review/triage) or Astra (write/send)
-- Docs/Sheets/Calendar → Peter
+- Financial/Business Strategy → Peter
 - Research/News/Trends → Apu
 - Shopify/Store/Sales → Emma
 
@@ -173,7 +168,7 @@ const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
 const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Notion intent → Ami orchestrates → delegate_to_notion_agent (Notion Agent executes)
 - Email triage → Ami; email compose/send → delegate_to_astra
-- Google Workspace creation (Docs/Sheets/Drive/Calendar) → Peter
+- Financial analysis/Business planning → Peter
  - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
  - Social content creation/copywriting → Nora orchestrates → Luna executes
  - Social analytics/metrics/reporting/insights → Nora orchestrates → Zara executes
@@ -196,7 +191,7 @@ ${Object.entries(AGENT_DELEGATION_RULES).map(([agent, { description, role }]) =>
 ORCHESTRATION INTELLIGENCE:
 - Use INTENT + CONTEXT > keywords.
 - Analyze verbs, objects, and implied needs.
-- Map domains: email→Ami/Astra, workspace→Peter/Notion Agent, research→Apu, ecommerce→Emma.
+- Map domains: email→Ami/Astra, finance→Peter, research→Apu, ecommerce→Emma, documents→Notion Agent.
 - Chain specialists with clean handoffs.`;
 // Inject explicit Wex routing guidance
 const SPECIALISTS_AWARENESS_ENHANCED = SPECIALISTS_AWARENESS + `\n- For strategic market / competitor / SEO / prospect intelligence (pricing comparisons, TAM sizing, SERP & keyword analysis, positioning matrices, opportunity/white space discovery, actionable insight synthesis / "insights accionables", executive summaries, frameworks like SWOT/Five Forces/Opportunity Matrix/ICE-RICE) → delegate to Wex early if high-signal context is present.`
@@ -236,9 +231,9 @@ const OUTPUT_REMINDERS = `OUTPUT FORMAT:
 - Sources: Compact list (e.g., "Sources: [Domain/Link]").
 - Validate: Empathetic? Actionable? Natural?`;
 
-// Reporting and visuals guidance for markets (Apu/Apu-Markets) and social analytics (Zara)
+// Reporting and visuals guidance for financial analysis (Peter) and social analytics (Zara)
 const REPORTING_AND_VISUALS = `REPORTING & VISUALS:
-MARKETS (Apu → Apu-Markets):
+FINANCIAL ANALYSIS (Peter):
 - Prefer charts for volatility/trend: include PNG/image or a link (if generated). If charts are unavailable, provide a compact table (Date, Close, Return %, Volatility) and explain how to interpret.
 - Clarify missing details once: tickers, period (e.g., 1m/3m/1y), timeframe (daily/weekly), benchmark (e.g., SPY).
 - Output: brief executive summary + visual(s)/table + 2–3 insights + next steps.

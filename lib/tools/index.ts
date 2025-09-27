@@ -69,6 +69,10 @@ import { twitterTools, twitterToolMeta } from './twitter'
 // Delegation tools (static predefined + dynamic generator)
 import { delegationTools } from './delegation'
 
+// Financial tools
+import { financialModelingPrepTools } from './financial-modeling-prep'
+import { alphaVantageTools } from './alpha-vantage'
+
 // Notion (register each tool with explicit keys)
 import {
 	getNotionPageTool,
@@ -337,6 +341,10 @@ export const tools = {
 
 	...serpapiTools,
 	...serpapiCredentialTools,
+
+	// Financial Analysis Tools
+	...financialModelingPrepTools,
+	...alphaVantageTools,
 }
 
 ensureToolsHaveRequestContext(tools)

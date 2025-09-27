@@ -59,7 +59,7 @@ interface AgentTask {
 }
 
 const agentAvatars = {
-  'apu-research': { icon: FlaskIcon, color: 'bg-blue-500', name: 'Apu Research' },
+  'apu-support': { icon: FlaskIcon, color: 'bg-blue-500', name: 'Apu Support' },
   'wex-automation': { icon: RobotIcon, color: 'bg-green-500', name: 'Wex Automation' },
   'emma-ecommerce': { icon: RobotIcon, color: 'bg-purple-500', name: 'Emma E-commerce' },
   'cleo-supervisor': { icon: UserIcon, color: 'bg-orange-500', name: 'Cleo Supervisor' }
@@ -333,7 +333,7 @@ export default function ScheduledTasksPage() {
                       <SelectValue placeholder="Select agent" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="apu-research">Apu Research</SelectItem>
+                      <SelectItem value="apu-support">Apu Support</SelectItem>
                       <SelectItem value="wex-automation">Wex Automation</SelectItem>
                       <SelectItem value="emma-ecommerce">Emma E-commerce</SelectItem>
                     </SelectContent>
@@ -497,7 +497,7 @@ export default function ScheduledTasksPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Agents</SelectItem>
-            <SelectItem value="apu-research">Apu Research</SelectItem>
+            <SelectItem value="apu-support">Apu Support</SelectItem>
             <SelectItem value="wex-automation">Wex Automation</SelectItem>
             <SelectItem value="emma-ecommerce">Emma E-commerce</SelectItem>
           </SelectContent>

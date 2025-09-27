@@ -161,9 +161,9 @@ export async function createAgentTask(
       'cleo': 'cleo-supervisor',
       'emma': 'emma-ecommerce',
       'ami': 'ami-creative',  // Keep consistent with existing tasks in DB
-      'peter': 'peter-google',
+      'peter': 'peter-financial',
       'toby': 'toby-technical',
-      'apu': 'apu-research',
+      'apu': 'apu-support',
   'wex': 'wex-intelligence'
     }
     const normalizeAgentId = (id: string, name?: string) => {

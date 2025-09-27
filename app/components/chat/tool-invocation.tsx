@@ -263,7 +263,7 @@ function SingleToolCard({
           toby: 'toby-technical',
           peter: 'peter-google',
           emma: 'emma-ecommerce',
-          apu: 'apu-research',
+          apu: 'apu-support',
         }
         if (shortMap[base]) return shortMap[base]
         // Convert underscores back to hyphens

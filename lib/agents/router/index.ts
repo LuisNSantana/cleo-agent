@@ -57,12 +57,16 @@ const EMAIL_GENERAL_KEYWORDS = [
   'email', 'gmail', 'correo', 'inbox', 'bandeja', 'mail'
 ]
 
-// Google Workspace intents (Docs/Sheets/Drive/Meet/Slides)
-const GOOGLE_WORKSPACE_KEYWORDS = [
-  // English
-  'google', 'docs', 'sheets', 'slides', 'drive', 'meet', 'workspace', 'spreadsheet', 'document', 'presentation', 'form', 'apps script', 'appsscript',
-  // Spanish
-  'documento', 'hoja de cálculo', 'hoja de calculo', 'presentación', 'presentacion', 'formulario', 'compartir', 'invitar'
+// Financial & Business Strategy intents
+const FINANCIAL_KEYWORDS = [
+  // English - Finance
+  'budget', 'finance', 'financial', 'accounting', 'money', 'investment', 'profit', 'revenue', 'expense', 'cost', 'roi', 'cash flow', 'business model', 'financial model', 'spreadsheet analysis', 'financial analysis',
+  // English - Business
+  'business plan', 'strategy', 'pricing', 'valuation', 'taxes', 'tax planning', 'bookkeeping', 'p&l', 'balance sheet', 'financial statement', 'crypto', 'cryptocurrency', 'bitcoin', 'portfolio',
+  // Spanish - Finance  
+  'presupuesto', 'finanzas', 'financiero', 'contabilidad', 'dinero', 'inversión', 'inversion', 'ganancia', 'ingreso', 'gasto', 'costo', 'flujo de caja', 'modelo de negocio', 'análisis financiero', 'analisis financiero',
+  // Spanish - Business
+  'plan de negocios', 'estrategia', 'precios', 'valuación', 'valuacion', 'impuestos', 'planeación fiscal', 'contabilidad', 'estado financiero', 'criptomoneda', 'bitcoin', 'portafolio'
 ]
 
 // Calendar intents (always route to Ami)
@@ -169,16 +173,16 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
     }
   }
 
-  // 5) Google Workspace (Docs/Sheets/Drive/Slides) → Peter
-  if (includesAny(text, GOOGLE_WORKSPACE_KEYWORDS)) {
+  // 5) Financial & Business Strategy → Peter
+  if (includesAny(text, FINANCIAL_KEYWORDS)) {
     return {
       source: 'early',
       action: 'delegate',
       toolName: 'delegate_to_peter',
-      agentId: 'peter-google',
-      agentName: 'Peter (Google Workspace)',
+      agentId: 'peter-financial',
+      agentName: 'Peter (Financial Advisor)',
       leafTool: 'delegate_to_peter',
-      reasons: ['google workspace intent detected (Docs/Sheets/Drive/Slides)', 'delegate to Peter for document creation/organization'],
+      reasons: ['financial or business strategy intent detected', 'delegate to Peter for financial analysis/business planning'],
       confidence: 0.9,
     }
   }

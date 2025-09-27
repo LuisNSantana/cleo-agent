@@ -69,18 +69,18 @@ export async function getAgentCapability(agent: AgentConfig): Promise<AgentCapab
  */
 function getToolCapability(toolName: string): ToolCapability {
   const toolMap: Record<string, ToolCapability> = {
-    // Peter's tools
+    // Google Workspace tools (used by multiple agents)
     'createGoogleDoc': {
       name: 'Create Google Doc',
       category: 'Document Creation',
-      description: 'Create new Google Documents with content',
-      useCases: ['Document creation', 'Report writing', 'Content drafting']
+      description: 'Create documents for financial reports, support guides, or general documentation',
+      useCases: ['Financial reports', 'Support documentation', 'Business analysis', 'Solution guides']
     },
     'createGoogleSheet': {
       name: 'Create Google Sheet',
       category: 'Spreadsheet Creation',
-      description: 'Create new Google Spreadsheets with data',
-      useCases: ['Data analysis', 'Spreadsheet creation', 'Calculations']
+      description: 'Create spreadsheets for financial modeling, ticket tracking, or data analysis',
+      useCases: ['Financial modeling', 'Ticket tracking', 'Data analysis', 'Performance metrics']
     },
     'createGoogleSlides': {
       name: 'Create Google Slides',
@@ -121,6 +121,26 @@ function getToolCapability(toolName: string): ToolCapability {
       useCases: ['Research', 'Information gathering', 'Fact finding']
     },
     
+    // Peter's financial tools
+    'fmpCompanyProfile': {
+      name: 'FMP Company Profile',
+      category: 'Financial Analysis',
+      description: 'Get detailed company financial profile',
+      useCases: ['Company analysis', 'Financial research', 'Investment evaluation']
+    },
+    'alphaVantageStockPrice': {
+      name: 'Alpha Vantage Stock Price',
+      category: 'Market Data',
+      description: 'Get real-time stock prices and market data',
+      useCases: ['Stock analysis', 'Market monitoring', 'Investment tracking']
+    },
+    'calculator': {
+      name: 'Calculator',
+      category: 'Analysis',
+      description: 'Perform complex calculations and financial modeling',
+      useCases: ['Financial calculations', 'ROI analysis', 'Budget planning']
+    },
+    
     // Emma's tools
     'shopifyGetProducts': {
       name: 'Get Shopify Products',
@@ -133,6 +153,14 @@ function getToolCapability(toolName: string): ToolCapability {
       category: 'Analytics',
       description: 'Get analytics data from Shopify',
       useCases: ['Sales analysis', 'Performance metrics', 'Business intelligence']
+    },
+    
+    // Apu's support-specific tools
+    'leadResearch': {
+      name: 'Lead Research',
+      category: 'Customer Analysis',
+      description: 'Research customer information and context',
+      useCases: ['Customer profiling', 'Account analysis', 'Support context']
     },
     
     // Toby's tools
@@ -193,14 +221,15 @@ function extractSpecializations(agent: AgentConfig): string[] {
  */
 function getCanHandleList(agent: AgentConfig): string[] {
   const agentSpecializations: Record<string, string[]> = {
-    'peter-google': [
-      'Google Docs creation',
-      'Google Sheets creation', 
-      'Google Slides creation',
-      'Drive file management',
-      'Document formatting',
-      'Spreadsheet calculations',
-      'File organization in Drive'
+    'peter-financial': [
+      'Financial analysis',
+      'Business strategy',
+      'Investment research',
+      'Market analysis',
+      'Financial modeling',
+      'ROI calculations',
+      'Budget planning',
+      'Cryptocurrency analysis'
     ],
     'ami-creative': [
       'Calendar scheduling',
@@ -229,12 +258,23 @@ function getCanHandleList(agent: AgentConfig): string[] {
       'Software architecture',
       'Database management'
     ],
-    'apu-research': [
-      'Market research',
-      'Data analysis',
-      'Financial research',
+    'apu-support': [
+      'Customer support',
+      'Technical troubleshooting',
+      'Issue resolution',
+      'Documentation creation',
+      'Service workflows',
+      'Ticket management',
+      'Customer communication',
+      'Help desk operations'
+    ],
+    'wex-intelligence': [
+      'Strategic intelligence',
+      'Market intelligence',
       'Competitive analysis',
-      'Information gathering'
+      'Business insights',
+      'Data synthesis',
+      'Trend analysis'
     ]
   }
   
@@ -246,16 +286,14 @@ function getCanHandleList(agent: AgentConfig): string[] {
  */
 function getShouldNotHandleList(agent: AgentConfig): string[] {
   const agentExclusions: Record<string, string[]> = {
-    'peter-google': [
-      'Email management',
-      'Calendar scheduling', 
-      'Research tasks',
-      'General organization',
-      'Productivity workflows',
-      'Meeting coordination',
-      'Task planning',
-      'E-commerce tasks',
-      'Programming tasks'
+    'peter-financial': [
+      'Customer support',
+      'Technical troubleshooting',
+      'E-commerce management',
+      'Programming tasks',
+      'Creative design',
+      'Calendar scheduling',
+      'Email management'
     ],
     'ami-creative': [
       'Google Docs creation (specific files)',
@@ -271,12 +309,27 @@ function getShouldNotHandleList(agent: AgentConfig): string[] {
       'Calendar management',
       'Email tasks'
     ],
+    'apu-support': [
+      'Financial analysis',
+      'Programming tasks',
+      'E-commerce management',
+      'Creative design',
+      'Market research'
+    ],
     'toby-technical': [
       'E-commerce management',
-      'Google Workspace documents',
+      'Customer support',
+      'Financial analysis',
       'Calendar scheduling',
       'Email management',
       'Creative design'
+    ],
+    'wex-intelligence': [
+      'Customer support',
+      'Programming tasks',
+      'E-commerce management',
+      'Calendar scheduling',
+      'Email management'
     ]
   }
   
@@ -288,11 +341,12 @@ function getShouldNotHandleList(agent: AgentConfig): string[] {
  */
 function getBestForList(agent: AgentConfig): string[] {
   const agentBestFor: Record<string, string[]> = {
-    'peter-google': [
-      'Creating actual Google Documents',
-      'Building spreadsheets with formulas',
-      'Organizing Drive files',
-      'Document collaboration setup'
+    'peter-financial': [
+      'Financial modeling and analysis',
+      'Investment research and evaluation',
+      'Business strategy development',
+      'Market analysis and insights',
+      'ROI calculations and planning'
     ],
     'ami-creative': [
       'Coordinating meetings and schedules',
@@ -305,10 +359,22 @@ function getBestForList(agent: AgentConfig): string[] {
       'E-commerce performance analysis',
       'Product catalog management'
     ],
+    'apu-support': [
+      'Customer issue resolution',
+      'Technical troubleshooting guides',
+      'Support documentation creation',
+      'Service workflow optimization'
+    ],
     'toby-technical': [
       'Code development and debugging',
       'API integrations',
       'Technical architecture'
+    ],
+    'wex-intelligence': [
+      'Strategic market intelligence',
+      'Competitive analysis reports',
+      'Business insights synthesis',
+      'Trend analysis and forecasting'
     ]
   }
   
