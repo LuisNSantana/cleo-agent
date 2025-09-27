@@ -37,6 +37,7 @@ import {
   MagnifyingGlassIcon,
   StarIcon,
 } from "@phosphor-icons/react"
+import { SingleChild } from "@/components/ui/single-child"
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
@@ -319,18 +320,20 @@ export function MultiModelSelector({
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
-                  className
-                )}
-                type="button"
-              >
-                <span>Select models</span>
-                <CaretDownIcon className="size-4" />
-              </Button>
+              <SingleChild label="unauthenticated-multi-model-trigger">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className={cn(
+                    "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
+                    className
+                  )}
+                  type="button"
+                >
+                  <span>Select models</span>
+                  <CaretDownIcon className="size-4" />
+                </Button>
+              </SingleChild>
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent>Select models</TooltipContent>
@@ -432,7 +435,9 @@ export function MultiModelSelector({
           }}
         >
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild>
+              <SingleChild label="multi-model-selector-trigger">{trigger}</SingleChild>
+            </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>
             Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
