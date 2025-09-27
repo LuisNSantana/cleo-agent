@@ -42,9 +42,17 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveUserId = user?.id || 'anonymous'
-    // Usar FLUX.1 Schnell via DeepInfra - compatible con OpenAI SDK
-    const modelId = 'deepinfra:flux-1-schnell'
-    console.log('🎯 [DEBUG] Using modelId:', modelId)
+  // Primary model attempt: DeepInfra FLUX-pro (higher quality). Fallback chain (DeepInfra variants) then OpenAI gpt-image-1 final fallback.
+  // Sequence: 1) black-forest-labs/FLUX-pro 2) black-forest-labs/flux-pro 3) black-forest-labs/flux-1-schnell 4) flux-1-schnell 5) (final) openai:gpt-image-1
+  // Attempt metadata returned to client for observability.
+    const deepInfraCandidates = [
+      'black-forest-labs/FLUX-pro',
+      'black-forest-labs/flux-pro',
+      'black-forest-labs/flux-1-schnell',
+      'flux-1-schnell'
+    ]
+    let modelId = 'deepinfra:black-forest-labs/FLUX-pro'
+    console.log('🎯 [DEBUG] Image generation candidate sequence:', deepInfraCandidates)
 
     // Para imagen, usamos un modelo compatible con ModelConfig
     const modelConfig = {
@@ -92,49 +100,80 @@ export async function POST(request: NextRequest) {
 
     console.log('🎨 Generating image with FLUX.1 Schnell via DeepInfra:', enhancedPrompt)
 
-    // Generate image using DeepInfra with OpenAI compatible API
-    let imageData
-    
-    try {
-      console.log('🎯 [DEBUG] Making call to DeepInfra API for image generation')
-      
-      // Import OpenAI client
-      const { OpenAI } = await import('openai')
-      
-      const client = new OpenAI({
-        apiKey: deepinfraApiKey,
-        baseURL: "https://api.deepinfra.com/v1/openai",
-      })
+    // Multi-attempt DeepInfra (and optional OpenRouter) strategy
+    let imageData: string | undefined
+    const attempts: Array<{ model: string; provider: string; success: boolean; error?: string }> = []
+    const { OpenAI } = await import('openai')
 
-      const response = await client.images.generate({
-        prompt: enhancedPrompt,
-        size: "1024x1024",
-        quality: "standard",
-        n: 1,
-      })
-
-      if (!response.data || response.data.length === 0) {
-        throw new Error('No image data returned from DeepInfra')
+    for (const candidate of deepInfraCandidates) {
+      const attemptLabel = candidate
+      try {
+        console.log(`🧪 [IMG] Attempting DeepInfra model: ${attemptLabel}`)
+        const client = new OpenAI({
+          apiKey: deepinfraApiKey,
+          baseURL: 'https://api.deepinfra.com/v1/openai'
+        })
+        const response = await client.images.generate({
+          prompt: enhancedPrompt,
+          model: candidate,
+          size: '1024x1024',
+          quality: 'standard',
+          n: 1,
+        })
+        if (!response.data?.length) throw new Error('No image data')
+        const image = response.data[0]
+        if (image.b64_json) {
+          imageData = image.b64_json
+        } else if (image.url) {
+          const r = await fetch(image.url)
+          const buf = await r.arrayBuffer()
+          imageData = Buffer.from(buf).toString('base64')
+        } else {
+          throw new Error('Unsupported image format in response')
+        }
+        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: true })
+        modelId = `deepinfra:${attemptLabel}`
+        console.log(`✅ [IMG] Success with ${attemptLabel}`)
+        break
+      } catch (err: any) {
+        attempts.push({ model: attemptLabel, provider: 'deepinfra', success: false, error: err?.message || String(err) })
+        console.warn(`⚠️ [IMG] Failed with ${attemptLabel}:`, err?.message || err)
       }
+    }
 
-      const image = response.data[0]
-      if (image.b64_json) {
-        imageData = image.b64_json
-        console.log('✅ Found image data in b64_json format')
-      } else if (image.url) {
-        // If URL is returned, we'll need to fetch it and convert to base64
-        console.log('🔄 Image returned as URL, fetching to convert to base64')
-        const imageResponse = await fetch(image.url)
-        const imageBuffer = await imageResponse.arrayBuffer()
-        imageData = Buffer.from(imageBuffer).toString('base64')
-        console.log('✅ Successfully converted URL to base64')
-      } else {
-        throw new Error('No valid image data format found in DeepInfra response')
+    // Final fallback to OpenAI gpt-image-1 if DeepInfra attempts all failed and we have OPENAI_API_KEY
+    if (!imageData) {
+      const openaiKey = process.env.OPENAI_API_KEY
+      if (openaiKey) {
+        try {
+          console.log('🛟 [IMG] DeepInfra attempts failed. Trying OpenAI gpt-image-1 fallback')
+          const { OpenAI: OpenAIStandard } = await import('openai')
+          const openaiClient = new OpenAIStandard({ apiKey: openaiKey })
+          const resp = await openaiClient.images.generate({
+            model: 'gpt-image-1',
+            prompt: enhancedPrompt,
+            size: '1024x1024',
+            n: 1
+          })
+          if (!resp.data?.length) throw new Error('No data returned from OpenAI')
+          const img = resp.data[0]
+          if (img.b64_json) imageData = img.b64_json
+          else if (img.url) {
+            const r = await fetch(img.url)
+            const buf = await r.arrayBuffer()
+            imageData = Buffer.from(buf).toString('base64')
+          } else throw new Error('Unsupported image format from OpenAI')
+          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: true })
+          modelId = 'openai:gpt-image-1'
+        } catch (openaiErr: any) {
+          attempts.push({ model: 'gpt-image-1', provider: 'openai', success: false, error: openaiErr?.message || String(openaiErr) })
+        }
       }
-      
-    } catch (modelError) {
-      console.error('DeepInfra API failed:', modelError)
-      throw new Error(`Image generation model failed: ${modelError instanceof Error ? modelError.message : 'Unknown model error'}`)
+    }
+
+    if (!imageData) {
+      console.error('❌ [IMG] All image generation attempts failed')
+      throw new Error('All image generation attempts failed')
     }
 
     // Validate that we have meaningful image data
@@ -184,6 +223,7 @@ export async function POST(request: NextRequest) {
       success: true,
       result: imageResponse,
       model: modelId,
+  attempts: attempts.map(a => ({...a, provider: a.provider })),
       usage: user?.id ? {
         userId: user.id,
         remaining: (await dailyLimits.canUseModel(user.id, modelId, modelConfig)).remaining - 1
@@ -242,7 +282,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Usar el mismo modelId que en el POST
-    const modelId = 'deepinfra:flux-1-schnell'
+  // Reflect primary model id; not attempting fallback on GET check
+  const modelId = 'deepinfra:flux-1-schnell'
     
     // Usar la misma configuración de modelo que en el POST
     const modelConfig = {

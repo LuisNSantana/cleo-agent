@@ -89,6 +89,8 @@ function categorizeTools(tools: string[]): Record<string, string[]> {
       categories['E-commerce'].push(tool)
     } else if (toolLower.includes('skyvern') || toolLower.includes('automation')) {
       categories['Automation'].push(tool)
+    } else if (toolLower.includes('perplexity') || toolLower.includes('firecrawl')) {
+      categories['Web & Research'].push(tool)
     } else if (toolLower.includes('credentials') || toolLower.includes('_connection') || toolLower.includes('add_') || toolLower.includes('test_')) {
       categories['Credentials'].push(tool)
     } else if (toolLower.includes('search') || toolLower.includes('web') || toolLower.includes('serp')) {
@@ -137,8 +139,12 @@ function getToolDescription(tool: string): string {
     'shopifyGetAnalytics': 'Get Shopify store analytics',
     
     // Automation
-    'create_skyvern_task': 'Create automated browser tasks',
-    'get_skyvern_task': 'Check status of automation tasks',
+  'create_skyvern_task': 'Create automated browser tasks',
+  'get_skyvern_task': 'Check status of automation tasks',
+  // Perplexity & Firecrawl
+  'perplexity_research': 'Multi-source deep research (synthesized insights + citations)',
+  'firecrawl_crawl': 'Crawl multiple pages (depth-limited) from a site for structured analysis',
+  'firecrawl_extract': 'Extract single page (markdown + meta) for targeted insight',
     
   // Credentials (only Skyvern credential helper retained for now)
   'add_skyvern_credentials': 'Add Skyvern automation credentials',

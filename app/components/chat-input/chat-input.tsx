@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { getModelInfo } from "@/lib/models"
+import { normalizeModelId as normalizeCoreModel } from "@/lib/models/normalize"
 import { ArrowUpIcon, CircleNotch, CirclesFour, ImageSquare, Sparkle } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
@@ -88,6 +89,7 @@ export function ChatInput({
   const isMobile = useBreakpoint(768)
   const { openCanvas } = useInteractiveCanvasStore()
   const [imageMode, setImageMode] = useState(false)
+  const [autoUpgraded, setAutoUpgraded] = useState(false)
 
   // Canvas message handling
   const { pendingMessage, consumePendingMessage, hasPendingMessage } = usePendingCanvasMessage()
@@ -238,6 +240,24 @@ export function ChatInput({
     [isUserAuthenticated, onFileUploadAction]
   )
 
+  // Auto-upgrade to multimodal reasoning model if images attached while on grok-4-free (non-vision)
+  useEffect(() => {
+    if (!files || files.length === 0) {
+      setAutoUpgraded(false)
+      return
+    }
+    const hasImage = files.some(f => f.type.startsWith('image/'))
+    if (hasImage) {
+      const normalized = normalizeCoreModel(selectedModel)
+      if (normalized === 'grok-4-free' && !autoUpgraded) {
+        onSelectModelAction('grok-4-fast-reasoning')
+        setAutoUpgraded(true)
+        // Optional: could trigger placeholder/tooltip via onShowPlaceholderAction
+        onShowPlaceholderAction?.('Adjuntaste imágenes – modelo actualizado a Multimodal para análisis visual.')
+      }
+    }
+  }, [files, selectedModel, autoUpgraded, onSelectModelAction, onShowPlaceholderAction])
+
   useMemo(() => {
     if (!hasSearchSupport && enableSearch) {
       setEnableSearchAction?.(false)
@@ -303,7 +323,7 @@ export function ChatInput({
           />
           
           <PromptInputTextarea
-            placeholder={placeholder || "Ask Cleo"}
+            placeholder={imageMode ? "Describe la imagen que quieres generar (estilo, iluminación, composición)..." : (placeholder || "Ask Cleo")}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
@@ -311,16 +331,25 @@ export function ChatInput({
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={imageMode ? 'secondary' : 'outline'}
-                className="size-9 p-0 rounded-full"
-                type="button"
-                aria-label="Toggle image generation mode"
-                onClick={() => setImageMode(m => !m)}
-              >
-                <ImageSquare className="size-4" />
-              </Button>
+              <div className="relative">
+                <Button
+                  size="sm"
+                  variant={imageMode ? 'secondary' : 'outline'}
+                  className="size-9 p-0 rounded-full transition-colors data-[active=true]:ring-2 data-[active=true]:ring-blue-400"
+                  data-active={imageMode}
+                  type="button"
+                  aria-pressed={imageMode}
+                  aria-label={imageMode ? "Exit image generation mode" : "Enable image generation mode"}
+                  onClick={() => setImageMode(m => !m)}
+                >
+                  <ImageSquare className="size-4" />
+                </Button>
+                {imageMode && (
+                  <div className="hidden md:flex items-center gap-1 absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] px-2 py-1 shadow-sm animate-in fade-in zoom-in">
+                    <Sparkle className="size-3" /> IMG MODE
+                  </div>
+                )}
+              </div>
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
@@ -382,11 +411,11 @@ export function ChatInput({
             >
               <Button
                 size="sm"
-                className="size-9 rounded-full transition-all duration-300 ease-out"
+                className={`size-9 rounded-full transition-all duration-300 ease-out ${imageMode ? 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white hover:from-blue-500 hover:to-indigo-600' : ''}`}
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
-                aria-label={status === "streaming" ? "Stop" : "Send message"}
+                aria-label={status === "streaming" ? "Stop" : imageMode ? 'Generate image' : "Send message"}
               >
                 {status === 'streaming' ? (
                   <CircleNotch className="size-4 animate-spin" />
@@ -396,6 +425,11 @@ export function ChatInput({
                   <ArrowUpIcon className="size-4" />
                 )}
               </Button>
+              {imageMode && (
+                <div className="absolute -top-8 right-0 flex md:hidden items-center gap-1 text-[11px] font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-1 rounded-md shadow-sm">
+                  <Sparkle className="size-3" /> IMG
+                </div>
+              )}
             </PromptInputAction>
           </PromptInputActions>
         </PromptInput>

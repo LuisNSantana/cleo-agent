@@ -56,6 +56,9 @@ import { shopifyTools } from './shopify'
 
 // Skyvern
 import { skyvernTools } from '../skyvern'
+// New research/crawl tools
+import { perplexityTools } from './perplexity'
+import { firecrawlTools, firecrawlExtendedTools } from './firecrawl'
 
 // SerpAPI
 import { serpapiTools, serpapiCredentialTools } from '@/lib/serpapi/tools'
@@ -297,7 +300,9 @@ export const tools = {
 
 	// Spread groups
 	...shopifyTools,
-	...skyvernTools,
+	...skyvernTools, // retained globally (Wex no longer uses them)
+	...perplexityTools,
+	...firecrawlExtendedTools,
 	...delegationTools,
 	...twitterTools,
 	// Notion tools (explicit keys)
