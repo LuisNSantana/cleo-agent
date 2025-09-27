@@ -1,7 +1,7 @@
 // Normalización de IDs de modelos legacy al nuevo conjunto reducido
 // Expuestos:
 //  - grok-4-free
-//  - grok-4-multimodal
+//  - grok-4-fast-reasoning (multimodal principal)
 // Todo lo demás cae a grok-4-free.
 
 const LEGACY_TO_FREE = new Set<string>([
@@ -12,15 +12,17 @@ const LEGACY_TO_FREE = new Set<string>([
   'grok-3', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'
 ])
 
-const VALID_MODELS = new Set(['grok-4-free', 'grok-4-multimodal'])
+const VALID_MODELS = new Set(['grok-4-free', 'grok-4-fast-reasoning'])
 
 export function normalizeModelId(id: string | undefined | null): string {
   if (!id) return 'grok-4-free'
+  // Map old public multimodal id to new reasoning id
+  if (id === 'grok-4-multimodal') return 'grok-4-fast-reasoning'
   if (VALID_MODELS.has(id)) return id
   if (LEGACY_TO_FREE.has(id)) return 'grok-4-free'
   return 'grok-4-free'
 }
 
 export function isMultimodal(id: string): boolean {
-  return id === 'grok-4-multimodal'
+  return id === 'grok-4-fast-reasoning'
 }

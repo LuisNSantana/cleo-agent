@@ -395,7 +395,37 @@ export function Chat() {
         }}
         ref={inputRef}
       >
-        <ChatInput {...chatInputProps} />
+        <ChatInput
+          {...chatInputProps}
+          onGenerateImageAction={async (prompt: string) => {
+            try {
+              const res = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, userId: user?.id })
+              })
+              if (!res.ok) {
+                console.error('Image generation failed', await res.text())
+                return
+              }
+              const data = await res.json()
+              if (data?.imageUrl) {
+                cacheAndAddMessage({
+                  id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-img`,
+                  role: 'assistant',
+                  content: `🖼️ Generated image for: "${prompt}"`,
+                  createdAt: new Date(),
+                  experimental_attachments: [
+                    { type: 'image', url: data.imageUrl, title: data.title || 'Generated Image' }
+                  ],
+                  model: 'flux-1-schnell'
+                } as any)
+              }
+            } catch (e) {
+              console.error('Error generating image', e)
+            }
+          }}
+        />
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />

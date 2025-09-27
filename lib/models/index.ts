@@ -6,7 +6,7 @@ import { grokModels } from "./data/grok"
  * Modelo unificado simplificado
  * Solo exponemos dos opciones claras en la UI:
  * - Faster (🚀): grok-4-free  -> texto rápido y económico
- * - Smarter (🧠): grok-4-multimodal -> reasoning + visión/archivos
+ * - Smarter (🧠): grok-4-fast-reasoning -> reasoning + visión/archivos
  *
  * Eliminados tiers antiguos (Fast/Balanced/Smarter multi‑proveedor) y modelos
  * legacy (Claude, GPT-5, Mistral, Gemini, etc.) para evitar duplicados y ruido.
@@ -32,8 +32,8 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 
 // Lista final (solo los dos modelos permitidos)
 let STATIC_MODELS: ModelConfig[] = pickById(grokModels, [
-  "grok-4-free",
-  "grok-4-multimodal",
+  'grok-4-free',
+  'grok-4-fast-reasoning',
 ])
 
 // Post-processing rules to prevent confusing duplicates in selector.

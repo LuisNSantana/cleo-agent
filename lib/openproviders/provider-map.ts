@@ -2,6 +2,14 @@ import type { Provider, SupportedModel } from "./types"
 
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
+  // Cleo simplified public models (added 2025-09-27)
+  // These are the only two user-selectable chat models now.
+  // grok-4-free is routed internally to openrouter:x-ai/grok-4-fast:free
+  // grok-4-fast-reasoning is the new multimodal primary (was grok-4-multimodal)
+  "grok-4-free": "openrouter",
+  "grok-4-fast-reasoning": "xai",
+  // Backward compatibility alias
+  "grok-4-multimodal": "xai",
   // OpenRouter models
   "openrouter:z-ai/glm-4.5": "openrouter",
   "z-ai/glm-4.5": "openrouter",
@@ -33,7 +41,6 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
   // X.AI Grok models
   "openrouter:x-ai/grok-4-fast:free": "openrouter",
-  "x-ai/grok-4-fast:free": "openrouter",
   // Claude 4 models
   "openrouter:anthropic/claude-sonnet-4": "openrouter",
   "anthropic/claude-sonnet-4": "openrouter",
@@ -159,8 +166,8 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
 
   // XAI
   "grok-4": "xai",
-  "grok-4-fast-reasoning": "xai",  // New Grok 4 Fast Reasoning
-  "grok-4-fast-non-reasoning": "xai",  // New Grok 4 Fast Non-Reasoning
+  // (dedup) entries moved to top section; keeping non-reasoning variant only
+  "grok-4-fast-non-reasoning": "xai",  // Grok 4 Fast Non-Reasoning
   "grok-3": "xai",
   "grok-3-latest": "xai",
   "grok-3-fast": "xai",

@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, CircleNotch, CirclesFour } from "@phosphor-icons/react"
+import { ArrowUpIcon, CircleNotch, CirclesFour, ImageSquare, Sparkle } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -47,6 +47,7 @@ type ChatInputProps = {
   onClearPlaceholderAction?: () => void
   onShowPlaceholderAction?: (placeholder: string) => void
   hideModelSelector?: boolean
+  onGenerateImageAction?: (prompt: string) => void
 }
 
 export function ChatInput({
@@ -70,6 +71,7 @@ export function ChatInput({
   onClearPlaceholderAction,
   onShowPlaceholderAction,
   hideModelSelector = false,
+  onGenerateImageAction,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -85,6 +87,7 @@ export function ChatInput({
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
   const isMobile = useBreakpoint(768)
   const { openCanvas } = useInteractiveCanvasStore()
+  const [imageMode, setImageMode] = useState(false)
 
   // Canvas message handling
   const { pendingMessage, consumePendingMessage, hasPendingMessage } = usePendingCanvasMessage()
@@ -159,17 +162,17 @@ export function ChatInput({
   }, [hasPendingMessage, pendingMessage?.timestamp, onValueChangeAction, onFileUploadAction, onSendAction, consumePendingMessage]) // Agregar dependencias necesarias
 
   const handleSend = useCallback(() => {
-    if (isSubmitting) {
+    if (imageMode && onGenerateImageAction) {
+      if (!isSubmitting && !isOnlyWhitespace(value)) {
+        onGenerateImageAction(value)
+        setImageMode(false)
+      }
       return
     }
-
-    if (status === "streaming") {
-      stopAction()
-      return
-    }
-
+    if (isSubmitting) return
+    if (status === 'streaming') { stopAction(); return }
     onSendAction()
-  }, [isSubmitting, onSendAction, status, stopAction])
+  }, [imageMode, onGenerateImageAction, isSubmitting, value, status, stopAction, onSendAction])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -184,10 +187,15 @@ export function ChatInput({
         }
 
     e.preventDefault()
-    onSendAction()
+    if (imageMode && onGenerateImageAction) {
+      onGenerateImageAction(value)
+      setImageMode(false)
+    } else {
+      onSendAction()
+    }
       }
     },
-  [isSubmitting, onSendAction, status, value]
+  [isSubmitting, onSendAction, status, value, imageMode, onGenerateImageAction]
   )
 
   const handlePaste = useCallback(
@@ -303,6 +311,16 @@ export function ChatInput({
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={imageMode ? 'secondary' : 'outline'}
+                className="size-9 p-0 rounded-full"
+                type="button"
+                aria-label="Toggle image generation mode"
+                onClick={() => setImageMode(m => !m)}
+              >
+                <ImageSquare className="size-4" />
+              </Button>
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
@@ -370,8 +388,10 @@ export function ChatInput({
                 onClick={handleSend}
                 aria-label={status === "streaming" ? "Stop" : "Send message"}
               >
-                {status === "streaming" ? (
+                {status === 'streaming' ? (
                   <CircleNotch className="size-4 animate-spin" />
+                ) : imageMode ? (
+                  <Sparkle className="size-4" />
                 ) : (
                   <ArrowUpIcon className="size-4" />
                 )}
