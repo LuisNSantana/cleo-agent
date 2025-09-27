@@ -60,7 +60,7 @@ test('analyzeDelegationIntent asks for clarification when social media tasks ove
   expect(result).toBeTruthy()
   expect(result?.needsClarification).toBe(true)
   expect(result?.clarificationQuestion).toBeTruthy()
-  expect(/Viktor|Zara|Nora/.test(result?.clarificationQuestion ?? '')).toBe(true)
+  expect(/Nora/.test(result?.clarificationQuestion ?? '')).toBe(true)
 })
 
 test('analyzeForDelegationWithCapabilities keeps work with capable current agent when suggestion is unclear', async () => {

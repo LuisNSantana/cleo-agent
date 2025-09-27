@@ -369,31 +369,6 @@ export const delegateToNotionTool = tool({
   }
 });
 
-// Nora sub-agent delegation tools
-export const delegateToLunaTool = tool({
-  description: 'Delegate content creation, copywriting, and social media content tasks to Luna specialist. Use for creating tweets, developing engaging content, hashtag research, trend adaptation, and creative social media campaigns.',
-  inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'luna-content-creator', task, context, priority, requirements })
-  }
-});
-
-export const delegateToZaraTool = tool({
-  description: 'Delegate analytics, metrics analysis, and trend research tasks to Zara specialist. Use for social media analytics, performance reporting, trend analysis, competitive intelligence, and data-driven insights.',
-  inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'zara-analytics-specialist', task, context, priority, requirements })
-  }
-});
-
-export const delegateToViktorTool = tool({
-  description: 'Delegate publishing, scheduling, and community management tasks to Viktor specialist. Use for posting content, optimal timing strategies, community engagement, crisis management, and publication workflow optimization.',
-  inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'viktor-publishing-specialist', task, context, priority, requirements })
-  }
-});
-
 export const delegateToNoraTool = tool({
   description: 'Delegate community management, social media strategy, and comprehensive social platform coordination tasks to Nora specialist. Use for social media campaigns, community engagement strategies, Twitter/X management, cross-platform content coordination, brand social presence, and social media crisis management.',
   inputSchema: delegationSchema,
@@ -413,7 +388,5 @@ export const delegationTools = {
   delegate_to_astra: delegateToAstraTool,
   delegate_to_notion_agent: delegateToNotionTool,
   delegate_to_nora: delegateToNoraTool,
-  delegate_to_luna: delegateToLunaTool,
-  delegate_to_zara: delegateToZaraTool,
-  delegate_to_viktor: delegateToViktorTool
+
 };

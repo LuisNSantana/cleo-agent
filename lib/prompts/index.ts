@@ -43,9 +43,9 @@ const AGENT_DELEGATION_RULES = {
     role: "Customer Success & Technical Support Specialist: Expert in troubleshooting, customer service, documentation, and support workflow optimization."
   },
   Nora: {
-    keywords: ["social media", "redes sociales", "community", "comunidad", "twitter", "content", "contenido", "post", "publicar", "engagement", "audience", "audiencia", "trends", "tendencias", "hashtags", "viral", "social", "community management"],
-    description: "social media strategy, community management, content coordination, audience engagement, platform management",
-    role: "Community Manager: Expert in social media strategy, content creation, and community engagement."
+    keywords: ["social media", "redes sociales", "community", "comunidad", "twitter", "content", "contenido", "post", "publicar", "engagement", "audience", "audiencia", "trends", "tendencias", "hashtags", "viral", "social", "community management", "analytics", "métricas", "scheduling", "programación", "content creation", "creación de contenido", "copywriting", "social strategy", "brand voice", "influencer", "ugc", "social listening", "crisis management"],
+    description: "complete community management, social media strategy, content creation, analytics, scheduling, audience engagement, brand monitoring, crisis management, influencer collaboration",
+    role: "Complete Community Manager: Full-spectrum social media management including content creation, analytics, scheduling, moderation, audience engagement, and strategic planning."
   },
   Wex: {
     keywords: [
@@ -66,22 +66,8 @@ const AGENT_DELEGATION_RULES = {
     description: "Notion workspace management, knowledge bases, databases, content organization",
     role: "Knowledge Manager: Specialized in Notion workspace operations and knowledge management (sub-agent of Ami)."
   },
-  Viktor: {
-    keywords: ["publish", "publicar", "schedule", "programar", "posting", "community management", "gestión de comunidad", "engagement", "publishing"],
-    description: "content publishing, scheduling, community management automation, engagement optimization",
-    role: "Publishing Specialist: Content publishing and scheduling automation (sub-agent of Nora)."
-  },
-  Luna: {
-    keywords: ["content creation", "creación de contenido", "copywriting", "social media content", "tweet", "hashtags", "creative content", "contenido creativo"],
-    description: "social media content creation, copywriting, hashtag research, creative content development",
-    role: "Content Creator: Social media content creation and copywriting specialist (sub-agent of Nora)."
-  },
-  Zara: {
-    keywords: ["analytics", "analíticas", "metrics", "métricas", "data analysis", "análisis de datos", "trends analysis", "análisis de tendencias", "reporting", "reportes"],
-    description: "analytics, metrics analysis, trend analysis, data reporting, performance measurement",
-    role: "Analytics Specialist: Metrics analysis and trend reporting expert (sub-agent of Nora)."
-  }
-};
+
+}
 
 // ============================================================================
 // CORE MODULES
@@ -158,9 +144,9 @@ HEURISTICS:
 const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
  - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
  - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
- - For social media via Nora: content creation/copy (tweets, captions, reels scripts, ideas) → Luna; analytics/KPIs/reportes/insights de audiencia → Zara. If campaign/account context is missing, ask ONE clarifying question (e.g., plataforma/objetivo/periodo) then delegate.
+ - For social media via Nora: complete community management including content creation, analytics, scheduling, and engagement. Nora handles all social media tasks directly with integrated tools.
  - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
- - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Khipu via Ami; "escribe 5 tweets" → Luna via Nora; "reporte de métricas del mes" → Zara via Nora).
+ - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Nora; "reporte de métricas" → Nora).
  - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
  - Always include minimal context in handoff: goal, constraints, success criteria.`;
 
@@ -170,8 +156,7 @@ const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Email triage → Ami; email compose/send → delegate_to_astra
 - Financial analysis/Business planning → Peter
  - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
- - Social content creation/copywriting → Nora orchestrates → Luna executes
- - Social analytics/metrics/reporting/insights → Nora orchestrates → Zara executes
+ - Social content creation/copywriting/analytics/metrics/reporting → Nora handles directly with integrated tools
  - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
 Notes:
 - When Notion credentials exist, do NOT ask the user to connect. Proceed to Notion Agent and return the real URL.
@@ -231,14 +216,14 @@ const OUTPUT_REMINDERS = `OUTPUT FORMAT:
 - Sources: Compact list (e.g., "Sources: [Domain/Link]").
 - Validate: Empathetic? Actionable? Natural?`;
 
-// Reporting and visuals guidance for financial analysis (Peter) and social analytics (Zara)
+// Reporting and visuals guidance for financial analysis (Peter) and social analytics (Nora)
 const REPORTING_AND_VISUALS = `REPORTING & VISUALS:
 FINANCIAL ANALYSIS (Peter):
 - Prefer charts for volatility/trend: include PNG/image or a link (if generated). If charts are unavailable, provide a compact table (Date, Close, Return %, Volatility) and explain how to interpret.
 - Clarify missing details once: tickers, period (e.g., 1m/3m/1y), timeframe (daily/weekly), benchmark (e.g., SPY).
 - Output: brief executive summary + visual(s)/table + 2–3 insights + next steps.
 
-SOCIAL REPORTING (Nora → Zara):
+SOCIAL REPORTING (Nora):
 - Concise template:
   1) Executive Summary (3–5 bullets)
   2) Core KPIs (reach, impressions, engagement rate, CTR, growth)

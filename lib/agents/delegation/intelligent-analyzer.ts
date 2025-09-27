@@ -196,24 +196,7 @@ const AGENT_PATTERNS: KeywordPatterns = {
     contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags', 'analyze performance', 'schedule posts', 'content calendar'],
     exclusions: ['email', 'calendar', 'shopify', 'google docs', 'research only', 'technical analysis']
   },
-  'luna-content-creator': {
-    primary: ['content', 'copy', 'copywriting', 'writing', 'creative', 'creativo', 'campaign', 'campaña', 'brand', 'marca', 'tweet', 'twitter', 'post'],
-    secondary: ['messaging', 'tone', 'voice', 'style', 'estilo', 'narrative', 'storytelling', 'engagement', 'caption', 'hashtag', 'hashtags'],
-    contextual: ['write content', 'create copy', 'social media copy', 'campaign content', 'brand messaging', 'creative writing', 'tweet about', 'post to twitter', 'social content'],
-    exclusions: ['technical', 'code', 'database', 'shopify']
-  },
-  'zara-analytics-specialist': {
-    primary: ['analytics', 'analíticas', 'analiticas', 'metrics', 'métricas', 'metricas', 'performance', 'rendimiento', 'data', 'datos', 'twitter', 'tweet', 'social media'],
-    secondary: ['insights', 'trends', 'engagement', 'reach', 'impressions', 'clicks', 'conversion', 'roi', 'kpi', 'followers', 'audience', 'brand'],
-    contextual: ['analyze performance', 'social media analytics', 'engagement metrics', 'performance report', 'twitter analytics', 'tweet about', 'post to twitter'],
-    exclusions: ['creation', 'writing', 'posting']
-  },
-  'viktor-publishing-specialist': {
-    primary: ['schedule', 'scheduling', 'publish', 'publishing', 'timing', 'automation', 'workflow', 'calendar', 'twitter', 'tweet', 'post', 'social media'],
-    secondary: ['optimal', 'timing', 'frequency', 'queue', 'batch', 'strategy', 'planning', 'coordination', 'analytics', 'engagement'],
-    contextual: ['schedule posts', 'publishing strategy', 'optimal timing', 'social media scheduling', 'content calendar', 'tweet about', 'post to twitter'],
-    exclusions: ['creation', 'writing', 'analytics']
-  }
+
 }
 
 // Agent display names and tool mappings
@@ -230,9 +213,7 @@ const AGENT_METADATA = {
 
   // Social Media & Twitter Specialists
   'nora-community': { name: 'Nora', toolName: 'delegate_to_nora' },
-  'luna-content-creator': { name: 'Luna', toolName: 'delegate_to_luna' },
-  'zara-analytics-specialist': { name: 'Zara', toolName: 'delegate_to_zara' },
-  'viktor-publishing-specialist': { name: 'Viktor', toolName: 'delegate_to_viktor' }
+
 }
 
 // Scoring configuration
@@ -450,8 +431,8 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
   // Determine if clarification is needed
   let needsClarification = confidence < CONFIDENCE.medium || (secondBest && (score - secondBest[1].score) < 2)
 
-  // Special case: social media overlap (Nora, Viktor, Zara)
-  const socialMediaAgents = ['nora-community', 'zara-analytics-specialist', 'viktor-publishing-specialist']
+  // Special case: social media overlap (now only Nora handles all social media)
+  const socialMediaAgents = ['nora-community']
   // Find all social media agents in the top 3
   const topSocial = sortedAgents
     .slice(0, 3)

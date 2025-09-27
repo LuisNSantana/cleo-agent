@@ -16,9 +16,7 @@ export { PETER_AGENT } from './predefined/peter'
 export { EMMA_AGENT } from './predefined/emma'
 export { APU_AGENT } from './predefined/apu'
 export { NORA_AGENT } from './predefined/nora'
-export { LUNA_AGENT } from './predefined/luna'
-export { ZARA_AGENT } from './predefined/zara'
-export { VIKTOR_AGENT } from './predefined/viktor'
+
 
 // Local imports for constructing collections/graphs
 import { CLEO_AGENT } from './predefined/cleo'
@@ -29,9 +27,7 @@ import { PETER_AGENT } from './predefined/peter'
 import { EMMA_AGENT } from './predefined/emma'
 import { APU_AGENT } from './predefined/apu'
 import { NORA_AGENT } from './predefined/nora'
-import { LUNA_AGENT } from './predefined/luna'
-import { ZARA_AGENT } from './predefined/zara'
-import { VIKTOR_AGENT } from './predefined/viktor'
+
 
 // =============================================================================
 // DELEGATION & HANDOFF TOOLS
@@ -123,9 +119,6 @@ export function getAllAgents(): AgentConfig[] {
     EMMA_AGENT,
     APU_AGENT,
     NORA_AGENT,
-    LUNA_AGENT,
-    ZARA_AGENT,
-    VIKTOR_AGENT,
   ]
 }
 
