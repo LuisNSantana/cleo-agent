@@ -336,7 +336,7 @@ export const delegateToEmmaTool = tool({
 });
 
 export const delegateToApuTool = tool({
-  description: 'Delegate advanced web research, financial market analysis, and comprehensive information gathering tasks to Apu specialist. Use for stock market research, financial analysis, competitive intelligence, web scraping, news analysis, academic research, or real-time information gathering about markets, companies, and trends.',
+  description: 'Delegate web research, data gathering, news monitoring, and academic search tasks to Apu specialist. Use for collecting raw data, news articles, academic papers, company information, trend data, and structured findings. For strategic analysis or business insights synthesis, use delegate_to_wex instead.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements, userId }) => {
     return runDelegation({ agentId: 'apu-research', task, context, priority, requirements, userId })
@@ -348,6 +348,14 @@ export const delegateToApuMarketsTool = tool({
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements, userId }) => {
     return runDelegation({ agentId: 'apu-markets', task, context, priority, requirements, userId })
+  }
+});
+
+export const delegateToWexTool = tool({
+  description: 'Delegate strategic market analysis, competitive intelligence, and actionable business insights synthesis to Wex specialist. Use for strategic analysis, market insights ("insights accionables"), executive summaries, SWOT analysis, competitive positioning, business frameworks (Porter Forces, opportunity matrices), and synthesis of complex market research into actionable recommendations.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'wex-intelligence', task, context, priority, requirements, userId })
   }
 });
 
@@ -408,6 +416,7 @@ export const delegationTools = {
   delegate_to_emma: delegateToEmmaTool,
   delegate_to_apu: delegateToApuTool,
   delegate_to_apu_markets: delegateToApuMarketsTool,
+  delegate_to_wex: delegateToWexTool,
   delegate_to_astra: delegateToAstraTool,
   delegate_to_notion_agent: delegateToNotionTool,
   delegate_to_nora: delegateToNoraTool,

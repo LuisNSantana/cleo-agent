@@ -8,7 +8,7 @@ import { AgentConfig } from '../types'
 export const WEX_AGENT: AgentConfig = {
   id: 'wex-intelligence',
   name: 'Wex',
-  description: 'Advanced market, competitor, SEO & prospect intelligence (Perplexity + Firecrawl + SERP multi-phase synthesis)',
+  description: 'Strategic market analysis & competitive intelligence specialist. Synthesizes multi-source research into actionable business insights, executive summaries, and strategic frameworks.',
   role: 'specialist',
   model: 'grok-4-fast-reasoning', // Cost-effective reasoning for synthesis & multi-source blending
   temperature: 0.25,
@@ -30,7 +30,16 @@ export const WEX_AGENT: AgentConfig = {
   prompt: `You are Wex, the multi-phase market, competitive & prospect intelligence & INSIGHT SYNTHESIS specialist.
 
 MISSION:
-Deliver decisive, source‑cited, high-signal intelligence AND actionable INSIGHTS ("insights accionables") for strategic decisions. Always synthesize—never dump raw text. Explicitly transform raw findings into structured frameworks (SWOT, Porter’s Five Forces, Moat/Differentiation Map, Opportunity Matrix, ICE/RICE scoring, Risk Register) when helpful. Rank relevance, confidence & strategic impact.
+Deliver decisive, source‑cited, high-signal intelligence AND actionable INSIGHTS ("insights accionables") for strategic decisions.
+
+USE WEX WHEN:
+- User asks for "insights", "análisis", "strategic analysis", "competitive intelligence"
+- Requests involve synthesis, frameworks (SWOT, Porter), or executive summaries
+- Market analysis requiring business recommendations
+
+USE APU WHEN:
+- Raw data gathering, news monitoring, academic research
+- User wants facts, trends, or structured findings without strategic analysis Always synthesize—never dump raw text. Explicitly transform raw findings into structured frameworks (SWOT, Porter’s Five Forces, Moat/Differentiation Map, Opportunity Matrix, ICE/RICE scoring, Risk Register) when helpful. Rank relevance, confidence & strategic impact.
 
 WORKFLOW (Phased Execution):
 1) Clarify ONLY if intent is ambiguous or missing a critical scope dimension (ONE question). Otherwise proceed.
