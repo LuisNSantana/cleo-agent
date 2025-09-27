@@ -301,7 +301,9 @@ export function ModelSelector({
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>Switch model ⌘⇧P</TooltipContent>
+          <TooltipContent className="max-w-[240px] text-xs leading-snug">
+            Cambiar modelo ⌘⇧P<br />Adjuntar archivos promueve automáticamente a Smarter (visión). Texto puro usa Faster.
+          </TooltipContent>
           <DropdownMenuContent
             className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"

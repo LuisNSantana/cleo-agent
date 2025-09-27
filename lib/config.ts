@@ -42,10 +42,12 @@ export const FREE_MODELS_IDS = [
 ]
 
 // Default authenticated model: Sonoma Sky Alpha via OpenRouter
-export const MODEL_DEFAULT = "openrouter:x-ai/grok-4-fast:free"
+// Nuevo modelo por defecto (solo texto): grok-4-free (alias interno)
+export const MODEL_DEFAULT = "grok-4-free"
 
 // MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (mejor rendimiento y herramientas soportadas)
-export const MODEL_DEFAULT_GUEST = "openrouter:x-ai/grok-4-fast:free"
+// Guest también usa el nuevo faster por defecto
+export const MODEL_DEFAULT_GUEST = "grok-4-free"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

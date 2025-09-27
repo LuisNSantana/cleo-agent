@@ -8,7 +8,7 @@ import { ChatOllama } from '@langchain/community/chat_models/ollama'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { getFallbackModel, getModelWithFallback } from '@/lib/models/fallback-system'
-import { allModelsWithFallbacks } from '@/lib/models/data/optimized-tiers'
+import { normalizeModelId } from '@/lib/models/normalize'
 import logger from '@/lib/utils/logger'
 
 // AI SDK imports for additional providers
@@ -114,16 +114,21 @@ export class ModelFactory {
       return this.modelCache.get(cacheKey)!
     }
 
+    const normalized = normalizeModelId(modelName)
+    const INTERNAL_MODEL_MAP: Record<string,string> = {
+      'grok-4-free': 'openrouter:x-ai/grok-4-fast:free',
+    }
+    const externalName = INTERNAL_MODEL_MAP[normalized] || normalized
     try {
-      const model = await this.createModelWithFallback(modelName, config)
+      const model = await this.createModelWithFallback(externalName, config)
       logger.info(`[ModelFactory] Model created`, { modelName, cacheKey, modelClass: (model as any)?.constructor?.name })
       this.modelCache.set(cacheKey, model)
       return model
     } catch (error) {
-      logger.error(`[ModelFactory] Failed to create model ${modelName}:`, error)
+      logger.error(`[ModelFactory] Failed to create model ${externalName}:`, error)
       
       // Try fallback model if available
-      const fallbackModelName = getFallbackModel(modelName)
+      const fallbackModelName = getFallbackModel(normalized)
       if (fallbackModelName) {
         logger.info(`[ModelFactory] Attempting fallback model`, { requested: modelName, fallback: fallbackModelName })
         try {
@@ -136,9 +141,9 @@ export class ModelFactory {
         }
       }
       
-      // Final fallback to GPT-4o-mini
-      logger.warn(`[ModelFactory] Using final fallback: GPT-4o-mini`)
-      const finalFallback = this.createModel('gpt-4o-mini', config)
+  // Final fallback to internal fast model
+  logger.warn(`[ModelFactory] Using final fallback: grok-4-free`)
+  const finalFallback = this.createModel('grok-4-free', config)
       this.modelCache.set(cacheKey, finalFallback)
       return finalFallback
     }
@@ -165,7 +170,7 @@ export class ModelFactory {
     // Apply provider-safe clamp for output tokens
     const safeMax = clampMaxOutputTokens(cleanModelName, maxTokens)
 
-    logger.debug(`[ModelFactory] createModel dispatch`, { modelName, temperature, maxTokens, streaming })
+  logger.debug(`[ModelFactory] createModel dispatch`, { modelName: cleanModelName, temperature, maxTokens, streaming })
 
     // OpenRouter models via OpenAI-compatible API (function/tool calling supported)
     if (cleanModelName.startsWith('openrouter:')) {

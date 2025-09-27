@@ -7,6 +7,7 @@ import { isImageFile } from "@/lib/image-utils"
 import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { getModelInfo } from "@/lib/models"
+import { normalizeModelId } from "../../../lib/models/normalize"
 import { MODEL_DEFAULT } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { API_ROUTE_CHAT, API_ROUTE_CHAT_GUEST } from "@/lib/routes"
@@ -485,7 +486,14 @@ export function useChatCore({
   // Validate selected model before sending. If the frontend has an unknown model id
   // (for example from legacy favorites or stale cached chats), fall back to the
   // application default model to avoid server-side 'Model not found' errors.
-  const resolvedModel = getModelInfo(selectedModel) ? selectedModel : MODEL_DEFAULT
+  let resolvedModel = getModelInfo(selectedModel) ? normalizeModelId(selectedModel) : MODEL_DEFAULT
+  // Auto-upgrade to multimodal model when user attaches files and current is text-only grok-4-free
+  if (resolvedModel === 'grok-4-free') {
+    const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)
+    if (hasAttachments) {
+      resolvedModel = 'grok-4-multimodal'
+    }
+  }
   if (resolvedModel !== selectedModel) {
     console.warn(`[ChatAPI] Invalid model requested: ${selectedModel}. Falling back to ${resolvedModel}`)
   }

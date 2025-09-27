@@ -1,5 +1,6 @@
 import { ModelConfig } from "../types"
 import { getXAIModel } from "../../xai"
+import { openproviders } from "@/lib/openproviders"
 
 /**
  * Cleo Agent - Powered by Grok-3 Mini (Faster)
@@ -13,6 +14,66 @@ import { getXAIModel } from "../../xai"
  * - Handle function calls for external integrations
  */
 const grokModels: ModelConfig[] = [
+  // New simplified public models
+  {
+    id: "grok-4-free",
+    name: "Faster",
+    provider: "OpenRouter", // Se sirve vía OpenRouter
+    providerId: "openrouter",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description: "Grok 4 Fast (free via OpenRouter) optimizado para tareas de texto rápidas y económicas.",
+    webSearch: true,
+    inputCost: 0.0,
+    outputCost: 0.0,
+    priceUnit: "per 1M tokens",
+    tags: ["fast","free","tools","text"],
+    contextWindow: 262144,
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "Medium",
+    website: "https://openrouter.ai",
+    apiDocs: "https://openrouter.ai/docs",
+    modelPage: "https://openrouter.ai/x-ai/grok-4-fast",
+    releasedAt: "2025-09-27",
+    icon: "faster",
+    defaults: { temperature: 0.3, topP: 0.9 },
+    // Usamos el endpoint real de OpenRouter; la fábrica hará mapping interno también
+    apiSdk: (apiKey?: string) => openproviders("openrouter:x-ai/grok-4-fast:free", undefined, apiKey),
+  },
+  {
+    id: "grok-4-multimodal",
+    name: "Smarter",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description: "Grok 4 Multimodal for document & image analysis with 2M context. Best quality/price for rich inputs.",
+    webSearch: true,
+    inputCost: 0.2,
+    outputCost: 0.5,
+    priceUnit: "per 1M tokens",
+    tags: ["multimodal","vision","documents","analysis","2m-context"],
+    contextWindow: 2000000,
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai/news/grok-4-fast",
+    apiDocs: "https://docs.x.ai/",
+    modelPage: "https://x.ai/news/grok-4-fast",
+    releasedAt: "2025-09-27",
+    icon: "smarter",
+    defaults: { temperature: 0.4, topP: 0.9 },
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-fast-reasoning", apiKey) as any,
+  },
   {
     id: "grok-4-fast-reasoning",
     name: "Grok 4 Fast (Reasoning)",
