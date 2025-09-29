@@ -11,7 +11,6 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ConnectionStatus } from "@/app/components/chat-input/connection-status"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import {
   ChatTeardropText,
@@ -20,15 +19,13 @@ import {
   NotePencilIcon,
   X,
 } from "@phosphor-icons/react"
-import { useParams, useRouter, usePathname } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { useMemo, useCallback } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { SidebarList } from "./sidebar-list"
 import { SidebarProject } from "./sidebar-project"
 import Link from "next/link"
 import { ThemeToggle } from "@/app/components/layout/theme-toggle"
-import { useUser } from "@/lib/user-store/provider"
-import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -44,40 +41,17 @@ import {
   FileText as DocsIcon,
   ChartBar as DashboardIcon,
   Plugs as IntegrationsIcon,
-  ImageSquare,
-  Sparkle,
-  GearSix,
   Folders,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
-
-const PRO_TIPS = [
-  {
-    id: "delegation",
-    title: "Delegación instantánea",
-    body: "Usa frases como \"delegale a Peter\" o \"pídele a Ami\" para enviar tareas a tus especialistas sin cambiar de vista.",
-  },
-  {
-    id: "imagen",
-    title: "Modo imagen FLUX Pro",
-    body: "Activa el botón con el icono de foto en el input para generar imágenes. Describe estilo, iluminación y composición.",
-  },
-  {
-    id: "integraciones",
-    title: "Aprovecha tus conexiones",
-    body: "Conecta Google Workspace y Notion para que Cleo pueda buscar documentos, eventos y correos al delegar.",
-  },
-]
 
 export function AppSidebar() {
   const isMobile = useBreakpoint(768)
   const { setOpenMobile } = useSidebar()
   const { chats, isLoading } = useChats()
-  const { user } = useUser()
   const params = useParams<{ chatId: string }>()
   const currentChatId = params.chatId
   const pathname = usePathname()
-  const { openCanvas } = useInteractiveCanvasStore()
   const openSettings = useSettingsStore((state) => state.openSettings)
 
   const groupedChats = useMemo(() => {
@@ -85,21 +59,6 @@ export function AppSidebar() {
     return result
   }, [chats])
   const hasChats = chats.length > 0
-  const router = useRouter()
-
-  const handleNavigate = useCallback((href: string) => {
-    router.push(href)
-    if (isMobile) {
-      setOpenMobile(false)
-    }
-  }, [router, isMobile, setOpenMobile])
-
-  const handleOpenCanvas = useCallback(() => {
-    openCanvas()
-    if (isMobile) {
-      setOpenMobile(false)
-    }
-  }, [openCanvas, isMobile, setOpenMobile])
 
   const handleOpenSettings = useCallback(
     (tab?: SettingsTab) => {
@@ -113,41 +72,13 @@ export function AppSidebar() {
 
   const quickActions = useMemo(() => [
     {
-      id: "image-studio",
-      label: "Image Studio",
-      description: "Genera visuales premium con FLUX Pro y automatiza variaciones.",
-      icon: ImageSquare,
-      action: () => handleNavigate("/docs#image-generation"),
-    },
-    {
-      id: "interactive-canvas",
-      label: "Lienzo interactivo",
-      description: "Abre el canvas para esbozar ideas o diagramas en vivo.",
-      icon: NotePencilIcon,
-      action: handleOpenCanvas,
-    },
-    {
-      id: "prompt-library",
-      label: "Biblioteca de prompts",
-      description: "Explora plantillas y ejemplos listos para delegar tareas.",
-      icon: Sparkle,
-      action: () => handleNavigate("/docs#prompt-library"),
-    },
-    {
-      id: "settings-models",
-      label: "Modelos preferidos",
-      description: "Configura prioridades y fallback de modelos para tus agentes.",
-      icon: GearSix,
-      action: () => handleOpenSettings("models"),
-    },
-    {
       id: "settings-files",
-      label: "Gestión de archivos",
-      description: "Sube, organiza y comparte archivos con tus agentes.",
+      label: "Files",
+      description: "Upload, organize, and share documents with your agents.",
       icon: Folders,
       action: () => handleOpenSettings("files"),
     },
-  ], [handleNavigate, handleOpenCanvas, handleOpenSettings])
+  ], [handleOpenSettings])
 
   const primaryNav = [
     { href: "/", label: "Home", icon: HouseIcon },
@@ -192,7 +123,16 @@ export function AppSidebar() {
                       isActive={isActive} 
                       tooltip={label}
                     >
-                      <Link href={href} prefetch className="flex items-center justify-between w-full">
+                      <Link
+                        href={href}
+                        prefetch
+                        className="flex items-center justify-between w-full"
+                        onClick={() => {
+                          if (isMobile) {
+                            setOpenMobile(false)
+                          }
+                        }}
+                      >
                         <div className="flex items-center gap-2">
                           <Icon className="size-4" />
                           <span>{label}</span>
@@ -216,6 +156,11 @@ export function AppSidebar() {
               href="/"
               className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-2 py-2 text-sm transition-colors"
               prefetch
+              onClick={() => {
+                if (isMobile) {
+                  setOpenMobile(false)
+                }
+              }}
             >
               <div className="flex items-center gap-2">
                 <NotePencilIcon size={20} />
@@ -240,52 +185,30 @@ export function AppSidebar() {
               hasPopover={false}
             />
           </div>
-          {user?.id && (
+          {quickActions.length > 0 && (
             <SidebarGroup className="mb-5">
-              <SidebarGroupLabel className="text-xs text-muted-foreground/80">Estado del workspace</SidebarGroupLabel>
-              <div className="mt-2 rounded-lg border border-border/40 bg-background/70 p-3">
-                <ConnectionStatus asPanel />
+              <SidebarGroupLabel className="text-xs text-muted-foreground/80">Quick links</SidebarGroupLabel>
+              <div className="mt-2 space-y-2">
+                {quickActions.map(({ id, label, description, icon: Icon, action }) => (
+                  <Button
+                    key={id}
+                    type="button"
+                    variant="ghost"
+                    onClick={action}
+                    className="h-auto w-full justify-start rounded-lg border border-border/40 bg-background/60 px-3 py-3 text-left transition hover:bg-background"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Icon className="size-4" />
+                      <span>{label}</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                      {description}
+                    </p>
+                  </Button>
+                ))}
               </div>
             </SidebarGroup>
           )}
-
-          <SidebarGroup className="mb-5">
-            <SidebarGroupLabel className="text-xs text-muted-foreground/80">Accesos directos</SidebarGroupLabel>
-            <div className="mt-2 space-y-2">
-              {quickActions.map(({ id, label, description, icon: Icon, action }) => (
-                <Button
-                  key={id}
-                  type="button"
-                  variant="ghost"
-                  onClick={action}
-                  className="h-auto w-full justify-start rounded-lg border border-border/40 bg-background/60 px-3 py-3 text-left transition hover:bg-background"
-                >
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Icon className="size-4" />
-                    <span>{label}</span>
-                  </div>
-                  <p className="mt-1 text-xs leading-snug text-muted-foreground">
-                    {description}
-                  </p>
-                </Button>
-              ))}
-            </div>
-          </SidebarGroup>
-
-          <SidebarGroup className="mb-6">
-            <SidebarGroupLabel className="text-xs text-muted-foreground/80">Tips para sacarle jugo</SidebarGroupLabel>
-            <div className="mt-2 space-y-3 rounded-lg border border-border/40 bg-background/60 px-3 py-3">
-              {PRO_TIPS.map((tip) => (
-                <div key={tip.id} className="flex gap-2">
-                  <Sparkle className="mt-0.5 size-3 text-primary" weight="fill" />
-                  <div className="space-y-1 text-xs leading-relaxed text-muted-foreground">
-                    <p className="text-sm font-semibold text-foreground">{tip.title}</p>
-                    <p>{tip.body}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SidebarGroup>
           <SidebarProject />
           {isLoading ? (
             <div className="h-full" />
