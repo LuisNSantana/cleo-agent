@@ -2,6 +2,7 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 // RAG prompt construction is now centralized in lib/chat/prompt
 import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
 import { getAllModels } from "@/lib/models"
+import { resolveModelFromList } from '@/lib/models/resolve'
 import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
 import { tools, ensureDelegationToolForAgent } from "@/lib/tools"
 import { scoreDelegationIntent } from '@/lib/delegation/intent-heuristics'
@@ -284,7 +285,7 @@ export async function POST(req: Request) {
 
   // Normalize model ID early and also keep original with prefix
   const originalModel = model
-  const normalizedModel = normalizeModelId(model)
+  let normalizedModel = normalizeModelId(model)
   console.log('[ChatAPI] Incoming model:', originalModel, 'normalized:', normalizedModel, 'isAuthenticated:', isAuthenticated)
 
   // Auto-enable RAG for personalized responses - always try to retrieve user context
@@ -546,11 +547,12 @@ export async function POST(req: Request) {
 
     // Resolve model config and establish effective system prompt
   const allModels = await getAllModels()
-  modelConfig = allModels.find((m) => m.id === originalModel) || allModels.find((m) => m.id === normalizedModel)
-
-    if (!modelConfig) {
-      throw new Error(`Model ${originalModel} not found`)
-    }
+  const resolution = resolveModelFromList(originalModel, allModels)
+  if (resolution.usedFallback) {
+    console.warn(`[ChatAPI] Model ${originalModel} not found in registry; using fallback ${resolution.normalizedModel}`)
+  }
+  modelConfig = resolution.modelConfig
+  normalizedModel = resolution.normalizedModel
     if (!modelConfig.apiSdk && !originalModel.startsWith('langchain:')) {
       throw new Error(`Model ${modelConfig.id} has no API SDK configured`)
     }
@@ -658,7 +660,7 @@ export async function POST(req: Request) {
     // fall back to environment keys so models like OpenRouter work in demos.
     {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
-  const provider = getProviderForModel(originalModel as any)
+  const provider = getProviderForModel(normalizedModel as any)
       const maybeKey = await getEffectiveApiKey(
         isAuthenticated && userId ? userId : null,
         provider as ProviderWithoutOllama

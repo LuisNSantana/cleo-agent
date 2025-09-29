@@ -259,6 +259,9 @@ export function normalizeModelId(model: string): string {
 
   // Aliases for legacy or incorrect IDs to prevent 400 errors
   switch (core) {
+    case "grok-4-multimodal":
+      // Legacy ID renamed to grok-4-fast-reasoning (same capabilities, prevents 404s)
+      return "grok-4-fast-reasoning"
     case "meta-llama/meta-llama-3.1-405b-instruct":
       // Corrected canonical OpenRouter path uses llama-3.1-405b-instruct
       return "meta-llama/llama-3.1-405b-instruct"

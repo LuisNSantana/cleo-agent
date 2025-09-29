@@ -2,7 +2,51 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackToolUsage } from '@/lib/analytics'
-import { getCurrentModel, getCurrentUserId } from '@/lib/server/request-context'
+import { getCurrentUserId } from '@/lib/server/request-context'
+
+export const googleSheetCellSchema = z
+  .union([z.string(), z.number(), z.boolean(), z.null()])
+  .describe('Represents a single Google Sheet cell value (string, number, boolean, or null for blanks)')
+
+export const googleSheetRowSchema = z
+  .array(googleSheetCellSchema)
+  .describe('A row in Google Sheets represented as an array of cell values')
+
+export const googleSheetDataSchema = z
+  .array(googleSheetRowSchema)
+  .describe('Tabular data for Google Sheets as an array of rows')
+
+type GoogleSheetData = z.infer<typeof googleSheetDataSchema>
+type NormalizedGoogleSheetCell = string | number | boolean
+type NormalizedGoogleSheetData = NormalizedGoogleSheetCell[][]
+
+export function normalizeGoogleSheetValues(rows: GoogleSheetData): NormalizedGoogleSheetData {
+  return rows.map((row) =>
+    row.map((cell) => {
+      if (cell === null || typeof cell === 'undefined') {
+        return ''
+      }
+      return cell
+    }),
+  )
+}
+
+function columnToLetter(column: number): string {
+  if (column <= 0) {
+    return 'A'
+  }
+
+  let result = ''
+  let current = column
+
+  while (current > 0) {
+    const remainder = (current - 1) % 26
+    result = String.fromCharCode(65 + remainder) + result
+    current = Math.floor((current - 1) / 26)
+  }
+
+  return result
+}
 
 // Simple in-memory token cache (5 min expiry)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
@@ -163,7 +207,7 @@ export const createGoogleSheetTool = tool({
   inputSchema: z.object({
     title: z.string().describe('The title of the new spreadsheet'),
     sheetTitle: z.string().optional().describe('The title of the first sheet (default: "Sheet1")'),
-    data: z.array(z.array(z.string())).optional().describe('Optional initial data as array of rows, each row is an array of cell values'),
+    data: googleSheetDataSchema.optional().describe('Optional initial data as array of rows; accepts strings, numbers, booleans, and formulas'),
     shareWithEveryone: z.boolean().optional().describe('Whether to share the spreadsheet publicly (default: false)'),
     shareEmails: z.array(z.string()).optional().describe('Email addresses to share the spreadsheet with')
   }),
@@ -207,21 +251,30 @@ export const createGoogleSheetTool = tool({
 
       // Add initial data if provided
       if (data && data.length > 0) {
-        const range = `${sheetTitle}!A1:${String.fromCharCode(64 + data[0].length)}${data.length}`
-        
-        const updateResult = await makeGoogleSheetsRequest(
-          userId, 
-          `/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=RAW`, 
-          'PUT',
-          {
-            values: data
-          }
-        )
+        const normalizedData = normalizeGoogleSheetValues(data)
+        const columnCount = normalizedData.reduce((max, row) => Math.max(max, row.length), 0)
 
-        if (!updateResult.success) {
-          console.warn('⚠️ Failed to add initial data:', updateResult.error)
-        } else {
-          console.log('✅ [Google Sheets] Initial data added')
+        if (columnCount > 0) {
+          const containsFormula = normalizedData.some((row) =>
+            row.some((cell) => typeof cell === 'string' && cell.trim().startsWith('='))
+          )
+          const valueInputOption = containsFormula ? 'USER_ENTERED' : 'RAW'
+          const range = `${sheetTitle}!A1:${columnToLetter(columnCount)}${normalizedData.length}`
+
+          const updateResult = await makeGoogleSheetsRequest(
+            userId,
+            `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`,
+            'PUT',
+            {
+              values: normalizedData
+            }
+          )
+
+          if (!updateResult.success) {
+            console.warn('⚠️ Failed to add initial data:', updateResult.error)
+          } else {
+            console.log('✅ [Google Sheets] Initial data added')
+          }
         }
       }
 
@@ -413,7 +466,7 @@ export const updateGoogleSheetTool = tool({
   inputSchema: z.object({
     spreadsheetId: z.string().describe('The ID of the spreadsheet to update'),
     range: z.string().describe('The range to update (e.g., "Sheet1!A1:C3")'),
-    values: z.array(z.array(z.string())).describe('The data to write as array of rows, each row is an array of cell values'),
+    values: googleSheetDataSchema.describe('The data to write as array of rows; accepts strings, numbers, booleans, and formulas'),
     inputOption: z.enum(['RAW', 'USER_ENTERED']).optional().describe('How input data should be interpreted (RAW for literal values, USER_ENTERED for formulas and formatted text)')
   }),
   execute: async ({ spreadsheetId, range, values, inputOption = 'USER_ENTERED' }) => {
@@ -428,7 +481,9 @@ export const updateGoogleSheetTool = tool({
       }
     }
 
-    console.log('📊 [Google Sheets] Updating spreadsheet:', { spreadsheetId, range, rowCount: values.length })
+    const normalizedValues = normalizeGoogleSheetValues(values)
+
+    console.log('📊 [Google Sheets] Updating spreadsheet:', { spreadsheetId, range, rowCount: normalizedValues.length })
 
     try {
       const updateResult = await makeGoogleSheetsRequest(
@@ -436,7 +491,7 @@ export const updateGoogleSheetTool = tool({
         `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=${inputOption}`, 
         'PUT',
         {
-          values: values
+          values: normalizedValues
         }
       )
 
@@ -449,11 +504,11 @@ export const updateGoogleSheetTool = tool({
       }
 
       // Track usage
-      await trackToolUsage(userId, 'updateGoogleSheet', { ok: true, execMs: Date.now() - started, params: { spreadsheetId, range, rowCount: values.length } })
+      await trackToolUsage(userId, 'updateGoogleSheet', { ok: true, execMs: Date.now() - started, params: { spreadsheetId, range, rowCount: normalizedValues.length } })
 
       const result = {
         success: true,
-        message: `Successfully updated ${values.length} rows in spreadsheet`,
+        message: `Successfully updated ${normalizedValues.length} rows in spreadsheet`,
         result: {
           spreadsheetId,
           updatedRange: updateResult.data.updatedRange,
@@ -487,7 +542,7 @@ export const appendGoogleSheetTool = tool({
   inputSchema: z.object({
     spreadsheetId: z.string().describe('The ID of the spreadsheet to append to'),
     range: z.string().describe('The range/sheet to append to (e.g., "Sheet1" or "Sheet1!A:A")'),
-    values: z.array(z.array(z.string())).describe('The data to append as array of rows, each row is an array of cell values'),
+    values: googleSheetDataSchema.describe('The data to append as array of rows; accepts strings, numbers, booleans, and formulas'),
     inputOption: z.enum(['RAW', 'USER_ENTERED']).optional().describe('How input data should be interpreted (RAW for literal values, USER_ENTERED for formulas and formatted text)')
   }),
   execute: async ({ spreadsheetId, range, values, inputOption = 'USER_ENTERED' }) => {
@@ -502,7 +557,9 @@ export const appendGoogleSheetTool = tool({
       }
     }
 
-    console.log('📊 [Google Sheets] Appending to spreadsheet:', { spreadsheetId, range, rowCount: values.length })
+    const normalizedValues = normalizeGoogleSheetValues(values)
+
+    console.log('📊 [Google Sheets] Appending to spreadsheet:', { spreadsheetId, range, rowCount: normalizedValues.length })
 
     try {
       const appendResult = await makeGoogleSheetsRequest(
@@ -510,7 +567,7 @@ export const appendGoogleSheetTool = tool({
         `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=${inputOption}`, 
         'POST',
         {
-          values: values
+          values: normalizedValues
         }
       )
 
@@ -523,11 +580,11 @@ export const appendGoogleSheetTool = tool({
       }
 
       // Track usage
-      await trackToolUsage(userId, 'appendGoogleSheet', { ok: true, execMs: Date.now() - started, params: { spreadsheetId, range, rowCount: values.length } })
+      await trackToolUsage(userId, 'appendGoogleSheet', { ok: true, execMs: Date.now() - started, params: { spreadsheetId, range, rowCount: normalizedValues.length } })
 
       const result = {
         success: true,
-        message: `Successfully appended ${values.length} rows to spreadsheet`,
+        message: `Successfully appended ${normalizedValues.length} rows to spreadsheet`,
         result: {
           spreadsheetId,
           updatedRange: appendResult.data.updates?.updatedRange,

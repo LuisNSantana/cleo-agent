@@ -8,21 +8,16 @@ import {
   PromptInputTextarea,
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, CircleNotch, CirclesFour, ImageSquare, Sparkle } from "@phosphor-icons/react"
+import { ArrowUpIcon, CircleNotch, ImageSquare, Sparkle } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
-import { ConnectionStatus } from "./connection-status"
 import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
 import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
-import { useBreakpoint } from "@/app/hooks/use-breakpoint"
-import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
-import { PencilSimple } from "@phosphor-icons/react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ChatInputProps = {
@@ -85,8 +80,6 @@ export function ChatInput({
   const selectModelConfig = getModelInfo(selectedModel)
   const hasSearchSupport = Boolean(selectModelConfig?.webSearch)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
-  const isMobile = useBreakpoint(768)
-  const { openCanvas } = useInteractiveCanvasStore()
   const [imageMode, setImageMode] = useState(false)
 
   // Canvas message handling
@@ -247,7 +240,6 @@ export function ChatInput({
   }, [hasSearchSupport, enableSearch, setEnableSearchAction])
 
   const deferredValue = useDeferredValue(value)
-  const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false)
   const showPromptSystem = hasSuggestions && (!value || value.trim().length === 0)
 
   return (
@@ -356,48 +348,12 @@ export function ChatInput({
                 isUserAuthenticated={isUserAuthenticated}
                 model={selectedModel}
               />
-              {isUserAuthenticated && <div className="hidden sm:block"><ConnectionStatus /></div>}
               {!hideModelSelector && (
                 <ModelSelector
                   selectedModelId={selectedModel}
                   setSelectedModelIdAction={onSelectModelAction}
                   isUserAuthenticated={isUserAuthenticated}
                 />
-              )}
-              {/* Mobile Draw Button - DISABLED TEMPORARILY */}
-              {/* {isMobile && (
-                <Button
-                  onClick={openCanvas}
-                  size="sm"
-                  variant="outline"
-                  className="size-9 p-0 rounded-full"
-                  aria-label="Open Drawing Canvas"
-                >
-                  <PencilSimple className="size-4" />
-                </Button>
-              )} */}
-              {/* Mobile Integrations Drawer Trigger */}
-              {isMobile && isUserAuthenticated && (
-                <Drawer open={isIntegrationsOpen} onOpenChange={setIsIntegrationsOpen} direction="bottom">
-                  <DrawerTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="size-9 p-0 rounded-full"
-                      aria-label="Service integrations"
-                    >
-                      <CirclesFour className="size-4" />
-                    </Button>
-                  </DrawerTrigger>
-                  <DrawerContent>
-                    <DrawerHeader>
-                      <DrawerTitle>Integrations</DrawerTitle>
-                    </DrawerHeader>
-                    <div className="max-h-[70vh] overflow-y-auto">
-                      <ConnectionStatus asPanel />
-                    </div>
-                  </DrawerContent>
-                </Drawer>
               )}
               {hasSearchSupport ? (
                 <ButtonSearch

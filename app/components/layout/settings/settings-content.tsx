@@ -17,7 +17,7 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react"
 import Link from "next/link"
-import { useState } from "react"
+import { useCallback } from "react"
 
 import { InteractionPreferences } from "./appearance/interaction-preferences"
 import { LayoutSettings } from "./appearance/layout-settings"
@@ -32,17 +32,25 @@ import { UserProfile } from "./general/user-profile"
 import { NotificationsSettings } from "./general/notifications-settings"
 import { SimpleModelsInfo } from "./models/simple-models-info"
 import { CleoPersonalitySettings } from "./models/cleo-personality-settings"
+import { useSettingsStore } from "@/lib/settings/store"
+import type { SettingsTab } from "@/lib/settings/store"
 
 type SettingsContentProps = {
   isDrawer?: boolean
 }
 
-type TabType = "general" | "appearance" | "models" | "connections" | "files" | "agents" | "docs"
-
 export function SettingsContent({
   isDrawer = false,
 }: SettingsContentProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("general")
+  const activeTab = useSettingsStore((state) => state.activeTab)
+  const setActiveTab = useSettingsStore((state) => state.setActiveTab)
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      setActiveTab(value as SettingsTab)
+    },
+    [setActiveTab]
+  )
 
   return (
     <div
@@ -62,9 +70,9 @@ export function SettingsContent({
         </div>
       )}
 
-    <Tabs
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as TabType)}
+  <Tabs
+    value={activeTab}
+    onValueChange={handleTabChange}
         className={cn(
       "flex w-full max-w-full flex-row overflow-x-hidden",
           isDrawer ? "" : "flex min-h-[400px]"
