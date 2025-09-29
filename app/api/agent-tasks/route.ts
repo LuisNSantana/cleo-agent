@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withRequestContext } from '@/lib/server/request-context';
-import { 
-  createAgentTask, 
-  getAgentTasks, 
-  getAgentTask, 
-  updateAgentTask, 
+import {
+  createAgentTask,
+  getAgentTasks,
+  getAgentTask,
+  updateAgentTask,
   deleteAgentTask,
   type CreateAgentTaskInput,
   type UpdateAgentTaskInput,
   type AgentTaskFilters
 } from '@/lib/agent-tasks/tasks-db';
 import { getScheduler } from '@/lib/agent-tasks/scheduler';
+import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver';
+import { getAgentDisplayName } from '@/lib/agents/id-canonicalization';
 
 // GET - List agent tasks with filtering
 export async function GET(request: NextRequest) {
@@ -105,16 +107,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Validate required fields
-    if (!body.agent_id || !body.agent_name || !body.title || !body.description) {
+    if (!body.title || !body.description) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: agent_id, agent_name, title, description' },
+        { success: false, error: 'Missing required fields: title, description' },
         { status: 400 }
       );
     }
 
+    const rawAgentId = typeof body.agent_id === 'string' ? body.agent_id.trim() : '';
+    const rawAgentName = typeof body.agent_name === 'string' ? body.agent_name.trim() : '';
+
+    let resolvedAgentId = rawAgentId;
+    if (!resolvedAgentId && rawAgentName) {
+      // Allow passing only the agent name/alias
+      resolvedAgentId = rawAgentName;
+    }
+
+    if (resolvedAgentId) {
+      resolvedAgentId = await resolveAgentCanonicalKey(resolvedAgentId);
+    }
+
+    if (!resolvedAgentId) {
+      resolvedAgentId = 'cleo-supervisor';
+    }
+
+    const resolvedAgentName = rawAgentName || getAgentDisplayName(resolvedAgentId) || 'Cleo';
+
     const taskData: CreateAgentTaskInput = {
-      agent_id: body.agent_id,
-      agent_name: body.agent_name,
+      agent_id: resolvedAgentId,
+      agent_name: resolvedAgentName,
       agent_avatar: body.agent_avatar,
       title: body.title,
       description: body.description,

@@ -12,24 +12,76 @@ import { globalErrorHandler } from '@/lib/agents/core/error-handler';
 import { getAgentById, getAgentByName } from '@/lib/agents/unified-config';
 import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
-import { createClient } from '@/lib/supabase/server';
 import { withRequestContext } from '@/lib/server/request-context';
+
+interface AgentMessageRecord {
+  role: string;
+  content: unknown;
+  timestamp: string;
+}
+
+interface ToolCallRecord {
+  tool: string;
+  input: unknown;
+  output: unknown;
+  timestamp: string;
+}
+
+function normalizeTaskResultPayload(result: unknown): Record<string, unknown> {
+  if (result === null || result === undefined) return {};
+  if (typeof result === 'string') {
+    return { summary: result };
+  }
+  if (Array.isArray(result)) {
+    return { items: result };
+  }
+  if (typeof result === 'object') {
+    return { ...(result as Record<string, unknown>) };
+  }
+  return { value: result };
+}
+
+function coerceAgentMessages(messages: unknown[]): AgentMessageRecord[] {
+  return messages.map((raw) => {
+    const entry = (raw ?? {}) as Record<string, unknown>;
+    const role = typeof entry.role === 'string'
+      ? entry.role
+      : typeof (entry as { _getType?: () => string })._getType === 'function'
+        ? (entry as { _getType: () => string })._getType()
+        : 'assistant';
+    return {
+      role,
+      content: entry.content,
+      timestamp: new Date().toISOString()
+    };
+  });
+}
+
+function extractToolCalls(messages: unknown[]): ToolCallRecord[] {
+  const calls: ToolCallRecord[] = [];
+  for (const raw of messages) {
+    const entry = (raw ?? {}) as Record<string, unknown>;
+    const toolCalls = (entry as { tool_calls?: unknown[] }).tool_calls;
+    if (!Array.isArray(toolCalls)) continue;
+    for (const call of toolCalls) {
+      const callEntry = (call ?? {}) as Record<string, unknown>;
+      calls.push({
+        tool: typeof callEntry.tool === 'string' ? callEntry.tool : 'unknown_tool',
+        input: callEntry.input,
+        output: callEntry.result ?? callEntry.output,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+  return calls;
+}
 
 export interface TaskExecutionResult {
   success: boolean;
-  result?: any;
+  result?: Record<string, unknown>;
   error?: string;
-  tool_calls?: Array<{
-    tool: string;
-    input: any;
-    output: any;
-    timestamp: string;
-  }>;
-  agent_messages?: Array<{
-    role: string;
-    content: string;
-    timestamp: string;
-  }>;
+  tool_calls?: ToolCallRecord[];
+  agent_messages?: AgentMessageRecord[];
   execution_metadata?: {
     start_time: string;
     end_time: string;
@@ -112,33 +164,42 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     let hasToolFailures = false;
     let failureReasons: string[] = [];
     
+    const agentMessages = Array.isArray(result.messages) ? coerceAgentMessages(result.messages) : [];
+    const toolCalls = Array.isArray(result.messages) ? extractToolCalls(result.messages) : [];
+    const normalizedResult = normalizeTaskResultPayload(resultContent);
+    normalizedResult.execution_metadata = execution_metadata;
+
     for (const message of result.messages) {
       // Check for tool messages with failures
-      if (message.content && typeof message.content === 'string') {
-        if (message.content.includes('"success":false') || 
-            message.content.includes('Auth required') ||
-            message.content.includes('error') ||
-            message.content.includes('failed')) {
+      const content = (message as Record<string, unknown>).content;
+      if (typeof content === 'string') {
+        if (content.includes('"success":false') || 
+            content.includes('Auth required') ||
+            content.includes('error') ||
+            content.includes('failed')) {
           hasToolFailures = true;
-          if (message.content.includes('Auth required')) {
+          if (content.includes('Auth required')) {
             failureReasons.push('Authentication required');
           }
         }
       }
       // Check for tool call results
-      if (message.tool_calls && Array.isArray(message.tool_calls)) {
-        for (const toolCall of message.tool_calls) {
-          if (toolCall.result && typeof toolCall.result === 'object') {
-            if (toolCall.result.success === false) {
+      const maybeToolCalls = (message as { tool_calls?: unknown[] }).tool_calls;
+      if (Array.isArray(maybeToolCalls)) {
+        for (const toolCall of maybeToolCalls) {
+          const resultPayload = (toolCall as Record<string, unknown>).result;
+          if (resultPayload && typeof resultPayload === 'object') {
+            if ((resultPayload as { success?: boolean }).success === false) {
               hasToolFailures = true;
-              failureReasons.push(toolCall.result.message || 'Tool execution failed');
+              const failureMessage = (resultPayload as { message?: string }).message;
+              failureReasons.push(failureMessage || 'Tool execution failed');
             }
           }
         }
       }
     }
 
-  if (hasToolFailures) {
+    if (hasToolFailures) {
       console.log(`❌ Task failed due to tool failures: ${failureReasons.join(', ')}`);
       
       // Create failure notification
@@ -162,9 +223,9 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       return {
         success: false,
         error: failureReasons.join(', '),
-        result: resultContent,
-        tool_calls: [],
-        agent_messages: result.messages,
+        result: normalizedResult,
+        tool_calls: toolCalls,
+        agent_messages: agentMessages,
         execution_metadata
       };
     }
@@ -182,9 +243,9 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       title: `✅ Task Completed: ${task.title}`,
       message: `${task.agent_name} has successfully completed your task "${task.title}" in ${execution_metadata.duration_ms}ms.`,
       task_result: {
-        summary: typeof resultContent === 'string' ? resultContent : 'Task completed successfully',
+        ...normalizedResult,
         execution_time: execution_metadata.duration_ms,
-        agent_messages_count: result.messages.length,
+        agent_messages_count: agentMessages.length,
         completed_at: execution_metadata.end_time
       },
       priority: 'medium',
@@ -193,13 +254,9 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     return {
       success: true,
-      result: resultContent,
-      tool_calls: [], // TODO: Extract tool calls from execution
-      agent_messages: result.messages.map((msg: any) => ({
-        role: msg.role || msg._getType(),
-        content: msg.content,
-        timestamp: new Date().toISOString()
-      })),
+      result: normalizedResult,
+      tool_calls: toolCalls,
+      agent_messages: agentMessages,
       execution_metadata
     };
 

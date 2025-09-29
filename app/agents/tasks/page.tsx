@@ -26,6 +26,8 @@ type AgentSummary = {
   color?: string
 }
 
+const DEFAULT_AGENT_ID = 'cleo-supervisor'
+
 type AgentTask = {
   task_id: string
   user_id: string
@@ -84,7 +86,9 @@ export default function AgentsTasksPage() {
   const [activeTab, setActiveTab] = useState('tasks')
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [notifications, setNotifications] = useState<TaskNotification[]>([])
-  const [agents, setAgents] = useState<AgentSummary[]>([])
+  const [agents, setAgents] = useState<AgentSummary[]>([
+    { id: DEFAULT_AGENT_ID, name: 'Cleo', icon: '🤖', color: '#6366f1' }
+  ])
   const [loading, setLoading] = useState(true)
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -95,7 +99,7 @@ export default function AgentsTasksPage() {
 
   // Create-form state
   const [formOpen, setFormOpen] = useState(false)
-  const [formAgentId, setFormAgentId] = useState('')
+  const [formAgentId, setFormAgentId] = useState(DEFAULT_AGENT_ID)
   const [formTitle, setFormTitle] = useState('')
   const [formDescription, setFormDescription] = useState('')
   const [formTaskType, setFormTaskType] = useState<'manual' | 'scheduled' | 'recurring'>('manual')
@@ -226,15 +230,28 @@ export default function AgentsTasksPage() {
 
   const fetchAgents = async () => {
     try {
-  const res = await fetch('/api/agents?includeSubAgents=1')
+      const res = await fetch('/api/agents?includeSubAgents=1')
       const data = await res.json()
       if (Array.isArray(data.agents)) {
-        setAgents(data.agents.map((a: any) => ({ 
-          id: a.id, 
-          name: a.name, 
-          icon: a.icon || '🤖', 
-          color: a.color || '#6366f1' 
-        })))
+        const mapped: AgentSummary[] = data.agents.map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          icon: a.icon || '🤖',
+          color: a.color || '#6366f1'
+        }))
+
+        const sorted = [...mapped].sort((a, b) => {
+          if (a.id === DEFAULT_AGENT_ID) return -1
+          if (b.id === DEFAULT_AGENT_ID) return 1
+          return a.name.localeCompare(b.name)
+        })
+
+        setAgents(sorted)
+        setFormAgentId(prev => {
+          if (prev && sorted.some(agent => agent.id === prev)) return prev
+          const preferred = sorted.find(agent => agent.id === DEFAULT_AGENT_ID) || sorted[0]
+          return preferred ? preferred.id : ''
+        })
       }
     } catch (e) {
       console.error('Failed to load agents', e)
@@ -367,13 +384,14 @@ export default function AgentsTasksPage() {
   }
 
   const submitCreate = async () => {
-    if (!formAgentId || !formTitle || !formDescription) return
+    if (!formTitle || !formDescription) return
     setCreating(true)
     try {
-      const agent = agents.find(a => a.id === formAgentId)
+      const effectiveAgentId = formAgentId || DEFAULT_AGENT_ID
+      const agent = agents.find(a => a.id === effectiveAgentId)
       const body: any = {
-        agent_id: formAgentId,
-        agent_name: agent?.name || 'Agent',
+        agent_id: effectiveAgentId,
+        agent_name: agent?.name || 'Cleo',
         // Use proper avatar URL instead of icon text
         agent_avatar: getAgentAvatarUrl(agent?.name, agent?.icon),
         title: formTitle,
@@ -422,6 +440,7 @@ export default function AgentsTasksPage() {
       setFormCron('')
       setFormTimezone(userTimezone) // Usar timezone del usuario
       setFormTags('')
+  setFormAgentId(DEFAULT_AGENT_ID)
       await fetchTasks()
     } catch (e) {
       console.error('Create task error', e)
@@ -1139,6 +1158,9 @@ export default function AgentsTasksPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Tasks run through <span className="text-foreground/90 font-medium">Cleo</span> by default. Pick a specialist only when you already know who should own it.
+                  </p>
                 </div>
 
                 <div>
@@ -1265,7 +1287,7 @@ export default function AgentsTasksPage() {
                 </Button>
                 <Button
                   onClick={submitCreate}
-                  disabled={creating || !formAgentId || !formTitle || !formDescription}
+                  disabled={creating || !formTitle || !formDescription}
                   className="bg-foreground text-background hover:bg-foreground/90"
                 >
                   {creating ? 'Creating...' : 'Create Task'}

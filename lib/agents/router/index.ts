@@ -57,6 +57,20 @@ const EMAIL_GENERAL_KEYWORDS = [
   'email', 'gmail', 'correo', 'inbox', 'bandeja', 'mail'
 ]
 
+// If any of these appear alongside a general email mention, keep Cleo in charge
+// so multi-step requests (research + follow-up email) aren't hijacked by Ami.
+const EMAIL_GENERAL_BLOCKERS = [
+  // Research & investigation
+  'research', 'investigate', 'investigation', 'investigación', 'investigar',
+  'analysis', 'análisis', 'analisis', 'look into', 'buscar', 'busca',
+  // Task / project planning
+  'task', 'tarea', 'project', 'proyecto', 'schedule', 'programa', 'programar',
+  'plan', 'planning', 'planificar', 'agenda',
+  // Information gathering wording
+  'info', 'información', 'informacion', 'details', 'detalles', 'datos',
+  'opportunity', 'oportunidad'
+]
+
 // Financial & Business Strategy intents
 const FINANCIAL_KEYWORDS = [
   // English - Finance
@@ -122,7 +136,7 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
   }
 
   // If any general email/gmail mention exists (without explicit triage/compose), prefer Ami triage
-  if (includesAny(text, EMAIL_GENERAL_KEYWORDS)) {
+  if (includesAny(text, EMAIL_GENERAL_KEYWORDS) && !includesAny(text, EMAIL_GENERAL_BLOCKERS)) {
     return {
       source: 'early',
       action: 'delegate',

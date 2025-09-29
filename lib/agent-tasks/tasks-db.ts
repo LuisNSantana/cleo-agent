@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createGuestServerClient } from '@/lib/supabase/server-guest';
 import { getCurrentUserId } from '@/lib/server/request-context';
+import { getAgentDisplayName } from '@/lib/agents/id-canonicalization';
 import { createTaskNotification } from './notifications';
 
 // Base task interface - updated to match current DB schema
@@ -66,8 +67,8 @@ export interface AgentTaskExecution {
 }
 
 export interface CreateAgentTaskInput {
-  agent_id: string;
-  agent_name: string;
+  agent_id?: string;
+  agent_name?: string;
   agent_avatar?: string;
   title: string;
   description: string;
@@ -88,11 +89,17 @@ export interface CreateAgentTaskInput {
 // Task update input
 export interface UpdateAgentTaskInput {
   status?: 'pending' | 'scheduled' | 'running' | 'completed' | 'failed' | 'cancelled';
-  result_data?: Record<string, any>;
-  error_message?: string;
-  execution_time_ms?: number;
+  result_data?: Record<string, any> | null;
+  error_message?: string | null;
+  execution_time_ms?: number | null;
   retry_count?: number;
   notification_sent?: boolean;
+  notification_sent_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  last_run_at?: string | null;
+  last_retry_at?: string | null;
+  next_run_at?: string | null;
 }
 
 // Filter options for listing tasks
@@ -154,9 +161,10 @@ export async function createAgentTask(
       return map[key] || '/img/agents/logocleo4.png'
     }
 
-    const avatarUrl = resolveAgentAvatar(taskData.agent_name, taskData.agent_avatar)
+    const DEFAULT_AGENT_ID = 'cleo-supervisor'
+    const rawAgentId = (taskData.agent_id || '').trim()
+    const fallbackAgentId = rawAgentId || DEFAULT_AGENT_ID
 
-    // Normalize agent_id to built-in IDs when applicable (avoids UUID vs static id mismatch)
     const builtinIdByName: Record<string, string> = {
       'cleo': 'cleo-supervisor',
       'emma': 'emma-ecommerce',
@@ -164,26 +172,29 @@ export async function createAgentTask(
       'peter': 'peter-financial',
       'toby': 'toby-technical',
       'apu': 'apu-support',
-  'wex': 'wex-intelligence'
+      'wex': 'wex-intelligence'
     }
     const normalizeAgentId = (id: string, name?: string) => {
-      // If already a known built-in id, keep it
       const knownIds = new Set(Object.values(builtinIdByName))
       if (knownIds.has(id)) return id
-      // If name maps to a built-in id, use it
+      const idKey = id.toLowerCase().trim()
+      if (idKey && builtinIdByName[idKey]) return builtinIdByName[idKey]
       const key = (name || '').toLowerCase().trim()
       if (key && builtinIdByName[key]) return builtinIdByName[key]
-      // Otherwise, return the original id (custom agents etc.)
       return id
     }
-    const normalizedAgentId = normalizeAgentId(taskData.agent_id, taskData.agent_name)
+
+    const rawAgentName = (taskData.agent_name || '').trim()
+    const normalizedAgentId = normalizeAgentId(fallbackAgentId, rawAgentName || undefined)
+    const agentName = rawAgentName || getAgentDisplayName(normalizedAgentId) || 'Cleo'
+    const avatarUrl = resolveAgentAvatar(agentName, taskData.agent_avatar)
 
     const { data, error } = await supabase
       .from('agent_tasks' as any)
       .insert({
         user_id: userId,
         agent_id: normalizedAgentId,
-        agent_name: taskData.agent_name,
+        agent_name: agentName,
         agent_avatar: avatarUrl,
         title: taskData.title,
         description: taskData.description,
@@ -597,7 +608,7 @@ export async function createTaskExecutionAdmin(
 
     const { data, error } = await supabase
       .from('agent_task_executions' as any)
-      .insert({ task_id: taskId, status: 'running' })
+        .insert({ task_id: taskId, status: 'running', execution_number: executionNumber })
       .select()
       .single();
 
@@ -664,7 +675,7 @@ export async function createTaskExecution(
 
     const { data, error } = await supabase
       .from('agent_task_executions' as any)
-      .insert({ task_id: taskId, status: 'running' })
+        .insert({ task_id: taskId, status: 'running', execution_number: executionNumber })
       .select()
       .single();
 

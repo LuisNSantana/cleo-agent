@@ -5,8 +5,21 @@
 
 import { getReadyScheduledTasksAdmin, updateAgentTaskAdmin, createTaskExecutionAdmin, updateTaskExecutionAdmin } from './tasks-db';
 import { executeAgentTask } from './task-executor';
-import { createTaskNotification } from './notifications';
 import type { AgentTask } from './tasks-db';
+
+function normalizeResultPayload(result: unknown): Record<string, any> {
+  if (result === null || result === undefined) return {};
+  if (typeof result === 'string') {
+    return { summary: result };
+  }
+  if (Array.isArray(result)) {
+    return { items: result };
+  }
+  if (typeof result === 'object') {
+    return { ...(result as Record<string, any>) };
+  }
+  return { value: result };
+}
 
 export interface SchedulerStats {
   tasksProcessed: number;
@@ -137,16 +150,23 @@ class AgentTaskScheduler {
    */
   private async processTask(task: AgentTask): Promise<void> {
     const startTime = Date.now();
+    const startedAt = new Date().toISOString();
     
     try {
       console.log(`🔄 Processing task: ${task.title} (${task.agent_name})`);
       this.stats.tasksProcessed++;
 
       // Update task status to running
-  await updateAgentTaskAdmin(task.task_id, { status: 'running' });
+	await updateAgentTaskAdmin(task.task_id, {
+        status: 'running',
+        started_at: startedAt,
+        last_run_at: startedAt,
+        error_message: null,
+        result_data: null
+      });
 
       // Create execution record
-  const executionResult = await createTaskExecutionAdmin(task.task_id, (task.retry_count || 0) + 1);
+      const executionResult = await createTaskExecutionAdmin(task.task_id, (task.retry_count || 0) + 1);
       if (!executionResult.success || !executionResult.execution) {
         throw new Error('Failed to create execution record');
       }
@@ -157,22 +177,35 @@ class AgentTaskScheduler {
         // Execute the task using the agent
         const result = await executeAgentTask(task);
         const executionTime = Date.now() - startTime;
+        const completedAt = result.execution_metadata?.end_time || new Date().toISOString();
+        const normalizedResult = normalizeResultPayload(result.result);
+        if (result.execution_metadata) {
+          normalizedResult.execution_metadata = result.execution_metadata;
+        }
+        const toolCalls = Array.isArray(result.tool_calls) ? result.tool_calls : [];
+        const agentMessages = Array.isArray(result.agent_messages) ? result.agent_messages : [];
 
         if (result.success) {
           // Update task as completed
           await updateAgentTaskAdmin(task.task_id, {
             status: 'completed',
-            result_data: result.result,
-            execution_time_ms: executionTime
+            result_data: normalizedResult,
+            execution_time_ms: executionTime,
+            completed_at: completedAt,
+            last_run_at: completedAt,
+            retry_count: task.retry_count || 0,
+            last_retry_at: null,
+            error_message: null
           });
 
           // Update execution record
           await updateTaskExecutionAdmin(execution.id, {
             status: 'completed',
-            result_data: result.result,
+            result_data: normalizedResult,
             execution_time_ms: executionTime,
-            tool_calls: result.tool_calls,
-            agent_messages: result.agent_messages
+            tool_calls: toolCalls,
+            agent_messages: agentMessages,
+            completed_at: completedAt
           });
 
           this.stats.tasksSucceeded++;
@@ -183,19 +216,25 @@ class AgentTaskScheduler {
 
       } catch (executionError) {
         const executionTime = Date.now() - startTime;
+        const finishedAt = new Date().toISOString();
+        const errorMessage = executionError instanceof Error ? executionError.message : 'Unknown error';
         
         // Update task as failed
-  await updateAgentTaskAdmin(task.task_id, {
+	await updateAgentTaskAdmin(task.task_id, {
           status: 'failed',
           retry_count: (task.retry_count || 0) + 1,
-          execution_time_ms: executionTime
+          execution_time_ms: executionTime,
+          error_message: errorMessage,
+          last_retry_at: finishedAt,
+          completed_at: finishedAt
         });
 
         // Update execution record
-  await updateTaskExecutionAdmin(execution.id, {
+	await updateTaskExecutionAdmin(execution.id, {
           status: 'failed',
-          error_message: executionError instanceof Error ? executionError.message : 'Unknown error',
-          execution_time_ms: executionTime
+          error_message: errorMessage,
+          execution_time_ms: executionTime,
+          completed_at: finishedAt
         });
 
         this.stats.tasksFailed++;

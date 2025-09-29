@@ -4,6 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createGuestServerClient } from '@/lib/supabase/server-guest';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getCurrentUserId } from '@/lib/server/request-context';
 import { Database, Json } from '@/types.d';
 
@@ -67,14 +69,27 @@ export async function createTaskNotification(
   notificationData: CreateNotificationInput
 ): Promise<{ success: boolean; notification?: TaskNotification; error?: string }> {
   try {
-    const supabase = await createClient();
+  let supabase: SupabaseClient<Database> | null = null;
+    let usingServiceRole = false;
+
+    try {
+      supabase = await createClient();
+    } catch (e) {
+      console.warn('⚠️ Falling back to service client for task notification:', e);
+    }
+
+    if (!supabase) {
+      supabase = await createGuestServerClient();
+      usingServiceRole = Boolean(supabase);
+    }
+
     if (!supabase) {
       return { success: false, error: 'Database not available' };
     }
 
     // Resolve user explicitly: prefer provided user_id, else use authenticated user
     let userId = notificationData.user_id;
-    if (!userId) {
+    if (!userId && !usingServiceRole) {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (!authError && user) {
         userId = user.id;
