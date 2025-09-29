@@ -1,8 +1,7 @@
 import { memo, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Download, Palette, Maximize2 } from "lucide-react"
+import { Download, Maximize2, Palette } from "lucide-react"
 
 interface GeneratedImageProps {
   imageUrl: string
@@ -89,112 +88,94 @@ export const GeneratedImage = memo(function GeneratedImage({
   }, [attempts])
 
   return (
-    <Card className="w-full max-w-lg mx-auto bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-2 border-purple-200 dark:border-purple-700">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-purple-800 dark:text-purple-200 flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            {title}
-          </CardTitle>
-          {(modelLabel || fallbackUsed) && (
-            <div className="flex items-center gap-2">
-              {modelLabel && (
-                <Badge variant="secondary" className="text-xs">
-                  {modelLabel}
-                </Badge>
-              )}
-              {fallbackUsed && (
-                <Badge
-                  variant="outline"
-                  className="text-xs border-amber-400 text-amber-700 dark:text-amber-200 dark:border-amber-500"
-                >
-                  Fallback activado
-                </Badge>
-              )}
-            </div>
+    <div className="mt-3 flex w-full justify-end">
+      <figure className="inline-flex max-w-[240px] sm:max-w-[280px] flex-col items-end gap-2 rounded-3xl bg-gradient-to-b from-white/80 via-white/60 to-white/45 px-3 py-3 text-right shadow-[0_18px_38px_-24px_rgba(15,23,42,0.55)] ring-1 ring-white/70 backdrop-blur-md dark:from-white/16 dark:via-white/12 dark:to-white/8 dark:ring-white/12">
+        <figcaption className="flex flex-col gap-1 text-sm font-medium text-slate-800 dark:text-slate-100">
+          <span>{title}</span>
+          {description && (
+            <span className="text-xs font-normal leading-snug text-muted-foreground">
+              {description}
+            </span>
           )}
-        </div>
-        {description && (
-          <p className="text-sm text-muted-foreground mt-1">
-            {description}
-          </p>
-        )}
-      </CardHeader>
-      
-      <CardContent className="p-0">
-        <div className="relative group">
+        </figcaption>
+
+        <div className="relative overflow-hidden rounded-2xl ring-1 ring-black/10 dark:ring-white/12">
           <img
             src={imageUrl}
             alt={title}
-            className="w-full h-auto rounded-lg transition-transform duration-200 group-hover:scale-[1.02]"
+            className="h-auto w-full rounded-2xl object-cover"
             loading="lazy"
           />
-          
-          {/* Overlay with actions on hover */}
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleOpenFullsize}
-              className="bg-white/90 hover:bg-white text-black"
-            >
-              <Maximize2 className="h-4 w-4 mr-1" />
-              View Full
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleDownload}
-              className="bg-white/90 hover:bg-white text-black"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-          </div>
         </div>
-      </CardContent>
-      
-      <CardFooter className="pt-3 pb-4">
-        <div className="flex flex-col gap-2 w-full text-xs text-muted-foreground">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {style && (
-                <span className="flex items-center gap-1">
-                  <Palette className="h-3 w-3" />
-                  {style}
-                </span>
-              )}
-              {formatDimensions() && <span>{formatDimensions()}</span>}
-            </div>
-            {(modelLabel || providerLabel) && (
-              <div className="text-right leading-tight">
-                {modelLabel && (
-                  <span className="block text-purple-700 dark:text-purple-300 font-medium">
-                    {fallbackUsed ? 'Resultado:' : 'Modelo:'} {modelLabel}
-                  </span>
-                )}
-                {providerLabel && (
-                  <span className="block text-[11px] text-muted-foreground">
-                    {fallbackUsed ? 'Proveedor de respaldo' : 'Proveedor'}: {providerLabel}
-                  </span>
-                )}
-                {fallbackUsed && failedAttemptsCount > 0 && (
-                  <span className="block text-[11px] text-muted-foreground mt-1">
-                    {failedAttemptsCount} intento{failedAttemptsCount === 1 ? '' : 's'} fallido{failedAttemptsCount === 1 ? '' : 's'} con FLUX antes del fallback.
-                  </span>
-                )}
-              </div>
+
+        {(style || formatDimensions()) && (
+          <div className="flex flex-wrap items-center justify-end gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+            {style && (
+              <span className="flex items-center gap-1">
+                <Palette className="h-3 w-3" />
+                {style}
+              </span>
+            )}
+            {formatDimensions() && (
+              <span>• {formatDimensions()}</span>
             )}
           </div>
+        )}
 
-          {usage && (
-            <div className="flex items-center justify-end text-purple-600 dark:text-purple-400">
-              {usage.remaining} imágenes disponibles hoy
-            </div>
-          )}
+        {(modelLabel || fallbackUsed || providerLabel) && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {modelLabel && (
+              <Badge className="bg-purple-100/70 px-2 py-0 text-[10px] font-medium uppercase tracking-wide text-purple-700 shadow-sm dark:bg-purple-500/15 dark:text-purple-200">
+                {modelLabel}
+              </Badge>
+            )}
+            {fallbackUsed && (
+              <Badge variant="outline" className="border-amber-400/70 bg-amber-50/70 px-2 py-0 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-300/60 dark:bg-amber-400/10 dark:text-amber-200">
+                Fallback
+              </Badge>
+            )}
+            {providerLabel && (
+              <span className="text-[11px] text-muted-foreground">
+                {providerLabel}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleOpenFullsize}
+            className="h-8 w-8 rounded-full bg-white/65 text-slate-700 hover:bg-white dark:bg-white/15 dark:text-slate-100"
+          >
+            <Maximize2 className="h-4 w-4" />
+            <span className="sr-only">Ver imagen en tamaño completo</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDownload}
+            className="h-8 w-8 rounded-full bg-white/65 text-slate-700 hover:bg-white dark:bg-white/15 dark:text-slate-100"
+          >
+            <Download className="h-4 w-4" />
+            <span className="sr-only">Descargar imagen</span>
+          </Button>
         </div>
-      </CardFooter>
-    </Card>
+
+        {fallbackUsed && failedAttemptsCount > 0 && (
+          <div className="text-[10px] leading-tight text-muted-foreground">
+            {failedAttemptsCount} intento{failedAttemptsCount === 1 ? '' : 's'} fallido{failedAttemptsCount === 1 ? '' : 's'} antes del fallback.
+          </div>
+        )}
+
+        {usage && (
+          <div className="text-[10px] font-medium uppercase tracking-wide text-purple-600/80 dark:text-purple-300/80">
+            {usage.remaining} imágenes restantes hoy
+          </div>
+        )}
+      </figure>
+    </div>
   )
 })
 

@@ -9,6 +9,7 @@ import { detectEarlyIntent, type RouterDirective } from '@/lib/agents/router'
 import { trackFeatureUsage } from '@/lib/analytics'
 import { makeDelegationDecision, analyzeTaskComplexity } from '@/lib/agents/complexity-scorer'
 import type { AgentConfig } from '@/lib/agents/types'
+import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
 
 // Build a dynamic internal hint to steer delegation without exposing it to the user
 async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective) {
@@ -18,6 +19,20 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
 🎯 ZERO OVERLAP: Each agent specialized (Ami=admin, Apu=research, Peter=creation, Emma=ecommerce)
 🔧 SUB-AGENTS: Hyper-specialized (Astra=email, Notion Agent=workspace)
 � PERFORMANCE: ~80% latency reduction for simple queries, better accuracy for complex`
+
+  // Image-specific optimization: handle quick prompts without delegation
+  if (userMessage) {
+    const imageIntent = detectImageGenerationIntent(userMessage)
+    if (imageIntent.shouldGenerate) {
+      return `${base}
+
+🖼️ IMAGE MODE ACTIVE:
+- This request is an image generation prompt handled by the built-in Image Studio.
+- Do NOT delegate to Astra or any other agent for this.
+- Acknowledge the generated image with a concise, vivid caption (<=2 sentences) once it is ready.
+- If generation fails, apologize briefly and ask whether the user wants to retry or adjust the prompt.`
+    }
+  }
   
   // Use enhanced complexity-based analyzer if we have a user message
   if (userMessage && !recommended) {
@@ -507,7 +522,7 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
   const capabilityInfo = `\n\nAGENT SPECIALIZATION & DELEGATION RULES
 - Peter (delegate_to_peter): ONLY for Google Docs/Sheets/Slides creation. Do NOT delegate to Peter for email, calendar, general tasks, or anything outside Google Workspace document creation.
 - Ami (delegate_to_ami): General organization, scheduling, email management, file management, and research. Handles Gmail, Calendar, Drive files, and administrative tasks.
-- Astra (delegate_to_astra): Creative writing, content creation, social media posts, image generation, and design tasks.
+- Astra (delegate_to_astra): Long-form email drafting/sending and complex communication workflows. For simple image prompts, stay in the main chat, rely on the built-in image generator, and respond with a short caption instead of delegating.
 - Before delegating: Consider if you can handle the task directly with your available tools. Only delegate when the specialist agent has unique capabilities or access.
 - Agent visibility: Each agent can see their own tools, tags, and specializations when making delegation decisions.`
   
