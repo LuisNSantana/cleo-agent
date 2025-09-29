@@ -1,11 +1,11 @@
-import { memo, useEffect, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import { GeneratedImage } from "./generated-image"
-import { useImageGeneration } from "@/hooks/use-image-generation"
+import { GeneratedImageData, useImageGeneration } from "@/hooks/use-image-generation"
 
 interface ImageGenerationHandlerProps {
   message: string
   userId?: string
-  onImageGenerated?: (imageData: any) => void
+  onImageGenerated?: (imageData: GeneratedImageData) => void
 }
 
 export const ImageGenerationHandler = memo(function ImageGenerationHandler({
@@ -13,8 +13,8 @@ export const ImageGenerationHandler = memo(function ImageGenerationHandler({
   userId,
   onImageGenerated
 }: ImageGenerationHandlerProps) {
-  const [hasAttempted, setHasAttempted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const processedMessageRef = useRef<string | null>(null)
   
   const {
     isGenerating,
@@ -26,25 +26,42 @@ export const ImageGenerationHandler = memo(function ImageGenerationHandler({
   })
 
   useEffect(() => {
-    // Prevent multiple attempts for the same message
-    if (hasAttempted) return
-    
+    if (!message?.trim()) {
+      processedMessageRef.current = null
+      if (error) setError(null)
+      return
+    }
+
+    if (processedMessageRef.current === message) {
+      return
+    }
+
+    processedMessageRef.current = message
+    setError(null)
+
+    let isActive = true
+
     const processMessage = async () => {
       try {
-        setError(null)
-        setHasAttempted(true)
-        
-        const result = await handleAutoGeneration(message)
-        if (result.handled) {
-          if (result.result?.success) {
-            console.log('✅ Image generated:', result.result.result)
-          } else if (result.result?.error) {
-            // Set error state to show user-friendly message
-            setError(result.result.error)
-            console.error('❌ Image generation failed:', result.result.error)
-          }
+        const autoResult = await handleAutoGeneration(message)
+
+        if (!isActive || !autoResult.handled) {
+          return
+        }
+
+        const generation = autoResult.result
+        if (!generation) {
+          return
+        }
+
+        if (generation.success && generation.result) {
+          console.log('✅ Image generated:', generation.result.title)
+        } else if (generation.error) {
+          setError(generation.error)
+          console.error('❌ Image generation failed:', generation.error)
         }
       } catch (error) {
+        if (!isActive) return
         const errorMessage = error instanceof Error ? error.message : 'Failed to generate image'
         setError(errorMessage)
         console.error('❌ Image generation error:', error)
@@ -52,13 +69,11 @@ export const ImageGenerationHandler = memo(function ImageGenerationHandler({
     }
 
     processMessage()
-  }, [message, handleAutoGeneration, hasAttempted])
 
-  // Reset state when message changes (new image request)
-  useEffect(() => {
-    setHasAttempted(false)
-    setError(null)
-  }, [message])
+    return () => {
+      isActive = false
+    }
+  }, [message, handleAutoGeneration])
 
   if (error) {
     return (
@@ -84,9 +99,12 @@ export const ImageGenerationHandler = memo(function ImageGenerationHandler({
     return (
       <div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-        <span className="text-purple-700 dark:text-purple-300">
-          Generating image...
-        </span>
+        <div className="flex flex-col text-purple-700 dark:text-purple-300 text-sm">
+          <span className="font-medium">Generando imagen con FLUX Pro…</span>
+          <span className="text-xs text-purple-500 dark:text-purple-300/80">
+            Si falla, usaremos OpenAI gpt-image-1 automáticamente.
+          </span>
+        </div>
       </div>
     )
   }
@@ -99,6 +117,10 @@ export const ImageGenerationHandler = memo(function ImageGenerationHandler({
         description={lastGenerated.description}
         style={lastGenerated.style}
         dimensions={lastGenerated.dimensions}
+        model={lastGenerated.canonicalModel || lastGenerated.model}
+        fallbackUsed={lastGenerated.fallbackUsed}
+        usage={lastGenerated.usage ?? undefined}
+        attempts={lastGenerated.attempts}
       />
     )
   }

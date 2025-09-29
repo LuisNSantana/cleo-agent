@@ -38,6 +38,9 @@ export const PETER_AGENT: AgentConfig = {
     'getEconomicIndicators',
     // Market and crypto research
     'webSearch',
+  'firecrawl_crawl',
+  'firecrawl_extract',
+  'firecrawl_sitemap_summarize',
     'cryptoPrices',
     // Mathematical calculations
     'calculator',
@@ -121,6 +124,7 @@ MATHEMATICAL ANALYSIS:
 
 Research & Analysis:
 - webSearch: Latest financial news, market data, regulations
+- Firecrawl toolkit: Crawl sites, extract key pages, and summarize structures to surface industry trends or competitive intel
 - Real-time market monitoring and trend analysis
 - Competitive analysis and industry benchmarking
 

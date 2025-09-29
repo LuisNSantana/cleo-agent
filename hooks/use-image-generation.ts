@@ -19,7 +19,7 @@ setInterval(() => {
 
 import { detectImageGenerationIntent } from "@/lib/image-generation/intent-detection"
 
-interface GeneratedImageData {
+export interface GeneratedImageData {
   imageUrl: string
   title: string
   description: string
@@ -28,16 +28,39 @@ interface GeneratedImageData {
     width: number
     height: number
   }
-}
-
-interface ImageGenerationResult {
-  success: boolean
-  result?: GeneratedImageData
   model?: string
+  canonicalModel?: string
+  fallbackUsed?: boolean
+  attempts?: Array<{
+    model: string
+    provider: string
+    success: boolean
+    ms: number
+    error?: string
+  }>
   usage?: {
     userId: string
     remaining: number
-  }
+  } | null
+}
+
+export interface ImageGenerationResult {
+  success: boolean
+  result?: GeneratedImageData
+  model?: string
+  canonicalModel?: string
+  fallbackUsed?: boolean
+  attempts?: Array<{
+    model: string
+    provider: string
+    success: boolean
+    ms: number
+    error?: string
+  }>
+  usage?: {
+    userId: string
+    remaining: number
+  } | null
   error?: string
   limitReached?: boolean
   limit?: number
@@ -116,7 +139,8 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
         },
         body: JSON.stringify({
           prompt,
-          userId
+          userId,
+          modelVariant: 'flux-pro'
         }),
         // Add timeout to prevent hanging requests - 120 seconds for image generation
         signal: AbortSignal.timeout(120000) // 120 seconds timeout
@@ -140,16 +164,32 @@ export function useImageGeneration({ userId, onImageGenerated }: UseImageGenerat
       }
 
       if (data.success && data.result) {
-        setLastGenerated(data.result)
-        onImageGenerated?.(data.result)
+        const formattedResult: GeneratedImageData = {
+          ...data.result,
+          model: data.model,
+          canonicalModel: data.canonicalModel,
+          fallbackUsed: data.fallbackUsed,
+          attempts: data.attempts,
+          usage: data.usage ?? null
+        }
+
+        setLastGenerated(formattedResult)
+        onImageGenerated?.(formattedResult)
         
-        showToast("Image Generated!", `Successfully created: ${data.result.title}`)
+        const successLabel = formattedResult.fallbackUsed
+          ? 'Fallback image generated via OpenAI'
+          : 'Image generated with FLUX Pro'
+
+        showToast("Image Generated!", `${successLabel}: ${formattedResult.title}`)
 
         return {
           success: true,
-          result: data.result,
+          result: formattedResult,
           model: data.model,
-          usage: data.usage
+          canonicalModel: data.canonicalModel,
+          fallbackUsed: data.fallbackUsed,
+          attempts: data.attempts,
+          usage: data.usage ?? null
         }
       } else {
         throw new Error('Invalid response from image generation service')

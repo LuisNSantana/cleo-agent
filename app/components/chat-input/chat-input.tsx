@@ -23,7 +23,7 @@ import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { useInteractiveCanvasStore } from "@/lib/interactive-canvas/store"
 import { PencilSimple } from "@phosphor-icons/react"
-import ToolConfirmationIndicator from "@/components/chat/tool-confirmation-indicator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ChatInputProps = {
   value: string
@@ -303,6 +303,16 @@ export function ChatInput({
             hasImages={files.some(isImageFile)} 
             onSuggestionAction={onSuggestionAction} 
           />
+
+          {imageMode && (
+            <div className="mx-3 mb-2 flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs text-purple-700 shadow-sm dark:border-purple-700 dark:bg-purple-900/30 dark:text-purple-200">
+              <Sparkle className="mt-0.5 size-4 flex-shrink-0" weight="fill" />
+              <div className="flex-1 leading-snug">
+                <span className="block text-sm font-semibold">Modo imagen activado</span>
+                Describe la escena, estilo o iluminación y Cleo la generará con FLUX Pro. Si falla, se intentará automáticamente con OpenAI gpt-image-1.
+              </div>
+            </div>
+          )}
           
           <PromptInputTextarea
             placeholder={imageMode ? "Describe la imagen que quieres generar (estilo, iluminación, composición)..." : (placeholder || "Ask Cleo")}
@@ -313,17 +323,34 @@ export function ChatInput({
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={imageMode ? 'secondary' : 'outline'}
-                className="size-9 p-0 rounded-full"
-                type="button"
-                aria-label="Toggle image generation mode"
-                aria-pressed={imageMode}
-                onClick={() => setImageMode(m => !m)}
-              >
-                <ImageSquare className="size-4" />
-              </Button>
+              <TooltipProvider delayDuration={120}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={imageMode ? 'secondary' : 'outline'}
+                      className="size-9 p-0 rounded-full"
+                      type="button"
+                      aria-label="Toggle image generation mode"
+                      aria-pressed={imageMode}
+                      onClick={() => setImageMode((mode) => !mode)}
+                    >
+                      <ImageSquare className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {imageMode
+                      ? "Modo imagen activo: el botón de envío generará la imagen"
+                      : "Activa el modo imagen (FLUX Pro con fallback OpenAI)"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {imageMode && (
+                <div className="hidden md:flex items-center gap-2 rounded-full border border-purple-200/80 bg-purple-50/80 px-3 py-1 text-xs font-medium text-purple-700 dark:border-purple-700/70 dark:bg-purple-900/30 dark:text-purple-200">
+                  <Sparkle className="size-4" weight="fill" />
+                  FLUX Pro listo
+                </div>
+              )}
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
@@ -389,7 +416,7 @@ export function ChatInput({
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
-                aria-label={status === "streaming" ? "Stop" : "Send message"}
+                aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
               >
                 {status === 'streaming' ? (
                   <CircleNotch className="size-4 animate-spin" />

@@ -27,6 +27,7 @@ import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
 import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
 import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
 import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
@@ -1059,35 +1060,209 @@ export async function POST(req: Request) {
             let lastStepCount = 0
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
+            const runtimeConfig = getRuntimeConfig()
             const POLL_MS = 400
-            const MAX_POLL_TIME = 60000 // Maximum polling time: 60 seconds
+            const supervisorLimitMs = Math.max(
+              runtimeConfig?.maxExecutionMsSupervisor ?? 300000,
+              runtimeConfig?.delegationTimeoutMs ?? 300000
+            )
+            const extensionAllowanceMs = Math.max(runtimeConfig?.delegationMaxExtensionMs ?? 0, 0)
+            const MAX_POLL_TIME = Math.max(60000, supervisorLimitMs + extensionAllowanceMs + 10000)
+            const HUNG_WARNING_THRESHOLD = Math.max(
+              45000,
+              Math.min(MAX_POLL_TIME - 10000, Math.floor(supervisorLimitMs * 0.5))
+            )
             const pollStartTime = Date.now()
+            let hungWarningSent = false
+            let pollInterval: ReturnType<typeof setInterval> | null = null
+            let streamClosed = false
 
-            const interval = setInterval(async () => {
-              // Add timeout protection to prevent infinite loops
-              if (Date.now() - pollStartTime > MAX_POLL_TIME) {
-                console.warn('⚠️ [POLLING] Maximum polling time reached, stopping polling')
-                clearInterval(interval)
+            const stopPolling = () => {
+              if (pollInterval) {
+                clearInterval(pollInterval)
+                pollInterval = null
+              }
+            }
+
+            const closeStream = () => {
+              if (streamClosed) return
+              streamClosed = true
+              stopPolling()
+              clearPipelineEventController()
+              try { controller.close() } catch {}
+            }
+
+            const computeFinalText = (snapshot: any) => {
+              let finalText = ''
+              try {
+                if (!snapshot) {
+                  return 'Task completed successfully'
+                }
+
+                if (snapshot.status === 'failed') {
+                  finalText = `Could not complete delegation: ${snapshot?.error || 'unknown error'}`
+                } else {
+                  if (snapshot?.result && typeof snapshot.result === 'string' && snapshot.result.trim()) {
+                    finalText = String(snapshot.result).trim()
+                    console.log('🔍 [PIPELINE DEBUG] Using snapshot.result:', finalText.slice(0, 100))
+                  } else if (snapshot?.messages && Array.isArray(snapshot.messages) && snapshot.messages.length > 0) {
+                    const lastAssistantMessage = [...snapshot.messages].reverse().find((msg: any) =>
+                      msg?.role === 'assistant' && msg?.content && String(msg.content).trim().length > 50
+                    )
+                    if (lastAssistantMessage?.content) {
+                      finalText = String(lastAssistantMessage.content).trim()
+                      console.log('🔍 [PIPELINE DEBUG] Using assistant message:', finalText.slice(0, 100))
+                    } else {
+                      const lastMessage = snapshot.messages[snapshot.messages.length - 1]
+                      if (lastMessage?.content && String(lastMessage.content).trim().length > 10) {
+                        finalText = String(lastMessage.content).trim()
+                        console.log('🔍 [PIPELINE DEBUG] Using last message:', finalText.slice(0, 100))
+                      }
+                    }
+                  }
+
+                  if (finalText === 'Enhanced unified fallback response' || finalText.length < 50) {
+                    console.log('🔍 [PIPELINE DEBUG] Detected generic fallback, looking for actual delegation result')
+                    if (snapshot?.messages && Array.isArray(snapshot.messages)) {
+                      const allMessages = snapshot.messages
+                      const substantialMessage = allMessages.find((msg: any) =>
+                        msg?.content &&
+                        String(msg.content).length > 100 &&
+                        !String(msg.content).includes('Enhanced unified fallback')
+                      )
+                      if (substantialMessage?.content) {
+                        finalText = String(substantialMessage.content).trim()
+                        console.log('🔍 [PIPELINE DEBUG] Found substantial content:', finalText.slice(0, 100))
+                      }
+                    }
+                  }
+                }
+
+                if (!finalText || finalText.trim().length === 0) {
+                  finalText = 'Task completed successfully'
+                }
+
+                console.log('🔍 [PIPELINE DEBUG] Final text extraction:', {
+                  status: snapshot?.status,
+                  messagesCount: snapshot?.messages?.length || 0,
+                  hasResult: !!snapshot?.result,
+                  resultPreview: snapshot?.result ? String(snapshot.result).slice(0, 50) : 'none',
+                  finalTextLength: finalText.length,
+                  finalTextPreview: finalText.slice(0, 100) + (finalText.length > 100 ? '...' : '')
+                })
+              } catch (err) {
+                console.error('❌ [PIPELINE DEBUG] Final text extraction failed:', err)
+                finalText = 'Response processing completed'
+              }
+              return finalText
+            }
+
+            const finalizeHungExecution = async (snapshot: any) => {
+              if (streamClosed) return
+              stopPolling()
+              const elapsedMs = Date.now() - pollStartTime
+              console.warn('⚠️ [POLLING] Delegation exceeded max polling time, finalizing with fallback:', {
+                executionId: execId,
+                elapsedMs,
+                status: snapshot?.status,
+                stepsCount: snapshot?.steps?.length || 0
+              })
+
+              const extracted = snapshot ? computeFinalText(snapshot) : ''
+              const fallbackText = extracted && extracted !== 'Task completed successfully'
+                ? `La delegación tardó más de ${Math.round(elapsedMs / 1000)} segundos. Comparto el resultado parcial obtenido:\n\n${extracted}`
+                : `La delegación tardó más de ${Math.round(elapsedMs / 1000)} segundos y se canceló automáticamente. Intenta dividir la solicitud o vuelve a ejecutarla.`
+
+              const timeoutStep = {
+                id: `timeout-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                agent: 'cleo',
+                action: 'reviewing' as const,
+                content: 'Cleo detuvo la delegación porque superó el tiempo máximo permitido.',
+                metadata: {
+                  synthetic: true,
+                  pipelineStep: true,
+                  timeout: true,
+                  elapsedMs,
+                  maxPollTimeMs: MAX_POLL_TIME
+                }
+              }
+              send({ type: 'execution-step', step: timeoutStep })
+              try { persistedParts.push({ type: 'execution-step', step: timeoutStep }) } catch {}
+
+              send({ type: 'text-start' })
+              send({ type: 'text-delta', delta: fallbackText })
+              send({ type: 'finish', error: 'execution-timeout' })
+
+              if (supabase) {
+                try {
+                  const fullMessage = [
+                    { type: 'text', text: fallbackText },
+                    ...persistedParts
+                  ]
+                  await storeAssistantMessage({
+                    supabase,
+                    chatId,
+                    messages: [{ role: 'assistant', content: fullMessage }] as any,
+                    message_group_id,
+                    model: 'agents:cleo-supervised',
+                    userId: realUserId!,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    responseTimeMs: Math.max(0, Date.now() - startedAt)
+                  })
+                } catch {}
+              }
+
+              try {
+                if (execId && typeof orchestrator.cancelExecution === 'function') {
+                  await orchestrator.cancelExecution(execId)
+                }
+              } catch {}
+
+              closeStream()
+            }
+
+            pollInterval = setInterval(async () => {
+              if (streamClosed) {
+                stopPolling()
                 return
               }
+
+              const elapsedMs = Date.now() - pollStartTime
+
               try {
                 const snapshot = execId ? orchestrator.getExecution?.(execId) : null
-                if (!snapshot) return
 
-                // Check for hung executions (running for >30 seconds without status change)
-                if (snapshot.status === 'running') {
-                  const executionAge = Date.now() - pollStartTime
-                  if (executionAge > 30000) { // 30 seconds
-                    console.warn('⚠️ [POLLING] Execution appears to be hung, attempting to complete:', {
-                      executionId: execId,
-                      age: executionAge,
-                      status: snapshot.status,
-                      stepsCount: snapshot.steps?.length || 0
-                    })
-                    // Stop polling for hung executions
-                    clearInterval(interval)
-                    return
+                if (!snapshot) {
+                  if (elapsedMs > MAX_POLL_TIME) {
+                    await finalizeHungExecution(null)
                   }
+                  return
+                }
+
+                if (elapsedMs > MAX_POLL_TIME) {
+                  await finalizeHungExecution(snapshot)
+                  return
+                }
+
+                if (snapshot.status === 'running' && !hungWarningSent && elapsedMs > HUNG_WARNING_THRESHOLD) {
+                  hungWarningSent = true
+                  const warningStep = {
+                    id: `warning-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    agent: 'cleo',
+                    action: 'reviewing' as const,
+                    content: 'Delegación en curso… está tardando más de lo habitual.',
+                    metadata: {
+                      synthetic: true,
+                      pipelineStep: true,
+                      warning: true,
+                      elapsedMs
+                    }
+                  }
+                  send({ type: 'execution-step', step: warningStep })
+                  try { persistedParts.push({ type: 'execution-step', step: warningStep }) } catch {}
                 }
 
                 // Stream new steps as execution-step events
@@ -1165,74 +1340,9 @@ export async function POST(req: Request) {
                     hasError: !!snapshot?.error,
                     snapshotKeys: Object.keys(snapshot || {})
                   })
-                  
-                  // Extract final text from execution snapshot
-                  let finalText = ''
-                  try {
-                    if (snapshot.status === 'failed') {
-                      finalText = `Could not complete delegation: ${snapshot?.error || 'unknown error'}`
-                    } else {
-                      // Priority 1: Use snapshot.result if available (for unified execution results)
-                      if (snapshot?.result && typeof snapshot.result === 'string' && snapshot.result.trim()) {
-                        finalText = String(snapshot.result).trim()
-                        console.log('🔍 [PIPELINE DEBUG] Using snapshot.result:', finalText.slice(0, 100))
-                      }
-                      // Priority 2: Extract from messages array if no result or result is generic fallback
-                      else if (snapshot?.messages && Array.isArray(snapshot.messages) && snapshot.messages.length > 0) {
-                        // Find the last assistant message with substantial content
-                        const lastAssistantMessage = [...snapshot.messages].reverse().find((msg: any) => 
-                          msg?.role === 'assistant' && msg?.content && String(msg.content).trim().length > 50
-                        )
-                        if (lastAssistantMessage?.content) {
-                          finalText = String(lastAssistantMessage.content).trim()
-                          console.log('🔍 [PIPELINE DEBUG] Using assistant message:', finalText.slice(0, 100))
-                        } else {
-                          // Fallback: use the last message content regardless of role
-                          const lastMessage = snapshot.messages[snapshot.messages.length - 1]
-                          if (lastMessage?.content && String(lastMessage.content).trim().length > 10) {
-                            finalText = String(lastMessage.content).trim()
-                            console.log('🔍 [PIPELINE DEBUG] Using last message:', finalText.slice(0, 100))
-                          }
-                        }
-                      }
-                      
-                      // If result is generic fallback, try to get actual delegation result
-                      if (finalText === 'Enhanced unified fallback response' || finalText.length < 50) {
-                        console.log('🔍 [PIPELINE DEBUG] Detected generic fallback, looking for actual delegation result')
-                        // Check if there are tool results or delegation completion data
-                        if (snapshot?.messages && Array.isArray(snapshot.messages)) {
-                          const allMessages = snapshot.messages
-                          const substantialMessage = allMessages.find((msg: any) => 
-                            msg?.content && 
-                            String(msg.content).length > 100 && 
-                            !String(msg.content).includes('Enhanced unified fallback')
-                          )
-                          if (substantialMessage?.content) {
-                            finalText = String(substantialMessage.content).trim()
-                            console.log('🔍 [PIPELINE DEBUG] Found substantial content:', finalText.slice(0, 100))
-                          }
-                        }
-                      }
-                    }
-                    
-                    // Final fallback if no content found
-                    if (!finalText || finalText.trim().length === 0) {
-                      finalText = 'Task completed successfully'
-                    }
-                    
-                    // Log extraction details for debugging
-                    console.log('🔍 [PIPELINE DEBUG] Final text extraction:', {
-                      status: snapshot.status,
-                      messagesCount: snapshot?.messages?.length || 0,
-                      hasResult: !!snapshot?.result,
-                      resultPreview: snapshot?.result ? String(snapshot.result).slice(0, 50) : 'none',
-                      finalTextLength: finalText.length,
-                      finalTextPreview: finalText.slice(0, 100) + (finalText.length > 100 ? '...' : '')
-                    })
-                  } catch (err) {
-                    console.error('❌ [PIPELINE DEBUG] Final text extraction failed:', err)
-                    finalText = 'Response processing completed'
-                  }
+
+                  stopPolling()
+                  const finalText = computeFinalText(snapshot)
 
                   // Generate Cleo supervision step before final completion
                   const supervisionStep = {
@@ -1333,18 +1443,15 @@ export async function POST(req: Request) {
                     } catch {}
                   }
 
-                  clearInterval(interval)
-                  // Clean up pipeline event controller
-                  clearPipelineEventController()
-                  try { controller.close() } catch {}
+                  closeStream()
+                  return
                 }
               } catch (err) {
                 // Emit error and close
-                try { send({ type: 'finish', error: 'execution-bridge-failed' }) } catch {}
-                clearInterval(interval)
-                // Clean up pipeline event controller on error
-                clearPipelineEventController()
-                try { controller.close() } catch {}
+                if (!streamClosed) {
+                  try { send({ type: 'finish', error: 'execution-bridge-failed' }) } catch {}
+                }
+                closeStream()
               }
             }, POLL_MS)
           },

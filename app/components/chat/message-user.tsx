@@ -243,7 +243,7 @@ export function MessageUser({
           
           {/* Render text content */}
           <MessageContent
-            className="relative max-w-[72%] rounded-3xl px-4 py-2 text-stone-900 dark:text-stone-100 shadow-[0_4px_14px_-10px_rgba(0,0,0,0.28)] ring-0 backdrop-blur-0 border bg-gradient-to-b from-amber-50/95 to-stone-50/95 dark:bg-gradient-to-b dark:from-stone-800/70 dark:to-stone-700/60 border-amber-100/70 dark:border-stone-600/60"
+            className="relative isolate max-w-[72%] rounded-[26px] px-5 py-3 text-stone-900 dark:text-stone-100 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.6)] bg-gradient-to-b from-white/85 via-white/70 to-white/55 dark:from-white/16 dark:via-white/12 dark:to-white/8 border border-white/60 dark:border-white/10 ring-1 ring-white/70 dark:ring-white/10 backdrop-blur-md supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:bg-white/40 supports-[backdrop-filter]:dark:bg-white/10"
             markdown={false}
             ref={contentRef}
           >

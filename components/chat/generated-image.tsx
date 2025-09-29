@@ -1,8 +1,8 @@
-import { memo } from "react"
+import { memo, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Download, Palette, Maximize2, ExternalLink } from "lucide-react"
+import { Download, Palette, Maximize2 } from "lucide-react"
 
 interface GeneratedImageProps {
   imageUrl: string
@@ -14,6 +14,14 @@ interface GeneratedImageProps {
     height: number
   }
   model?: string
+  fallbackUsed?: boolean
+  attempts?: Array<{
+    model: string
+    provider: string
+    success: boolean
+    ms: number
+    error?: string
+  }>
   usage?: {
     userId: string
     remaining: number
@@ -27,6 +35,8 @@ export const GeneratedImage = memo(function GeneratedImage({
   style,
   dimensions,
   model,
+  fallbackUsed,
+  attempts,
   usage
 }: GeneratedImageProps) {
   const handleDownload = async () => {
@@ -57,6 +67,27 @@ export const GeneratedImage = memo(function GeneratedImage({
     return `${dimensions.width} × ${dimensions.height}`
   }
 
+  const modelLabel = useMemo(() => {
+    if (!model) return null
+    const core = model.replace(/^.*?:/, '')
+    if (/gpt-image-1/i.test(core)) return "gpt-image-1"
+    if (/flux-pro/i.test(core)) return "FLUX Pro"
+    if (/flux-1-schnell/i.test(core)) return "FLUX Schnell"
+    return core
+  }, [model])
+
+  const providerLabel = useMemo(() => {
+    if (!model) return null
+    if (model.startsWith('openai')) return 'OpenAI'
+    if (model.startsWith('deepinfra')) return 'DeepInfra'
+    return 'AI'
+  }, [model])
+
+  const failedAttemptsCount = useMemo(() => {
+    if (!attempts?.length) return 0
+    return attempts.filter(attempt => !attempt.success).length
+  }, [attempts])
+
   return (
     <Card className="w-full max-w-lg mx-auto bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-2 border-purple-200 dark:border-purple-700">
       <CardHeader className="pb-3">
@@ -65,10 +96,22 @@ export const GeneratedImage = memo(function GeneratedImage({
             <Palette className="h-5 w-5" />
             {title}
           </CardTitle>
-          {model && (
-            <Badge variant="secondary" className="text-xs">
-              {model.includes('gemini') ? 'Gemini' : model.split(':')[1]?.split('/')[1] || 'AI'}
-            </Badge>
+          {(modelLabel || fallbackUsed) && (
+            <div className="flex items-center gap-2">
+              {modelLabel && (
+                <Badge variant="secondary" className="text-xs">
+                  {modelLabel}
+                </Badge>
+              )}
+              {fallbackUsed && (
+                <Badge
+                  variant="outline"
+                  className="text-xs border-amber-400 text-amber-700 dark:text-amber-200 dark:border-amber-500"
+                >
+                  Fallback activado
+                </Badge>
+              )}
+            </div>
           )}
         </div>
         {description && (
@@ -112,24 +155,41 @@ export const GeneratedImage = memo(function GeneratedImage({
       </CardContent>
       
       <CardFooter className="pt-3 pb-4">
-        <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
-          <div className="flex items-center gap-3">
-            {style && (
-              <span className="flex items-center gap-1">
-                <Palette className="h-3 w-3" />
-                {style}
-              </span>
-            )}
-            {formatDimensions() && (
-              <span>{formatDimensions()}</span>
+        <div className="flex flex-col gap-2 w-full text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {style && (
+                <span className="flex items-center gap-1">
+                  <Palette className="h-3 w-3" />
+                  {style}
+                </span>
+              )}
+              {formatDimensions() && <span>{formatDimensions()}</span>}
+            </div>
+            {(modelLabel || providerLabel) && (
+              <div className="text-right leading-tight">
+                {modelLabel && (
+                  <span className="block text-purple-700 dark:text-purple-300 font-medium">
+                    {fallbackUsed ? 'Resultado:' : 'Modelo:'} {modelLabel}
+                  </span>
+                )}
+                {providerLabel && (
+                  <span className="block text-[11px] text-muted-foreground">
+                    {fallbackUsed ? 'Proveedor de respaldo' : 'Proveedor'}: {providerLabel}
+                  </span>
+                )}
+                {fallbackUsed && failedAttemptsCount > 0 && (
+                  <span className="block text-[11px] text-muted-foreground mt-1">
+                    {failedAttemptsCount} intento{failedAttemptsCount === 1 ? '' : 's'} fallido{failedAttemptsCount === 1 ? '' : 's'} con FLUX antes del fallback.
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          
+
           {usage && (
-            <div className="flex items-center gap-1">
-              <span className="text-purple-600 dark:text-purple-400">
-                {usage.remaining} images remaining today
-              </span>
+            <div className="flex items-center justify-end text-purple-600 dark:text-purple-400">
+              {usage.remaining} imágenes disponibles hoy
             </div>
           )}
         </div>
