@@ -470,3 +470,77 @@ img {
 .animate-accordion-up {
   animation: accordion-up 0.2s ease-out;
 }
+
+/* ====================================================================
+   PREMIUM TYPOGRAPHY OPTIMIZATIONS
+   Geist Sans/Mono fine-tuning for optimal readability
+   ==================================================================== */
+
+/* Body text optimization */
+body {
+  font-family: var(--font-geist-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+}
+
+/* Headings - more expressive with tighter spacing */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-weight: 600;
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+}
+
+h1 { font-size: clamp(1.875rem, 4vw, 2.5rem); letter-spacing: -0.025em; }
+h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.022em; }
+h3 { font-size: clamp(1.25rem, 2.5vw, 1.5rem); letter-spacing: -0.02em; }
+
+/* Body text - optimal readability */
+p, li, td {
+  line-height: 1.6;
+  letter-spacing: -0.008em;
+}
+
+/* Small text refinement */
+.text-xs, .text-sm {
+  letter-spacing: -0.006em;
+}
+
+/* Code blocks - monospace optimization */
+code, pre, kbd {
+  font-family: var(--font-geist-mono);
+  font-feature-settings: "liga" 0, "calt" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Button text - slightly bolder */
+button, .btn {
+  font-feature-settings: "rlig" 1, "calt" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Input text */
+input, textarea {
+  font-feature-settings: "rlig" 1, "calt" 1;
+  letter-spacing: -0.008em;
+}
+
+/* Labels - uppercase tracking */
+label, .label-text {
+  letter-spacing: 0.01em;
+}
+
+/* Sidebar navigation - refined */
+[data-sidebar] {
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+
+/* Chat messages - optimal reading */
+[data-message-content] {
+  line-height: 1.65;
+  letter-spacing: -0.009em;
+}

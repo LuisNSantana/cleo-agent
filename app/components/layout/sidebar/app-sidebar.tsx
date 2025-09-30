@@ -36,12 +36,12 @@ import {
 } from "@/components/ui/sidebar"
 import {
   House as HouseIcon,
-  TreeStructure as AgentsIcon,
-  CheckSquare as TasksIcon,
-  FileText as DocsIcon,
-  ChartBar as DashboardIcon,
+  Sparkle as AgentsIcon,
+  ListChecks as TasksIcon,
+  BookOpen as DocsIcon,
+  ChartLine as DashboardIcon,
   Plugs as IntegrationsIcon,
-  Folders,
+  Folder as Folders,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
 
@@ -81,12 +81,12 @@ export function AppSidebar() {
   ], [handleOpenSettings])
 
   const primaryNav = [
-    { href: "/", label: "Home", icon: HouseIcon },
-    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, badge: "New" },
-    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, badge: "New" },
-    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, badge: "New" },
-    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
-    { href: "/docs", label: "Docs", icon: DocsIcon },
+    { href: "/", label: "Home", icon: HouseIcon, iconWeight: "duotone" as const },
+    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, badge: "New", iconWeight: "duotone" as const },
+    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, badge: "New", iconWeight: "duotone" as const },
+    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, badge: "New", iconWeight: "duotone" as const },
+    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, iconWeight: "duotone" as const },
+    { href: "/docs", label: "Docs", icon: DocsIcon, iconWeight: "duotone" as const },
   ]
 
   return (
@@ -109,10 +109,10 @@ export function AppSidebar() {
       <SidebarContent className="mask-t-from-98% mask-t-to-100% mask-b-from-98% mask-b-to-100% px-3">
         <ScrollArea className="flex h-full [&>div>div]:!block">
           {/* Primary minimal navigation */}
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-xs text-muted-foreground/80">Navigation</SidebarGroupLabel>
-            <SidebarMenu>
-              {primaryNav.map(({ href, label, icon: Icon, badge }) => {
+          <SidebarGroup className="mb-1">
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Navigation</SidebarGroupLabel>
+            <SidebarMenu className="space-y-1">
+              {primaryNav.map(({ href, label, icon: Icon, badge, iconWeight }) => {
                 const isActive = href === "/"
                   ? pathname === "/"
                   : pathname === href || pathname.startsWith(href + "/")
@@ -126,19 +126,19 @@ export function AppSidebar() {
                       <Link
                         href={href}
                         prefetch
-                        className="flex items-center justify-between w-full"
+                        className="flex items-center justify-between w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
                         onClick={() => {
                           if (isMobile) {
                             setOpenMobile(false)
                           }
                         }}
                       >
-                        <div className="flex items-center gap-2">
-                          <Icon className="size-4" />
-                          <span>{label}</span>
+                        <div className="flex items-center gap-3">
+                          <Icon className="size-[18px]" weight={iconWeight} />
+                          <span className="text-[13.5px]">{label}</span>
                         </div>
                         {badge && (
-                          <span className="ml-auto px-1 py-px text-[7px] font-medium bg-foreground/6 text-foreground/50 rounded-[2px] tracking-wide">
+                          <span className="ml-auto px-1.5 py-0.5 text-[9px] font-medium bg-primary/8 text-primary/60 border border-primary/10 rounded-md tracking-wide animate-in fade-in duration-300">
                             {badge}
                           </span>
                         )}
@@ -149,12 +149,12 @@ export function AppSidebar() {
               })}
             </SidebarMenu>
           </SidebarGroup>
-          <SidebarSeparator />
+          <SidebarSeparator className="my-5 bg-gradient-to-r from-transparent via-border/30 to-transparent" />
 
-          <div className="mt-3 mb-5 flex w-full flex-col items-start gap-0">
+          <div className="mb-6 flex w-full flex-col items-start gap-1">
             <Link
               href="/"
-              className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-2 py-2 text-sm transition-colors"
+              className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5"
               prefetch
               onClick={() => {
                 if (isMobile) {
@@ -162,9 +162,9 @@ export function AppSidebar() {
                 }
               }}
             >
-              <div className="flex items-center gap-2">
-                <NotePencilIcon size={20} />
-                New Chat
+              <div className="flex items-center gap-3">
+                <NotePencilIcon size={18} weight="duotone" />
+                <span className="font-medium">New Chat</span>
               </div>
               <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/new-chat:opacity-100">
                 ⌘⇧U
@@ -172,11 +172,11 @@ export function AppSidebar() {
             </Link>
             <HistoryTrigger
               hasSidebar={false}
-              classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-2 py-2 text-sm transition-colors group/search"
-              icon={<MagnifyingGlass size={24} className="mr-2" />}
+              classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/search"
+              icon={<MagnifyingGlass size={18} weight="duotone" className="mr-3" />}
               label={
-                <div className="flex w-full items-center gap-2">
-                  <span>Search</span>
+                <div className="flex w-full items-center gap-3">
+                  <span className="font-medium">Search</span>
                   <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/search:opacity-100">
                     ⌘+K
                   </div>
@@ -186,22 +186,22 @@ export function AppSidebar() {
             />
           </div>
           {quickActions.length > 0 && (
-            <SidebarGroup className="mb-5">
-              <SidebarGroupLabel className="text-xs text-muted-foreground/80">Quick links</SidebarGroupLabel>
-              <div className="mt-2 space-y-2">
+            <SidebarGroup className="mb-6">
+              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Quick links</SidebarGroupLabel>
+              <div className="mt-3 space-y-2">
                 {quickActions.map(({ id, label, description, icon: Icon, action }) => (
                   <Button
                     key={id}
                     type="button"
                     variant="ghost"
                     onClick={action}
-                    className="h-auto w-full justify-start rounded-lg border border-border/40 bg-background/60 px-3 py-3 text-left transition hover:bg-background"
+                    className="h-auto w-full justify-start rounded-lg border border-border/40 bg-background/60 px-3 py-3 text-left transition-all duration-200 hover:bg-background hover:translate-x-0.5"
                   >
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Icon className="size-4" />
+                    <div className="flex items-center gap-3 text-[13px] font-medium">
+                      <Icon className="size-[18px]" weight="duotone" />
                       <span>{label}</span>
                     </div>
-                    <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                    <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/80">
                       {description}
                     </p>
                   </Button>

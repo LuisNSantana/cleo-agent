@@ -122,8 +122,33 @@ export interface TaskExecutionResult {
 /**
  * Execute an agent task
  */
+/**
+ * Get timeout based on agent type (delegations need more time)
+ */
+function getAgentTimeout(agentId: string): number {
+  // Research agents + delegations (Cleo, Apu)
+  if (agentId.includes('apu') || agentId.includes('cleo')) {
+    return 240_000 // 4 minutes
+  }
+  
+  // Email and workflow agents (Astra, Ami)
+  if (agentId.includes('astra') || agentId.includes('ami')) {
+    return 180_000 // 3 minutes
+  }
+  
+  // Automation (Wex with Skyvern)
+  if (agentId.includes('wex')) {
+    return 300_000 // 5 minutes
+  }
+  
+  // Standard agents
+  return 120_000 // 2 minutes
+}
+
 export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionResult> {
   const startTime = Date.now();
+  const TIMEOUT_MS = getAgentTimeout(task.agent_id);
+  
   const execution_metadata = {
     start_time: new Date().toISOString(),
     end_time: '',
@@ -134,6 +159,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     console.log(`🤖 Executing task for agent: ${task.agent_name} (${task.agent_id})`);
     console.log(`📋 Task: ${task.title}`);
     console.log(`🔧 Config:`, task.task_config);
+    console.log(`⏱️ Timeout: ${TIMEOUT_MS/1000}s`);
 
     // Get agent configuration using unified function (supports both static and DB agents)
     let agent = await getAgentById(task.agent_id, task.user_id);
@@ -176,11 +202,18 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     console.log(`🚀 Starting agent execution...`);
     
-    // Execute within user context so tools can access credentials
-    const result = await withRequestContext(
+    // Execute within user context with timeout protection
+    const resultPromise = withRequestContext(
       { userId: task.user_id, requestId: `task-${task.task_id}` },
       () => compiledGraph.invoke(initialState)
     );
+    
+    // Race between execution and timeout
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Task execution timeout')), TIMEOUT_MS)
+    );
+    
+    const result = await Promise.race([resultPromise, timeoutPromise]) as any;
 
     execution_metadata.end_time = new Date().toISOString();
     execution_metadata.duration_ms = Date.now() - startTime;
@@ -296,6 +329,34 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     execution_metadata.duration_ms = Date.now() - startTime;
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown execution error';
+    
+    // Handle timeout specifically
+    if (errorMessage === 'Task execution timeout') {
+      console.error(`⏱️ Task timed out after ${TIMEOUT_MS/1000}s (agent: ${task.agent_id})`);
+      
+      await createTaskNotification({
+        user_id: task.user_id,
+        task_id: task.task_id,
+        agent_id: task.agent_id,
+        agent_name: task.agent_name,
+        agent_avatar: task.agent_avatar || undefined,
+        notification_type: 'task_failed',
+        title: `⏱️ Task Timeout: ${task.title}`,
+        message: `${task.agent_name} task timed out after ${TIMEOUT_MS/1000}s. The task may have been too complex or requires longer processing time.`,
+        error_details: `Timeout after ${TIMEOUT_MS/1000}s - Consider breaking into smaller tasks`,
+        priority: 'high'
+      }).catch(err => console.error('Failed to create timeout notification:', err));
+      
+      return {
+        success: false,
+        error: `Task timed out after ${TIMEOUT_MS/1000}s`,
+        execution_metadata: {
+          ...execution_metadata,
+          timeout: true
+        } as any
+      };
+    }
+    
     console.error(`❌ Task execution failed: ${errorMessage}`);
 
     // Create failure notification
@@ -445,32 +506,91 @@ When task is complete, call complete_task with results.`;
     case 'cleo-supervisor':
       return `${basePrompt}
 
-As Cleo (Supervisor & Coordinator), you orchestrate complex multi-step tasks:
+As Cleo (Supervisor & Coordinator), you orchestrate complex multi-step tasks with EXTREME PRECISION:
 
-STEP-BY-STEP WORKFLOW:
-1. ANALYZE the task description carefully - identify ALL required steps
-2. For EACH step identified:
-   - If it's research/investigation → Execute directly OR delegate to appropriate specialist
-   - If it's email sending → delegate_to_astra with clear context
-   - If it's calendar → delegate_to_ami with event details
-   - If it's document creation → delegate_to_peter with specifications
-   - If it's market analysis → delegate_to_wex with scope
+🔴 CRITICAL MULTI-STEP EXECUTION PROTOCOL:
 
-3. WAIT for each delegation to complete before proceeding
-4. SYNTHESIZE results from all steps
-5. ONLY call complete_task when ALL steps are done
+STEP 1: PARSE & LIST ALL STEPS
+Parse the task description and identify EVERY action:
+- Look for keywords: "research", "send", "email", "correo", "enviar", "create", "analyze"
+- Each action verb = separate step
+- WRITE OUT each step explicitly before starting
 
-COMMON MULTI-STEP PATTERNS:
-- "Investigate X and send email to Y" → Step 1: Research, Step 2: delegate_to_astra
-- "Research X and create calendar event" → Step 1: Research, Step 2: delegate_to_ami
-- "Analyze X and send report" → Step 1: Analysis, Step 2: delegate_to_astra
+STEP 2: EXECUTE SEQUENTIALLY
+For EACH step in order:
 
-CRITICAL: If the task mentions "send", "enviar", "email", "correo" after another action, you MUST delegate to Astra for email sending with:
-- recipient email (from task_config or description)
-- email subject (clear and relevant)
-- email body (with your research/analysis results)
+a) RESEARCH/INVESTIGATION:
+   - Use webSearch, perplexity_research, or other research tools
+   - Gather comprehensive information
+   - Create detailed summary
 
-Execute ALL steps. No shortcuts.`;
+b) EMAIL SENDING (if task mentions "send", "enviar", "email", "correo"):
+   - MUST call delegate_to_astra with:
+     * task: "Send email about [topic]"
+     * context: "Full research findings: [paste your summary here]"
+     * requirements: "Recipient: ${task.task_config?.recipient || '[extract from description]'}, Subject: [descriptive subject]"
+   - WAIT for delegation to return before proceeding
+   - Verify Astra confirmed email sent
+
+c) CALENDAR (if task mentions "calendar", "event", "schedule"):
+   - Call delegate_to_ami with event details
+   - Wait for confirmation
+
+d) DOCUMENT (if task mentions "document", "report", "file"):
+   - Call delegate_to_peter with specifications
+   - Wait for document link
+
+STEP 3: VERIFY COMPLETION
+- Confirm EACH step completed successfully
+- Check delegation results for errors
+- If any step failed, report in final summary
+
+STEP 4: CALL complete_task
+- Synthesize ALL results
+- List what was done in each step
+- Include any links/confirmations received
+- ALWAYS call complete_task at the end
+
+📋 EXECUTION EXAMPLE:
+Task: "Correo investigacion mou"
+(Implied: Research MOU and send email)
+
+Step 1: Parse
+✓ Action 1: Research about MOU
+✓ Action 2: Send email with findings
+
+Step 2a: Research
+- Use webSearch for "MOU memorandum of understanding"
+- Gather key information
+- Create summary: "MOU is..."
+
+Step 2b: Email
+- Call delegate_to_astra({
+    task: "Send email about MOU research",
+    context: "MOU Research Findings: [paste full summary]",
+    requirements: "Recipient: ${task.task_config?.recipient || 'from task config'}, Subject: MOU Research Summary"
+  })
+- Wait for Astra response
+- Confirm: "Email sent successfully"
+
+Step 3: Verify
+✓ Research completed
+✓ Email sent via Astra
+
+Step 4: Complete
+- Call complete_task({
+    summary: "Completed MOU research and sent email via Astra",
+    status: "completed",
+    nextSteps: "Check inbox for confirmation"
+  })
+
+🚨 CRITICAL RULES:
+1. NEVER skip email delegation - If task says "send"/"email"/"correo", MUST use delegate_to_astra
+2. ALWAYS wait for delegations to complete
+3. ALWAYS call complete_task when done
+4. If delegation fails, report error but still call complete_task
+
+Execute NOW with ZERO shortcuts.`;
 
     default:
       return `${basePrompt}

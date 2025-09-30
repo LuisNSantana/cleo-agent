@@ -307,40 +307,40 @@ export function ChatInput({
           )}
           
           <PromptInputTextarea
-            placeholder={imageMode ? "Describe la imagen que quieres generar (estilo, iluminación, composición)..." : (placeholder || "Ask Cleo")}
+            placeholder={imageMode ? "Describe la imagen que quieres generar (estilo, iluminación, composición)..." : (placeholder || "Ask Cleo...")}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
-            className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+            className="min-h-[44px] pt-3 pl-4 pr-4 text-[15px] leading-[1.4] placeholder:text-muted-foreground/60"
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <TooltipProvider delayDuration={120}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      variant={imageMode ? 'secondary' : 'outline'}
-                      className="size-9 p-0 rounded-full"
+                      variant={imageMode ? 'secondary' : 'ghost'}
+                      className="size-9 p-0 rounded-full hover:bg-muted/80 transition-all duration-200"
                       type="button"
                       aria-label="Toggle image generation mode"
                       aria-pressed={imageMode}
                       onClick={() => setImageMode((mode) => !mode)}
                     >
-                      <ImageSquare className="size-4" />
+                      <ImageSquare className="size-[18px]" weight={imageMode ? "fill" : "duotone"} />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="top">
+                  <TooltipContent side="top" className="text-xs">
                     {imageMode
-                      ? "Modo imagen activo: el botón de envío generará la imagen"
-                      : "Activa el modo imagen (FLUX Pro con fallback OpenAI)"}
+                      ? "Modo imagen activo"
+                      : "Generar imagen con IA"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               {imageMode && (
-                <div className="hidden md:flex items-center gap-2 rounded-full border border-purple-200/80 bg-purple-50/80 px-3 py-1 text-xs font-medium text-purple-700 dark:border-purple-700/70 dark:bg-purple-900/30 dark:text-purple-200">
-                  <Sparkle className="size-4" weight="fill" />
-                  FLUX Pro listo
+                <div className="hidden md:flex items-center gap-1.5 rounded-full border border-purple-200/60 bg-purple-50/60 dark:bg-purple-900/20 px-2.5 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 backdrop-blur-sm">
+                  <Sparkle className="size-3.5" weight="fill" />
+                  <span>Imagen</span>
                 </div>
               )}
               <ButtonFileUpload
@@ -364,22 +364,22 @@ export function ChatInput({
               ) : null}
             </div>
             <PromptInputAction
-              tooltip={status === "streaming" ? "Stop" : "Send"}
+              tooltip={status === "streaming" ? "Detener" : imageMode ? "Generar imagen" : "Enviar"}
             >
               <Button
                 size="sm"
-                className="size-9 rounded-full transition-all duration-300 ease-out"
+                className="size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95"
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
                 aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
               >
                 {status === 'streaming' ? (
-                  <CircleNotch className="size-4 animate-spin" />
+                  <CircleNotch className="size-[18px] animate-spin" weight="bold" />
                 ) : imageMode ? (
-                  <Sparkle className="size-4" />
+                  <Sparkle className="size-[18px]" weight="fill" />
                 ) : (
-                  <ArrowUpIcon className="size-4" />
+                  <ArrowUpIcon className="size-[18px]" weight="bold" />
                 )}
               </Button>
             </PromptInputAction>
