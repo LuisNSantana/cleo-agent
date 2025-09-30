@@ -172,7 +172,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     }
 
     // Create task-specific prompt based on agent and task type
-    const taskPrompt = createTaskPrompt(task);
+    const taskPrompt = createTaskPrompt(task, TIMEOUT_MS);
     
     // Initialize the graph builder with proper configuration
     const modelFactory = new ModelFactory();
@@ -387,7 +387,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 /**
  * Create task-specific prompt based on agent and task configuration
  */
-function createTaskPrompt(task: AgentTask): string {
+function createTaskPrompt(task: AgentTask, timeoutMs: number): string {
   const basePrompt = `You have been assigned a ${task.task_type} task: "${task.title}"
 
 Description: ${task.description}
@@ -506,91 +506,77 @@ When task is complete, call complete_task with results.`;
     case 'cleo-supervisor':
       return `${basePrompt}
 
-As Cleo (Supervisor & Coordinator), you orchestrate complex multi-step tasks with EXTREME PRECISION:
+As Cleo (Supervisor & Coordinator), this is a SCHEDULED TASK that requires EXACT execution.
 
-🔴 CRITICAL MULTI-STEP EXECUTION PROTOCOL:
+🔴 MANDATORY EXECUTION PROTOCOL (NO EXCEPTIONS):
 
-STEP 1: PARSE & LIST ALL STEPS
-Parse the task description and identify EVERY action:
-- Look for keywords: "research", "send", "email", "correo", "enviar", "create", "analyze"
-- Each action verb = separate step
-- WRITE OUT each step explicitly before starting
+YOUR TASK RIGHT NOW:
+Title: "${task.title}"
+Description: "${task.description}"
+${task.task_config?.recipient ? `Recipient Email: ${task.task_config.recipient}` : ''}
 
-STEP 2: EXECUTE SEQUENTIALLY
-For EACH step in order:
+STEP-BY-STEP INSTRUCTIONS (FOLLOW EXACTLY):
 
-a) RESEARCH/INVESTIGATION:
-   - Use webSearch, perplexity_research, or other research tools
-   - Gather comprehensive information
-   - Create detailed summary
+1️⃣ ANALYZE THE TASK (10 seconds max):
+   ✓ Does it mention email/correo/send/enviar? → YES = Need Astra delegation
+   ✓ Does it mention research/investigar/buscar? → YES = Need web search
+   ✓ Does it mention calendar/evento? → YES = Need Ami delegation
 
-b) EMAIL SENDING (if task mentions "send", "enviar", "email", "correo"):
-   - MUST call delegate_to_astra with:
-     * task: "Send email about [topic]"
-     * context: "Full research findings: [paste your summary here]"
-     * requirements: "Recipient: ${task.task_config?.recipient || '[extract from description]'}, Subject: [descriptive subject]"
-   - WAIT for delegation to return before proceeding
-   - Verify Astra confirmed email sent
+2️⃣ EXECUTE EACH REQUIRED ACTION:
 
-c) CALENDAR (if task mentions "calendar", "event", "schedule"):
-   - Call delegate_to_ami with event details
-   - Wait for confirmation
+   IF RESEARCH NEEDED:
+   • Use webSearch tool with specific query
+   • Extract key findings (3-5 bullet points)
+   • Keep summary under 200 words
+   
+   IF EMAIL NEEDED (ANY of: "email", "correo", "enviar", "send"):
+   ⚠️ CRITICAL: You CANNOT send emails yourself!
+   • MUST use delegate_to_astra tool
+   • Format:
+     {
+       "task": "Send email about [topic]",
+       "context": "[Your research summary here if any]",
+       "requirements": "Recipient: ${task.task_config?.recipient || '[check task description]'}, Subject: [clear subject based on task]"
+     }
+   • WAIT for Astra's response
+   • Verify response says "email sent" or "completed"
+   
+   IF CALENDAR NEEDED:
+   • Use delegate_to_ami tool
+   • Provide event details
+   • Wait for confirmation
 
-d) DOCUMENT (if task mentions "document", "report", "file"):
-   - Call delegate_to_peter with specifications
-   - Wait for document link
+3️⃣ CALL complete_task WHEN DONE:
+   • Summary of what you did
+   • Results from each step
+   • Any confirmations received
+   • MUST call this tool to finish
 
-STEP 3: VERIFY COMPLETION
-- Confirm EACH step completed successfully
-- Check delegation results for errors
-- If any step failed, report in final summary
+🔴 COMMON MISTAKES TO AVOID:
+❌ Trying to send emails yourself (you can't - only Astra can)
+❌ Forgetting to call delegate_to_astra for emails
+❌ Not waiting for delegation responses
+❌ Forgetting to call complete_task at the end
+❌ Asking for clarification (this is automated - use available info)
 
-STEP 4: CALL complete_task
-- Synthesize ALL results
-- List what was done in each step
-- Include any links/confirmations received
-- ALWAYS call complete_task at the end
+✅ CORRECT FLOW FOR EMAIL TASKS:
+1. Research (if needed) → 2. delegate_to_astra → 3. Wait → 4. complete_task
 
-📋 EXECUTION EXAMPLE:
-Task: "Correo investigacion mou"
-(Implied: Research MOU and send email)
+📋 REAL EXAMPLE FOR YOUR CURRENT TASK:
+If task = "Investiga ofertas empleo sector comercio y envía correo a X":
+Step 1: webSearch("ofertas empleo comercio exterior septiembre 2025")
+Step 2: Extract findings → "Found 3 offers: [list]"
+Step 3: delegate_to_astra({
+  task: "Send email with job offers research",
+  context: "Research findings: [paste findings]",
+  requirements: "Recipient: ${task.task_config?.recipient || 'moisescorpamag2020@gmail.com'}, Subject: Ofertas de Empleo - Sector Comercio Exterior 30 Sep 2025"
+})
+Step 4: Wait for Astra confirmation
+Step 5: complete_task({ summary: "Researched job offers and sent email via Astra to ${task.task_config?.recipient}" })
 
-Step 1: Parse
-✓ Action 1: Research about MOU
-✓ Action 2: Send email with findings
+⏰ TIMEOUT: You have ${timeoutMs/1000} seconds total. Execute efficiently.
 
-Step 2a: Research
-- Use webSearch for "MOU memorandum of understanding"
-- Gather key information
-- Create summary: "MOU is..."
-
-Step 2b: Email
-- Call delegate_to_astra({
-    task: "Send email about MOU research",
-    context: "MOU Research Findings: [paste full summary]",
-    requirements: "Recipient: ${task.task_config?.recipient || 'from task config'}, Subject: MOU Research Summary"
-  })
-- Wait for Astra response
-- Confirm: "Email sent successfully"
-
-Step 3: Verify
-✓ Research completed
-✓ Email sent via Astra
-
-Step 4: Complete
-- Call complete_task({
-    summary: "Completed MOU research and sent email via Astra",
-    status: "completed",
-    nextSteps: "Check inbox for confirmation"
-  })
-
-🚨 CRITICAL RULES:
-1. NEVER skip email delegation - If task says "send"/"email"/"correo", MUST use delegate_to_astra
-2. ALWAYS wait for delegations to complete
-3. ALWAYS call complete_task when done
-4. If delegation fails, report error but still call complete_task
-
-Execute NOW with ZERO shortcuts.`;
+� START EXECUTION NOW - DO NOT ASK QUESTIONS, DO NOT WAIT FOR APPROVAL.`;
 
     default:
       return `${basePrompt}

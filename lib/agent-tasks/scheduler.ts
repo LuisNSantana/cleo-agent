@@ -91,6 +91,72 @@ class AgentTaskScheduler {
   }
 
   /**
+   * Cleanup stuck tasks that have been running for too long
+   * This is a safety mechanism to prevent tasks from being stuck forever
+   */
+  async cleanupStuckTasks(): Promise<number> {
+    try {
+      console.log('🧹 Checking for stuck tasks...');
+      
+      // Import here to avoid circular dependencies
+      const { getSupabaseAdmin } = await import('@/lib/supabase/admin');
+      const supabase = getSupabaseAdmin();
+      
+      const MAX_EXECUTION_TIME = 10 * 60 * 1000; // 10 minutes
+      const cutoffTime = new Date(Date.now() - MAX_EXECUTION_TIME).toISOString();
+      
+      // Find tasks that have been "running" for more than MAX_EXECUTION_TIME
+      // Use created_at as proxy since started_at might not be in database schema
+      const { data: stuckTasks, error } = await supabase
+        .from('agent_tasks')
+        .select('*')
+        .eq('status', 'running')
+        .lt('created_at', cutoffTime);
+      
+      if (error) {
+        console.error('❌ Error fetching stuck tasks:', error);
+        return 0;
+      }
+      
+      if (!stuckTasks || stuckTasks.length === 0) {
+        console.log('✅ No stuck tasks found');
+        return 0;
+      }
+      
+      console.log(`⚠️ Found ${stuckTasks.length} stuck tasks, marking as failed...`);
+      
+      let cleaned = 0;
+      for (const task of stuckTasks) {
+        try {
+          // Use created_at as fallback if started_at doesn't exist
+          const startTime = new Date(task.created_at || Date.now());
+          const runningTime = Date.now() - startTime.getTime();
+          const runningMinutes = Math.floor(runningTime / 60000);
+          
+          await updateAgentTaskAdmin(task.id, {
+            status: 'failed',
+            error_message: `Task was stuck in running state for ${runningMinutes} minutes and was automatically cleaned up`,
+            completed_at: new Date().toISOString(),
+            execution_time_ms: runningTime
+          });
+          
+          cleaned++;
+          console.log(`🧹 Cleaned stuck task: ${task.title} (was running for ${runningMinutes} minutes)`);
+        } catch (err) {
+          console.error(`❌ Failed to clean task ${task.id}:`, err);
+        }
+      }
+      
+      console.log(`✅ Cleaned up ${cleaned}/${stuckTasks.length} stuck tasks`);
+      return cleaned;
+      
+    } catch (error) {
+      console.error('❌ Error in cleanupStuckTasks:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Process scheduled tasks
    */
   private async processScheduledTasks(): Promise<void> {
@@ -104,6 +170,9 @@ class AgentTaskScheduler {
     this.stats.lastRunAt = new Date();
 
     try {
+      // Run cleanup of stuck tasks first
+      await this.cleanupStuckTasks();
+      
       console.log('🔍 Checking for ready scheduled tasks...');
       
       const result = await getReadyScheduledTasksAdmin();
@@ -159,15 +228,31 @@ class AgentTaskScheduler {
   }
 
   /**
-   * Process a single task
+   * Process a single task with absolute timeout protection
    */
   private async processTask(task: AgentTask): Promise<void> {
     const startTime = Date.now();
     const startedAt = new Date().toISOString();
     
+    // CRITICAL: Absolute max timeout regardless of agent type
+    const ABSOLUTE_MAX_TIMEOUT = 600_000; // 10 minutes max
+    
     try {
       console.log(`🔄 Processing task: ${task.title} (${task.agent_name})`);
       this.stats.tasksProcessed++;
+
+      // Check if task has been retried too many times
+      const MAX_RETRIES = 3;
+      if ((task.retry_count || 0) >= MAX_RETRIES) {
+        console.error(`❌ Task ${task.title} exceeded max retries (${MAX_RETRIES}), marking as failed`);
+        await updateAgentTaskAdmin(task.task_id, {
+          status: 'failed',
+          error_message: `Maximum retry attempts (${MAX_RETRIES}) exceeded`,
+          completed_at: new Date().toISOString()
+        });
+        this.stats.tasksFailed++;
+        return;
+      }
 
       // Update task status to running
       await updateAgentTaskAdmin(task.task_id, {
@@ -187,8 +272,14 @@ class AgentTaskScheduler {
       const execution = executionResult.execution;
 
       try {
-        // Execute the task using the agent
-        const result = await executeAgentTask(task);
+        // CRITICAL: Execute with absolute timeout protection
+        const executionPromise = executeAgentTask(task);
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error(`Task execution exceeded absolute timeout of ${ABSOLUTE_MAX_TIMEOUT/1000}s`)), ABSOLUTE_MAX_TIMEOUT)
+        );
+        
+        console.log(`⏱️ Task executing with ${ABSOLUTE_MAX_TIMEOUT/1000}s absolute timeout...`);
+        const result = await Promise.race([executionPromise, timeoutPromise]);
         const executionTime = Date.now() - startTime;
         const completedAt = result.execution_metadata?.end_time || new Date().toISOString();
         const normalizedResult = normalizeResultPayload(result.result);
@@ -206,7 +297,7 @@ class AgentTaskScheduler {
             execution_time_ms: executionTime,
             completed_at: completedAt,
             last_run_at: completedAt,
-            retry_count: task.retry_count || 0,
+            retry_count: 0, // Reset retry count on success
             last_retry_at: null,
             error_message: null
           });
@@ -222,8 +313,9 @@ class AgentTaskScheduler {
           });
 
           this.stats.tasksSucceeded++;
-          console.log(`✅ Task completed: ${task.title}`);
+          console.log(`✅ Task completed: ${task.title} in ${executionTime}ms`);
         } else {
+          // Task returned unsuccessfully, throw to handle as failure
           throw new Error(result.error || 'Task execution failed');
         }
 
@@ -231,15 +323,22 @@ class AgentTaskScheduler {
         const executionTime = Date.now() - startTime;
         const finishedAt = new Date().toISOString();
         const errorMessage = executionError instanceof Error ? executionError.message : 'Unknown error';
+        const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+        
+        console.error(`❌ Task execution error: ${task.title} - ${errorMessage}`);
+        
+        // Determine if should retry
+        const currentRetries = task.retry_count || 0;
+        const shouldRetry = currentRetries < MAX_RETRIES && !isTimeout; // Don't retry timeouts
         
         // Update task as failed
         await updateAgentTaskAdmin(task.task_id, {
-          status: 'failed',
-          retry_count: (task.retry_count || 0) + 1,
+          status: shouldRetry ? 'pending' : 'failed', // Retry if under limit
+          retry_count: currentRetries + 1,
           execution_time_ms: executionTime,
           error_message: errorMessage,
           last_retry_at: finishedAt,
-          completed_at: finishedAt
+          completed_at: shouldRetry ? null : finishedAt // Only mark completed if not retrying
         });
 
         // Update execution record
@@ -251,10 +350,31 @@ class AgentTaskScheduler {
         });
 
         this.stats.tasksFailed++;
-        console.error(`❌ Task failed: ${task.title}`, executionError);
+        
+        if (shouldRetry) {
+          console.log(`🔄 Task will retry (attempt ${currentRetries + 1}/${MAX_RETRIES}) in ${Math.pow(2, currentRetries)} minutes`);
+        } else {
+          console.error(`❌ Task permanently failed after ${currentRetries + 1} attempts: ${task.title}`);
+        }
       }
 
     } catch (error) {
+      // CRITICAL: Ensure task is ALWAYS marked as failed if we reach here
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Critical processing error';
+      
+      try {
+        await updateAgentTaskAdmin(task.task_id, {
+          status: 'failed',
+          error_message: `Critical error: ${errorMessage}`,
+          execution_time_ms: executionTime,
+          completed_at: new Date().toISOString(),
+          retry_count: (task.retry_count || 0) + 1
+        });
+      } catch (updateError) {
+        console.error(`💥 Failed to update task status:`, updateError);
+      }
+      
       this.stats.tasksFailed++;
       console.error(`💥 Critical error processing task: ${task.title}`, error);
     }
