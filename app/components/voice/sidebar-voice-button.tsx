@@ -4,16 +4,52 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Microphone, MicrophoneSlash } from '@phosphor-icons/react'
 import { VoiceMode } from './voice-mode'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 export function SidebarVoiceButton() {
   const [isOpen, setIsOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const params = useParams<{ chatId: string }>()
+  const router = useRouter()
   const chatId = params?.chatId
 
-  const handleClick = () => {
-    setIsOpen(true)
+  const handleClick = async () => {
+    // If no chatId, create a new chat first
+    if (!chatId) {
+      setIsCreating(true)
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-3-5-sonnet-20241022',
+            title: 'Voice Conversation'
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create chat')
+        }
+
+        const { id: newChatId } = await response.json()
+        
+        // Redirect to new chat and open voice mode
+        router.push(`/c/${newChatId}`)
+        
+        // Wait a bit for navigation then open modal
+        setTimeout(() => {
+          setIsOpen(true)
+          setIsCreating(false)
+        }, 100)
+      } catch (error) {
+        console.error('Error creating chat:', error)
+        setIsCreating(false)
+      }
+    } else {
+      // If we have chatId, just open modal
+      setIsOpen(true)
+    }
   }
 
   return (

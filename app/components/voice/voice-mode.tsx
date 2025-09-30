@@ -186,11 +186,14 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
             {/* Main content */}
             {!isActive ? (
               <div className="flex flex-col items-center space-y-6">
-                {/* Icon */}
+                {/* Cleo Avatar */}
                 <div className="relative">
                   <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl" />
-                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <Phone className="w-12 h-12 text-white" />
+                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center ring-4 ring-purple-500/20">
+                    <div className="text-4xl font-bold text-white">C</div>
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center ring-4 ring-zinc-900">
+                    <Mic className="w-4 h-4 text-white" />
                   </div>
                 </div>
 
