@@ -166,7 +166,7 @@ class AgentTaskScheduler {
       });
 
       // Create execution record
-      const executionResult = await createTaskExecutionAdmin(task.task_id, (task.retry_count || 0) + 1);
+  const executionResult = await createTaskExecutionAdmin(task.task_id);
       if (!executionResult.success || !executionResult.execution) {
         throw new Error('Failed to create execution record');
       }
@@ -203,7 +203,7 @@ class AgentTaskScheduler {
             status: 'completed',
             result_data: normalizedResult,
             execution_time_ms: executionTime,
-            tool_calls: toolCalls,
+            tool_calls: toolCalls.map(tc => ({ ...tc })),
             agent_messages: agentMessages,
             completed_at: completedAt
           });

@@ -3,68 +3,46 @@
  * Universal task creation, scheduling, and execution for all agents
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createGuestServerClient } from '@/lib/supabase/server-guest';
 import { getCurrentUserId } from '@/lib/server/request-context';
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization';
 import { createTaskNotification } from './notifications';
+import type { Database } from '@/types.d';
+import type {
+  AgentTask,
+  AgentTaskExecution,
+  AgentTaskExecutionInsert,
+  AgentTaskExecutionUpdate,
+  AgentTaskInsert,
+  AgentTaskUpdate,
+  AgentTaskStatus
+} from './types';
+import type { JsonObject, JsonValue } from '@/types/json';
 
-// Base task interface - updated to match current DB schema
-export interface AgentTask {
-  task_id: string; // Primary key in DB
-  user_id: string;
-  title: string;
-  description: string;
-  agent_id: string;
-  agent_name: string;
-  agent_avatar?: string;
-  task_type: string;
-  priority?: number; // New field
-  task_config: Record<string, any>;
-  context_data: Record<string, any>;
-  // Note: schedule_config was removed from DB; keep runtime-only if needed elsewhere
-  schedule_config?: Record<string, any>;
-  scheduled_for?: string; // Existing field in DB (renamed from scheduled_at)
-  scheduled_at?: string; // New field
-  cron_expression?: string;
-  timezone?: string;
-  status: 'pending' | 'scheduled' | 'running' | 'completed' | 'failed' | 'cancelled';
-  started_at?: string;
-  completed_at?: string;
-  result_data?: Record<string, any>;
-  error_message?: string;
-  execution_time_ms?: number;
-  retry_count: number;
-  max_retries?: number;
-  last_retry_at?: string;
-  notify_on_completion?: boolean;
-  notify_on_failure?: boolean;
-  notification_sent?: boolean;
-  notification_sent_at?: string;
-  created_at: string;
-  updated_at: string;
-  last_run_at?: string;
-  next_run_at?: string;
-  tags?: string[];
-  id?: string; // Secondary UUID field
-}
+export type { AgentTask, AgentTaskExecution } from './types';
 
-// Task execution history
-export interface AgentTaskExecution {
-  id: string;
-  task_id: string;
-  execution_number: number;
-  started_at: string;
-  completed_at?: string;
-  status: 'running' | 'completed' | 'failed';
-  agent_messages: Array<Record<string, any>>;
-  tool_calls: Array<Record<string, any>>;
-  result_data?: Record<string, any>;
-  error_message?: string;
-  error_stack?: string;
-  execution_time_ms?: number;
-  memory_usage_mb?: number;
-}
+type TasksTables = Database['public']['Tables'] & {
+  agent_tasks: {
+    Row: AgentTask;
+    Insert: AgentTaskInsert;
+    Update: AgentTaskUpdate;
+  };
+  agent_task_executions: {
+    Row: AgentTaskExecution;
+    Insert: AgentTaskExecutionInsert;
+    Update: AgentTaskExecutionUpdate;
+  };
+};
+
+type TasksDatabase = Database & {
+  public: Database['public'] & {
+    Tables: TasksTables;
+  };
+};
+
+type TasksSupabaseClient = SupabaseClient<TasksDatabase>;
 
 export interface CreateAgentTaskInput {
   agent_id?: string;
@@ -74,8 +52,8 @@ export interface CreateAgentTaskInput {
   description: string;
   task_type?: string;
   priority?: number;
-  task_config?: Record<string, any>;
-  context_data?: Record<string, any>;
+  task_config?: JsonObject | null;
+  context_data?: JsonObject | null;
   scheduled_at?: string;
   scheduled_for?: string; // Support both naming conventions
   cron_expression?: string;
@@ -88,8 +66,8 @@ export interface CreateAgentTaskInput {
 
 // Task update input
 export interface UpdateAgentTaskInput {
-  status?: 'pending' | 'scheduled' | 'running' | 'completed' | 'failed' | 'cancelled';
-  result_data?: Record<string, any> | null;
+  status?: AgentTaskStatus;
+  result_data?: JsonValue | null;
   error_message?: string | null;
   execution_time_ms?: number | null;
   retry_count?: number;
@@ -105,7 +83,7 @@ export interface UpdateAgentTaskInput {
 // Filter options for listing tasks
 export interface AgentTaskFilters {
   agent_id?: string;
-  status?: string;
+  status?: AgentTaskStatus;
   task_type?: string;
   tags?: string[];
   priority_min?: number;
@@ -133,6 +111,8 @@ export async function createAgentTask(
     if (!supabase) {
       return { success: false, error: 'Database not available' };
     }
+
+    const client = supabase as unknown as TasksSupabaseClient;
 
     // Handle scheduled date - ensure proper timezone conversion
     let scheduledDate = null;
@@ -189,29 +169,33 @@ export async function createAgentTask(
     const agentName = rawAgentName || getAgentDisplayName(normalizedAgentId) || 'Cleo'
     const avatarUrl = resolveAgentAvatar(agentName, taskData.agent_avatar)
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
-      .insert({
-        user_id: userId,
-        agent_id: normalizedAgentId,
-        agent_name: agentName,
-        agent_avatar: avatarUrl,
-        title: taskData.title,
-        description: taskData.description,
-        task_type: taskData.task_type || 'manual',
-        priority: taskData.priority || 5,
-        task_config: taskData.task_config || {},
-        context_data: taskData.context_data || {},
-        scheduled_at: scheduledDate, // Use consistent field name
-        cron_expression: taskData.cron_expression,
-        timezone: taskData.timezone || 'UTC',
-        max_retries: taskData.max_retries || 0,
-        notify_on_completion: taskData.notify_on_completion !== false,
-        notify_on_failure: taskData.notify_on_failure !== false,
-        tags: taskData.tags || [],
-        status: scheduledDate ? 'scheduled' : 'pending'
-      })
-      .select()
+    const insertPayload = {
+      user_id: userId,
+      agent_id: normalizedAgentId,
+      agent_name: agentName,
+      agent_avatar: avatarUrl,
+      title: taskData.title,
+      description: taskData.description,
+      task_type: taskData.task_type || 'manual',
+      priority: taskData.priority ?? 5,
+      task_config: taskData.task_config ?? {},
+      context_data: taskData.context_data ?? {},
+  scheduled_at: scheduledDate,
+      cron_expression: taskData.cron_expression,
+      timezone: taskData.timezone || 'UTC',
+      max_retries: taskData.max_retries ?? 0,
+      notify_on_completion: taskData.notify_on_completion !== false,
+      notify_on_failure: taskData.notify_on_failure !== false,
+      tags: taskData.tags ?? [],
+      status: (scheduledDate ? 'scheduled' : 'pending') as AgentTaskStatus,
+      retry_count: 0,
+      notification_sent: false
+    } satisfies AgentTaskInsert;
+
+    const { data, error } = await client
+      .from('agent_tasks')
+      .insert(insertPayload)
+      .select('*')
       .single();
 
     if (error) {
@@ -219,7 +203,7 @@ export async function createAgentTask(
       return { success: false, error: error.message };
     }
 
-    const createdTask = data as unknown as AgentTask;
+  const createdTask = data;
 
     // Create notification for scheduled tasks
     if (createdTask.status === 'scheduled' && taskData.scheduled_at) {
@@ -281,9 +265,10 @@ export async function updateAgentTask(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
-      .update(updates)
+    const client = supabase as unknown as TasksSupabaseClient;
+    const { data, error } = await client
+      .from('agent_tasks')
+      .update(updates as AgentTaskUpdate)
       .eq('task_id', taskId)
       .eq('user_id', userId)
       .select()
@@ -294,7 +279,7 @@ export async function updateAgentTask(
       return { success: false, error: error.message };
     }
 
-    return { success: true, task: data as unknown as AgentTask };
+  return { success: true, task: data };
   } catch (error) {
     console.error('❌ Error in updateAgentTask:', error);
     return { 
@@ -321,8 +306,10 @@ export async function getAgentTasks(
       return { success: false, error: 'Database not available' };
     }
 
-    let query = supabase
-      .from('agent_tasks' as any)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    let query = client
+      .from('agent_tasks')
       .select('*', { count: 'exact' })
       .eq('user_id', userId);
 
@@ -343,11 +330,11 @@ export async function getAgentTasks(
       query = query.overlaps('tags', filters.tags);
     }
 
-    if (filters.priority_min) {
+    if (typeof filters.priority_min === 'number') {
       query = query.gte('priority', filters.priority_min);
     }
 
-    if (filters.priority_max) {
+    if (typeof filters.priority_max === 'number') {
       query = query.lte('priority', filters.priority_max);
     }
 
@@ -368,22 +355,23 @@ export async function getAgentTasks(
                  .order('created_at', { ascending: false });
 
     // Apply pagination
-    if (filters.limit) {
+    if (typeof filters.limit === 'number') {
       query = query.limit(filters.limit);
     }
 
-    if (filters.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+    if (typeof filters.offset === 'number') {
+      const limit = typeof filters.limit === 'number' ? filters.limit : 50;
+      query = query.range(filters.offset, filters.offset + limit - 1);
     }
 
-    const { data, error, count } = await query;
+  const { data, error, count } = await query;
 
     if (error) {
       console.error('❌ Error fetching agent tasks:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, tasks: (data || []) as unknown as AgentTask[], total: count || 0 };
+  return { success: true, tasks: data ?? [], total: count ?? 0 };
   } catch (error) {
     console.error('❌ Error in getAgentTasks:', error);
     return { 
@@ -410,8 +398,10 @@ export async function getAgentTask(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_tasks')
       .select('*')
       .eq('task_id', taskId)
       .eq('user_id', userId)
@@ -422,7 +412,7 @@ export async function getAgentTask(
       return { success: false, error: error.message };
     }
 
-    return { success: true, task: data as unknown as AgentTask };
+  return { success: true, task: data };
   } catch (error) {
     console.error('❌ Error in getAgentTask:', error);
     return { 
@@ -449,8 +439,10 @@ export async function deleteAgentTask(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_tasks')
       .delete()
       .eq('task_id', taskId)
       .eq('user_id', userId)
@@ -487,8 +479,10 @@ export async function getReadyScheduledTasks(): Promise<{
     }
 
     // For now, use a simple query instead of the stored procedure
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_tasks')
       .select('*')
       .eq('status', 'scheduled')
       .not('scheduled_at', 'is', null)
@@ -502,7 +496,7 @@ export async function getReadyScheduledTasks(): Promise<{
       return { success: false, error: error.message };
     }
 
-    return { success: true, tasks: (data || []) as unknown as AgentTask[] };
+  return { success: true, tasks: data ?? [] };
   } catch (error) {
     console.error('❌ Error in getReadyScheduledTasks:', error);
     return { 
@@ -527,8 +521,10 @@ export async function getReadyScheduledTasksAdmin(): Promise<{
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_tasks')
       .select('*')
       .eq('status', 'scheduled')
       .not('scheduled_at', 'is', null)
@@ -544,13 +540,12 @@ export async function getReadyScheduledTasksAdmin(): Promise<{
 
     // Group tasks by user_id to prevent cross-user execution
     const tasksByUser: Record<string, AgentTask[]> = {};
-    (data || []).forEach((task: any) => {
-      const agentTask = task as AgentTask;
-      if (!tasksByUser[agentTask.user_id]) {
-        tasksByUser[agentTask.user_id] = [];
+    for (const task of data ?? []) {
+      if (!tasksByUser[task.user_id]) {
+        tasksByUser[task.user_id] = [];
       }
-      tasksByUser[agentTask.user_id].push(agentTask);
-    });
+      tasksByUser[task.user_id].push(task);
+    }
 
     return { success: true, tasksByUser };
   } catch (error) {
@@ -573,9 +568,11 @@ export async function updateAgentTaskAdmin(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_tasks' as any)
-      .update(updates)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_tasks')
+      .update(updates as AgentTaskUpdate)
       .eq('task_id', taskId)
       .select()
       .single();
@@ -585,7 +582,7 @@ export async function updateAgentTaskAdmin(
       return { success: false, error: error.message };
     }
 
-    return { success: true, task: data as unknown as AgentTask };
+  return { success: true, task: data };
   } catch (error) {
     console.error('❌ [ADMIN] Error in updateAgentTaskAdmin:', error);
     return { 
@@ -597,8 +594,7 @@ export async function updateAgentTaskAdmin(
 
 /** Admin: Create task execution (service role) */
 export async function createTaskExecutionAdmin(
-  taskId: string,
-  executionNumber: number
+  taskId: string
 ): Promise<{ success: boolean; execution?: AgentTaskExecution; error?: string }> {
   try {
     const supabase = await createGuestServerClient();
@@ -606,10 +602,17 @@ export async function createTaskExecutionAdmin(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_task_executions' as any)
-        .insert({ task_id: taskId, status: 'running', execution_number: executionNumber })
-      .select()
+    const client = supabase as unknown as TasksSupabaseClient;
+    const executionPayload = {
+      task_id: taskId,
+      status: 'running',
+      started_at: new Date().toISOString()
+    } satisfies AgentTaskExecutionInsert;
+
+    const { data, error } = await client
+      .from('agent_task_executions')
+      .insert(executionPayload)
+      .select('*')
       .single();
 
     if (error) {
@@ -617,7 +620,7 @@ export async function createTaskExecutionAdmin(
       return { success: false, error: error.message };
     }
 
-    return { success: true, execution: data as unknown as AgentTaskExecution };
+  return { success: true, execution: data };
   } catch (error) {
     console.error('❌ [ADMIN] Error in createTaskExecutionAdmin:', error);
     return { 
@@ -638,9 +641,11 @@ export async function updateTaskExecutionAdmin(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_task_executions' as any)
-      .update(updates)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_task_executions')
+      .update(updates as AgentTaskExecutionUpdate)
       .eq('id', executionId)
       .select()
       .single();
@@ -650,7 +655,7 @@ export async function updateTaskExecutionAdmin(
       return { success: false, error: error.message };
     }
 
-    return { success: true, execution: data as unknown as AgentTaskExecution };
+  return { success: true, execution: data };
   } catch (error) {
     console.error('❌ [ADMIN] Error in updateTaskExecutionAdmin:', error);
     return { 
@@ -664,8 +669,7 @@ export async function updateTaskExecutionAdmin(
  * Create task execution record
  */
 export async function createTaskExecution(
-  taskId: string,
-  executionNumber: number
+  taskId: string
 ): Promise<{ success: boolean; execution?: AgentTaskExecution; error?: string }> {
   try {
     const supabase = await createClient();
@@ -673,10 +677,17 @@ export async function createTaskExecution(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_task_executions' as any)
-        .insert({ task_id: taskId, status: 'running', execution_number: executionNumber })
-      .select()
+    const client = supabase as unknown as TasksSupabaseClient;
+    const executionPayload = {
+      task_id: taskId,
+      status: 'running',
+      started_at: new Date().toISOString()
+    } satisfies AgentTaskExecutionInsert;
+
+    const { data, error } = await client
+      .from('agent_task_executions')
+      .insert(executionPayload)
+      .select('*')
       .single();
 
     if (error) {
@@ -684,7 +695,7 @@ export async function createTaskExecution(
       return { success: false, error: error.message };
     }
 
-    return { success: true, execution: data as unknown as AgentTaskExecution };
+  return { success: true, execution: data };
   } catch (error) {
     console.error('❌ Error in createTaskExecution:', error);
     return { 
@@ -707,9 +718,11 @@ export async function updateTaskExecution(
       return { success: false, error: 'Database not available' };
     }
 
-    const { data, error } = await supabase
-      .from('agent_task_executions' as any)
-      .update(updates)
+    const client = supabase as unknown as TasksSupabaseClient;
+
+    const { data, error } = await client
+      .from('agent_task_executions')
+      .update(updates as AgentTaskExecutionUpdate)
       .eq('id', executionId)
       .select()
       .single();
@@ -719,7 +732,7 @@ export async function updateTaskExecution(
       return { success: false, error: error.message };
     }
 
-    return { success: true, execution: data as unknown as AgentTaskExecution };
+  return { success: true, execution: data };
   } catch (error) {
     console.error('❌ Error in updateTaskExecution:', error);
     return { 

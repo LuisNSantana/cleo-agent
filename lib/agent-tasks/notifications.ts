@@ -8,39 +8,14 @@ import { createGuestServerClient } from '@/lib/supabase/server-guest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getCurrentUserId } from '@/lib/server/request-context';
 import { Database, Json } from '@/types.d';
+import type {
+  NotificationAction,
+  TaskNotification
+} from '@/lib/agent-tasks/types';
+import type { JsonObject, JsonValue } from '@/types/json';
 
 type NotificationInsert = Database['public']['Tables']['task_notifications']['Insert'];
 type NotificationRow = Database['public']['Tables']['task_notifications']['Row'];
-
-export interface TaskNotification {
-  id: string;
-  user_id: string;
-  task_id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_avatar?: string;
-  notification_type: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder';
-  title: string;
-  message: string;
-  task_result?: Record<string, any>;
-  error_details?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  read: boolean;
-  read_at?: string;
-  action_buttons?: NotificationAction[];
-  metadata?: Record<string, any>;
-  expires_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface NotificationAction {
-  id: string;
-  label: string;
-  action_type: 'open_chat' | 'view_result' | 'retry_task' | 'dismiss' | 'schedule_followup';
-  action_data?: Record<string, any>;
-  style?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
-}
 
 export interface CreateNotificationInput {
   // Explicit user scoping (required for server-side executions)
@@ -52,11 +27,11 @@ export interface CreateNotificationInput {
   notification_type: 'task_completed' | 'task_failed' | 'task_scheduled' | 'task_reminder';
   title: string;
   message: string;
-  task_result?: Record<string, any>;
+  task_result?: JsonValue;
   error_details?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   action_buttons?: NotificationAction[];
-  metadata?: Record<string, any>;
+  metadata?: JsonObject;
   expires_at?: string;
   auto_send_to_chat?: boolean;
   target_chat_id?: string;
@@ -433,19 +408,23 @@ function formatNotificationForChat(notification: TaskNotification): string {
   if (notification.notification_type === 'task_completed' && notification.task_result) {
     message += '\n\n**Results:**\n';
     
-    // Formatear resultados de manera legible
-    if (typeof notification.task_result === 'object') {
-      const summary = notification.task_result.summary || 
-                     notification.task_result.result || 
-                     'Task completed successfully';
+    const rawResult = notification.task_result;
+    if (rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)) {
+      const resultObject = rawResult as JsonObject;
+      const summaryCandidate = resultObject.summary ?? resultObject.result;
+      const summary = typeof summaryCandidate === 'string'
+        ? summaryCandidate
+        : 'Task completed successfully';
       message += `${summary}`;
-      
-      if (notification.task_result.files_created) {
-        message += `\n- Files created: ${notification.task_result.files_created.length}`;
+
+      const filesCreated = resultObject.files_created;
+      if (Array.isArray(filesCreated)) {
+        message += `\n- Files created: ${filesCreated.length}`;
       }
-      
-      if (notification.task_result.execution_time) {
-        message += `\n- Execution time: ${notification.task_result.execution_time}ms`;
+
+      const executionTime = resultObject.execution_time;
+      if (typeof executionTime === 'number') {
+        message += `\n- Execution time: ${executionTime}ms`;
       }
     }
   }
