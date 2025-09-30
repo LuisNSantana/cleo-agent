@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, PhoneOff, Mic, MicOff, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useVoiceSession } from './use-voice-session'
+import { useVoiceWebRTC } from './use-voice-webrtc'
 import { cn } from '@/lib/utils'
 
 // Audio visualizer component (inline to avoid import issues)
@@ -77,7 +77,7 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
     audioLevel,
     duration,
     cost
-  } = useVoiceSession()
+  } = useVoiceWebRTC()
 
   useEffect(() => {
     setMounted(true)

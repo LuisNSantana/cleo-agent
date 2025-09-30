@@ -100,7 +100,7 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       const audioContext = new AudioContext({ sampleRate: 24000 })
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
-      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      const processor = audioContext.createScriptProcessor(2048, 1, 1)
       
       analyser.fftSize = 256
       source.connect(analyser)
@@ -182,22 +182,10 @@ export function useVoiceSession(): UseVoiceSessionReturn {
           
           // Wait for session.created
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created')
+            console.log('✅ session.created - Using default session config')
             
-            // Now configure session with proper authorization
-            ws.send(JSON.stringify({
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                instructions: config.instructions || 'You are a helpful AI assistant named Cleo.',
-                voice: config.voice || 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
-                turn_detection: {
-                  type: 'server_vad'
-                }
-              }
-            }))
+            // Don't send session.update - use OpenAI defaults
+            // This avoids server errors from invalid configurations
             
             sessionReady = true
             setStatus('listening')
