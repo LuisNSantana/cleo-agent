@@ -6,6 +6,10 @@ import { Microphone } from '@phosphor-icons/react'
 import { VoiceMode } from './voice-mode'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useChats } from '@/lib/chat-store/chats/provider'
+import { useUser } from '@/lib/user-store/provider'
+import { getOrCreateGuestUserId } from '@/lib/api'
+import { toast } from '@/components/ui/toast'
 
 export function SidebarVoiceButton() {
   const [isOpen, setIsOpen] = useState(false)
@@ -15,6 +19,8 @@ export function SidebarVoiceButton() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const chatId = params?.chatId
+  const { createNewChat } = useChats()
+  const { user } = useUser()
 
   useEffect(() => {
     if (!searchParams) return
@@ -35,35 +41,58 @@ export function SidebarVoiceButton() {
   }, [pathname, router, searchParams])
 
   const handleClick = async () => {
-    // If no chatId, create a new chat first
-    if (!chatId) {
-      setIsCreating(true)
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            title: 'Voice Conversation'
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to create chat')
-        }
-
-        const { id: newChatId } = await response.json()
-        
-        // Redirect to new chat and open voice mode
-        router.push(`/c/${newChatId}?voice=open`)
-        setIsCreating(false)
-      } catch (error) {
-        console.error('Error creating chat:', error)
-        setIsCreating(false)
-      }
-    } else {
-      // If we have chatId, just open modal
+    if (chatId) {
       setIsOpen(true)
+      return
+    }
+
+    setIsCreating(true)
+
+    try {
+      const isAuthenticated = !!user?.id
+
+      if (!isAuthenticated) {
+        const existingGuestChatId = localStorage.getItem('guestChatId')
+        if (existingGuestChatId) {
+          router.push(`/c/${existingGuestChatId}?voice=open`)
+          return
+        }
+      }
+
+      const uid = isAuthenticated
+        ? user?.id
+        : await getOrCreateGuestUserId(user)
+
+      if (!uid) {
+        throw new Error('No user identifier available for chat creation.')
+      }
+
+      const newChat = await createNewChat(
+        uid,
+        'Voice Conversation',
+        undefined,
+        isAuthenticated
+      )
+
+      if (!newChat) {
+        throw new Error('Failed to create chat')
+      }
+
+      if (!isAuthenticated) {
+        localStorage.setItem('guestChatId', newChat.id)
+      }
+
+      router.push(`/c/${newChat.id}?voice=open`)
+    } catch (error) {
+      console.error('Error creating chat:', error)
+      const message = error instanceof Error ? error.message : undefined
+      toast({
+        title: 'No pudimos iniciar el chat de voz',
+        description: message,
+        status: 'error',
+      })
+    } finally {
+      setIsCreating(false)
     }
   }
 
