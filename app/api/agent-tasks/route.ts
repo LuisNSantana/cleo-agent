@@ -11,6 +11,7 @@ import {
   type UpdateAgentTaskInput,
   type AgentTaskFilters
 } from '@/lib/agent-tasks/tasks-db';
+import type { AgentTaskStatus } from '@/lib/agent-tasks/types';
 import { getScheduler } from '@/lib/agent-tasks/scheduler';
 import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver';
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization';
@@ -30,9 +31,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     
+    // Helper to validate status
+    const validateStatus = (status: string | null): AgentTaskStatus | undefined => {
+      if (!status) return undefined;
+      const validStatuses: AgentTaskStatus[] = ['pending', 'scheduled', 'running', 'completed', 'failed', 'cancelled'];
+      return validStatuses.includes(status as AgentTaskStatus) ? (status as AgentTaskStatus) : undefined;
+    };
+
     const filters: AgentTaskFilters = {
       agent_id: searchParams.get('agent_id') || undefined,
-      status: searchParams.get('status') || undefined,
+      status: validateStatus(searchParams.get('status')),
       task_type: searchParams.get('task_type') || undefined,
       priority_min: searchParams.get('priority_min') ? parseInt(searchParams.get('priority_min')!) : undefined,
       priority_max: searchParams.get('priority_max') ? parseInt(searchParams.get('priority_max')!) : undefined,
