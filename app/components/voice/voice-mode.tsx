@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, PhoneOff, Mic, MicOff, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -63,6 +64,8 @@ interface VoiceModeProps {
 }
 
 export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
+  const [mounted, setMounted] = useState(false)
+  
   const {
     startSession,
     endSession,
@@ -75,6 +78,13 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
     duration,
     cost
   } = useVoiceSession()
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
+
+  if (!mounted) return null
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -130,7 +140,7 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
     }
   }
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -300,4 +310,6 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
       </motion.div>
     </AnimatePresence>
   )
+
+  return createPortal(modalContent, document.body)
 }

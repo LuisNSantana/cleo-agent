@@ -166,17 +166,24 @@ export function useVoiceSession(): UseVoiceSessionReturn {
 
         // Process and send audio to OpenAI
         processor.onaudioprocess = (e) => {
-          if (ws.readyState === WebSocket.OPEN) {
+          if (ws.readyState === WebSocket.OPEN && !isMuted) {
             const inputData = e.inputBuffer.getChannelData(0)
             const pcm16 = new Int16Array(inputData.length)
             
             // Convert float32 to pcm16
             for (let i = 0; i < inputData.length; i++) {
-              pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768))
+              const s = Math.max(-1, Math.min(1, inputData[i]))
+              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
             }
             
-            // Send as base64
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
+            // Convert to base64 properly
+            const uint8 = new Uint8Array(pcm16.buffer)
+            let binary = ''
+            for (let i = 0; i < uint8.length; i++) {
+              binary += String.fromCharCode(uint8[i])
+            }
+            const base64Audio = btoa(binary)
+            
             ws.send(JSON.stringify({
               type: 'input_audio_buffer.append',
               audio: base64Audio
