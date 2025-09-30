@@ -284,8 +284,10 @@ function createAndRunExecution(
 		// Run via core orchestrator (includes routing/delegation)
 		// Use centralized runtime-config for timeouts
 		const runtime = getRuntimeConfig()
-		const timeoutMs = target.role === 'supervisor' ? runtime.maxExecutionMsSupervisor : runtime.maxExecutionMsSpecialist
-	logger.debug(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs}ms for agent ${target.id}`)
+		const timeoutMsRaw = target.role === 'supervisor' ? runtime.maxExecutionMsSupervisor : runtime.maxExecutionMsSpecialist
+		const hasTimeout = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0
+		const timeoutMs = hasTimeout ? timeoutMsRaw : null
+		logger.debug(`🔍 [DEBUG] About to call core.executeAgent with timeout ${timeoutMs ?? 'disabled'}ms for agent ${target.id}`)
 	
 	// Add timeout wrapper to prevent hanging
 	// Ensure ALS request context is preserved for downstream tools (calendar, drive, etc.)
@@ -294,17 +296,23 @@ function createAndRunExecution(
 		// Lazy require to avoid client bundle impact
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const { withRequestContext } = require('@/lib/server/request-context')
-		executionPromise = withRequestContext({ userId: exec.userId, requestId: exec.id }, () => core.executeAgent(target, ctx, { timeout: timeoutMs }))
+		executionPromise = withRequestContext({ userId: exec.userId, requestId: exec.id }, () => core.executeAgent(target, ctx, { timeout: timeoutMs ?? undefined }))
 		logger.debug('🔐 [LEGACY DEBUG] Wrapped core.executeAgent with request context', { executionId: exec.id, userId: exec.userId })
 	} catch (ctxWrapErr) {
 		logger.warn('⚠️ [LEGACY DEBUG] Failed to wrap with request context, executing directly', { error: ctxWrapErr instanceof Error ? ctxWrapErr.message : String(ctxWrapErr) })
-		executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs })
+		executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs ?? undefined })
 	}
-	const timeoutPromise = new Promise((_, reject) => {
-		setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
-	})
+
+	const promiseToAwait = timeoutMs
+		? Promise.race([
+			executionPromise,
+			new Promise((_, reject) => {
+				setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
+			})
+		])
+		: executionPromise
 	
-	Promise.race([executionPromise, timeoutPromise]).then(res => {
+	promiseToAwait.then(res => {
 		logger.info('🔍 [LEGACY DEBUG] Execution completed, processing result:', {
 			executionId: exec.id,
 			agentId: target.id,

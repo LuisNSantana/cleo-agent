@@ -607,7 +607,10 @@ export class AgentOrchestrator {
     const processedContext = await this.prepareExecutionContext(context)
 
     // CRITICAL FIX: Add absolute timeout with proper error handling
-    const SUPERVISOR_TIMEOUT = 600000; // 10 minutes max for supervisor (can do multiple delegations)
+    const supervisorTimeoutConfig = this.runtime.maxExecutionMsSupervisor
+    const SUPERVISOR_TIMEOUT = Number.isFinite(supervisorTimeoutConfig) && supervisorTimeoutConfig > 0
+      ? supervisorTimeoutConfig
+      : 0
     
     let result: ExecutionResult;
     let timedOut = false;
@@ -623,15 +626,18 @@ export class AgentOrchestrator {
         ),
         execution.id
       );
-      
-      const supervisorTimeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => {
-          timedOut = true;
-          reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`));
-        }, SUPERVISOR_TIMEOUT)
-      );
-      
-      result = await Promise.race([supervisorPromise, supervisorTimeoutPromise]) as ExecutionResult;
+
+      result = SUPERVISOR_TIMEOUT
+        ? await Promise.race([
+            supervisorPromise,
+            new Promise<never>((_, reject) =>
+              setTimeout(() => {
+                timedOut = true;
+                reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`));
+              }, SUPERVISOR_TIMEOUT)
+            ),
+          ]) as ExecutionResult
+        : await supervisorPromise as ExecutionResult;
     } catch (error) {
       // CRITICAL: Always return a response to user, even on error/timeout
       logger.error('❌ [SUPERVISOR] Execution failed:', error);
@@ -1366,7 +1372,10 @@ export class AgentOrchestrator {
         })
         
         // CRITICAL FIX: Add absolute timeout for sub-agent execution with error handling
-        const SUBAGENT_TIMEOUT = 180000; // 3 minutes max for sub-agents
+        const subAgentTimeoutConfig = this.runtime.maxExecutionMsSpecialist
+        const SUBAGENT_TIMEOUT = Number.isFinite(subAgentTimeoutConfig) && subAgentTimeoutConfig > 0
+          ? subAgentTimeoutConfig
+          : 0
         
         try {
           const subAgentPromise = this.executeAgent(
@@ -1377,19 +1386,26 @@ export class AgentOrchestrator {
               priority: normalizedPriority
             }
           );
-          
-          const subTimeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Sub-agent timeout: ${delegationData.targetAgent} exceeded ${SUBAGENT_TIMEOUT/1000}s`)), SUBAGENT_TIMEOUT)
-          );
-          
-          delegationResult = await Promise.race([subAgentPromise, subTimeoutPromise]) as ExecutionResult;
+
+          delegationResult = SUBAGENT_TIMEOUT
+            ? await Promise.race([
+                subAgentPromise,
+                new Promise<never>((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error(`Sub-agent timeout: ${delegationData.targetAgent} exceeded ${Math.round(SUBAGENT_TIMEOUT / 1000)}s`)),
+                    SUBAGENT_TIMEOUT
+                  )
+                )
+              ]) as ExecutionResult
+            : await subAgentPromise as ExecutionResult;
         } catch (subError) {
           // CRITICAL: Always return a response, even on timeout/error
           logger.error(`❌ [DELEGATION] Sub-agent ${delegationData.targetAgent} failed:`, subError);
           
-          const isTimeout = subError instanceof Error && subError.message.includes('timeout');
+          const isTimeout = SUBAGENT_TIMEOUT > 0 && subError instanceof Error && subError.message.includes('timeout');
+          const timeoutSeconds = SUBAGENT_TIMEOUT ? Math.round(SUBAGENT_TIMEOUT / 1000) : null;
           const errorMessage = isTimeout
-            ? `⏱️ El sub-agente ${delegationData.targetAgent} excedió el tiempo máximo (${SUBAGENT_TIMEOUT/1000}s). La tarea es demasiado compleja para este agente especializado.`
+            ? `⏱️ El sub-agente ${delegationData.targetAgent} excedió el tiempo máximo (${timeoutSeconds}s). La tarea es demasiado compleja para este agente especializado.`
             : `❌ El sub-agente ${delegationData.targetAgent} encontró un error: ${subError instanceof Error ? subError.message : String(subError)}`;
           
           delegationResult = {
@@ -1400,7 +1416,7 @@ export class AgentOrchestrator {
               timedOut: isTimeout,
               originalError: subError instanceof Error ? subError.message : String(subError)
             },
-            executionTime: SUBAGENT_TIMEOUT,
+            executionTime: isTimeout && SUBAGENT_TIMEOUT ? SUBAGENT_TIMEOUT : 0,
             tokensUsed: 0,
             messages: []
           };
@@ -1453,7 +1469,10 @@ export class AgentOrchestrator {
         })
         
         // CRITICAL FIX: Add absolute timeout for delegated agent execution with error handling
-        const DELEGATION_TIMEOUT = 180000; // 3 minutes max for delegations
+        const delegationTimeoutConfig = this.runtime.delegationTimeoutMs
+        const DELEGATION_TIMEOUT = Number.isFinite(delegationTimeoutConfig) && delegationTimeoutConfig > 0
+          ? delegationTimeoutConfig
+          : 0
         
         try {
           const delegationPromise = this.executeAgent(
@@ -1464,19 +1483,26 @@ export class AgentOrchestrator {
               priority: normalizedPriority
             }
           );
-          
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error(`Delegation timeout: ${delegationData.targetAgent} exceeded ${DELEGATION_TIMEOUT/1000}s`)), DELEGATION_TIMEOUT)
-          );
-          
-          delegationResult = await Promise.race([delegationPromise, timeoutPromise]) as ExecutionResult;
+
+          delegationResult = DELEGATION_TIMEOUT
+            ? await Promise.race([
+                delegationPromise,
+                new Promise<never>((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error(`Delegation timeout: ${delegationData.targetAgent} exceeded ${Math.round(DELEGATION_TIMEOUT / 1000)}s`)),
+                    DELEGATION_TIMEOUT
+                  )
+                )
+              ]) as ExecutionResult
+            : await delegationPromise as ExecutionResult;
         } catch (delError) {
           // CRITICAL: Always return a response, even on timeout/error
           logger.error(`❌ [DELEGATION] Agent ${delegationData.targetAgent} failed:`, delError);
           
-          const isTimeout = delError instanceof Error && delError.message.includes('timeout');
+          const isTimeout = DELEGATION_TIMEOUT > 0 && delError instanceof Error && delError.message.includes('timeout');
+          const timeoutSeconds = DELEGATION_TIMEOUT ? Math.round(DELEGATION_TIMEOUT / 1000) : null;
           const errorMessage = isTimeout
-            ? `⏱️ El agente ${delegationData.targetAgent} excedió el tiempo máximo (${DELEGATION_TIMEOUT/1000}s). Por favor, intenta reformular la tarea de manera más específica.`
+            ? `⏱️ El agente ${delegationData.targetAgent} excedió el tiempo máximo (${timeoutSeconds}s). Por favor, intenta reformular la tarea de manera más específica.`
             : `❌ El agente ${delegationData.targetAgent} encontró un error: ${delError instanceof Error ? delError.message : String(delError)}`;
           
           delegationResult = {
@@ -1487,7 +1513,7 @@ export class AgentOrchestrator {
               timedOut: isTimeout,
               originalError: delError instanceof Error ? delError.message : String(delError)
             },
-            executionTime: DELEGATION_TIMEOUT,
+            executionTime: isTimeout && DELEGATION_TIMEOUT ? DELEGATION_TIMEOUT : 0,
             tokensUsed: 0,
             messages: []
           };

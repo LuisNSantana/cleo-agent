@@ -21,9 +21,10 @@ export type RuntimeConfig = {
 
 function intFromEnv(name: string, fallback: number): number {
   const v = process.env[name]
-  if (!v) return fallback
+  if (v === undefined) return fallback
   const n = parseInt(v, 10)
-  return Number.isFinite(n) && n > 0 ? n : fallback
+  if (!Number.isFinite(n)) return fallback
+  return n
 }
 
 function numFromEnv(name: string, fallback: number): number {
@@ -34,6 +35,19 @@ function numFromEnv(name: string, fallback: number): number {
 }
 
 export function getRuntimeConfig(): RuntimeConfig {
+  const defaultSpecialistLimit = 600_000
+  const defaultSupervisorLimit = 600_000
+
+  let specialistLimit = intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', defaultSpecialistLimit)
+  if (specialistLimit < 0) {
+    specialistLimit = defaultSpecialistLimit
+  }
+
+  let supervisorLimit = intFromEnv('AGENT_SUPERVISOR_MAX_EXECUTION_MS', defaultSupervisorLimit)
+  if (supervisorLimit < 0) {
+    supervisorLimit = defaultSupervisorLimit
+  }
+
   return {
     // Default delegation timeout set to 300s to match API route maxDuration
     delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 300_000),
@@ -44,9 +58,9 @@ export function getRuntimeConfig(): RuntimeConfig {
   progressMinDeltaPercent: intFromEnv('PROGRESS_MIN_DELTA', 5),
   noProgressNoExtendMs: intFromEnv('NO_PROGRESS_NO_EXTEND_MS', 60_000),
 
-    maxExecutionMsSpecialist: intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', 120_000),
-    // Supervisor may orchestrate delegations; allow up to 300s
-    maxExecutionMsSupervisor: intFromEnv('AGENT_SUPERVISOR_MAX_EXECUTION_MS', 300_000),
+  maxExecutionMsSpecialist: specialistLimit,
+  // Supervisor may orchestrate delegations; allow up to 600s by default
+  maxExecutionMsSupervisor: supervisorLimit,
     maxToolCallsSpecialist: intFromEnv('AGENT_SPECIALIST_MAX_TOOL_CALLS', 8),
   maxToolCallsSupervisor: intFromEnv('AGENT_SUPERVISOR_MAX_TOOL_CALLS', 15),
 
