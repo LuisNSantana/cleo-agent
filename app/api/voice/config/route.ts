@@ -34,13 +34,15 @@ export async function POST(req: NextRequest) {
     const { chatId } = body
 
     // Get user info from auth metadata or email
-    const userName = user.user_metadata?.full_name || 
-                     user.user_metadata?.name || 
-                     user.email?.split('@')[0] || 
-                     'usuario'
+  const userName = user.user_metadata?.full_name || 
+           user.user_metadata?.name || 
+           user.email?.split('@')[0] || 
+           'usuario'
+
+  const userFirstName = userName.split(' ')[0] || userName
 
     // Get chat context if chatId provided
-    let chatContext = ''
+    let chatContextLines: string[] = []
     if (chatId) {
       try {
         const { data: messages } = await supabase
@@ -51,10 +53,9 @@ export async function POST(req: NextRequest) {
           .limit(5)
 
         if (messages && messages.length > 0) {
-          chatContext = '\n\nContexto de la conversación reciente:\n' +
-            messages.reverse().map((m: any) => 
-              `${m.role === 'user' ? 'Usuario' : 'Cleo'}: ${m.content}`
-            ).join('\n')
+          chatContextLines = messages
+            .reverse()
+            .map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Cleo'}: ${m.content}`)
         }
       } catch (error) {
         console.log('No chat context available')
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Try to get user's pending tasks
-    let tasksContext = ''
+    let tasksContextLines: string[] = []
     try {
       const { data: tasks } = await supabase
         .from('tasks' as any)
@@ -73,36 +74,50 @@ export async function POST(req: NextRequest) {
         .limit(5)
 
       if (tasks && tasks.length > 0) {
-        tasksContext = '\n\nTareas pendientes del usuario:\n' +
-          tasks.map((t: any) => `- ${t.title} (${t.priority || 'normal'})`).join('\n')
+        tasksContextLines = tasks.map((t: any) => `• ${t.title} (${t.priority || 'prioridad normal'})`)
       }
     } catch (error) {
       console.log('No tasks available')
     }
 
     // Build contextual instructions
-    const instructions = `Eres Cleo, el asistente personal de IA de ${userName}. 
+    const chatContextSummary = chatContextLines.length > 0
+      ? chatContextLines.join('\n')
+      : 'Sin historial reciente.'
 
-INFORMACIÓN DEL USUARIO:
-- Nombre: ${userName}
+    const tasksContextSummary = tasksContextLines.length > 0
+      ? tasksContextLines.join('\n')
+      : 'Sin tareas registradas.'
+
+  const instructions = `You are Cleo, ${userFirstName}'s personal AI assistant. You speak through voice in a warm, curious, and highly practical manner.
+
+USER PROFILE
+- Preferred name: ${userFirstName}
 - Email: ${user.email}
 
-TU ROL:
-- Habla en español de manera natural y conversacional
-- Llama al usuario por su nombre (${userName})
-- Eres proactiva, amigable y eficiente
-- Puedes ayudar con tareas, recordatorios, búsquedas web, análisis de documentos
-- Recuerda el contexto de conversaciones previas
+CONVERSATION PRINCIPLES
+- Detect the user's language from their most recent utterance and answer in that language fluently. When unsure, politely ask which language they prefer.
+- Greet ${userFirstName} once at the start, then use natural pronouns instead of repeating their full name unless you need to regain attention.
+- Keep responses concise but conversational—vary phrasing, use natural pauses, and avoid sounding scripted.
+- Show active listening: briefly acknowledge what you heard, ask follow-up questions, and invite more detail when ideas are vague.
+- Offer concrete help (tasks, reminders, research, summaries) and describe the steps you take. Confirm important actions aloud.
+- If you need thinking time, use organic fillers like “mm...” or “let me check” and then continue with substance.
+- Never fabricate information. When you lack details, say so transparently and suggest next steps.
+- Close only when ${userFirstName} is satisfied or the dialogue reaches a clear pause; otherwise keep the flow going.
 
-CAPACIDADES:
-- Crear y gestionar tareas
-- Recordatorios y seguimiento
-- Búsqueda de información
-- Responder preguntas
-- Análisis y resumen de información
-${chatContext}${tasksContext}
+CAPABILITIES AT HAND
+- Create, track, and update tasks or reminders.
+- Perform quick research and explain findings clearly.
+- Synthesize and clarify complex information.
+- Coordinate follow-ups or next steps on the user's behalf.
 
-Responde de forma concisa pero completa. Si necesitas crear una tarea o hacer algo específico, hazlo y confírmalo al usuario.`
+RECENT CONVERSATION SNAPSHOT
+${chatContextSummary}
+
+OPEN TASKS
+${tasksContextSummary}
+
+Overall goal: maintain a fluid, helpful conversation. Decide whether to deepen the topic, suggest actions, or execute tasks, and narrate your reasoning to ${userFirstName} as you assist.`
 
     // Return configuration for voice session
     return NextResponse.json({
