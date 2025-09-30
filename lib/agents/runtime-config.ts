@@ -37,7 +37,7 @@ export function getRuntimeConfig(): RuntimeConfig {
   return {
     // Default delegation timeout set to 300s to match API route maxDuration
     delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 300_000),
-    delegationPollMs: intFromEnv('DELEGATION_POLL_MS', 750),
+    delegationPollMs: intFromEnv('DELEGATION_POLL_MS', 2000), // OPTIMIZADO: 2s en lugar de 750ms (reduce carga 62%)
     // Disable auto-extensions by default to avoid exceeding serverless function time limits
     delegationExtendOnProgressMs: intFromEnv('DELEGATION_EXTEND_ON_PROGRESS_MS', 60_000),
     delegationMaxExtensionMs: intFromEnv('DELEGATION_MAX_EXTENSION_MS', 0),
