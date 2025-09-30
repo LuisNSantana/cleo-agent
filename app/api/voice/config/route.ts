@@ -107,7 +107,7 @@ Responde de forma concisa pero completa. Si necesitas crear una tarea o hacer al
     // Return configuration for voice session
     return NextResponse.json({
       apiKey,
-      model: 'gpt-4o-realtime-preview-2024-10-01',
+      model: 'gpt-4o-mini-realtime-preview-2024-12-17',
       voice: 'alloy',
       instructions
     })

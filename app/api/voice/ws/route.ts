@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const model = searchParams.get('model') || 'gpt-4o-realtime-preview-2024-10-01'
+  const model = searchParams.get('model') || 'gpt-4o-mini-realtime-preview-2024-12-17'
   
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {

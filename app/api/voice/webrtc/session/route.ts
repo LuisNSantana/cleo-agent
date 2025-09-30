@@ -51,45 +51,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Session configuration - using alias model name
-    const sessionConfig = JSON.stringify({
-      session: {
-        type: 'realtime',
-        model: 'gpt-realtime',
-        audio: {
-          output: {
-            voice: 'alloy'
-          }
-        }
-      }
-    })
+    // Session configuration
+  const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview-2024-12-17'
+    const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy'
 
-    // Create multipart form data - using set() not append()
+    const sessionConfig = {
+      model,
+      voice,
+      modalities: ['text', 'audio'],
+      turn_detection: { type: 'server_vad' }
+    }
+
+    // Create multipart form data - using append to preserve multiple values if needed
     const formData = new FormData()
-    formData.set('sdp', sdp)
-    formData.set('session', sessionConfig)
+    formData.append('sdp', sdp)
+    formData.append('session', JSON.stringify(sessionConfig))
 
     console.log('📡 Forwarding SDP to OpenAI Realtime API...')
 
     // Forward to OpenAI using the unified interface
-    const response = await fetch('https://api.openai.com/v1/realtime/calls', {
+    const realtimeUrl = `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(model)}`
+    const response = await fetch(realtimeUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'OpenAI-Beta': 'realtime=v1'
       },
       body: formData
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('OpenAI API error:', response.status, errorText)
-      
+      const rawError = await response.text()
+      let errorPayload: unknown = rawError
+
+      try {
+        errorPayload = JSON.parse(rawError)
+      } catch (parseError) {
+        // keep raw text if parsing fails
+      }
+
+      console.error('OpenAI API error:', response.status, errorPayload)
+
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to establish connection with OpenAI',
-          details: errorText
+          details: errorPayload
         },
-        { status: response.status }
+        { status: response.status === 400 ? 502 : response.status }
       )
     }
 

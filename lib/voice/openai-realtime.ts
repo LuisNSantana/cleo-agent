@@ -12,7 +12,7 @@ export class OpenAIRealtimeClient {
   private model: string
   private voice: string
 
-  constructor(apiKey: string, model = 'gpt-4o-realtime-preview-2024-10-01', voice = 'alloy') {
+  constructor(apiKey: string, model = 'gpt-4o-mini-realtime-preview-2024-12-17', voice = 'alloy') {
     this.apiKey = apiKey
     this.model = model
     this.voice = voice
