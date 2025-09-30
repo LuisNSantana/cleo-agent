@@ -189,6 +189,10 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
+      console.log('📤 Sending SDP offer to backend...')
+      console.log('📤 SDP length:', offer.sdp?.length)
+      console.log('📤 SDP preview:', offer.sdp?.substring(0, 100))
+
       // Send offer to our backend which will forward to OpenAI
       const sdpResponse = await fetch('/api/voice/webrtc/session', {
         method: 'POST',
@@ -198,8 +202,12 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         body: offer.sdp
       })
 
+      console.log('📥 Response status:', sdpResponse.status)
+
       if (!sdpResponse.ok) {
-        throw new Error('Failed to establish WebRTC connection')
+        const errorText = await sdpResponse.text()
+        console.error('❌ Backend error:', errorText)
+        throw new Error(`Failed to establish WebRTC connection: ${errorText}`)
       }
 
       // Get answer from OpenAI (via our backend)
