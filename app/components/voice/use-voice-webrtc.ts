@@ -126,15 +126,26 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const audioTrack = stream.getAudioTracks()[0]
       pc.addTrack(audioTrack, stream)
 
-      // Set up data channel for events
+      // Create data channel for events (must be done before createOffer)
       const dc = pc.createDataChannel('oai-events')
       dataChannelRef.current = dc
+      console.log('📡 Created data channel: oai-events')
 
       dc.onopen = () => {
         console.log('✅ Data channel opened')
         setStatus('listening')
         startTimeRef.current = Date.now()
         monitorAudioLevel()
+      }
+
+      dc.onclose = () => {
+        console.log('❌ Data channel closed')
+      }
+
+      dc.onerror = (error) => {
+        console.error('❌ Data channel error:', error)
+        setError(new Error('Data channel error'))
+        setStatus('error')
       }
 
       dc.onmessage = (e) => {
@@ -175,15 +186,6 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         }
       }
 
-      dc.onerror = (error) => {
-        console.error('❌ Data channel error:', error)
-        setError(new Error('Data channel error'))
-        setStatus('error')
-      }
-
-      dc.onclose = () => {
-        console.log('Data channel closed')
-      }
 
       // Create offer
       const offer = await pc.createOffer()
