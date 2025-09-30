@@ -36,16 +36,29 @@ export class VoiceSessionManager {
       throw new VoiceRateLimitError(rateLimitInfo.message)
     }
 
-    // Get user preferences for defaults
-    const { data: preferences } = await supabase
-      .from('user_preferences')
-      .select('voice_mode_enabled, voice_minutes_limit')
-      .eq('user_id', userId)
-      .single()
+    // Get user preferences for defaults (optional - for backward compatibility)
+    // Voice mode is enabled by default for all authenticated users
+    let voiceEnabled = true // Default: enabled for all users
+    
+    try {
+      const { data: preferences } = await supabase
+        .from('user_preferences')
+        .select('voice_mode_enabled, voice_minutes_limit')
+        .eq('user_id', userId)
+        .single()
 
-    const prefs = preferences as any
+      const prefs = preferences as any
+      
+      // Only check if columns exist (after migration)
+      if (prefs && 'voice_mode_enabled' in prefs) {
+        voiceEnabled = prefs.voice_mode_enabled
+      }
+    } catch (error) {
+      // If columns don't exist yet, default to enabled for authenticated users
+      console.log('Voice preferences not found, using default (enabled)')
+    }
 
-    if (!prefs?.voice_mode_enabled) {
+    if (!voiceEnabled) {
       throw new VoiceError(
         'Voice mode is not enabled for this user',
         'VOICE_MODE_DISABLED'
@@ -82,8 +95,23 @@ export class VoiceSessionManager {
       .single()
 
     if (error) {
+      // Check if error is due to missing table (migration not run)
+      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+        throw new VoiceError(
+          'Voice sessions table does not exist. Please run database migration first: migrations/0012_voice_mode_tables.sql',
+          'MIGRATION_REQUIRED'
+        )
+      }
+      
       throw new VoiceError(
         `Failed to create voice session: ${error.message}`,
+        'CREATE_SESSION_ERROR'
+      )
+    }
+
+    if (!data) {
+      throw new VoiceError(
+        'No data returned from voice session creation',
         'CREATE_SESSION_ERROR'
       )
     }
