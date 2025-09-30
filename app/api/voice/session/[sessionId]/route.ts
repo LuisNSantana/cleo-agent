@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  context: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -23,7 +23,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { sessionId } = params
+    const { sessionId } = await context.params
     const body = await req.json()
 
     const session = await VoiceSessionManager.endSession(
@@ -53,7 +53,7 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  context: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -71,7 +71,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { sessionId } = params
+    const { sessionId } = await context.params
 
     await VoiceSessionManager.markSessionError(
       sessionId,
