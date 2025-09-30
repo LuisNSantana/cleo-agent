@@ -21,6 +21,8 @@ import { TipOnboarding } from "../onboarding/tip-onboarding"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
 import ConfirmationPanel, { ConfirmationItem } from "@/components/chat/confirmation-panel"
+import { VoiceMode } from "@/app/components/voice/voice-mode"
+import { Phone } from "lucide-react"
 
 const FeedbackWidget = dynamic(
   () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
@@ -34,6 +36,7 @@ const DialogAuth = dynamic(
 
 export function Chat() {
   const [mounted, setMounted] = useState(false)
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false)
   useEffect(() => setMounted(true), [])
   // Measure ChatInput height for dynamic bottom padding (mobile)
   const inputRef = useRef<HTMLDivElement | null>(null)
@@ -412,12 +415,31 @@ export function Chat() {
         }}
         ref={inputRef}
       >
-        <ChatInput
-          {...chatInputProps}
-        />
+        <div className="relative">
+          {/* Voice Mode Button */}
+          <button
+            onClick={() => setVoiceModeOpen(true)}
+            className="absolute -top-14 right-4 p-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-lg shadow-purple-500/25 transition-all hover:scale-105 z-10"
+            aria-label="Voice Mode"
+          >
+            <Phone className="w-5 h-5 text-white" />
+          </button>
+
+          <ChatInput
+            {...chatInputProps}
+          />
+        </div>
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />
+
+      {/* Voice Mode Modal */}
+      {voiceModeOpen && (
+        <VoiceMode
+          chatId={chatId || undefined}
+          onClose={() => setVoiceModeOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -1298,14 +1298,23 @@ export class AgentOrchestrator {
           progress: 70
         })
         
-        delegationResult = await this.executeAgent(
+        // CRITICAL FIX: Add absolute timeout for sub-agent execution  
+        const SUBAGENT_TIMEOUT = 180000; // 3 minutes max for sub-agents
+        
+        const subAgentPromise = this.executeAgent(
           subAgentConfig,
           delegationContext,
           {
             timeout: this.runtime.maxExecutionMsSpecialist,
             priority: normalizedPriority
           }
-        )
+        );
+        
+        const subTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Sub-agent timeout: ${delegationData.targetAgent} exceeded ${SUBAGENT_TIMEOUT/1000}s`)), SUBAGENT_TIMEOUT)
+        );
+        
+        delegationResult = await Promise.race([subAgentPromise, subTimeoutPromise]) as ExecutionResult;
       } else {
         // Execute regular agent with delegated task
         
@@ -1353,14 +1362,23 @@ export class AgentOrchestrator {
           progress: 60
         })
         
-        delegationResult = await this.executeAgent(
+        // CRITICAL FIX: Add absolute timeout for delegated agent execution
+        const DELEGATION_TIMEOUT = 180000; // 3 minutes max for delegations
+        
+        const delegationPromise = this.executeAgent(
           targetAgentConfig as AgentConfig,
           delegationContext,
           {
             timeout: this.runtime.maxExecutionMsSupervisor,
             priority: normalizedPriority
           }
-        )
+        );
+        
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error(`Delegation timeout: ${delegationData.targetAgent} exceeded ${DELEGATION_TIMEOUT/1000}s`)), DELEGATION_TIMEOUT)
+        );
+        
+        delegationResult = await Promise.race([delegationPromise, timeoutPromise]) as ExecutionResult;
       }
       
   logger.info(`✅ [DELEGATION] ${targetAgentConfig.name} completed delegated task`)
