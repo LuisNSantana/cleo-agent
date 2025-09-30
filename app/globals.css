@@ -180,65 +180,82 @@ body {
 
 .dark {
   /* ====================================================================
-     Dark Mode: Modern neutral palette with WCAG AA/AAA contrast
-     Inspired by GitHub Dark and Material 3
+     Dark Mode Premium 2025
+     Inspired by Apple Vision, Claude, ChatGPT, Linear
+     - True black avoided (warm charcoal base)
+     - Elevated surfaces with subtle borders
+     - Soft shadows and glows
+     - Slightly warm tones (not cold blue)
+     - Perfect for OLED displays
      ==================================================================== */
   
-  --background: #0d1117;
-  --foreground: #f0f6fc;
-  --foreground-soft: #c9d1d9;
-  --foreground-subtle: #8b949e;
+  /* Base - Warm charcoal, not true black (Apple/Claude style) */
+  --background: #0f0f10;        /* Warm charcoal base */
+  --foreground: #ededef;        /* Soft white, not harsh */
+  --foreground-soft: #c5c5c7;   /* Medium gray */
+  --foreground-subtle: #87878a; /* Subtle gray */
   
-  --card: #161b22;
-  --card-foreground: #f0f6fc;
-  --popover: #161b22;
-  --popover-foreground: #f0f6fc;
+  /* Elevated surfaces - progressive layers */
+  --card: #1a1a1c;              /* First elevation */
+  --card-foreground: #ededef;
+  --popover: #1f1f21;           /* Second elevation */
+  --popover-foreground: #ededef;
   
-  --primary: #58a6ff;
-  --primary-foreground: #0d1117;
+  /* Primary - Soft blue with good contrast */
+  --primary: #3b82f6;           /* Balanced blue */
+  --primary-foreground: #ffffff;
   
-  --secondary: #21262d;
-  --secondary-foreground: #f0f6fc;
+  /* Secondary surfaces */
+  --secondary: #27272a;         /* Neutral zinc */
+  --secondary-foreground: #ededef;
   
-  --muted: #30363d;
-  --muted-foreground: #8b949e;
+  /* Muted elements */
+  --muted: #27272a;
+  --muted-foreground: #a1a1a3;
   
-  --accent: #1f6feb;
-  --accent-foreground: #f0f6fc;
+  /* Accent - Warmer blue */
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
   
-  --destructive: #f85149;
+  /* Destructive - Softer red */
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   
-  --border: #30363d;
-  --input: #0d1117;
-  --ring: #58a6ff;
+  /* Borders - Subtle but present (key for premium feel) */
+  --border: #2d2d30;            /* Visible but soft */
+  --input: #1a1a1c;
+  --ring: #3b82f6;
   
-  /* Chart colors - bright and clear for dark mode */
-  --chart-1: #79c0ff;
-  --chart-2: #56d364;
-  --chart-3: #e3b341;
-  --chart-4: #ff7b72;
-  --chart-5: #d2a8ff;
+  /* Chart colors - Slightly desaturated for comfort */
+  --chart-1: #60a5fa;
+  --chart-2: #4ade80;
+  --chart-3: #fbbf24;
+  --chart-4: #f87171;
+  --chart-5: #c084fc;
   
-  /* Sidebar - darker than main for hierarchy */
-  --sidebar: #010409;
-  --sidebar-foreground: #f0f6fc;
-  --sidebar-primary: #58a6ff;
-  --sidebar-primary-foreground: #0d1117;
-  --sidebar-accent: #161b22;
-  --sidebar-accent-foreground: #c9d1d9;
-  --sidebar-border: #21262d;
-  --sidebar-ring: #58a6ff;
+  /* Sidebar - Slightly darker for hierarchy (Apple style) */
+  --sidebar: #09090b;           /* Deeper than main */
+  --sidebar-foreground: #ededef;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1a1c;    /* Elevated from sidebar base */
+  --sidebar-accent-foreground: #c5c5c7;
+  --sidebar-border: #27272a;    /* Subtle separation */
+  --sidebar-ring: #3b82f6;
 
-  /* Elevation surfaces */
-  --surface-1: #161b22;
-  --surface-2: #21262d;
-  --surface-3: #30363d;
+  /* Elevation surfaces - Progressive layers with subtle differences */
+  --surface-1: #1a1a1c;         /* Base elevated */
+  --surface-2: #1f1f21;         /* More elevated */
+  --surface-3: #27272a;         /* Highest elevation */
 
-  /* Shadows for dark mode */
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.4);
-  --shadow-2: 0 4px 16px rgba(0,0,0,0.3);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.5);
+  /* Shadows - Soft and present even in dark (Premium feel) */
+  --shadow-1: 0 1px 3px 0 rgba(0,0,0,0.45), 0 1px 2px -1px rgba(0,0,0,0.45);
+  --shadow-2: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.3);
+  --shadow-3: 0 10px 15px -3px rgba(0,0,0,0.25), 0 4px 6px -4px rgba(0,0,0,0.25);
+  
+  /* Glow effects for interactive elements */
+  --glow-primary: 0 0 20px rgba(59,130,246,0.15);
+  --glow-accent: 0 0 20px rgba(37,99,235,0.12);
 }
 
 @layer base {
@@ -543,4 +560,173 @@ label, .label-text {
 [data-message-content] {
   line-height: 1.65;
   letter-spacing: -0.009em;
+}
+
+/* ====================================================================
+   PREMIUM GLASSMORPHISM & EFFECTS (Apple/Claude/ChatGPT Style)
+   2025 Best Practices
+   ==================================================================== */
+
+/* Glassmorphism variants */
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .glass-subtle {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-medium {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dark .glass-medium {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Premium glow effects for interactive elements */
+.glow-primary {
+  box-shadow: var(--glow-primary);
+}
+
+.glow-primary-hover:hover {
+  box-shadow: var(--glow-primary);
+  transition: box-shadow 200ms ease;
+}
+
+/* Elevated surfaces with subtle borders (Key for premium feel) */
+.elevated-1 {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+}
+
+.elevated-2 {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+}
+
+.elevated-3 {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+}
+
+/* Interactive state improvements */
+.interactive-base {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-base:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+}
+
+.interactive-base:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-1);
+}
+
+/* Sidebar active item with border accent (Linear/Arc style) */
+.sidebar-active {
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 2px solid var(--primary);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+.dark .sidebar-active {
+  background: rgba(59, 130, 246, 0.10);
+  box-shadow: 
+    inset 0 0 0 1px rgba(59, 130, 246, 0.15),
+    var(--glow-primary);
+}
+
+/* Subtle pulse for badges */
+@keyframes subtle-pulse {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.02);
+  }
+}
+
+.badge-pulse {
+  animation: subtle-pulse 3s ease-in-out infinite;
+}
+
+/* Smooth reveal animation */
+@keyframes smooth-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.smooth-reveal {
+  animation: smooth-reveal 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Premium focus states */
+.focus-premium:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Frosted glass for modals (Claude/ChatGPT style) */
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dark .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.dark .modal-content {
+  background: rgba(26, 26, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.4),
+    0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms !important;
+  }
 }
