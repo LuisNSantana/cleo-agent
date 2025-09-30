@@ -168,25 +168,22 @@ export function useVoiceSession(): UseVoiceSessionReturn {
         processor.onaudioprocess = (e) => {
           if (ws.readyState === WebSocket.OPEN && !isMuted) {
             const inputData = e.inputBuffer.getChannelData(0)
-            const pcm16 = new Int16Array(inputData.length)
             
-            // Convert float32 to pcm16
+            // Convert Float32 to Int16 PCM
+            const pcm16 = new Int16Array(inputData.length)
             for (let i = 0; i < inputData.length; i++) {
               const s = Math.max(-1, Math.min(1, inputData[i]))
               pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
             }
             
-            // Convert to base64 properly
-            const uint8 = new Uint8Array(pcm16.buffer)
-            let binary = ''
-            for (let i = 0; i < uint8.length; i++) {
-              binary += String.fromCharCode(uint8[i])
-            }
-            const base64Audio = btoa(binary)
+            // Convert to base64 - simple approach
+            const base64 = btoa(
+              String.fromCharCode(...new Uint8Array(pcm16.buffer))
+            )
             
             ws.send(JSON.stringify({
               type: 'input_audio_buffer.append',
-              audio: base64Audio
+              audio: base64
             }))
           }
         }
