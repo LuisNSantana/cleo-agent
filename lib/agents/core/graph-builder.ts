@@ -16,6 +16,19 @@ import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/to
 import { resolveNotionKey } from '@/lib/notion/credentials'
 import logger from '@/lib/utils/logger'
 
+type DelegationCompletionPayload = {
+  sourceExecutionId?: string
+  sourceAgent?: string
+  targetAgent?: string
+  result?: unknown
+  continuationHint?: string
+}
+
+type DelegationFailurePayload = {
+  sourceExecutionId?: string
+  error?: string
+}
+
 export interface GraphBuilderConfig {
   modelFactory: ModelFactory
   eventEmitter: EventEmitter
@@ -371,47 +384,59 @@ export class GraphBuilder {
                 const delegationData = this.parseDelegationResponse(output)
                 
                 // Create promise to wait for delegation completion
-                const delegationPromise = new Promise((resolve, reject) => {
-                  const timeout = setTimeout(() => {
-                    reject(new Error(`Delegation timeout after ${runtime.delegationTimeoutMs} ms`))
-                  }, runtime.delegationTimeoutMs)
-                  
-                  const onCompleted = (result: any) => {
+                const delegationPromise = new Promise<DelegationCompletionPayload>((resolve, reject) => {
+                  let timeoutHandle: ReturnType<typeof setTimeout>
+                  let onCompleted: (result: DelegationCompletionPayload) => void
+                  let onFailed: (error: DelegationFailurePayload) => void
+
+                  const cleanup = () => {
+                    if (timeoutHandle) clearTimeout(timeoutHandle)
+                    if (onCompleted) this.eventEmitter.off('delegation.completed', onCompleted)
+                    if (onFailed) this.eventEmitter.off('delegation.failed', onFailed)
+                  }
+
+                  onCompleted = (result: DelegationCompletionPayload) => {
                     // Compare using execution context ID instead of agent names for more reliable matching
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (result.sourceExecutionId === currentExecutionId) {
                       logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
-                      clearTimeout(timeout)
-                      this.eventEmitter.off('delegation.completed', onCompleted)
-                      this.eventEmitter.off('delegation.failed', onFailed)
+                      cleanup()
                       resolve(result)
                     } else {
                       logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
                         resultExecutionId: result.sourceExecutionId,
-                        currentExecutionId: currentExecutionId,
+                        currentExecutionId,
                         sourceAgent: result.sourceAgent,
                         targetAgent: result.targetAgent
                       })
                     }
                   }
-                  
-                  const onFailed = (error: any) => {
+
+                  onFailed = (error: DelegationFailurePayload) => {
                     // Compare using execution context ID instead of agent names
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (error.sourceExecutionId === currentExecutionId) {
                       logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
-                      clearTimeout(timeout)
-                      this.eventEmitter.off('delegation.completed', onCompleted)
-                      this.eventEmitter.off('delegation.failed', onFailed)
+                      cleanup()
                       reject(new Error(error.error || 'Delegation failed'))
                     } else {
                       logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
                         errorExecutionId: error.sourceExecutionId,
-                        currentExecutionId: currentExecutionId
+                        currentExecutionId
                       })
                     }
                   }
-                  
+
+                  const onTimeout = () => {
+                    logger.warn('⏱️ [DELEGATION] Delegation promise timed out', {
+                      executionId: ExecutionManager.getCurrentExecutionId(),
+                      targetAgent: delegationData.targetAgent || delegationData.agentId
+                    })
+                    cleanup()
+                    reject(new Error(`Delegation timeout after ${runtime.delegationTimeoutMs} ms`))
+                  }
+
+                  timeoutHandle = setTimeout(onTimeout, runtime.delegationTimeoutMs)
                   this.eventEmitter.on('delegation.completed', onCompleted)
                   this.eventEmitter.on('delegation.failed', onFailed)
                 })
@@ -435,40 +460,45 @@ export class GraphBuilder {
                   logger.debug('⏳ [DELEGATION] Waiting for delegation to complete...')
                   const delegationResult = await delegationPromise
                   
-                  const delegatedText = String((delegationResult as any)?.result || '').trim()
-                  const delegatedSender = String(delegationData.targetAgent || delegationData.agentId || '')
-                  
-                  // If running under Cleo supervisor, finalize immediately with the delegated agent's result
-                  // so the final message comes from the specialist (e.g., Toby) instead of Cleo.
-                  if (agentConfig.id === 'cleo-supervisor' && delegatedText) {
-                    logger.info('🎉 [HANDOFF] Finalizing with delegated agent result', { sender: delegatedSender })
-                    // Emit completion for UI/metrics before returning
-                    this.eventEmitter.emit('node.completed', {
-                      nodeId: agentConfig.id,
-                      agentId: delegatedSender,
-                      response: delegatedText
-                    })
-                    return {
-                      messages: [
-                        ...filteredStateMessages,
-                        new AIMessage({
-                          content: delegatedText,
-                          additional_kwargs: {
-                            sender: delegatedSender,
-                            conversation_mode: state.messages[state.messages.length - 1]?.additional_kwargs?.conversation_mode
-                          }
-                        })
-                      ]
-                    }
-                  }
+                  const rawResult = delegationResult?.result
+                  const delegatedText = typeof rawResult === 'string'
+                    ? rawResult.trim()
+                    : JSON.stringify(rawResult ?? {})
+                  const delegatedSender = String(
+                    delegationData.targetAgent ||
+                      delegationData.agentId ||
+                      delegationResult?.targetAgent ||
+                      'agente delegado'
+                  )
 
-                  // Default behavior: add as tool result and continue model loop
+                  if (!state.metadata) state.metadata = {}
+                  const existingDelegations = Array.isArray(state.metadata.delegations)
+                    ? state.metadata.delegations
+                    : []
+                  state.metadata.delegations = [
+                    ...existingDelegations,
+                    {
+                      agentId: delegatedSender,
+                      task: delegationData.delegatedTask || delegationData.task,
+                      result: delegatedText,
+                      completedAt: new Date().toISOString()
+                    }
+                  ]
+
+                  // Default behavior: add as tool result and continue model loop.
+                  // Provide guidance so Cleo can chain additional delegations before finalizing.
                   logger.info('✅ [DELEGATION] Delegation completed, adding result to conversation')
+                  const continuationHint = delegationResult?.continuationHint ||
+                    delegationData?.continuationHint ||
+                    'Acción interna: Usa este resultado para continuar con la solicitud original. Si el usuario pidió pasos adicionales (por ejemplo, enviar un correo con los hallazgos), realiza la siguiente delegación antes de finalizar.'
+                  const summarizedTask = delegationData.delegatedTask || delegationData.task || 'Tarea delegada'
+                  const toolSummary = `✅ Delegation result from ${delegatedSender}\n\nTask: ${summarizedTask}\n\nOutput:\n${delegatedText}\n\n${continuationHint}`
+
                   messages = [
                     ...messages,
-                    new ToolMessage({ 
-                      content: `✅ Task completed by ${delegationData.targetAgent || delegationData.agentId}:\n\n${delegatedText}`, 
-                      tool_call_id: String(callId) 
+                    new ToolMessage({
+                      content: toolSummary,
+                      tool_call_id: String(callId)
                     })
                   ]
                 } catch (delegationError) {
@@ -936,47 +966,57 @@ export class GraphBuilder {
                 const delegationData = this.parseDelegationResponse(output)
 
                 // Create promise to await delegation completion
-                const delegationPromise = new Promise((resolve, reject) => {
-                  const timeout = setTimeout(() => {
-                    reject(new Error(`Delegation timeout after ${this.runtime.delegationTimeoutMs / 1000} seconds`))
-                  }, this.runtime.delegationTimeoutMs)
+                const delegationPromise = new Promise<DelegationCompletionPayload>((resolve, reject) => {
+                  let timeoutHandle: ReturnType<typeof setTimeout>
+                  let onCompleted: (result: DelegationCompletionPayload) => void
+                  let onFailed: (error: DelegationFailurePayload) => void
 
-                  const onCompleted = (result: any) => {
-                    // Compare using execution context ID instead of agent names for more reliable matching
+                  const cleanup = () => {
+                    if (timeoutHandle) clearTimeout(timeoutHandle)
+                    if (onCompleted) this.eventEmitter.off('delegation.completed', onCompleted)
+                    if (onFailed) this.eventEmitter.off('delegation.failed', onFailed)
+                  }
+
+                  onCompleted = (result: DelegationCompletionPayload) => {
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (result.sourceExecutionId === currentExecutionId) {
                       logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
-                      clearTimeout(timeout)
-                      this.eventEmitter.off('delegation.completed', onCompleted)
-                      this.eventEmitter.off('delegation.failed', onFailed)
+                      cleanup()
                       resolve(result)
                     } else {
                       logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
                         resultExecutionId: result.sourceExecutionId,
-                        currentExecutionId: currentExecutionId,
+                        currentExecutionId,
                         sourceAgent: result.sourceAgent,
                         targetAgent: result.targetAgent
                       })
                     }
                   }
 
-                  const onFailed = (error: any) => {
-                    // Compare using execution context ID instead of agent names
+                  onFailed = (error: DelegationFailurePayload) => {
                     const currentExecutionId = ExecutionManager.getCurrentExecutionId()
                     if (error.sourceExecutionId === currentExecutionId) {
                       logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
-                      clearTimeout(timeout)
-                      this.eventEmitter.off('delegation.completed', onCompleted)
-                      this.eventEmitter.off('delegation.failed', onFailed)
+                      cleanup()
                       reject(new Error(error.error || 'Delegation failed'))
                     } else {
                       logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
                         errorExecutionId: error.sourceExecutionId,
-                        currentExecutionId: currentExecutionId
+                        currentExecutionId
                       })
                     }
                   }
 
+                  const onTimeout = () => {
+                    logger.warn('⏱️ [DELEGATION] Delegation promise timed out', {
+                      executionId: ExecutionManager.getCurrentExecutionId(),
+                      targetAgent: delegationData.targetAgent || delegationData.agentId
+                    })
+                    cleanup()
+                    reject(new Error(`Delegation timeout after ${this.runtime.delegationTimeoutMs / 1000} seconds`))
+                  }
+
+                  timeoutHandle = setTimeout(onTimeout, this.runtime.delegationTimeoutMs)
                   this.eventEmitter.on('delegation.completed', onCompleted)
                   this.eventEmitter.on('delegation.failed', onFailed)
                 })
@@ -997,16 +1037,46 @@ export class GraphBuilder {
 
                 try {
                   logger.debug('⏳ [DELEGATION] Waiting for delegated task to complete... executionId:', currentExecutionId)
-                  const delegationResult: any = await delegationPromise
+                  const delegationResult = await delegationPromise
                   logger.info('✅ [DELEGATION] Completed, injecting result into conversation. ExecutionId:', currentExecutionId)
-                  const contentStr = typeof (delegationResult?.result) === 'string' 
-                    ? delegationResult.result 
-                    : JSON.stringify(delegationResult?.result || {})
+
+                  const rawResult = delegationResult?.result
+                  const delegatedText = typeof rawResult === 'string'
+                    ? rawResult.trim()
+                    : JSON.stringify(rawResult ?? {})
+                  const delegatedSender = String(
+                    delegationData.targetAgent ||
+                      delegationData.agentId ||
+                      delegationResult?.targetAgent ||
+                      'agente delegado'
+                  )
+
+                  if (!state.metadata) state.metadata = {}
+                  const existingDelegations = Array.isArray(state.metadata.delegations)
+                    ? state.metadata.delegations
+                    : []
+                  state.metadata.delegations = [
+                    ...existingDelegations,
+                    {
+                      agentId: delegatedSender,
+                      task: delegationData.delegatedTask || delegationData.task,
+                      result: delegatedText,
+                      completedAt: new Date().toISOString()
+                    }
+                  ]
+
+                  logger.info('✅ [DELEGATION] Delegation completed, adding structured result to conversation')
+                  const continuationHint = delegationResult?.continuationHint ||
+                    delegationData?.continuationHint ||
+                    'Acción interna: Usa este resultado para continuar con la solicitud original. Si el usuario pidió pasos adicionales (por ejemplo, enviar un correo con los hallazgos), realiza la siguiente delegación antes de finalizar.'
+                  const summarizedTask = delegationData.delegatedTask || delegationData.task || 'Tarea delegada'
+                  const toolSummary = `✅ Delegation result from ${delegatedSender}\n\nTask: ${summarizedTask}\n\nOutput:\n${delegatedText}\n\n${continuationHint}`
+
                   messages = [
                     ...messages,
-                    new ToolMessage({ 
-                      content: `✅ Task completed by ${delegationData.targetAgent || delegationData.agentId}:\n\n${contentStr}`, 
-                      tool_call_id: String(callId) 
+                    new ToolMessage({
+                      content: toolSummary,
+                      tool_call_id: String(callId)
                     })
                   ]
                   logger.debug('🔄 [DELEGATION] ToolMessage injected, continuing graph execution...')
