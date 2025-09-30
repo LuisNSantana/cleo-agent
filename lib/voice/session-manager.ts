@@ -36,34 +36,8 @@ export class VoiceSessionManager {
       throw new VoiceRateLimitError(rateLimitInfo.message)
     }
 
-    // Get user preferences for defaults (optional - for backward compatibility)
-    // Voice mode is enabled by default for all authenticated users
-    let voiceEnabled = true // Default: enabled for all users
-    
-    try {
-      const { data: preferences } = await supabase
-        .from('user_preferences')
-        .select('voice_mode_enabled, voice_minutes_limit')
-        .eq('user_id', userId)
-        .single()
-
-      const prefs = preferences as any
-      
-      // Only check if columns exist (after migration)
-      if (prefs && 'voice_mode_enabled' in prefs) {
-        voiceEnabled = prefs.voice_mode_enabled
-      }
-    } catch (error) {
-      // If columns don't exist yet, default to enabled for authenticated users
-      console.log('Voice preferences not found, using default (enabled)')
-    }
-
-    if (!voiceEnabled) {
-      throw new VoiceError(
-        'Voice mode is not enabled for this user',
-        'VOICE_MODE_DISABLED'
-      )
-    }
+    // Voice mode is enabled for all authenticated users
+    // No additional checks needed
 
     // Create session
     const session: Partial<VoiceSession> = {
