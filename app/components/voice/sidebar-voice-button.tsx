@@ -1,18 +1,38 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Microphone, MicrophoneSlash } from '@phosphor-icons/react'
+import { Microphone } from '@phosphor-icons/react'
 import { VoiceMode } from './voice-mode'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 export function SidebarVoiceButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const params = useParams<{ chatId: string }>()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const chatId = params?.chatId
+
+  useEffect(() => {
+    if (!searchParams) return
+
+    const shouldOpen = searchParams.get('voice') === 'open'
+
+    if (shouldOpen) {
+      setIsOpen(true)
+
+      const updatedParams = new URLSearchParams(searchParams.toString())
+      updatedParams.delete('voice')
+
+      const nextQuery = updatedParams.toString()
+      const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname
+
+      router.replace(nextUrl, { scroll: false })
+    }
+  }, [pathname, router, searchParams])
 
   const handleClick = async () => {
     // If no chatId, create a new chat first
@@ -35,13 +55,8 @@ export function SidebarVoiceButton() {
         const { id: newChatId } = await response.json()
         
         // Redirect to new chat and open voice mode
-        router.push(`/c/${newChatId}`)
-        
-        // Wait a bit for navigation then open modal
-        setTimeout(() => {
-          setIsOpen(true)
-          setIsCreating(false)
-        }, 100)
+        router.push(`/c/${newChatId}?voice=open`)
+        setIsCreating(false)
       } catch (error) {
         console.error('Error creating chat:', error)
         setIsCreating(false)
@@ -58,6 +73,7 @@ export function SidebarVoiceButton() {
         type="button"
         variant="ghost"
         onClick={handleClick}
+        disabled={isCreating}
         className={cn(
           "group/voice relative inline-flex w-full items-center radius-md px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5",
           "bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground"

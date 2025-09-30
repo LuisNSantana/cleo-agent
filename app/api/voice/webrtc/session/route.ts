@@ -18,12 +18,25 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get SDP from browser
-    const sdp = await request.text()
-    
-    console.log('📥 Received SDP length:', sdp.length)
-    console.log('📥 SDP preview:', sdp.substring(0, 100))
-    
+    const contentType = request.headers.get('content-type') ?? ''
+    let sdp: string | undefined
+    let sessionOverrides: Partial<Record<string, unknown>> | undefined
+
+    if (contentType.includes('application/json')) {
+      const body = await request.json().catch(() => null)
+
+      if (body && typeof body === 'object') {
+        if (typeof body.sdp === 'string') {
+          sdp = body.sdp
+        }
+        if (body.session && typeof body.session === 'object') {
+          sessionOverrides = body.session as Partial<Record<string, unknown>>
+        }
+      }
+    } else {
+      sdp = await request.text()
+    }
+
     if (!sdp || sdp.trim().length === 0) {
       console.error('❌ Empty SDP received')
       return NextResponse.json(
@@ -31,7 +44,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
+
+    console.log('📥 Received SDP length:', sdp.length)
+    console.log('📥 SDP preview:', sdp.substring(0, 100))
+
     // Validate SDP format
     if (!sdp.includes('v=0')) {
       console.error('❌ Invalid SDP format - missing v=0')
@@ -52,14 +68,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Session configuration
-  const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview-2024-12-17'
+    const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview-2024-12-17'
     const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy'
 
-    const sessionConfig = {
+    const sessionConfig: Record<string, unknown> = {
       model,
       voice,
       modalities: ['text', 'audio'],
       turn_detection: { type: 'server_vad' }
+    }
+
+    if (sessionOverrides) {
+      if (typeof sessionOverrides.model === 'string' && sessionOverrides.model.trim().length > 0) {
+        sessionConfig.model = sessionOverrides.model
+      }
+      if (typeof sessionOverrides.voice === 'string' && sessionOverrides.voice.trim().length > 0) {
+        sessionConfig.voice = sessionOverrides.voice
+      }
+      if (typeof sessionOverrides.instructions === 'string') {
+        sessionConfig.instructions = sessionOverrides.instructions
+      }
+      if (Array.isArray(sessionOverrides.modalities)) {
+        sessionConfig.modalities = sessionOverrides.modalities
+      }
+      if (sessionOverrides.turn_detection && typeof sessionOverrides.turn_detection === 'object') {
+        sessionConfig.turn_detection = sessionOverrides.turn_detection
+      }
     }
 
     // Create multipart form data - using append to preserve multiple values if needed
@@ -70,7 +104,11 @@ export async function POST(request: NextRequest) {
     console.log('📡 Forwarding SDP to OpenAI Realtime API...')
 
     // Forward to OpenAI using the unified interface
-    const realtimeUrl = `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(model)}`
+    const effectiveModel = typeof sessionConfig.model === 'string' && sessionConfig.model.trim().length > 0
+      ? sessionConfig.model
+      : model
+
+    const realtimeUrl = `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(effectiveModel)}`
     const response = await fetch(realtimeUrl, {
       method: 'POST',
       headers: {

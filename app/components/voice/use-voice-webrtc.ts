@@ -71,6 +71,23 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       setStatus('connecting')
       setError(null)
 
+      // Fetch voice configuration with contextual instructions
+      const configResponse = await fetch('/api/voice/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId })
+      })
+
+      if (!configResponse.ok) {
+        const errorData = await configResponse.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to get voice configuration')
+      }
+
+      const config = await configResponse.json()
+      const instructions = typeof config?.instructions === 'string'
+        ? config.instructions.trim()
+        : undefined
+
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -136,6 +153,20 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         setStatus('listening')
         startTimeRef.current = Date.now()
         monitorAudioLevel()
+
+        if (instructions && instructions.length > 0) {
+          try {
+            dc.send(JSON.stringify({
+              type: 'session.update',
+              session: {
+                instructions
+              }
+            }))
+            console.log('🧠 Sent personalized instructions to OpenAI session')
+          } catch (sendError) {
+            console.error('Failed to send session.update instructions:', sendError)
+          }
+        }
       }
 
       dc.onclose = () => {
@@ -170,6 +201,10 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             setStatus('listening')
           }
 
+          if (event.type === 'session.updated') {
+            console.log('✅ session.updated acknowledged by OpenAI')
+          }
+
           if (event.type === 'response.audio.delta') {
             setStatus('active')
           }
@@ -199,9 +234,16 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const sdpResponse = await fetch('/api/voice/webrtc/session', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/sdp'
+          'Content-Type': 'application/json'
         },
-        body: offer.sdp
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          session: {
+            model: config?.model,
+            voice: config?.voice,
+            instructions: config?.instructions
+          }
+        })
       })
 
       console.log('📥 Response status:', sdpResponse.status)
