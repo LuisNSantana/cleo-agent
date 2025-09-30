@@ -59,13 +59,27 @@ wss.on('connection', (clientWs, req) => {
   
   // Handle errors
   clientWs.on('error', (error) => {
-    console.error('Client WebSocket error:', error.message)
+    console.error('❌ Client WebSocket error:', error.message)
     openaiWs.close()
   })
   
   openaiWs.on('error', (error) => {
-    console.error('OpenAI WebSocket error:', error.message)
+    console.error('❌ OpenAI WebSocket error:', error.message)
+    console.error('Full error:', error)
     clientWs.close()
+  })
+  
+  openaiWs.on('open', () => {
+    console.log('✅ OpenAI connection opened successfully')
+  })
+  
+  openaiWs.on('unexpected-response', (req, res) => {
+    console.error('❌ OpenAI unexpected response:', res.statusCode, res.statusMessage)
+    let body = ''
+    res.on('data', chunk => body += chunk)
+    res.on('end', () => {
+      console.error('Response body:', body)
+    })
   })
   
   // Handle closures

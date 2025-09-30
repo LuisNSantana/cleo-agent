@@ -219,6 +219,13 @@ export function useVoiceSession(): UseVoiceSessionReturn {
             console.log('✅ session.updated')
           }
           
+          if (eventType === 'error') {
+            console.error('❌ OpenAI Error:', data)
+            setError(new Error(data.error?.message || 'OpenAI connection error'))
+            setStatus('error')
+            return
+          }
+          
           if (eventType === 'input_audio_buffer.speech_started') {
             console.log('🎤 User started speaking')
             setStatus('speaking')
