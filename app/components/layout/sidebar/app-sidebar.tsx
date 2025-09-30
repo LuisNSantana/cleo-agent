@@ -44,6 +44,7 @@ import {
   Folder as Folders,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
+import { SidebarVoiceButton } from "@/app/components/voice/sidebar-voice-button"
 
 export function AppSidebar() {
   const isMobile = useBreakpoint(768)
@@ -184,6 +185,7 @@ export function AppSidebar() {
               }
               hasPopover={false}
             />
+            <SidebarVoiceButton />
           </div>
           {quickActions.length > 0 && (
             <SidebarGroup className="mb-6">
