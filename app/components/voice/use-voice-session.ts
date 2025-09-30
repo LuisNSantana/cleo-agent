@@ -125,52 +125,20 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       const { sessionId } = await response.json()
       sessionIdRef.current = sessionId
 
-      // Get WebSocket configuration (includes API key)
-      const wsConfigResponse = await fetch(`/api/voice/ws?model=${config.model}`)
-      if (!wsConfigResponse.ok) {
-        throw new Error('Failed to get WebSocket configuration')
-      }
-      const wsConfig = await wsConfigResponse.json()
-      
-      // Connect directly to OpenAI with API key
-      const ws = new WebSocket(
-        `${wsConfig.url}&api_key=${wsConfig.apiKey}`,
-        ['realtime', 'openai-beta.realtime-v1']
-      )
+      // Connect to WebSocket proxy server
+      // The proxy adds the Authorization header that browsers cannot set
+      const proxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
+      const wsUrl = `${proxyUrl}?model=${config.model}`
+      const ws = new WebSocket(wsUrl)
 
       wsRef.current = ws
 
-      ws.onopen = () => {
-        console.log('Connected to OpenAI Realtime API')
-        
-        // Configure session
-        ws.send(JSON.stringify({
-          type: 'session.update',
-          session: {
-            modalities: ['text', 'audio'],
-            instructions: config.instructions,
-            voice: config.voice,
-            input_audio_format: 'pcm16',
-            output_audio_format: 'pcm16',
-            input_audio_transcription: {
-              model: 'whisper-1'
-            },
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 500
-            }
-          }
-        }))
-
-        setStatus('listening')
-        startTimeRef.current = Date.now()
-        monitorAudioLevel()
-
-        // Process and send audio to OpenAI
+      let sessionReady = false
+      
+      // Define audio processor function first
+      const startAudioProcessor = () => {
         processor.onaudioprocess = (e) => {
-          if (ws.readyState === WebSocket.OPEN && !isMuted) {
+          if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
             const inputData = e.inputBuffer.getChannelData(0)
             
             // Convert Float32 to Int16 PCM
@@ -180,7 +148,7 @@ export function useVoiceSession(): UseVoiceSessionReturn {
               pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
             }
             
-            // Convert to base64 - simple approach
+            // Convert to base64
             const base64 = btoa(
               String.fromCharCode(...new Uint8Array(pcm16.buffer))
             )
@@ -192,13 +160,68 @@ export function useVoiceSession(): UseVoiceSessionReturn {
           }
         }
       }
+      
+      ws.onopen = async () => {
+        console.log('WebSocket opened, waiting for session.created...')
+      }
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data)
+          const eventType = data.type
           
-          // Handle different event types
-          if (data.type === 'response.audio.delta' && data.delta) {
+          console.log('Event:', eventType)
+          
+          // Wait for session.created
+          if (eventType === 'session.created' && !sessionReady) {
+            console.log('✅ session.created')
+            
+            // Now configure session with proper authorization
+            ws.send(JSON.stringify({
+              type: 'session.update',
+              session: {
+                modalities: ['text', 'audio'],
+                instructions: config.instructions,
+                voice: config.voice,
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                input_audio_transcription: {
+                  model: 'whisper-1'
+                },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 500
+                }
+              }
+            }))
+            
+            sessionReady = true
+            setStatus('listening')
+            startTimeRef.current = Date.now()
+            monitorAudioLevel()
+            
+            // Start sending audio
+            startAudioProcessor()
+            return
+          }
+          // Handle other event types
+          if (eventType === 'session.updated') {
+            console.log('✅ session.updated')
+          }
+          
+          if (eventType === 'input_audio_buffer.speech_started') {
+            console.log('🎤 User started speaking')
+            setStatus('speaking')
+          }
+          
+          if (eventType === 'input_audio_buffer.speech_stopped') {
+            console.log('🎤 User stopped speaking')
+            setStatus('listening')
+          }
+          
+          if (eventType === 'response.audio.delta' && data.delta) {
             setStatus('speaking')
             
             // Decode and play audio

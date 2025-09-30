@@ -18,8 +18,8 @@
     "docker:dev-down": "docker-compose -f docker-compose.yml -f docker-compose.override.yml down --volumes --remove-orphans && docker volume prune -f",
     "docker:dev-restart": "docker-compose -f docker-compose.yml -f docker-compose.override.yml restart cleo && docker-compose logs -f cleo",
     "docker:prod": "docker-compose -f docker-compose.yml up --build",
-  "test:context": "pnpm exec tsc -p tsconfig.tests.json && node --test $(find .tmp-tests/tests -type f -name '*.js')",
-  "test:jest": "jest",
+    "test:context": "pnpm exec tsc -p tsconfig.tests.json && node --test $(find .tmp-tests/tests -type f -name '*.js')",
+    "test:jest": "jest",
     "docker:test": "docker-compose run --rm cleo pnpm test:context",
     "docker:logs": "docker-compose logs -f cleo",
     "docker:logs-all": "docker-compose logs -f",
@@ -28,7 +28,9 @@
     "docker:reset": "docker-compose down --volumes --remove-orphans && docker system prune -af --volumes && docker builder prune -af",
     "docker:status": "docker-compose ps && echo '\n--- Docker System Usage ---' && docker system df",
     "docker:shell": "docker-compose exec cleo /bin/bash",
-    "dev:helper": "node scripts/dev-helper.js"
+    "dev:helper": "node scripts/dev-helper.js",
+    "voice:proxy": "node server/websocket-proxy.js",
+    "dev:voice": "npm-run-all --parallel dev voice:proxy"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.1",
@@ -142,6 +144,7 @@
     "use-stick-to-bottom": "^1.1.1",
     "vaul": "^1.1.2",
     "web-push": "^3.6.7",
+    "ws": "^8.18.3",
     "zod": "^3.25.76",
     "zustand": "^5.0.7"
   },

@@ -1,0 +1,15 @@
+{
+  "name": "cleo-voice-proxy",
+  "version": "1.0.0",
+  "description": "WebSocket proxy for OpenAI Realtime API",
+  "main": "websocket-proxy.js",
+  "scripts": {
+    "start": "node websocket-proxy.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

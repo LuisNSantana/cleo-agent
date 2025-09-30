@@ -1,0 +1,9 @@
+# Ignore everything except server directory
+/*
+!/server
+!/server/**
+
+# Ignore node_modules if exists
+node_modules/
+.next/
+.vercel/
