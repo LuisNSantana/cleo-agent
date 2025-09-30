@@ -1063,7 +1063,7 @@ export async function POST(req: Request) {
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
             const runtimeConfig = getRuntimeConfig()
-            const POLL_MS = 400
+            const POLL_MS = 2000 // OPTIMIZADO: 2s en lugar de 400ms (reduce carga 80%)
             const supervisorLimitMs = Math.max(
               runtimeConfig?.maxExecutionMsSupervisor ?? 300000,
               runtimeConfig?.delegationTimeoutMs ?? 300000
