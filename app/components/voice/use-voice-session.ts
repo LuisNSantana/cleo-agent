@@ -167,7 +167,15 @@ export function useVoiceSession(): UseVoiceSessionReturn {
 
       ws.onmessage = async (event) => {
         try {
-          const data = JSON.parse(event.data)
+          // Handle both Blob and string data
+          let messageText: string
+          if (event.data instanceof Blob) {
+            messageText = await event.data.text()
+          } else {
+            messageText = event.data
+          }
+          
+          const data = JSON.parse(messageText)
           const eventType = data.type
           
           console.log('Event:', eventType)
