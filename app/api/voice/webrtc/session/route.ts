@@ -51,11 +51,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Session configuration for OpenAI - EXACT format from official docs
+    // Session configuration for OpenAI - using latest GA model
     const sessionConfig = {
       session: {
         type: 'realtime',
-        model: 'gpt-realtime',
+        model: 'gpt-realtime-2025-08-28',
         audio: {
           output: {
             voice: 'alloy'
