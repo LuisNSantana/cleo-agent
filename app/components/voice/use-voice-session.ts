@@ -71,6 +71,18 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       setStatus('connecting')
       setError(null)
 
+      // Get OpenAI configuration
+      const configResponse = await fetch('/api/voice/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!configResponse.ok) {
+        throw new Error('Failed to get voice configuration')
+      }
+
+      const config = await configResponse.json()
+
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -83,17 +95,21 @@ export function useVoiceSession(): UseVoiceSessionReturn {
 
       mediaStreamRef.current = stream
 
-      // Setup audio analysis
-      const audioContext = new AudioContext()
+      // Setup audio context for processing
+      const audioContext = new AudioContext({ sampleRate: 24000 })
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      
       analyser.fftSize = 256
       source.connect(analyser)
+      source.connect(processor)
+      processor.connect(audioContext.destination)
 
       audioContextRef.current = audioContext
       analyserRef.current = analyser
 
-      // Create voice session
+      // Create voice session in database
       const response = await fetch('/api/voice/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,59 +117,115 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create voice session')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create voice session')
       }
 
-      const { sessionId, wsUrl, token } = await response.json()
+      const { sessionId } = await response.json()
       sessionIdRef.current = sessionId
 
-      // Connect WebSocket
-      const ws = new WebSocket(`${wsUrl}?token=${token}`)
+      // Connect to OpenAI Realtime API
+      const wsUrl = `wss://api.openai.com/v1/realtime?model=${config.model}`
+      const ws = new WebSocket(wsUrl, {
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'OpenAI-Beta': 'realtime=v1'
+        }
+      } as any)
+
       wsRef.current = ws
 
       ws.onopen = () => {
-        setStatus('active')
+        console.log('Connected to OpenAI Realtime API')
+        
+        // Configure session
+        ws.send(JSON.stringify({
+          type: 'session.update',
+          session: {
+            modalities: ['text', 'audio'],
+            instructions: config.instructions,
+            voice: config.voice,
+            input_audio_format: 'pcm16',
+            output_audio_format: 'pcm16',
+            input_audio_transcription: {
+              model: 'whisper-1'
+            },
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 500
+            }
+          }
+        }))
+
+        setStatus('listening')
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        // Start sending audio
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'audio/webm;codecs=opus',
-          audioBitsPerSecond: 16000
-        })
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            ws.send(event.data)
+        // Process and send audio to OpenAI
+        processor.onaudioprocess = (e) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            const inputData = e.inputBuffer.getChannelData(0)
+            const pcm16 = new Int16Array(inputData.length)
+            
+            // Convert float32 to pcm16
+            for (let i = 0; i < inputData.length; i++) {
+              pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768))
+            }
+            
+            // Send as base64
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
+            ws.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: base64Audio
+            }))
           }
         }
-
-        mediaRecorder.start(100) // Send chunks every 100ms
       }
 
       ws.onmessage = (event) => {
-        // Handle incoming audio/transcription
-        setStatus('speaking')
-        
-        if (event.data instanceof Blob) {
-          // Play audio response
-          const audioUrl = URL.createObjectURL(event.data)
-          const audio = new Audio(audioUrl)
-          audio.play()
-          audio.onended = () => {
-            setStatus('listening')
-            URL.revokeObjectURL(audioUrl)
+        try {
+          const data = JSON.parse(event.data)
+          
+          // Handle different event types
+          if (data.type === 'response.audio.delta' && data.delta) {
+            setStatus('speaking')
+            
+            // Decode and play audio
+            const audioData = atob(data.delta)
+            const pcm16 = new Int16Array(audioData.length / 2)
+            for (let i = 0; i < pcm16.length; i++) {
+              pcm16[i] = (audioData.charCodeAt(i * 2) | (audioData.charCodeAt(i * 2 + 1) << 8))
+            }
+            
+            // Play audio (simplified - in production use Web Audio API buffer)
+            const audioBlob = new Blob([pcm16], { type: 'audio/pcm' })
+            const audioUrl = URL.createObjectURL(audioBlob)
+            const audio = new Audio(audioUrl)
+            audio.play().catch(console.error)
           }
+          
+          if (data.type === 'response.audio.done') {
+            setStatus('listening')
+          }
+          
+          if (data.type === 'conversation.item.input_audio_transcription.completed') {
+            console.log('Transcription:', data.transcript)
+          }
+        } catch (err) {
+          console.error('Error processing message:', err)
         }
       }
 
-      ws.onerror = () => {
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
         setError(new VoiceConnectionError())
         setStatus('error')
       }
 
       ws.onclose = () => {
+        console.log('WebSocket closed')
         if (status !== 'idle') {
           setStatus('idle')
         }
@@ -165,7 +237,7 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       setStatus('error')
       cleanup()
     }
-  }, [status, monitorAudioLevel])
+  }, [monitorAudioLevel, status])
 
   const endSession = useCallback(async () => {
     try {
