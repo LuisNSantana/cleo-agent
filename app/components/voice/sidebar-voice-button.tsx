@@ -8,7 +8,6 @@ import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigat
 import { cn } from '@/lib/utils'
 import { useChats } from '@/lib/chat-store/chats/provider'
 import { useUser } from '@/lib/user-store/provider'
-import { getOrCreateGuestUserId } from '@/lib/api'
 import { toast } from '@/components/ui/toast'
 
 export function SidebarVoiceButton() {
@@ -20,15 +19,23 @@ export function SidebarVoiceButton() {
   const router = useRouter()
   const chatId = params?.chatId
   const { createNewChat } = useChats()
-  const { user } = useUser()
+  const { user, isLoading } = useUser()
 
   useEffect(() => {
-    if (!searchParams) return
+    if (!searchParams || isLoading) return
 
     const shouldOpen = searchParams.get('voice') === 'open'
 
     if (shouldOpen) {
-      setIsOpen(true)
+      if (!user?.id) {
+        toast({
+          title: 'Activa tu cuenta para usar voz',
+          description: 'Inicia sesión o crea una cuenta para acceder al modo voz de Cleo.',
+          status: 'info',
+        })
+      } else {
+        setIsOpen(true)
+      }
 
       const updatedParams = new URLSearchParams(searchParams.toString())
       updatedParams.delete('voice')
@@ -38,9 +45,20 @@ export function SidebarVoiceButton() {
 
       router.replace(nextUrl, { scroll: false })
     }
-  }, [pathname, router, searchParams])
+  }, [isLoading, pathname, router, searchParams, user?.id])
 
   const handleClick = async () => {
+    const isAuthenticated = !!user?.id
+
+    if (!isAuthenticated) {
+      toast({
+        title: 'Inicia sesión para hablar con Cleo',
+        description: 'El modo voz está disponible solo para cuentas registradas.',
+        status: 'info',
+      })
+      return
+    }
+
     if (chatId) {
       setIsOpen(true)
       return
@@ -49,26 +67,8 @@ export function SidebarVoiceButton() {
     setIsCreating(true)
 
     try {
-      const isAuthenticated = !!user?.id
-
-      if (!isAuthenticated) {
-        const existingGuestChatId = localStorage.getItem('guestChatId')
-        if (existingGuestChatId) {
-          router.push(`/c/${existingGuestChatId}?voice=open`)
-          return
-        }
-      }
-
-      const uid = isAuthenticated
-        ? user?.id
-        : await getOrCreateGuestUserId(user)
-
-      if (!uid) {
-        throw new Error('No user identifier available for chat creation.')
-      }
-
       const newChat = await createNewChat(
-        uid,
+        user.id,
         'Voice Conversation',
         undefined,
         isAuthenticated
@@ -76,10 +76,6 @@ export function SidebarVoiceButton() {
 
       if (!newChat) {
         throw new Error('Failed to create chat')
-      }
-
-      if (!isAuthenticated) {
-        localStorage.setItem('guestChatId', newChat.id)
       }
 
       router.push(`/c/${newChat.id}?voice=open`)

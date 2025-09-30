@@ -17,6 +17,9 @@ import { addMinutes, startOfMonth, endOfMonth } from 'date-fns'
 import { randomUUID } from 'crypto'
 
 export class VoiceSessionManager {
+  private static readonly LIMIT_DISABLED =
+    process.env.VOICE_RATE_LIMIT_ENFORCED !== 'true'
+
   /**
    * Create a new voice session
    */
@@ -213,6 +216,18 @@ export class VoiceSessionManager {
    * Check if user can start a new voice session
    */
   static async checkRateLimit(userId: string): Promise<VoiceRateLimitInfo> {
+    const resetAt = endOfMonth(new Date()).toISOString()
+
+    if (this.LIMIT_DISABLED) {
+      const unlimited = Number.MAX_SAFE_INTEGER
+      return {
+        allowed: true,
+        remaining: unlimited,
+        limit: unlimited,
+        resetAt,
+      }
+    }
+
     const supabase = await createClient()
 
     if (!supabase) {
@@ -227,15 +242,13 @@ export class VoiceSessionManager {
       .single()
 
     const prefs = preferences as any
-    const limit = prefs?.voice_minutes_limit || 5 // default 5 minutes
+    const limit = prefs?.voice_minutes_limit || Number.MAX_SAFE_INTEGER
 
     // Get usage for current month
     const stats = await this.getUsageStats(userId)
 
     const remaining = Math.max(0, limit - stats.monthlyMinutes)
     const allowed = remaining > 0
-
-    const resetAt = endOfMonth(new Date()).toISOString()
 
     return {
       allowed,
@@ -290,21 +303,29 @@ export class VoiceSessionManager {
     const monthlySessions = monthlySessionsData?.length || 0
     const monthlyCost = (monthlySessionsData as any)?.reduce((sum: number, s: any) => sum + s.cost_usd, 0) || 0
 
-    // Get user's limit
-    let limit = 5 // default
-    
-    try {
-      const { data: preferences } = await supabase
-        .from('user_preferences')
-        .select('voice_minutes_limit')
-        .eq('user_id', userId)
-        .single()
+    // Determine limit behaviour
+    let limit = Number.MAX_SAFE_INTEGER
 
-      const prefs = preferences as any
-      limit = prefs?.voice_minutes_limit || 5
-    } catch (error) {
-      console.error('Error fetching voice limit:', error)
-      // Use default limit on error
+    if (!this.LIMIT_DISABLED) {
+      try {
+        const { data: preferences } = await supabase
+          .from('user_preferences')
+          .select('voice_minutes_limit')
+          .eq('user_id', userId)
+          .single()
+
+        const prefs = preferences as any
+        const configuredLimit = prefs?.voice_minutes_limit
+        if (typeof configuredLimit === 'number' && configuredLimit > 0) {
+          limit = configuredLimit
+        }
+      } catch (error) {
+        console.error('Error fetching voice limit:', error)
+        // Keep unlimited on error if limits are disabled
+        if (!this.LIMIT_DISABLED) {
+          limit = 5
+        }
+      }
     }
 
     return {
@@ -314,7 +335,9 @@ export class VoiceSessionManager {
       monthlyMinutes,
       monthlySessions,
       monthlyCost,
-      remainingMinutes: Math.max(0, limit - monthlyMinutes),
+      remainingMinutes: limit === Number.MAX_SAFE_INTEGER
+        ? Number.MAX_SAFE_INTEGER
+        : Math.max(0, limit - monthlyMinutes),
       limit
     }
   }
