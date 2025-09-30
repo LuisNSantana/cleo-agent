@@ -71,6 +71,59 @@ const EMAIL_GENERAL_BLOCKERS = [
   'opportunity', 'oportunidad'
 ]
 
+// Research & Intelligence keywords (Apu)
+const RESEARCH_KEYWORDS = [
+  // English - Research
+  'research', 'investigate', 'analysis', 'analyze', 'study', 'examine', 'explore',
+  'find out', 'discover', 'learn about', 'understand', 'compare', 'comparison',
+  'what is', 'how does', 'why does', 'tell me about', 'explain', 'difference between',
+  // English - Data & Sources
+  'data', 'statistics', 'stats', 'report', 'findings', 'insights', 'trends',
+  'market', 'competitor', 'competitive', 'industry', 'sector', 'news about',
+  // Spanish - Research
+  'investigar', 'investigación', 'analizar', 'análisis', 'estudiar', 'examinar',
+  'explorar', 'averiguar', 'descubrir', 'aprender sobre', 'entender', 'comparar',
+  'qué es', 'cómo funciona', 'por qué', 'cuéntame sobre', 'explica', 'diferencia entre',
+  // Spanish - Data & Sources
+  'datos', 'estadísticas', 'reporte', 'hallazgos', 'insights', 'tendencias',
+  'mercado', 'competidor', 'competencia', 'industria', 'sector', 'noticias sobre'
+]
+
+// Automation keywords (Wex)
+const AUTOMATION_KEYWORDS = [
+  // English
+  'automate', 'automation', 'scrape', 'scraping', 'extract data', 'web scraping',
+  'fill form', 'fill out', 'submit form', 'navigate to', 'browse to', 'visit website',
+  'click on', 'interact with', 'automated task', 'bot', 'web automation',
+  // Spanish
+  'automatizar', 'automatización', 'scrape', 'scraping', 'extraer datos', 'raspado web',
+  'rellenar formulario', 'completar formulario', 'enviar formulario', 'navegar a',
+  'visitar sitio', 'hacer clic', 'interactuar con', 'tarea automatizada', 'bot'
+]
+
+// E-commerce keywords (Emma)  
+const ECOMMERCE_KEYWORDS = [
+  // English
+  'shopify', 'store', 'shop', 'ecommerce', 'e-commerce', 'product', 'products',
+  'order', 'orders', 'sales', 'revenue', 'aov', 'ltv', 'conversion', 'analytics',
+  'inventory', 'stock', 'collection', 'collections', 'customer', 'customers',
+  // Spanish
+  'tienda', 'comercio', 'producto', 'productos', 'orden', 'ordenes', 'ventas',
+  'ingresos', 'conversión', 'analíticas', 'inventario', 'stock', 'colección',
+  'colecciones', 'cliente', 'clientes'
+]
+
+// Google Workspace Creation keywords (Peter)
+const WORKSPACE_CREATION_KEYWORDS = [
+  // English - Creation focus
+  'create document', 'create doc', 'create sheet', 'create spreadsheet', 'create slides',
+  'create presentation', 'new document', 'new spreadsheet', 'new sheet', 'make a doc',
+  'make a sheet', 'write a document', 'build a spreadsheet', 'generate sheet',
+  // Spanish - Creation focus  
+  'crear documento', 'crear doc', 'crear hoja', 'crear spreadsheet', 'crear presentación',
+  'nuevo documento', 'nueva hoja', 'hacer un doc', 'hacer una hoja', 'generar hoja'
+]
+
 // Financial & Business Strategy intents
 const FINANCIAL_KEYWORDS = [
   // English - Finance
@@ -107,6 +160,20 @@ function includesAny(text: string, list: string[]): boolean {
 export function detectEarlyIntent(userText: string): RouterDirective | undefined {
   const text = (userText || '').toLowerCase().trim()
   if (!text) return undefined
+
+  // 0) Research & Intelligence (Apu) - Alta prioridad para queries informativas
+  if (includesAny(text, RESEARCH_KEYWORDS) && !includesAny(text, EMAIL_GENERAL_KEYWORDS)) {
+    return {
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_apu',
+      agentId: 'apu-support',
+      agentName: 'Apu (Research)',
+      leafTool: 'serpGeneralSearch',
+      reasons: ['research/analysis intent detected', 'delegate to Apu for information gathering'],
+      confidence: 0.88,
+    }
+  }
 
   // 1) Email triage vs compose (PRIORITY over time/weather to avoid 'today' collisions)
   if (includesAny(text, EMAIL_TRIAGE_KEYWORDS)) {
@@ -212,6 +279,48 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
       leafTool: 'delegate_to_notion_agent',
       reasons: ['notion/workspace intent detected', 'delegate to Notion Agent for workspace tasks'],
       confidence: 0.88,
+    }
+  }
+
+  // 7) Web Automation → Wex
+  if (includesAny(text, AUTOMATION_KEYWORDS)) {
+    return {
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_wex',
+      agentId: 'wex-intelligence',
+      agentName: 'Wex (Web Automation)',
+      leafTool: 'create_skyvern_task',
+      reasons: ['automation/scraping intent detected', 'delegate to Wex for web automation'],
+      confidence: 0.90,
+    }
+  }
+
+  // 8) E-commerce → Emma (only if Shopify mentioned or clear store context)
+  if (includesAny(text, ECOMMERCE_KEYWORDS) && (text.includes('shopify') || text.includes('store') || text.includes('tienda'))) {
+    return {
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_emma',
+      agentId: 'emma-ecommerce',
+      agentName: 'Emma (E-commerce)',
+      leafTool: 'delegate_to_emma',
+      reasons: ['e-commerce/shopify intent detected', 'delegate to Emma for store management'],
+      confidence: 0.87,
+    }
+  }
+
+  // 9) Google Workspace Creation → Peter (only for creation intents)
+  if (includesAny(text, WORKSPACE_CREATION_KEYWORDS)) {
+    return {
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_peter',
+      agentId: 'peter-financial',
+      agentName: 'Peter (Google Workspace Creator)',
+      leafTool: 'createGoogleDoc',
+      reasons: ['google workspace creation intent detected', 'delegate to Peter for document creation'],
+      confidence: 0.89,
     }
   }
 

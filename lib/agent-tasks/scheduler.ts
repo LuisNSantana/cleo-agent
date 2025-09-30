@@ -136,12 +136,25 @@ class AgentTaskScheduler {
   }
 
   /**
-   * Process tasks for a specific user
+   * Process tasks for a specific user with parallel execution
+   * OPTIMIZACIÓN: Procesar tasks en paralelo con límite de concurrencia
    */
   private async processUserTasks(userId: string, userTasks: AgentTask[]): Promise<void> {
-    // Process tasks sequentially for this user to maintain proper context
-    for (const task of userTasks) {
-      await this.processTask(task);
+    const BATCH_SIZE = 3 // Máximo 3 tasks simultáneas por usuario
+    
+    // Dividir tasks en chunks para procesamiento paralelo
+    const chunks = this.chunkArray(userTasks, BATCH_SIZE)
+    
+    console.log(`⚡ Processing ${userTasks.length} tasks in ${chunks.length} batches (max ${BATCH_SIZE} concurrent)`)
+    
+    for (const chunk of chunks) {
+      // Procesar chunk en paralelo
+      await Promise.allSettled(chunk.map(task => this.processTask(task)))
+      
+      // Pequeña pausa entre batches para no saturar
+      if (chunks.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
     }
   }
 
@@ -157,7 +170,7 @@ class AgentTaskScheduler {
       this.stats.tasksProcessed++;
 
       // Update task status to running
-	await updateAgentTaskAdmin(task.task_id, {
+      await updateAgentTaskAdmin(task.task_id, {
         status: 'running',
         started_at: startedAt,
         last_run_at: startedAt,
@@ -166,7 +179,7 @@ class AgentTaskScheduler {
       });
 
       // Create execution record
-  const executionResult = await createTaskExecutionAdmin(task.task_id);
+      const executionResult = await createTaskExecutionAdmin(task.task_id);
       if (!executionResult.success || !executionResult.execution) {
         throw new Error('Failed to create execution record');
       }
@@ -203,7 +216,7 @@ class AgentTaskScheduler {
             status: 'completed',
             result_data: normalizedResult,
             execution_time_ms: executionTime,
-            tool_calls: toolCalls.map(tc => ({ ...tc })),
+            tool_calls: toolCalls,
             agent_messages: agentMessages,
             completed_at: completedAt
           });
@@ -220,7 +233,7 @@ class AgentTaskScheduler {
         const errorMessage = executionError instanceof Error ? executionError.message : 'Unknown error';
         
         // Update task as failed
-	await updateAgentTaskAdmin(task.task_id, {
+        await updateAgentTaskAdmin(task.task_id, {
           status: 'failed',
           retry_count: (task.retry_count || 0) + 1,
           execution_time_ms: executionTime,
@@ -230,7 +243,7 @@ class AgentTaskScheduler {
         });
 
         // Update execution record
-	await updateTaskExecutionAdmin(execution.id, {
+        await updateTaskExecutionAdmin(execution.id, {
           status: 'failed',
           error_message: errorMessage,
           execution_time_ms: executionTime,

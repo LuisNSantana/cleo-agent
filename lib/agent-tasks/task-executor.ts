@@ -13,35 +13,44 @@ import { getAgentById, getAgentByName } from '@/lib/agents/unified-config';
 import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
 import { withRequestContext } from '@/lib/server/request-context';
+import type { JsonObject, JsonValue } from '@/types/json';
 
-interface AgentMessageRecord {
-  role: string;
-  content: unknown;
-  timestamp: string;
+function toJsonValue(value: unknown): JsonValue {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+  if (typeof value === 'object') {
+    const result: JsonObject = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = toJsonValue(val);
+    }
+    return result;
+  }
+  return String(value);
 }
 
-interface ToolCallRecord {
-  tool: string;
-  input: unknown;
-  output: unknown;
-  timestamp: string;
-}
-
-function normalizeTaskResultPayload(result: unknown): Record<string, unknown> {
+export function normalizeTaskResultPayload(result: unknown): JsonObject {
   if (result === null || result === undefined) return {};
   if (typeof result === 'string') {
     return { summary: result };
   }
   if (Array.isArray(result)) {
-    return { items: result };
+    return { items: toJsonValue(result) };
   }
   if (typeof result === 'object') {
-    return { ...(result as Record<string, unknown>) };
+    const jsonObject = toJsonValue(result);
+    if (jsonObject && typeof jsonObject === 'object' && !Array.isArray(jsonObject)) {
+      return jsonObject;
+    }
   }
-  return { value: result };
+  return { value: toJsonValue(result) };
 }
 
-function coerceAgentMessages(messages: unknown[]): AgentMessageRecord[] {
+function coerceAgentMessages(messages: unknown[]): JsonObject[] {
   return messages.map((raw) => {
     const entry = (raw ?? {}) as Record<string, unknown>;
     const role = typeof entry.role === 'string'
@@ -49,28 +58,48 @@ function coerceAgentMessages(messages: unknown[]): AgentMessageRecord[] {
       : typeof (entry as { _getType?: () => string })._getType === 'function'
         ? (entry as { _getType: () => string })._getType()
         : 'assistant';
-    return {
+
+    const message: JsonObject = {
       role,
-      content: entry.content,
       timestamp: new Date().toISOString()
     };
+
+    if ('content' in entry) {
+      message.content = toJsonValue(entry.content);
+    }
+
+    if ('metadata' in entry) {
+      message.metadata = toJsonValue((entry as { metadata?: unknown }).metadata);
+    }
+
+    if (typeof entry.id === 'string') {
+      message.id = entry.id;
+    }
+
+    return message;
   });
 }
 
-function extractToolCalls(messages: unknown[]): ToolCallRecord[] {
-  const calls: ToolCallRecord[] = [];
+function extractToolCalls(messages: unknown[]): JsonObject[] {
+  const calls: JsonObject[] = [];
   for (const raw of messages) {
     const entry = (raw ?? {}) as Record<string, unknown>;
     const toolCalls = (entry as { tool_calls?: unknown[] }).tool_calls;
     if (!Array.isArray(toolCalls)) continue;
     for (const call of toolCalls) {
       const callEntry = (call ?? {}) as Record<string, unknown>;
-      calls.push({
+      const record: JsonObject = {
         tool: typeof callEntry.tool === 'string' ? callEntry.tool : 'unknown_tool',
-        input: callEntry.input,
-        output: callEntry.result ?? callEntry.output,
+        input: toJsonValue(callEntry.input ?? null),
+        output: toJsonValue((callEntry.result ?? callEntry.output) ?? null),
         timestamp: new Date().toISOString()
-      });
+      };
+
+      if (typeof callEntry.id === 'string') {
+        record.id = callEntry.id;
+      }
+
+      calls.push(record);
     }
   }
   return calls;
@@ -78,10 +107,10 @@ function extractToolCalls(messages: unknown[]): ToolCallRecord[] {
 
 export interface TaskExecutionResult {
   success: boolean;
-  result?: Record<string, unknown>;
+  result?: JsonObject;
   error?: string;
-  tool_calls?: ToolCallRecord[];
-  agent_messages?: AgentMessageRecord[];
+  tool_calls?: JsonObject[];
+  agent_messages?: JsonObject[];
   execution_metadata?: {
     start_time: string;
     end_time: string;
@@ -208,7 +237,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
         task_id: task.task_id,
         agent_id: task.agent_id,
         agent_name: task.agent_name,
-        agent_avatar: task.agent_avatar,
+        agent_avatar: task.agent_avatar || undefined,
         notification_type: 'task_failed',
         title: `❌ Task Failed: ${task.title}`,
         message: `${task.agent_name} could not complete task "${task.title}". Reason: ${failureReasons.join(', ')}`,
@@ -238,7 +267,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       task_id: task.task_id,
       agent_id: task.agent_id,
       agent_name: task.agent_name,
-      agent_avatar: task.agent_avatar,
+      agent_avatar: task.agent_avatar || undefined,
       notification_type: 'task_completed',
       title: `✅ Task Completed: ${task.title}`,
       message: `${task.agent_name} has successfully completed your task "${task.title}" in ${execution_metadata.duration_ms}ms.`,
@@ -249,7 +278,9 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
         completed_at: execution_metadata.end_time
       },
       priority: 'medium',
-      auto_send_to_chat: task.task_config?.auto_notify_chat || false
+      auto_send_to_chat: (task.task_config && typeof task.task_config.auto_notify_chat === 'boolean') 
+        ? task.task_config.auto_notify_chat 
+        : false
     }).catch(err => console.error('Failed to create success notification:', err));
 
     return {
@@ -273,13 +304,15 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       task_id: task.task_id,
       agent_id: task.agent_id,
       agent_name: task.agent_name,
-      agent_avatar: task.agent_avatar,
+      agent_avatar: task.agent_avatar || undefined,
       notification_type: 'task_failed',
       title: `❌ Task Failed: ${task.title}`,
       message: `${task.agent_name} encountered an error while executing your task "${task.title}".`,
       error_details: errorMessage,
       priority: 'high',
-      auto_send_to_chat: task.task_config?.auto_notify_chat || false
+      auto_send_to_chat: (task.task_config && typeof task.task_config.auto_notify_chat === 'boolean')
+        ? task.task_config.auto_notify_chat
+        : false
     }).catch(err => console.error('Failed to create failure notification:', err));
 
     return {
@@ -409,6 +442,10 @@ Execute this task immediately using your available tools and expertise. When fin
  * Validate task configuration for specific agent types
  */
 export function validateTaskConfig(task: AgentTask): { valid: boolean; error?: string } {
+  if (!task.task_config) {
+    return { valid: true }; // Si no hay config, es válido por defecto
+  }
+
   switch (task.agent_id) {
     case 'apu-support':
       if (!task.task_config.issue && !task.task_config.support_request) {
@@ -419,7 +456,7 @@ export function validateTaskConfig(task: AgentTask): { valid: boolean; error?: s
       }
       break;
     
-  case 'wex-intelligence':
+    case 'wex-intelligence':
       if (!task.task_config.url && !task.task_config.instructions) {
         return { 
           valid: false, 
