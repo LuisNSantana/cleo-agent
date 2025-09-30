@@ -125,14 +125,18 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       const { sessionId } = await response.json()
       sessionIdRef.current = sessionId
 
-      // Connect to OpenAI Realtime API
-      const wsUrl = `wss://api.openai.com/v1/realtime?model=${config.model}`
-      const ws = new WebSocket(wsUrl, {
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'OpenAI-Beta': 'realtime=v1'
-        }
-      } as any)
+      // Get WebSocket configuration (includes API key)
+      const wsConfigResponse = await fetch(`/api/voice/ws?model=${config.model}`)
+      if (!wsConfigResponse.ok) {
+        throw new Error('Failed to get WebSocket configuration')
+      }
+      const wsConfig = await wsConfigResponse.json()
+      
+      // Connect directly to OpenAI with API key
+      const ws = new WebSocket(
+        `${wsConfig.url}&api_key=${wsConfig.apiKey}`,
+        ['realtime', 'openai-beta.realtime-v1']
+      )
 
       wsRef.current = ws
 
