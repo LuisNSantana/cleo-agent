@@ -189,8 +189,12 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
                 {/* Cleo Avatar */}
                 <div className="relative">
                   <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl" />
-                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center ring-4 ring-purple-500/20">
-                    <div className="text-4xl font-bold text-white">C</div>
+                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-600/10 backdrop-blur-sm flex items-center justify-center ring-4 ring-purple-500/20 overflow-hidden">
+                    <img 
+                      src="/logocleo.png" 
+                      alt="Cleo" 
+                      className="w-20 h-20 object-contain"
+                    />
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center ring-4 ring-zinc-900">
                     <Mic className="w-4 h-4 text-white" />
