@@ -51,23 +51,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Session configuration for OpenAI - using latest GA model
-    const sessionConfig = {
+    // Session configuration - using alias model name
+    const sessionConfig = JSON.stringify({
       session: {
         type: 'realtime',
-        model: 'gpt-realtime-2025-08-28',
+        model: 'gpt-realtime',
         audio: {
           output: {
             voice: 'alloy'
           }
         }
       }
-    }
+    })
 
-    // Create multipart form data
+    // Create multipart form data - using set() not append()
     const formData = new FormData()
-    formData.append('sdp', sdp)
-    formData.append('session', JSON.stringify(sessionConfig))
+    formData.set('sdp', sdp)
+    formData.set('session', sessionConfig)
 
     console.log('📡 Forwarding SDP to OpenAI Realtime API...')
 
