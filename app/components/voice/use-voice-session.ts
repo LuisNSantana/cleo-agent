@@ -71,10 +71,11 @@ export function useVoiceSession(): UseVoiceSessionReturn {
       setStatus('connecting')
       setError(null)
 
-      // Get OpenAI configuration
+      // Get OpenAI configuration with chat context
       const configResponse = await fetch('/api/voice/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId })
       })
 
       if (!configResponse.ok) {
