@@ -222,6 +222,16 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       await pc.setRemoteDescription(answer)
       console.log('✅ WebRTC connection established')
 
+      // Fallback: Si el data channel no se abre en 3 segundos, cambiar a listening de todos modos
+      setTimeout(() => {
+        if (dataChannelRef.current?.readyState !== 'open') {
+          console.log('⚠️ Data channel timeout, switching to listening anyway')
+          setStatus('listening')
+          startTimeRef.current = Date.now()
+          monitorAudioLevel()
+        }
+      }, 3000)
+
     } catch (err) {
       console.error('Voice session error:', err)
       setError(err as Error)
