@@ -51,15 +51,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Session configuration for OpenAI
-    // According to docs, this should be a flat JSON object
+    // Session configuration for OpenAI - EXACT format from official docs
     const sessionConfig = {
-      model: 'gpt-4o-realtime-preview-2024-10-01',
-      modalities: ['text', 'audio'],
-      instructions: 'You are Cleo, a helpful AI assistant.',
-      voice: 'alloy',
-      turn_detection: {
-        type: 'server_vad'
+      session: {
+        type: 'realtime',
+        model: 'gpt-realtime',
+        audio: {
+          output: {
+            voice: 'alloy'
+          }
+        }
       }
     }
 
