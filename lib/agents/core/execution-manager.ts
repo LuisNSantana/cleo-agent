@@ -87,9 +87,28 @@ export class ExecutionManager {
 
       // Compile graph and execute within request context so tools can read userId
       const compiledGraph = graph.compile()
-      const result = await withRequestContext({ userId: context.userId, model: agentConfig.id, requestId: execution.id }, async () => {
-        return compiledGraph.invoke(initialState)
-      })
+      
+      // CRITICAL: Add timeout at graph execution level to prevent indefinite hangs
+      // This prevents the graph from hanging if LLM API is slow or tools get stuck
+      const GRAPH_EXECUTION_TIMEOUT = options.timeout || 300000; // 5 minutes default, respects options.timeout
+      
+      logger.debug(`🚀 [EXECUTION] Starting graph execution for ${agentConfig.id} with timeout ${GRAPH_EXECUTION_TIMEOUT}ms`);
+      
+      const graphPromise = withRequestContext(
+        { userId: context.userId, model: agentConfig.id, requestId: execution.id }, 
+        async () => {
+          return compiledGraph.invoke(initialState)
+        }
+      );
+      
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => {
+          logger.error(`⏱️ [EXECUTION] Graph execution timeout for ${agentConfig.id} after ${GRAPH_EXECUTION_TIMEOUT}ms`);
+          reject(new Error(`Graph execution timeout after ${GRAPH_EXECUTION_TIMEOUT}ms`));
+        }, GRAPH_EXECUTION_TIMEOUT)
+      );
+      
+      const result = await Promise.race([graphPromise, timeoutPromise]);
 
       // Extract final response
       const finalMessages = result.messages || []
