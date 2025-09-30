@@ -134,8 +134,9 @@ export function Conversation({
           style={{
             scrollbarGutter: "stable both-edges",
             scrollbarWidth: "none",
-            // Add dynamic bottom padding equal to input height + safe area, mobile only effect due to fixed input
-            paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 88px))`,
+            // IMPROVED: Add dynamic bottom padding with extra margin to prevent input overlay
+            // Increased default from 88px to 120px + 16px safety margin
+            paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 16px)`,
           }}
         >
           {messages?.map((message, index) => {

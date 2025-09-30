@@ -384,15 +384,14 @@ export function Chat() {
             <Conversation key="conversation" {...conversationProps} />
             {confirmationItems.length > 0 && (
               <div className="w-full max-w-4xl mx-auto px-4 mt-2 md:static md:relative">
-                {/* Sticky container on mobile: keeps confirmation visible above input */}
-                <div className="md:static fixed left-0 right-0 bottom-[calc(var(--chat-input-height)+env(safe-area-inset-bottom)+8px)] z-40 px-4 md:px-0 pointer-events-none md:pointer-events-auto">
-                  <div className="pointer-events-auto">
+                {/* IMPROVED: Better positioning to prevent overlay with input */}
+                {/* Changed from fixed to sticky with increased bottom offset */}
+                <div className="sticky bottom-[calc(var(--chat-input-height)+env(safe-area-inset-bottom)+16px)] z-30 px-4 md:px-0">
                 <ConfirmationPanel
                   items={confirmationItems}
                   onResolve={handleResolveConfirmation}
                   loadingId={confirmationLoadingId}
                 />
-                  </div>
                 </div>
               </div>
             )}

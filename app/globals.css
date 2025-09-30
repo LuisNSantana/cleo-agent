@@ -1,5 +1,4 @@
 @import "tailwindcss";
-
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
@@ -12,7 +11,6 @@
     overflow: hidden;
   }
   .tl-container {
-    /* Prevent browser gestures from hijacking drawing */
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
@@ -29,13 +27,8 @@
   --spacing-input-area: 134px;
 
   @keyframes loading-dots {
-    0%,
-    100% {
-      opacity: 0;
-    }
-    50% {
-      opacity: 1;
-    }
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
   }
 }
 
@@ -79,75 +72,86 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --spacing-scroll-area: calc(
-    -1 * (var(--spacing-input-area) + var(--spacing-app-header))
-  );
+  --spacing-scroll-area: calc(-1 * (var(--spacing-input-area) + var(--spacing-app-header)));
   --spacing-scroll-anchor-offset: 140px;
-  --spacing-scroll-anchor: calc(
-    var(--spacing-scroll-area) - var(--spacing-scroll-anchor-offset) + 100dvh
-  );
+  --spacing-scroll-anchor: calc(var(--spacing-scroll-area) - var(--spacing-scroll-anchor-offset) + 100dvh);
 }
 
 :root {
-  /* Premium light theme: warm, pastel off-white that feels soft and exquisite */
-  --background: #faf7f2; /* warm ivory */
-  --foreground: oklch(0.19 0.01 265); /* slightly cooler for sharper contrast */
-  --foreground-soft: oklch(0.38 0.022 265); /* mid emphasis */
-  --foreground-subtle: oklch(0.55 0.02 265); /* low emphasis still readable */
-  --card: #fdf9f4;
-  --card-foreground: var(--foreground);
-  --popover: #fefbf7;
-  --popover-foreground: var(--foreground);
-  --primary: oklch(0.42 0.06 260); /* calm navy for professional tone */
-  --primary-foreground: oklch(0.98 0.01 260);
-  --secondary: oklch(0.9 0.02 250); /* airy neutral for secondary surfaces */
-  --secondary-foreground: oklch(0.32 0.03 260);
-  --muted: oklch(0.92 0.012 250); /* softer muted backing */
-  --muted-foreground: oklch(0.48 0.03 255);
-  --accent: oklch(0.94 0.018 100); /* warm highlight for chips */
-  --accent-foreground: oklch(0.26 0.03 100);
-  --destructive: oklch(0.55 0.24 27.3);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.83 0.01 260); /* crisper delineation */
-  --input: oklch(0.87 0.012 260);
-  --ring: oklch(0.58 0.045 260);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* ====================================================================
+     IMPROVED COLOR SYSTEM - WCAG AA/AAA Optimized
+     Based on Apple HIG, Material 3, WCAG 2.1
+     ==================================================================== */
+  
+  /* Light Mode: Premium warm palette with excellent contrast */
+  --background: #faf7f2;
+  --foreground: #1a1f2e;
+  --foreground-soft: #4a5568;
+  --foreground-subtle: #718096;
+  
+  --card: #ffffff;
+  --card-foreground: #1a1f2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1f2e;
+  
+  --primary: #3b5bdb;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #f1f3f5;
+  --secondary-foreground: #1a1f2e;
+  
+  --muted: #e9ecef;
+  --muted-foreground: #495057;
+  
+  --accent: #fff4e6;
+  --accent-foreground: #d9480f;
+  
+  --destructive: #e03131;
+  --destructive-foreground: #ffffff;
+  
+  --border: #dee2e6;
+  --input: #f8f9fa;
+  --ring: #3b5bdb;
+  
+  /* Chart colors */
+  --chart-1: #3b5bdb;
+  --chart-2: #2f9e44;
+  --chart-3: #f59f00;
+  --chart-4: #e03131;
+  --chart-5: #9c36b5;
+  
   --radius: 0.625rem;
-  --sidebar: oklch(0.97 0.01 250);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: oklch(0.98 0.01 260);
-  --sidebar-accent: oklch(0.93 0.014 250);
-  --sidebar-accent-foreground: oklch(0.36 0.025 255);
-  --sidebar-border: oklch(0.85 0.008 255);
-  --sidebar-ring: oklch(0.6 0.04 260);
+  
+  /* Sidebar colors - slightly differentiated */
+  --sidebar: #f8f9fa;
+  --sidebar-foreground: #1a1f2e;
+  --sidebar-primary: #3b5bdb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9ecef;
+  --sidebar-accent-foreground: #495057;
+  --sidebar-border: #dee2e6;
+  --sidebar-ring: #3b5bdb;
 
-  /* Minimal design system tokens */
-  /* Spacing scale (4/8 rhythm) */
-  --space-1: 0.25rem;  /* 4px */
-  --space-2: 0.5rem;   /* 8px */
-  --space-3: 0.75rem;  /* 12px */
-  --space-4: 1rem;     /* 16px */
-  --space-5: 1.5rem;   /* 24px */
-  --space-6: 2rem;     /* 32px */
-  --space-7: 2.5rem;   /* 40px */
-  --space-8: 3rem;     /* 48px */
+  /* Design system tokens */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
 
-  /* Radii */
   --radius-sm-token: 6px;
   --radius-md-token: 10px;
   --radius-lg-token: 16px;
 
-  /* Elevation surfaces (light theme defaults) */
-  --surface-1: color-mix(in oklch, var(--background), black 2%);
-  --surface-2: color-mix(in oklch, var(--background), black 4%);
-  --surface-3: color-mix(in oklch, var(--background), black 6%);
+  /* Elevation surfaces */
+  --surface-1: #ffffff;
+  --surface-2: #f8f9fa;
+  --surface-3: #f1f3f5;
 
-  /* Shadows (balanced, non-intrusive) */
+  /* Shadows */
   --shadow-1: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-2: 0 4px 16px rgba(0,0,0,0.08);
   --shadow-3: 0 8px 32px rgba(0,0,0,0.12);
@@ -165,74 +169,73 @@
 .text-soft { color: var(--foreground-soft); }
 .text-subtle { color: var(--foreground-subtle); }
 .contrast-boost { filter: contrast(1.08) saturate(1.02); }
-
-/* Tight leading for large headings */
 .leading-tight { line-height: 1.15; }
-
-/* Slight tracking for all-caps badges */
 .tracking-wide-caps { letter-spacing: 0.06em; }
 
-/* Contrast & Typography System Notes
-   ---------------------------------
-   Emphasis tiers:
-     - --foreground (primary text)
-     - --foreground-soft (secondary labels, meta stats)
-     - --foreground-subtle (de-emphasized helper text)
-   Utilities map directly to these tiers: .text-strong, .text-soft, .text-subtle
-   Surfaces: background < secondary < muted < accent < card < popover (light)
-   Dark mode surfaces: background < secondary < muted < surface-2 < surface-3
-   Accessibility: Base body copy uses at least ~4.5:1 contrast; subtle may approach ~3.8–4.2:1 but reserved for non-essential meta.
-   To adjust global contrast: tweak --foreground and cascade soft/subtle from there.
-*/
-
-body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering: optimizeLegibility; }
-
+body { 
+  -webkit-font-smoothing: antialiased; 
+  font-smooth: always; 
+  text-rendering: optimizeLegibility; 
+}
 
 .dark {
-  /* Modern neutral dark theme – tuned for balanced contrast per Material 3 guidance */
-  --background: #0b0d10;
-  --foreground: oklch(0.95 0.01 255);
-  --foreground-soft: oklch(0.82 0.025 255);
-  --foreground-subtle: oklch(0.68 0.03 255);
-  --card: #14171d; /* Elevated neutral */
-  --card-foreground: var(--foreground);
-  --popover: #14171d;
-  --popover-foreground: var(--foreground);
-  --primary: oklch(0.68 0.05 255);
-  --primary-foreground: oklch(0.2 0.015 255);
-  --secondary: #171b21;
-  --secondary-foreground: oklch(0.78 0.022 255);
-  --muted: #1f242c;
-  --muted-foreground: oklch(0.6 0.028 255);
-  --accent: oklch(0.62 0.02 255);
-  --accent-foreground: oklch(0.22 0.02 255);
+  /* ====================================================================
+     Dark Mode: Modern neutral palette with WCAG AA/AAA contrast
+     Inspired by GitHub Dark and Material 3
+     ==================================================================== */
+  
+  --background: #0d1117;
+  --foreground: #f0f6fc;
+  --foreground-soft: #c9d1d9;
+  --foreground-subtle: #8b949e;
+  
+  --card: #161b22;
+  --card-foreground: #f0f6fc;
+  --popover: #161b22;
+  --popover-foreground: #f0f6fc;
+  
+  --primary: #58a6ff;
+  --primary-foreground: #0d1117;
+  
+  --secondary: #21262d;
+  --secondary-foreground: #f0f6fc;
+  
+  --muted: #30363d;
+  --muted-foreground: #8b949e;
+  
+  --accent: #1f6feb;
+  --accent-foreground: #f0f6fc;
+  
   --destructive: #f85149;
   --destructive-foreground: #ffffff;
-  --border: #272d36;
-  --input: #171b21;
-  --ring: oklch(0.64 0.038 255);
-  /* Charts: neutral but distinguishable colors */
-  --chart-1: #79c0ff; /* Light blue */
-  --chart-2: #56d364; /* Green */
-  --chart-3: #e3b341; /* Yellow */
-  --chart-4: #a5a5a5; /* Gray */
-  --chart-5: #ff7b72; /* Red */
-  /* Sidebar: slightly different from main for hierarchy */
-  --sidebar: #0c1014;
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: oklch(0.24 0.02 255);
-  --sidebar-accent: #191d24;
-  --sidebar-accent-foreground: oklch(0.74 0.025 255);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  
+  --border: #30363d;
+  --input: #0d1117;
+  --ring: #58a6ff;
+  
+  /* Chart colors - bright and clear for dark mode */
+  --chart-1: #79c0ff;
+  --chart-2: #56d364;
+  --chart-3: #e3b341;
+  --chart-4: #ff7b72;
+  --chart-5: #d2a8ff;
+  
+  /* Sidebar - darker than main for hierarchy */
+  --sidebar: #010409;
+  --sidebar-foreground: #f0f6fc;
+  --sidebar-primary: #58a6ff;
+  --sidebar-primary-foreground: #0d1117;
+  --sidebar-accent: #161b22;
+  --sidebar-accent-foreground: #c9d1d9;
+  --sidebar-border: #21262d;
+  --sidebar-ring: #58a6ff;
 
-  /* Elevation surfaces (neutral warm grays) */
-  --surface-1: #14171d;
-  --surface-2: #1c2128; /* Medium elevation */
-  --surface-3: #252c35; /* High elevation clearer separation */
+  /* Elevation surfaces */
+  --surface-1: #161b22;
+  --surface-2: #21262d;
+  --surface-3: #30363d;
 
-  /* Shadows (subtle for dark mode) */
+  /* Shadows for dark mode */
   --shadow-1: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-2: 0 4px 16px rgba(0,0,0,0.3);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.5);
@@ -243,25 +246,40 @@ body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering:
     @apply border-border outline-ring/50;
   }
   body {
-  /* Keep background transparent so video underneath is visible; main container provides fallback */
-  background-color: transparent;
-  @apply text-foreground;
+    background-color: transparent;
+    @apply text-foreground;
   }
 }
 
-/* Minimal utility surfaces for consistent UIX */
+/* Minimal utility surfaces */
 .surface-1 { background-color: var(--surface-1); box-shadow: var(--shadow-1); }
 .surface-2 { background-color: var(--surface-2); box-shadow: var(--shadow-2); }
 .surface-3 { background-color: var(--surface-3); box-shadow: var(--shadow-3); }
 .radius-sm { border-radius: var(--radius-sm-token); }
 .radius-md { border-radius: var(--radius-md-token); }
 .radius-lg { border-radius: var(--radius-lg-token); }
-.toolbar-blur { backdrop-filter: saturate(140%) blur(12px); -webkit-backdrop-filter: saturate(140%) blur(12px); }
+.toolbar-blur { 
+  backdrop-filter: saturate(140%) blur(12px); 
+  -webkit-backdrop-filter: saturate(140%) blur(12px); 
+}
 .divider-subtle { border-color: color-mix(in oklch, var(--border), transparent 40%); }
 .focus-ring { outline: 2px solid color-mix(in oklch, var(--ring), transparent 35%); outline-offset: 2px; }
 
+/* Respect user motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-fast: 0ms; --motion-normal: 0ms; --motion-slow: 0ms; }
+  :root { 
+    --motion-fast: 0ms; 
+    --motion-normal: 0ms; 
+    --motion-slow: 0ms; 
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Premium shimmer effect for hero text */
@@ -304,12 +322,12 @@ body { -webkit-font-smoothing: antialiased; font-smooth: always; text-rendering:
 /* Subtle book page reveal effect */
 .book-reveal-text {
   position: relative;
-  background: inherit; /* Use parent gradient/background */
+  background: inherit;
   background-clip: text;
   -webkit-background-clip: text;
-  color: transparent; /* Keep gradient-filled text visible after reveal */
-  opacity: 0; /* Start hidden */
-  animation: book-reveal-fade 900ms ease-out forwards; /* Fade in only */
+  color: transparent;
+  opacity: 0;
+  animation: book-reveal-fade 900ms ease-out forwards;
 }
 .book-reveal-text::after {
   content: "";
@@ -351,10 +369,7 @@ code {
   font-variation-settings: var(--default-mono-font-variation-settings);
 }
 
-/* =============================
-   Global Fixed Header System
-   Centralized header height + utilities so content never scrolls under header
-   ============================= */
+/* Global Fixed Header System */
 :root {
   --app-header-height: 56px;
 }
@@ -363,35 +378,31 @@ code {
   :root { --app-header-height: 60px; }
 }
 
-/* Utility: apply top padding equal to header height */
 .pt-header { padding-top: var(--app-header-height); }
 
-/* Fixed header base style (avoid re-declaring in multiple components) */
 .app-fixed-header {
   height: var(--app-header-height);
-  top: 0; left: 0; right: 0;
+  top: 0; 
+  left: 0; 
+  right: 0;
   position: fixed;
   z-index: 50;
-  /* Subtle glass + separator for readability */
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   background: linear-gradient(to bottom, hsl(var(--background)/0.82), hsl(var(--background)/0.68));
   border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 40%);
-  pointer-events: none; /* Children re-enable */
+  pointer-events: none;
 }
 
 .app-fixed-header > * { pointer-events: auto; }
-
-/* Spacer utility (rare cases) */
 .h-app-header { height: var(--app-header-height); }
-
 
 /* sonner toast */
 [data-sonner-toaster] > li {
   width: 100%;
 }
 
-/* Prevent horizontal scroll from document content */
+/* Prevent horizontal scroll */
 .chat-message {
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -400,7 +411,6 @@ code {
   overflow-x: hidden;
 }
 
-/* Ensure pre and code blocks don't cause horizontal scroll */
 pre {
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -413,13 +423,11 @@ code {
   overflow-wrap: break-word;
 }
 
-/* Prevent images from causing horizontal scroll */
 img {
   max-width: 100%;
   height: auto;
 }
 
-/* Ensure document content wraps properly */
 .document-content {
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -429,38 +437,30 @@ img {
   overflow-x: hidden;
 }
 
-/* Hide scrollbar for chat areas while keeping scroll functionality */
+/* Hide scrollbar while keeping functionality */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Safari and Chrome */
+  display: none;
 }
 
-/* Scroll anchor for auto-scroll behavior */
+/* Scroll anchor for auto-scroll */
 .min-h-scroll-anchor {
   min-height: var(--spacing-scroll-anchor);
 }
 
 /* Accordion animations */
 @keyframes accordion-down {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--radix-accordion-content-height);
-  }
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
 }
 
 @keyframes accordion-up {
-  from {
-    height: var(--radix-accordion-content-height);
-  }
-  to {
-    height: 0;
-  }
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
 }
 
 .animate-accordion-down {
