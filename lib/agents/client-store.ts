@@ -555,9 +555,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
     pollExecutionStatus: async (executionId: string) => {
       let attempt = 0
-      const maxAttempts = 20 // Reasonable cap to prevent infinite polling
-      let backoffDelay = 1000 // Start with 1 second
-      const maxDelay = 30000 // Max 30 seconds between polls
+      const maxAttempts = 12 // OPTIMIZADO: Reducido de 20 a 12 intentos
+      let backoffDelay = 2000 // OPTIMIZADO: Empezar con 2 segundos (era 1s)
+      const maxDelay = 10000 // OPTIMIZADO: Máximo 10s (era 30s)
       
       const poll = async (): Promise<void> => {
         attempt++
@@ -571,7 +571,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                 status: data.execution.status,
                 messages: data.execution.messages?.length || 0,
                 steps: data.execution.steps?.length || 0,
-                delay: backoffDelay
+                nextPollIn: `${backoffDelay}ms`
               })
               
               // Process delegation steps from execution to update delegation state
@@ -596,17 +596,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                 }
               })
 
-              // Process delegation steps from execution to update delegation state
-              if (data.execution.steps && data.execution.steps.length > 0) {
-                const delegationSteps = data.execution.steps.filter((step: any) => step.action === 'delegating')
-                if (delegationSteps.length > 0) {
-                  get().processDelegationSteps(delegationSteps)
-                }
-              }
-
               // Stop polling if execution is complete
               if (data.execution.status !== 'running') {
-                console.log(`✅ [POLL-COMPLETE] Execution ${executionId}: ${data.execution.status}`)
+                console.log(`✅ [POLL-COMPLETE] Execution ${executionId}: ${data.execution.status} (stopped after ${attempt} attempts)`)
                 
                 // Force final state update to ensure UI shows completion
                 set((state) => ({
@@ -624,50 +616,60 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                     console.warn('Persist final message failed:', e)
                   }
                 }
-                return // Stop polling
+                return // Stop polling ✅
               }
               
-              // Continue polling with exponential backoff
+              // OPTIMIZADO: Continue polling with exponential backoff (más conservador)
               if (attempt < maxAttempts) {
                 setTimeout(poll, backoffDelay)
-                backoffDelay = Math.min(backoffDelay * 2, maxDelay) // Double delay, max 30s
-              }
-            } else {
-              console.warn(`⚠️ [POLL-${attempt}] No execution data found for ${executionId}`)
-              // Try fallback after several failed attempts
-              if (attempt > 3) {
+                backoffDelay = Math.min(backoffDelay * 1.5, maxDelay) // OPTIMIZADO: 1.5x instead of 2x
+              } else {
+                console.log(`⏰ [POLL-TIMEOUT] Max attempts (${maxAttempts}) reached for ${executionId}`)
                 try { 
                   await get().finalizeExecutionFromThread(executionId) 
                 } catch {}
               }
+            } else {
+              console.warn(`⚠️ [POLL-${attempt}] No execution data found for ${executionId}`)
+              // OPTIMIZADO: Solo intentar fallback después de más intentos
+              if (attempt > 5) {
+                try { 
+                  await get().finalizeExecutionFromThread(executionId) 
+                } catch {}
+                return // Stop after fallback
+              }
+              // Continue polling pero con delay más largo para missing data
+              if (attempt < maxAttempts) {
+                setTimeout(poll, Math.min(backoffDelay * 2, maxDelay))
+                backoffDelay = Math.min(backoffDelay * 1.5, maxDelay)
+              }
             }
           } else {
             console.warn(`⚠️ [POLL-${attempt}] API error ${response.status} for ${executionId}`)
-            if (attempt > 3) {
+            if (attempt > 5) {
               try { 
                 await get().finalizeExecutionFromThread(executionId) 
               } catch {}
+              return // Stop after multiple API errors
+            }
+            // Continue with longer delays on API errors
+            if (attempt < maxAttempts) {
+              setTimeout(poll, Math.min(backoffDelay * 2, maxDelay))
+              backoffDelay = Math.min(backoffDelay * 1.5, maxDelay)
             }
           }
         } catch (error) {
           console.error(`❌ [POLL-${attempt}] Network error:`, error)
+          // OPTIMIZADO: Stop immediately on network errors
           try { 
             await get().finalizeExecutionFromThread(executionId) 
           } catch {}
-          return // Stop on network errors
-        }
-        
-        // Auto-stop after max attempts
-        if (attempt >= maxAttempts) {
-          console.log(`⏰ [POLL-TIMEOUT] Max attempts reached for ${executionId}`)
-          try { 
-            await get().finalizeExecutionFromThread(executionId) 
-          } catch {}
+          return // Stop on network errors ✅
         }
       }
       
-      // Start polling immediately
-      poll()
+      // OPTIMIZADO: Start polling with slight delay to avoid immediate rush
+      setTimeout(poll, 500)
     }
 
     ,
