@@ -605,7 +605,10 @@ export class AgentOrchestrator {
     await this.initializeAgent(supervisorConfig)
     const processedContext = await this.prepareExecutionContext(context)
 
-    const result = await this.errorHandler.withRetry(
+    // CRITICAL FIX: Add absolute timeout for supervisor execution with delegations
+    const SUPERVISOR_TIMEOUT = 600000; // 10 minutes max for supervisor (can do multiple delegations)
+    
+    const supervisorPromise = this.errorHandler.withRetry(
       () => this.executionManager.executeWithHistory(
         supervisorConfig,
         this.graphs.get(supervisorConfig.id)!,
@@ -614,7 +617,13 @@ export class AgentOrchestrator {
         options
       ),
       execution.id
-    )
+    );
+    
+    const supervisorTimeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`)), SUPERVISOR_TIMEOUT)
+    );
+    
+    const result = await Promise.race([supervisorPromise, supervisorTimeoutPromise]) as ExecutionResult;
     
     // For supervisor executions, mark as completed and clean up properly
   {
