@@ -179,7 +179,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         setStatus('error')
       }
 
-      dc.onmessage = (e) => {
+      dc.onmessage = async (e) => {
         try {
           const event = JSON.parse(e.data)
           console.log('Event:', event.type)
@@ -215,6 +215,72 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
           if (event.type === 'conversation.item.input_audio_transcription.completed') {
             console.log('📝 Transcription:', event.transcript)
+          }
+
+          // Handle tool calls from Realtime API
+          if (event.type === 'response.function_call_arguments.done') {
+            console.log('🔧 Tool call received:', event.name)
+            
+            try {
+              const toolCall = {
+                call_id: event.call_id,
+                name: event.name,
+                arguments: JSON.parse(event.arguments)
+              }
+              
+              console.log('🔧 Executing tool:', toolCall.name, toolCall.arguments)
+              
+              // Execute tool via backend
+              const toolResponse = await fetch('/api/voice/tools/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolCall })
+              })
+              
+              if (!toolResponse.ok) {
+                throw new Error('Tool execution failed')
+              }
+              
+              const toolResult = await toolResponse.json()
+              console.log('✅ Tool executed:', toolCall.name, 'Success:', JSON.parse(toolResult.output).success)
+              
+              // Send result back to Realtime API
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: toolCall.call_id,
+                  output: toolResult.output
+                }
+              }))
+              
+              // Trigger response generation with the tool result
+              dc.send(JSON.stringify({
+                type: 'response.create'
+              }))
+              
+              console.log('📤 Tool result sent back to OpenAI')
+            } catch (toolError) {
+              console.error('❌ Tool execution error:', toolError)
+              
+              // Send error back to OpenAI
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: event.call_id,
+                  output: JSON.stringify({
+                    success: false,
+                    error: (toolError as Error).message
+                  })
+                }
+              }))
+              
+              // Still trigger response so Cleo can explain the error
+              dc.send(JSON.stringify({
+                type: 'response.create'
+              }))
+            }
           }
         } catch (err) {
           console.error('Error processing event:', err)

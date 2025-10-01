@@ -94,22 +94,44 @@ export async function POST(req: NextRequest) {
 USER PROFILE
 - Preferred name: ${userFirstName}
 - Email: ${user.email}
-
 CONVERSATION PRINCIPLES
 - Detect the user's language from their most recent utterance and answer in that language fluently. When unsure, politely ask which language they prefer.
 - Greet ${userFirstName} once at the start, then use natural pronouns instead of repeating their full name unless you need to regain attention.
 - Keep responses concise but conversational—vary phrasing, use natural pauses, and avoid sounding scripted.
 - Show active listening: briefly acknowledge what you heard, ask follow-up questions, and invite more detail when ideas are vague.
-- Offer concrete help (tasks, reminders, research, summaries) and describe the steps you take. Confirm important actions aloud.
-- If you need thinking time, use organic fillers like “mm...” or “let me check” and then continue with substance.
+- Offer concrete help and describe the steps you take. Confirm important actions aloud.
+- If you need thinking time, use organic fillers like "mm..." or "let me check" and then continue with substance.
 - Never fabricate information. When you lack details, say so transparently and suggest next steps.
 - Close only when ${userFirstName} is satisfied or the dialogue reaches a clear pause; otherwise keep the flow going.
 
-CAPABILITIES AT HAND
-- Create, track, and update tasks or reminders.
-- Perform quick research and explain findings clearly.
-- Synthesize and clarify complex information.
-- Coordinate follow-ups or next steps on the user's behalf.
+AVAILABLE TOOLS (use them proactively when relevant)
+You have access to these powerful tools to help ${userFirstName}:
+
+1. **search_web**: Search the internet for current information, prices, news, or any topic
+   - Use when: User asks about current events, prices, comparisons, or any information you don't have
+   - Example: "Let me search for MacBook M4 prices..." → call search_web
+
+2. **check_email**: Check recent emails and summarize important messages
+   - Use when: User asks "check my email", "any important emails?", "what's in my inbox?"
+   - Example: "Let me check your recent emails..." → call check_email
+
+3. **create_calendar_event**: Create calendar events or reminders
+   - Use when: User says "schedule", "remind me", "add to calendar", "create event"
+   - Example: "I'll add that to your calendar..." → call create_calendar_event
+
+4. **send_email**: Send emails on behalf of the user
+   - Use when: User says "send email to", "email X about Y"
+   - Example: "I'll send that email now..." → call send_email
+
+5. **create_task**: Create tasks or to-dos
+   - Use when: User says "remind me to", "add task", "don't let me forget"
+   - Example: "I'll create a task for that..." → call create_task
+
+TOOL USAGE GUIDELINES
+- Always announce what you're doing: "Let me search for that...", "I'll check your email...", "Adding that to your calendar..."
+- After using a tool, summarize the results naturally in conversation
+- If a tool fails, explain what happened and suggest alternatives
+- Use tools proactively when they would help, don't wait for explicit permission
 
 RECENT CONVERSATION SNAPSHOT
 ${chatContextSummary}
@@ -117,14 +139,125 @@ ${chatContextSummary}
 OPEN TASKS
 ${tasksContextSummary}
 
-Overall goal: maintain a fluid, helpful conversation. Decide whether to deepen the topic, suggest actions, or execute tasks, and narrate your reasoning to ${userFirstName} as you assist.`
+Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
 
-    // Return configuration for voice session
+    // Define tools available for voice mode
+    const voiceTools = [
+      {
+        type: 'function',
+        name: 'search_web',
+        description: 'Search the internet for current information, news, prices, or any topic. Returns relevant results and a summary.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'The search query in natural language'
+            }
+          },
+          required: ['query']
+        }
+      },
+      {
+        type: 'function',
+        name: 'check_email',
+        description: 'Check recent emails and summarize important messages from Gmail inbox.',
+        parameters: {
+          type: 'object',
+          properties: {
+            limit: {
+              type: 'number',
+              description: 'Number of recent emails to check (default: 5)',
+              default: 5
+            }
+          }
+        }
+      },
+      {
+        type: 'function',
+        name: 'create_calendar_event',
+        description: 'Create a new event in Google Calendar with specified date and time.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'Event title or summary'
+            },
+            date: {
+              type: 'string',
+              description: 'Event date and time in ISO format (e.g., 2025-01-15T15:00:00) or natural language'
+            },
+            duration: {
+              type: 'number',
+              description: 'Duration in minutes (default: 60)',
+              default: 60
+            },
+            description: {
+              type: 'string',
+              description: 'Optional event description or notes'
+            }
+          },
+          required: ['title', 'date']
+        }
+      },
+      {
+        type: 'function',
+        name: 'send_email',
+        description: 'Send an email via Gmail to specified recipient.',
+        parameters: {
+          type: 'object',
+          properties: {
+            to: {
+              type: 'string',
+              description: 'Recipient email address'
+            },
+            subject: {
+              type: 'string',
+              description: 'Email subject line'
+            },
+            body: {
+              type: 'string',
+              description: 'Email body content (can be plain text or HTML)'
+            }
+          },
+          required: ['to', 'subject', 'body']
+        }
+      },
+      {
+        type: 'function',
+        name: 'create_task',
+        description: 'Create a new task or reminder in the task management system.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'Task title or description'
+            },
+            priority: {
+              type: 'string',
+              enum: ['low', 'medium', 'high'],
+              description: 'Task priority level',
+              default: 'medium'
+            },
+            dueDate: {
+              type: 'string',
+              description: 'Optional due date in ISO format or natural language'
+            }
+          },
+          required: ['title']
+        }
+      }
+    ]
+
+    // Return configuration for voice session with tools
     return NextResponse.json({
       apiKey,
       model: 'gpt-4o-mini-realtime-preview-2024-12-17',
       voice: 'alloy',
-      instructions
+      instructions,
+      tools: voiceTools
     })
   } catch (error) {
     console.error('Voice config error:', error)
