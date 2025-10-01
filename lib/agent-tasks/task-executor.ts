@@ -14,6 +14,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
 import { withRequestContext } from '@/lib/server/request-context';
 import type { JsonObject, JsonValue } from '@/types/json';
+import type { AgentExecution } from '@/lib/agents/types';
 
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) return null;
@@ -124,25 +125,38 @@ export interface TaskExecutionResult {
  */
 /**
  * Get timeout based on agent type (delegations need more time)
+ * CRITICAL: Timeouts must account for potential delegations
  */
 function getAgentTimeout(agentId: string): number {
-  // Research agents + delegations (Cleo, Apu)
-  if (agentId.includes('apu') || agentId.includes('cleo')) {
+  // Supervisor agents that delegate (Cleo) - need extra time for delegation overhead
+  // Supports up to 2 complex delegations (e.g., research + email)
+  // For 3+ delegations, task should be split into multiple scheduled tasks
+  if (agentId.includes('cleo')) {
+    return 600_000 // 10 minutes (allows for 2 delegations + overhead with safety margin)
+  }
+  
+  // Research agents (Apu) - may do extensive searches
+  if (agentId.includes('apu')) {
+    return 300_000 // 5 minutes
+  }
+  
+  // Email agents (Astra) - need time for email composition and sending
+  if (agentId.includes('astra')) {
     return 240_000 // 4 minutes
   }
   
-  // Email and workflow agents (Astra, Ami)
-  if (agentId.includes('astra') || agentId.includes('ami')) {
-    return 180_000 // 3 minutes
+  // Workflow and calendar agents (Ami)
+  if (agentId.includes('ami')) {
+    return 240_000 // 4 minutes
   }
   
   // Automation (Wex with Skyvern)
   if (agentId.includes('wex')) {
-    return 300_000 // 5 minutes
+    return 360_000 // 6 minutes
   }
   
   // Standard agents
-  return 120_000 // 2 minutes
+  return 180_000 // 3 minutes
 }
 
 export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionResult> {
@@ -188,32 +202,77 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       executionManager
     });
     
+    console.log(`⏱️ Task executing with ${TIMEOUT_MS/1000}s absolute timeout...`);
+    
     console.log(`🚀 Building graph for agent: ${agent.name}`);
     
     // Build the graph for this agent
     const graph = await graphBuilder.buildGraph(agent);
     
-    // Compile and execute the graph
-    const compiledGraph = graph.compile();
-    
-    const initialState = {
-      messages: [new HumanMessage(taskPrompt)]
-    };
-
     console.log(`🚀 Starting agent execution...`);
     
-    // Execute within user context with timeout protection
-    const resultPromise = withRequestContext(
-      { userId: task.user_id, requestId: `task-${task.task_id}` },
-      () => compiledGraph.invoke(initialState)
+    // Create execution record
+    const execution = {
+      id: `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      agentId: agent.id,
+      threadId: 'scheduled-task',
+      userId: task.user_id,
+      status: 'running' as const,
+      startTime: new Date(),
+      messages: [],
+      steps: [],
+      metrics: {
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        executionTime: 0,
+        executionTimeMs: 0,
+        tokensUsed: 0,
+        toolCallsCount: 0,
+        handoffsCount: 0,
+        errorCount: 0,
+        retryCount: 0,
+        cost: 0
+      }
+    };
+    
+    // Execute using ExecutionManager with proper timeout handling
+    const executionContext = {
+      threadId: 'scheduled-task',
+      userId: task.user_id,
+      agentId: agent.id,
+      messageHistory: [new HumanMessage(taskPrompt)],
+      metadata: {
+        isScheduledTask: true,
+        taskId: task.task_id,
+        taskTitle: task.title
+      }
+    };
+    
+    const executionOptions = {
+      timeout: TIMEOUT_MS
+    };
+    
+    // Execute within user context with timeout protection via ExecutionManager
+    const resultPromise = executionManager.executeWithHistory(
+      agent,
+      graph,
+      executionContext,
+      execution,
+      executionOptions
     );
     
-    // Race between execution and timeout
+    // Race between execution and timeout (double protection)
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Task execution timeout')), TIMEOUT_MS)
     );
     
-    const result = await Promise.race([resultPromise, timeoutPromise]) as any;
+    const executionResult = await Promise.race([resultPromise, timeoutPromise]) as any;
+    
+    // Extract messages from execution result
+    const result = {
+      messages: executionResult.messages || []
+    };
 
     execution_metadata.end_time = new Date().toISOString();
     execution_metadata.duration_ms = Date.now() - startTime;

@@ -140,9 +140,23 @@ async function runDelegation(params: {
   const startedAt = Date.now()
   const { getRuntimeConfig } = await import('../agents/runtime-config')
   const runtime = getRuntimeConfig()
-  let timeoutMs = runtime.delegationTimeoutMs
+  
+  // For scheduled tasks, use longer timeout to allow complex operations
+  // Check if we're in a scheduled task context
+  const { getRequestContext } = await import('../server/request-context')
+  const requestContext = getRequestContext()
+  const isScheduledTask = requestContext?.requestId?.startsWith('task-')
+  
+  // Use 6 minutes for scheduled tasks (allows for complex email composition, searches, etc.)
+  let timeoutMs = isScheduledTask ? 360_000 : runtime.delegationTimeoutMs
   const POLL_MS = runtime.delegationPollMs
   let lastProgressAt = startedAt
+  
+  logger.debug('🔁 [DELEGATION] Timeout configuration', {
+    isScheduledTask,
+    timeoutMs,
+    requestId: requestContext?.requestId
+  })
 
   // Emit initial processing as progress (detail only)
   ActionLifecycle.progress(actionId, 0, 'starting')

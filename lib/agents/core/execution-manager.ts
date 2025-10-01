@@ -90,12 +90,14 @@ export class ExecutionManager {
       
       // CRITICAL: Add timeout at graph execution level to prevent indefinite hangs
       // This prevents the graph from hanging if LLM API is slow or tools get stuck
+      // For scheduled tasks with delegations, use longer timeout to allow sub-agent execution
       const configuredTimeout = options.timeout ?? 300000; // 5 minutes default when undefined
       const hasTimeout = Number.isFinite(configuredTimeout) && configuredTimeout > 0;
       const GRAPH_EXECUTION_TIMEOUT = hasTimeout ? configuredTimeout : null;
 
       logger.debug(
-        `🚀 [EXECUTION] Starting graph execution for ${agentConfig.id} with timeout ${GRAPH_EXECUTION_TIMEOUT ?? 'disabled'}ms`
+        `🚀 [EXECUTION] Starting graph execution for ${agentConfig.id} with timeout ${GRAPH_EXECUTION_TIMEOUT ?? 'disabled'}ms`,
+        { isScheduledTask: context.metadata?.isScheduledTask }
       );
       
       const graphPromise = withRequestContext(
