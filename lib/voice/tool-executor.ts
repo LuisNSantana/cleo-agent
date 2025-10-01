@@ -62,27 +62,68 @@ export async function executeVoiceTool(
         }
       
       case 'check_email':
-        result = await (listGmailMessagesTool as any).execute({
-          maxResults: args.limit || 5
-        })
-        
-        // Format emails for voice consumption
-        const emails = result.emails?.map((e: any) => ({
-          from: e.from,
-          subject: e.subject,
-          snippet: e.snippet?.substring(0, 150),
-          date: e.date,
-          isUnread: e.labelIds?.includes('UNREAD')
-        })) || []
-        
-        return {
-          call_id,
-          output: JSON.stringify({
-            success: true,
-            emailCount: emails.length,
-            emails,
-            unreadCount: emails.filter((e: any) => e.isUnread).length
+        // Build a Gmail query for today's messages in INBOX
+        try {
+          const now = new Date()
+          const yyyy = now.getFullYear()
+          const mm = String(now.getMonth() + 1).padStart(2, '0')
+          const dd = String(now.getDate()).padStart(2, '0')
+          const after = `${yyyy}/${mm}/${dd}` // Gmail expects YYYY/MM/DD
+          const qParts: string[] = [
+            `after:${after}`,
+            'in:inbox'
+          ]
+          if (args.unreadOnly) qParts.push('is:unread')
+          const q = qParts.join(' ')
+
+          result = await (listGmailMessagesTool as any).execute({
+            q,
+            maxResults: Math.min(Math.max(Number(args.limit) || 10, 1), 20)
           })
+
+          if (!result?.success) {
+            return {
+              call_id,
+              output: JSON.stringify({
+                success: false,
+                error: result?.message || 'Unable to access Gmail. Please connect your Google account in Settings.',
+                spoken_summary: 'I could not access your Gmail right now. Please ensure your Google account is connected.'
+              })
+            }
+          }
+
+          const emails = (result.messages || []).map((e: any) => ({
+            from: e.from,
+            subject: e.subject,
+            snippet: e.snippet?.substring(0, 150) || '',
+            date: e.date,
+            isUnread: Array.isArray(e.labelIds) && e.labelIds.includes('UNREAD')
+          }))
+
+          const unreadCount = emails.filter((e: any) => e.isUnread).length
+          const spoken_summary = emails.length === 0
+            ? 'You have no emails from today in your inbox.'
+            : `You have ${emails.length} email${emails.length === 1 ? '' : 's'} from today${args.unreadOnly ? ' (unread only)' : ''}. The top one is: ${emails[0].subject || 'no subject'}.`
+
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: true,
+              emailCount: emails.length,
+              emails,
+              unreadCount,
+              spoken_summary
+            })
+          }
+        } catch (err) {
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: false,
+              error: (err as Error).message,
+              spoken_summary: 'I ran into an error while checking your inbox.'
+            })
+          }
         }
       
       case 'create_calendar_event':
@@ -159,10 +200,11 @@ export async function executeVoiceTool(
           }
         }
 
+        // Adapt to gmail tool schema: to is string[], body as text
         result = await (sendGmailMessageTool as any).execute({
-          to: args.to,
+          to: Array.isArray(args.to) ? args.to : [args.to],
           subject: args.subject,
-          body: args.body
+          text: args.body
         })
         
         return {
