@@ -213,7 +213,12 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     const compiledGraph = graph.compile();
     
     const initialState = {
-      messages: [new HumanMessage(taskPrompt)]
+      messages: [new HumanMessage(taskPrompt)],
+      metadata: {
+        isScheduledTask: true,
+        taskId: task.task_id,
+        taskTitle: task.title
+      }
     };
 
     console.log(`🚀 Starting agent execution...`);

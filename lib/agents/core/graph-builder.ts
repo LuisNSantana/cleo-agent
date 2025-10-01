@@ -276,9 +276,12 @@ export class GraphBuilder {
           : baseModel
 
   // Prepare messages with agent prompt
-        // For Cleo supervisor agent, use dynamic prompt building to include routing hints and RAG
+        // For Cleo supervisor agent, use dynamic prompt building ONLY for interactive chat (not scheduled tasks)
+        // Scheduled tasks use the optimized prompt from task-executor.ts
         let systemMessage: SystemMessage
-        if (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') {
+        const isScheduledTask = state.metadata?.isScheduledTask === true
+        
+        if ((agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') && !isScheduledTask) {
           try {
             const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
             const { createClient } = await import('@/lib/supabase/server')
@@ -312,6 +315,9 @@ export class GraphBuilder {
           }
         } else {
           systemMessage = new SystemMessage(agentConfig.prompt)
+          if (isScheduledTask) {
+            logger.debug('📋 [Cleo] Using static prompt for scheduled task (optimized)')
+          }
         }
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
@@ -811,9 +817,12 @@ export class GraphBuilder {
           : baseModel
 
   // Prepare messages with agent prompt
-        // For Cleo supervisor agent, use dynamic prompt building to include routing hints and RAG (legacy path)
+        // For Cleo supervisor agent, use dynamic prompt building ONLY for interactive chat (not scheduled tasks)
+        // Scheduled tasks use the optimized prompt from task-executor.ts (legacy path)
         let systemMessage: SystemMessage
-        if (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') {
+        const isScheduledTaskLegacy = state.metadata?.isScheduledTask === true
+        
+        if ((agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') && !isScheduledTaskLegacy) {
           try {
             const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
             const { createClient } = await import('@/lib/supabase/server')
@@ -847,6 +856,9 @@ export class GraphBuilder {
           }
         } else {
           systemMessage = new SystemMessage(agentConfig.prompt)
+          if (isScheduledTaskLegacy) {
+            logger.debug('📋 [Cleo Legacy] Using static prompt for scheduled task (optimized)')
+          }
         }
         
   let messages: any[] = [systemMessage, ...filteredStateMessages]
