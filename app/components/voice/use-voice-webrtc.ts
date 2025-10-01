@@ -34,6 +34,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const hasActiveResponseRef = useRef<boolean>(false)
+  const enableBargeInRef = useRef<boolean>(false)
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -142,6 +143,9 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       // Add local audio track (microphone)
       const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack && audioTrack.enabled === false) {
+        audioTrack.enabled = true
+      }
       pc.addTrack(audioTrack, stream)
 
       // Create data channel for events (must be done before createOffer)
@@ -155,24 +159,26 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        if (instructions && instructions.length > 0) {
-          try {
-            dc.send(JSON.stringify({
-              type: 'session.update',
-              session: {
-                instructions,
-                // Enable server-side VAD turn detection and tune pause before responding
-                // 600-800ms yields more natural pauses; start with 600ms
-                turn_detection: {
-                  type: 'server_vad',
-                  silence_duration_ms: 600
-                }
+        // Always send a session.update to ensure VAD is configured even if no instructions
+        try {
+          const sessionUpdate: any = {
+            type: 'session.update',
+            session: {
+              // Enable server-side VAD turn detection and tune pause before responding
+              // 500–700ms yields natural pauses; use 500ms for quicker detection
+              turn_detection: {
+                type: 'server_vad',
+                silence_duration_ms: 500
               }
-            }))
-            console.log('🧠 Sent personalized instructions to OpenAI session')
-          } catch (sendError) {
-            console.error('Failed to send session.update instructions:', sendError)
+            }
           }
+          if (instructions && instructions.length > 0) {
+            sessionUpdate.session.instructions = instructions
+          }
+          dc.send(JSON.stringify(sessionUpdate))
+          console.log('🧠 Sent session.update (VAD config + optional instructions)')
+        } catch (sendError) {
+          console.error('Failed to send session.update:', sendError)
         }
       }
 
@@ -203,13 +209,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             setStatus('speaking')
             // Barge-in: cancel any ongoing response so the model stops speaking immediately
             try {
-              if (hasActiveResponseRef.current) {
+              if (enableBargeInRef.current && hasActiveResponseRef.current) {
                 dc.send(JSON.stringify({ type: 'response.cancel' }))
                 console.log('⛔ Sent response.cancel for barge-in')
                 // Optimistically clear; model will also emit done events later
                 hasActiveResponseRef.current = false
               } else {
-                console.log('ℹ️ No active response to cancel; skipping response.cancel')
+                console.log('ℹ️ No active response to cancel or barge-in disabled; skipping response.cancel')
               }
             } catch (cancelErr) {
               console.error('Failed to send response.cancel:', cancelErr)
