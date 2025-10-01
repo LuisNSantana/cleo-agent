@@ -278,7 +278,6 @@ class AgentTaskScheduler {
           setTimeout(() => reject(new Error(`Task execution exceeded absolute timeout of ${ABSOLUTE_MAX_TIMEOUT/1000}s`)), ABSOLUTE_MAX_TIMEOUT)
         );
         
-        console.log(`⏱️ Task executing with ${ABSOLUTE_MAX_TIMEOUT/1000}s absolute timeout...`);
         const result = await Promise.race([executionPromise, timeoutPromise]);
         const executionTime = Date.now() - startTime;
         const completedAt = result.execution_metadata?.end_time || new Date().toISOString();

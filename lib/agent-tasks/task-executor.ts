@@ -209,70 +209,27 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     // Build the graph for this agent
     const graph = await graphBuilder.buildGraph(agent);
     
+    // Compile and execute the graph
+    const compiledGraph = graph.compile();
+    
+    const initialState = {
+      messages: [new HumanMessage(taskPrompt)]
+    };
+
     console.log(`🚀 Starting agent execution...`);
     
-    // Create execution record
-    const execution = {
-      id: `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-      agentId: agent.id,
-      threadId: 'scheduled-task',
-      userId: task.user_id,
-      status: 'running' as const,
-      startTime: new Date(),
-      messages: [],
-      steps: [],
-      metrics: {
-        totalTokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        executionTime: 0,
-        executionTimeMs: 0,
-        tokensUsed: 0,
-        toolCallsCount: 0,
-        handoffsCount: 0,
-        errorCount: 0,
-        retryCount: 0,
-        cost: 0
-      }
-    };
-    
-    // Execute using ExecutionManager with proper timeout handling
-    const executionContext = {
-      threadId: 'scheduled-task',
-      userId: task.user_id,
-      agentId: agent.id,
-      messageHistory: [new HumanMessage(taskPrompt)],
-      metadata: {
-        isScheduledTask: true,
-        taskId: task.task_id,
-        taskTitle: task.title
-      }
-    };
-    
-    const executionOptions = {
-      timeout: TIMEOUT_MS
-    };
-    
-    // Execute within user context with timeout protection via ExecutionManager
-    const resultPromise = executionManager.executeWithHistory(
-      agent,
-      graph,
-      executionContext,
-      execution,
-      executionOptions
+    // Execute within user context with timeout protection
+    const resultPromise = withRequestContext(
+      { userId: task.user_id, requestId: `task-${task.task_id}` },
+      () => compiledGraph.invoke(initialState)
     );
     
-    // Race between execution and timeout (double protection)
+    // Race between execution and timeout
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Task execution timeout')), TIMEOUT_MS)
     );
     
-    const executionResult = await Promise.race([resultPromise, timeoutPromise]) as any;
-    
-    // Extract messages from execution result
-    const result = {
-      messages: executionResult.messages || []
-    };
+    const result = await Promise.race([resultPromise, timeoutPromise]) as any;
 
     execution_metadata.end_time = new Date().toISOString();
     execution_metadata.duration_ms = Date.now() - startTime;
