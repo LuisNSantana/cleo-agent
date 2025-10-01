@@ -159,7 +159,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             dc.send(JSON.stringify({
               type: 'session.update',
               session: {
-                instructions
+                instructions,
+                // Enable server-side VAD turn detection and tune pause before responding
+                // 600-800ms yields more natural pauses; start with 600ms
+                turn_detection: {
+                  type: 'server_vad',
+                  silence_duration_ms: 600
+                }
               }
             }))
             console.log('🧠 Sent personalized instructions to OpenAI session')
@@ -194,6 +200,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           if (event.type === 'input_audio_buffer.speech_started') {
             console.log('🎤 User started speaking')
             setStatus('speaking')
+            // Barge-in: cancel any ongoing response so the model stops speaking immediately
+            try {
+              dc.send(JSON.stringify({ type: 'response.cancel' }))
+              console.log('⛔ Sent response.cancel for barge-in')
+            } catch (cancelErr) {
+              console.error('Failed to send response.cancel:', cancelErr)
+            }
           }
 
           if (event.type === 'input_audio_buffer.speech_stopped') {

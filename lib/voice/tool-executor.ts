@@ -95,7 +95,27 @@ export async function executeVoiceTool(
           // In production, you'd want to use a date parsing library
           startDateTime = new Date(startDateTime).toISOString()
         }
-        
+        // Confirmation flow: require explicit confirmation before creating
+        if (args.confirm !== true) {
+          const spoken = `I'll create the event "${args.title}" for ${new Date(startDateTime).toLocaleString()}. Should I confirm and add it to your calendar now?`
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: false,
+              needs_confirmation: true,
+              action: 'create_calendar_event',
+              proposal: {
+                title: args.title,
+                start: startDateTime,
+                duration: args.duration || 60,
+                description: args.description
+              },
+              spoken_summary: spoken,
+              suggestion: 'Please confirm, or adjust the title/date/duration.'
+            })
+          }
+        }
+
         result = await (createCalendarEventTool as any).execute({
           summary: args.title,
           start: startDateTime,
@@ -113,11 +133,32 @@ export async function executeVoiceTool(
               end: result.end,
               link: result.htmlLink,
               id: result.id
-            }
+            },
+            spoken_summary: `Done. I scheduled "${result.summary}" for ${new Date(result.start).toLocaleString()}. Would you like me to send you the link?`
           })
         }
       
       case 'send_email':
+        // Confirmation flow: require explicit confirmation before sending
+        if (args.confirm !== true) {
+          const spoken = `I'll send an email to ${args.to} with subject "${args.subject}" saying: ${String(args.body).slice(0, 120)}... Is it okay to send it now?`
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: false,
+              needs_confirmation: true,
+              action: 'send_email',
+              proposal: {
+                to: args.to,
+                subject: args.subject,
+                body: args.body
+              },
+              spoken_summary: spoken,
+              suggestion: 'Please confirm, or edit the recipient/subject/body.'
+            })
+          }
+        }
+
         result = await (sendGmailMessageTool as any).execute({
           to: args.to,
           subject: args.subject,
@@ -130,7 +171,8 @@ export async function executeVoiceTool(
             success: true,
             messageId: result.id,
             to: args.to,
-            subject: args.subject
+            subject: args.subject,
+            spoken_summary: `Done. I sent the email to ${args.to} with subject "${args.subject}".`
           })
         }
       

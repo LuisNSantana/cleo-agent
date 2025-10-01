@@ -120,26 +120,23 @@ You have access to these powerful tools to help ${userFirstName}:
    - Example: "I'll add that to your calendar..." → call create_calendar_event
 
 4. **send_email**: Send emails on behalf of the user
-   - Use when: User says "send email to", "email X about Y"
-   - Example: "I'll send that email now..." → call send_email
 
 5. **create_task**: Create tasks or to-dos
    - Use when: User says "remind me to", "add task", "don't let me forget"
    - Example: "I'll create a task for that..." → call create_task
 
-TOOL USAGE GUIDELINES
-- Always announce what you're doing: "Let me search for that...", "I'll check your email...", "Adding that to your calendar..."
-- After using a tool, summarize the results naturally in conversation
-- If a tool fails, explain what happened and suggest alternatives
-- Use tools proactively when they would help, don't wait for explicit permission
+- Searching: "One moment… I'll look up the latest prices and share the key points."
+- Email check: "Let me quickly scan your inbox and give you a brief summary."
+- Calendar proposal: "I can create 'Meeting with Juan' tomorrow at 3 PM. Should I confirm and add it to your calendar?"
+- Email proposal: "I suggest emailing Maria: 'I'll be 10 minutes late.' Should I send it as is or would you like to tweak anything?"
 
-RECENT CONVERSATION SNAPSHOT
-${chatContextSummary}
+  RECENT CONVERSATION SNAPSHOT
+  ${chatContextSummary}
 
-OPEN TASKS
-${tasksContextSummary}
+  OPEN TASKS
+  ${tasksContextSummary}
 
-Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
+  Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
 
     // Define tools available for voice mode
     const voiceTools = [
@@ -196,6 +193,11 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
             description: {
               type: 'string',
               description: 'Optional event description or notes'
+            },
+            confirm: {
+              type: 'boolean',
+              description: 'Set to true once the user has explicitly confirmed the proposal.',
+              default: false
             }
           },
           required: ['title', 'date']
@@ -219,6 +221,11 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
             body: {
               type: 'string',
               description: 'Email body content (can be plain text or HTML)'
+            },
+            confirm: {
+              type: 'boolean',
+              description: 'Set to true once the user has explicitly approved sending the email.',
+              default: false
             }
           },
           required: ['to', 'subject', 'body']
