@@ -216,6 +216,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     
     const initialState = {
       messages: [new HumanMessage(taskPrompt)],
+      userId: task.user_id,  // CRITICAL: Required for context propagation
       metadata: {
         isScheduledTask: true,
         taskId: task.task_id,
@@ -224,6 +225,12 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     };
 
     console.log(`🚀 Starting agent execution...`);
+    console.log(`📋 Initial state:`, {
+      hasMessages: !!initialState.messages?.length,
+      userId: initialState.userId,
+      isScheduledTask: initialState.metadata?.isScheduledTask,
+      taskId: initialState.metadata?.taskId
+    });
     
     // Execute within user context with timeout protection
     const resultPromise = withRequestContext(
