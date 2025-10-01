@@ -33,6 +33,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   const sessionIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const hasActiveResponseRef = useRef<boolean>(false)
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -202,8 +203,14 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             setStatus('speaking')
             // Barge-in: cancel any ongoing response so the model stops speaking immediately
             try {
-              dc.send(JSON.stringify({ type: 'response.cancel' }))
-              console.log('⛔ Sent response.cancel for barge-in')
+              if (hasActiveResponseRef.current) {
+                dc.send(JSON.stringify({ type: 'response.cancel' }))
+                console.log('⛔ Sent response.cancel for barge-in')
+                // Optimistically clear; model will also emit done events later
+                hasActiveResponseRef.current = false
+              } else {
+                console.log('ℹ️ No active response to cancel; skipping response.cancel')
+              }
             } catch (cancelErr) {
               console.error('Failed to send response.cancel:', cancelErr)
             }
@@ -220,10 +227,20 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
           if (event.type === 'response.audio.delta') {
             setStatus('active')
+            hasActiveResponseRef.current = true
           }
 
           if (event.type === 'response.audio.done') {
             setStatus('listening')
+            hasActiveResponseRef.current = false
+          }
+
+          // Text-only responses (if used) — set/clear active state too
+          if (event.type === 'response.output_text.delta') {
+            hasActiveResponseRef.current = true
+          }
+          if (event.type === 'response.output_text.done' || event.type === 'response.completed') {
+            hasActiveResponseRef.current = false
           }
 
           if (event.type === 'conversation.item.input_audio_transcription.completed') {

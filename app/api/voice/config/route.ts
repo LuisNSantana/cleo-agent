@@ -166,6 +166,11 @@ You have access to these powerful tools to help ${userFirstName}:
               type: 'number',
               description: 'Number of recent emails to check (default: 5)',
               default: 5
+            },
+            unreadOnly: {
+              type: 'boolean',
+              description: 'If true, only summarize unread emails (today).',
+              default: false
             }
           }
         }
