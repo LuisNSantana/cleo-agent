@@ -142,19 +142,21 @@ async function runDelegation(params: {
   const runtime = getRuntimeConfig()
   
   // For scheduled tasks, use longer timeout to allow complex operations
-  // Check if we're in a scheduled task context
+  // Based on Azure Durable Functions sub-orchestration patterns
   const { getRequestContext } = await import('../server/request-context')
   const requestContext = getRequestContext()
   const isScheduledTask = requestContext?.requestId?.startsWith('task-')
   
-  // Use 6 minutes for scheduled tasks (allows for complex email composition, searches, etc.)
-  let timeoutMs = isScheduledTask ? 360_000 : runtime.delegationTimeoutMs
+  // Use 7 minutes for scheduled tasks (allows for complex operations with retries)
+  // This supports hierarchical multi-agent workflows as per LangGraph best practices
+  let timeoutMs = isScheduledTask ? 420_000 : runtime.delegationTimeoutMs
   const POLL_MS = runtime.delegationPollMs
   let lastProgressAt = startedAt
   
   logger.debug('🔁 [DELEGATION] Timeout configuration', {
     isScheduledTask,
     timeoutMs,
+    timeoutMinutes: timeoutMs / 60_000,
     requestId: requestContext?.requestId
   })
 

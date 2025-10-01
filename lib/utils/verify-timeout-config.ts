@@ -11,25 +11,25 @@ export interface TimeoutConfig {
 }
 
 export const TIMEOUT_CONFIGS: TimeoutConfig[] = [
-  // Level 1: Task Executors (Top level)
-  { name: 'Cleo Task Executor', timeoutMs: 600_000, level: 1 },
-  { name: 'Astra Task Executor', timeoutMs: 240_000, level: 1 },
+  // Level 1: Task Executors (Top level) - Hierarchical multi-agent support
+  { name: 'Cleo Task Executor', timeoutMs: 900_000, level: 1 },
+  { name: 'Astra Task Executor', timeoutMs: 300_000, level: 1 },
   { name: 'Apu Task Executor', timeoutMs: 300_000, level: 1 },
-  { name: 'Ami Task Executor', timeoutMs: 240_000, level: 1 },
+  { name: 'Ami Task Executor', timeoutMs: 300_000, level: 1 },
   { name: 'Wex Task Executor', timeoutMs: 360_000, level: 1 },
   
-  // Level 2: Delegations
-  { name: 'Delegation (Scheduled Task)', timeoutMs: 360_000, level: 2, parent: 'Cleo Task Executor' },
+  // Level 2: Delegations (Sub-orchestrations)
+  { name: 'Delegation (Scheduled Task)', timeoutMs: 420_000, level: 2, parent: 'Cleo Task Executor' },
   { name: 'Delegation (Chat)', timeoutMs: 300_000, level: 2, parent: 'Cleo Task Executor' },
   
   // Level 3: Sub-Agents
-  { name: 'Astra Agent', timeoutMs: 240_000, level: 3, parent: 'Delegation (Scheduled Task)' },
-  { name: 'Ami Agent', timeoutMs: 240_000, level: 3, parent: 'Delegation (Scheduled Task)' },
+  { name: 'Astra Agent', timeoutMs: 300_000, level: 3, parent: 'Delegation (Scheduled Task)' },
+  { name: 'Ami Agent', timeoutMs: 300_000, level: 3, parent: 'Delegation (Scheduled Task)' },
   { name: 'Apu Agent', timeoutMs: 300_000, level: 3, parent: 'Delegation (Scheduled Task)' },
   
   // Level 4: Execution Manager
-  { name: 'Execution Manager (Astra)', timeoutMs: 240_000, level: 4, parent: 'Astra Agent' },
-  { name: 'Execution Manager (Ami)', timeoutMs: 240_000, level: 4, parent: 'Ami Agent' },
+  { name: 'Execution Manager (Astra)', timeoutMs: 300_000, level: 4, parent: 'Astra Agent' },
+  { name: 'Execution Manager (Ami)', timeoutMs: 300_000, level: 4, parent: 'Ami Agent' },
   { name: 'Execution Manager (Apu)', timeoutMs: 300_000, level: 4, parent: 'Apu Agent' },
 ];
 
@@ -129,11 +129,11 @@ export function printValidationResult(result: ValidationResult): void {
 export function getTimeoutForAgent(agentId: string): number {
   // Mirror the logic from task-executor.ts
   if (agentId.includes('cleo')) {
-    return 600_000; // 10 minutes
+    return 900_000; // 15 minutes
   }
   
   if (agentId.includes('astra')) {
-    return 240_000; // 4 minutes
+    return 300_000; // 5 minutes
   }
   
   if (agentId.includes('apu')) {
@@ -141,7 +141,7 @@ export function getTimeoutForAgent(agentId: string): number {
   }
   
   if (agentId.includes('ami')) {
-    return 240_000; // 4 minutes
+    return 300_000; // 5 minutes
   }
   
   if (agentId.includes('wex')) {
@@ -152,7 +152,7 @@ export function getTimeoutForAgent(agentId: string): number {
 }
 
 export function getDelegationTimeout(isScheduledTask: boolean): number {
-  return isScheduledTask ? 360_000 : 300_000;
+  return isScheduledTask ? 420_000 : 300_000;
 }
 
 export function validateTaskScenario(

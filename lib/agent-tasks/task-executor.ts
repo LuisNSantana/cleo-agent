@@ -128,11 +128,11 @@ export interface TaskExecutionResult {
  * CRITICAL: Timeouts must account for potential delegations
  */
 function getAgentTimeout(agentId: string): number {
-  // Supervisor agents that delegate (Cleo) - need extra time for delegation overhead
-  // Supports up to 2 complex delegations (e.g., research + email)
-  // For 3+ delegations, task should be split into multiple scheduled tasks
+  // Supervisor agents that delegate (Cleo) - hierarchical orchestration support
+  // Based on LangGraph best practices for multi-agent systems
+  // Supports up to 3 complex delegations with proper timeout hierarchy
   if (agentId.includes('cleo')) {
-    return 600_000 // 10 minutes (allows for 2 delegations + overhead with safety margin)
+    return 900_000 // 15 minutes (allows for 3 delegations: 3x240s + 180s overhead)
   }
   
   // Research agents (Apu) - may do extensive searches
@@ -141,13 +141,15 @@ function getAgentTimeout(agentId: string): number {
   }
   
   // Email agents (Astra) - need time for email composition and sending
+  // Increased for complex emails with attachments or multiple recipients
   if (agentId.includes('astra')) {
-    return 240_000 // 4 minutes
+    return 300_000 // 5 minutes
   }
   
   // Workflow and calendar agents (Ami)
+  // Increased for complex calendar operations
   if (agentId.includes('ami')) {
-    return 240_000 // 4 minutes
+    return 300_000 // 5 minutes
   }
   
   // Automation (Wex with Skyvern)

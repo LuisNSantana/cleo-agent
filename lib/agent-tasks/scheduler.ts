@@ -234,8 +234,9 @@ class AgentTaskScheduler {
     const startTime = Date.now();
     const startedAt = new Date().toISOString();
     
-    // CRITICAL: Absolute max timeout regardless of agent type
-    const ABSOLUTE_MAX_TIMEOUT = 600_000; // 10 minutes max
+    // CRITICAL: Absolute max timeout for hierarchical multi-agent workflows
+    // Based on LangGraph best practices: supports up to 3 complex delegations
+    const ABSOLUTE_MAX_TIMEOUT = 900_000; // 15 minutes max
     
     try {
       console.log(`🔄 Processing task: ${task.title} (${task.agent_name})`);
