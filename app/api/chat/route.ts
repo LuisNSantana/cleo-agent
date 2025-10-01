@@ -1035,6 +1035,18 @@ export async function POST(req: Request) {
         const encoder = new TextEncoder()
   // Persisted parts accumulator (pipeline + tool chips)
   const persistedParts: any[] = []
+        
+        // Shared state for polling (accessible from both start and cancel)
+        let pollInterval: ReturnType<typeof setInterval> | null = null
+        let streamClosed = false
+        
+        const stopPolling = () => {
+          if (pollInterval) {
+            clearInterval(pollInterval)
+            pollInterval = null
+          }
+        }
+        
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
             // Set up pipeline event controller for delegation events
@@ -1063,28 +1075,38 @@ export async function POST(req: Request) {
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
             const runtimeConfig = getRuntimeConfig()
-            const POLL_MS = 2000 // OPTIMIZADO: 2s en lugar de 400ms (reduce carga 80%)
+            
+            // PHASE 1: Updated timeouts to match scheduled tasks (hierarchical multi-agent support)
+            // Based on LangGraph best practices - supports up to 3 complex delegations
             const supervisorLimitMs = Math.max(
-              runtimeConfig?.maxExecutionMsSupervisor ?? 300000,
-              runtimeConfig?.delegationTimeoutMs ?? 300000
+              runtimeConfig?.maxExecutionMsSupervisor ?? 600000,  // 10 min (was 5 min)
+              runtimeConfig?.delegationTimeoutMs ?? 420000         // 7 min (was 5 min)
             )
-            const extensionAllowanceMs = Math.max(runtimeConfig?.delegationMaxExtensionMs ?? 0, 0)
-            const MAX_POLL_TIME = Math.max(60000, supervisorLimitMs + extensionAllowanceMs + 10000)
+            const extensionAllowanceMs = Math.max(
+              runtimeConfig?.delegationMaxExtensionMs ?? 180000,   // 3 min extension
+              0
+            )
+            const MAX_POLL_TIME = Math.max(
+              120000,  // 2 min minimum
+              supervisorLimitMs + extensionAllowanceMs + 30000  // ~13 min total
+            )
+            
+            // PHASE 1: Adaptive polling - adjusts based on elapsed time
+            // Fast for quick responses, slower for long delegations
+            let pollMs = 500  // Start fast
+            const updatePollInterval = (elapsedMs: number): number => {
+              if (elapsedMs < 5000) return 500      // 0-5s: very fast (0.5s)
+              if (elapsedMs < 15000) return 1000    // 5-15s: fast (1s)
+              if (elapsedMs < 45000) return 2000    // 15-45s: normal (2s)
+              return 3000                            // 45s+: slow (3s)
+            }
+            // Progressive warning thresholds for better UX
             const HUNG_WARNING_THRESHOLD = Math.max(
-              45000,
-              Math.min(MAX_POLL_TIME - 10000, Math.floor(supervisorLimitMs * 0.5))
+              60000,  // 1 min (was 45s)
+              Math.min(MAX_POLL_TIME - 30000, Math.floor(supervisorLimitMs * 0.5))
             )
             const pollStartTime = Date.now()
             let hungWarningSent = false
-            let pollInterval: ReturnType<typeof setInterval> | null = null
-            let streamClosed = false
-
-            const stopPolling = () => {
-              if (pollInterval) {
-                clearInterval(pollInterval)
-                pollInterval = null
-              }
-            }
 
             const closeStream = () => {
               if (streamClosed) return
@@ -1225,13 +1247,23 @@ export async function POST(req: Request) {
               closeStream()
             }
 
-            pollInterval = setInterval(async () => {
+            // PHASE 1: Adaptive polling implementation
+            const pollLogic = async () => {
               if (streamClosed) {
                 stopPolling()
                 return
               }
 
               const elapsedMs = Date.now() - pollStartTime
+              
+              // Update poll interval based on elapsed time
+              const newPollMs = updatePollInterval(elapsedMs)
+              if (newPollMs !== pollMs) {
+                pollMs = newPollMs
+                stopPolling()
+                pollInterval = setInterval(pollLogic, pollMs)
+                console.log(`🔄 [ADAPTIVE POLL] Adjusted interval to ${pollMs}ms after ${elapsedMs}ms`)
+              }
 
               try {
                 const snapshot = execId ? orchestrator.getExecution?.(execId) : null
@@ -1455,10 +1487,13 @@ export async function POST(req: Request) {
                 }
                 closeStream()
               }
-            }, POLL_MS)
+            }
+            
+            // Start polling with initial fast interval
+            pollInterval = setInterval(pollLogic, pollMs)
           },
           cancel() {
-            // No-op
+            stopPolling()
           }
         })
 

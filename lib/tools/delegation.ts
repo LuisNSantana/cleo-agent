@@ -6,6 +6,8 @@ import { logger } from '@/lib/utils/logger'
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization'
 import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver'
 import { actionSnapshotStore, ActionLifecycle, redactInput } from '@/lib/actions/snapshot-store'
+import { circuitBreaker } from '@/lib/agents/circuit-breaker'
+import { executeWithRetry, RETRY_PRESETS } from '@/lib/agents/retry-policy'
 
 // Global event controller for pipeline streaming
 let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -91,6 +93,22 @@ async function runDelegation(params: {
       }
     }
   } catch {}
+
+  // PHASE 2: Circuit breaker check
+  const circuitCheck = circuitBreaker.canExecute(agentId)
+  if (!circuitCheck.allowed) {
+    logger.warn('🔴 [CIRCUIT_BREAKER] Delegation blocked', {
+      agentId,
+      reason: circuitCheck.reason
+    })
+    
+    return {
+      status: 'circuit_open',
+      error: circuitCheck.reason || `Agent ${agentId} is temporarily unavailable`,
+      agentId,
+      timestamp: new Date().toISOString()
+    }
+  }
 
   logger.info('🔁 [DELEGATION_START]', {
     delegation_entry: 'tool_invocation',
@@ -242,6 +260,10 @@ async function runDelegation(params: {
       if (snapshot?.status === 'completed') {
         finalResult = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
         logger.info('✅ [DELEGATION_COMPLETE]', { executionId: execId, target_agent: agentId, context_user_id: userId })
+        
+        // PHASE 2: Record success in circuit breaker
+        circuitBreaker.recordSuccess(agentId)
+        
         ActionLifecycle.result(actionId, { result: finalResult }, 'delegation completed')
         lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         // Emit completion events (legacy + new)
@@ -265,6 +287,10 @@ async function runDelegation(params: {
       if (snapshot?.status === 'failed') {
         finalResult = `Delegation failed: ${snapshot?.error || 'unknown error'}`
         logger.error('❌ [DELEGATION_FAILED]', { executionId: execId, target_agent: agentId, context_user_id: userId, error: snapshot?.error })
+        
+        // PHASE 2: Record failure in circuit breaker
+        circuitBreaker.recordFailure(agentId, snapshot?.error)
+        
         ActionLifecycle.error(actionId, { message: finalResult, code: 'DELEGATION_FAILED' })
         lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
         emitPipelineEvent({
@@ -293,6 +319,10 @@ async function runDelegation(params: {
     const elapsed = Date.now() - startedAt
     finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
     logger.warn('⏱️ [DELEGATION_TIMEOUT]', { executionId: execId, target_agent: agentId, context_user_id: userId, elapsedMs: elapsed })
+    
+    // PHASE 2: Record timeout as failure in circuit breaker
+    circuitBreaker.recordFailure(agentId, 'timeout')
+    
     ActionLifecycle.timeout(actionId)
     lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]
     emitPipelineEvent({
