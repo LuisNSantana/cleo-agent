@@ -67,17 +67,47 @@ export async function POST(req: NextRequest) {
     try {
       const { data: tasks } = await supabase
         .from('tasks' as any)
-        .select('title, status, priority')
+        .select('title, status, priority, due_date')
         .eq('user_id', user.id)
         .eq('status', 'pending')
         .order('priority', { ascending: false })
         .limit(5)
 
       if (tasks && tasks.length > 0) {
-        tasksContextLines = tasks.map((t: any) => `• ${t.title} (${t.priority || 'prioridad normal'})`)
+        tasksContextLines = tasks.map((t: any) => {
+          const dueDate = t.due_date ? ` - Due: ${new Date(t.due_date).toLocaleDateString()}` : ''
+          return `• ${t.title} (${t.priority || 'medium'}${dueDate})`
+        })
       }
     } catch (error) {
       console.log('No tasks available')
+    }
+    
+    // NUEVO: Obtener eventos próximos del calendario
+    let upcomingEventsLines: string[] = []
+    try {
+      const { data: events } = await supabase
+        .from('calendar_events' as any)
+        .select('title, start_time, end_time')
+        .eq('user_id', user.id)
+        .gte('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(3)
+
+      if (events && events.length > 0) {
+        upcomingEventsLines = events.map((e: any) => {
+          const startDate = new Date(e.start_time)
+          const timeStr = startDate.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: 'numeric', 
+            minute: '2-digit' 
+          })
+          return `• ${e.title} - ${timeStr}`
+        })
+      }
+    } catch (error) {
+      console.log('No calendar events available')
     }
 
     // Build contextual instructions
@@ -88,6 +118,10 @@ export async function POST(req: NextRequest) {
     const tasksContextSummary = tasksContextLines.length > 0
       ? tasksContextLines.join('\n')
       : 'Sin tareas registradas.'
+    
+    const upcomingEventsSummary = upcomingEventsLines.length > 0
+      ? upcomingEventsLines.join('\n')
+      : 'Sin eventos próximos.'
 
   const instructions = `You are Cleo, ${userFirstName}'s personal AI assistant. You speak through voice in a warm, curious, and highly practical manner.
 
@@ -130,13 +164,22 @@ You have access to these powerful tools to help ${userFirstName}:
 - Calendar proposal: "I can create 'Meeting with Juan' tomorrow at 3 PM. Should I confirm and add it to your calendar?"
 - Email proposal: "I suggest emailing Maria: 'I'll be 10 minutes late.' Should I send it as is or would you like to tweak anything?"
 
-  RECENT CONVERSATION SNAPSHOT
-  ${chatContextSummary}
+RECENT CONVERSATION SNAPSHOT
+${chatContextSummary}
 
-  OPEN TASKS
-  ${tasksContextSummary}
+UPCOMING CALENDAR EVENTS
+${upcomingEventsSummary}
 
-  Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
+OPEN TASKS
+${tasksContextSummary}
+
+IMPORTANT CONTEXT NOTES
+- The conversation history above is a summary. You will also receive the actual previous messages as conversation items for full context.
+- When referencing past conversations, use the actual message history, not just this summary.
+- Always use your tools (search_web, check_email, etc.) to get real, current information. Never make up data.
+- For actions like sending emails or creating events, propose the action first and wait for explicit confirmation before executing.
+
+Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
 
     // Define tools available for voice mode
     const voiceTools = [

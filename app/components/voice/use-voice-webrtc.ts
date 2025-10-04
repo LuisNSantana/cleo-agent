@@ -31,6 +31,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const chatIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const hasActiveResponseRef = useRef<boolean>(false)
@@ -72,6 +73,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
     try {
       setStatus('connecting')
       setError(null)
+      chatIdRef.current = chatId || null
 
       // Fetch voice configuration with contextual instructions
       const configResponse = await fetch('/api/voice/config', {
@@ -121,8 +123,8 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         throw new Error(errorData.error || 'Failed to create voice session')
       }
 
-      const { sessionId } = await sessionResponse.json()
-      sessionIdRef.current = sessionId
+      const { sessionId: voiceSessionId } = await sessionResponse.json()
+      sessionIdRef.current = voiceSessionId
 
       // Create WebRTC peer connection
       const pc = new RTCPeerConnection()
@@ -153,13 +155,10 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       dataChannelRef.current = dc
       console.log('📡 Created data channel: oai-events')
 
-      dc.onopen = () => {
+      dc.onopen = async () => {
         console.log('✅ Data channel opened')
-        setStatus('listening')
-        startTimeRef.current = Date.now()
-        monitorAudioLevel()
-
-        // Always send a session.update to ensure VAD is configured even if no instructions
+        
+        // 1. First, send session.update with instructions and VAD config
         try {
           const sessionUpdate: any = {
             type: 'session.update',
@@ -176,10 +175,54 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             sessionUpdate.session.instructions = instructions
           }
           dc.send(JSON.stringify(sessionUpdate))
-          console.log('🧠 Sent session.update (VAD config + optional instructions)')
+          console.log('🧠 Sent session.update (VAD config + instructions)')
         } catch (sendError) {
           console.error('Failed to send session.update:', sendError)
         }
+
+        // 2. NUEVO: Agregar mensajes previos del chat como conversation items
+        // Siguiendo best practices de ChatGPT y Grok
+        if (chatId) {
+          try {
+            console.log('📝 Fetching conversation context for chat:', chatId)
+            const contextResponse = await fetch(`/api/voice/context/${chatId}`)
+            
+            if (contextResponse.ok) {
+              const { messages } = await contextResponse.json()
+              
+              if (messages && messages.length > 0) {
+                console.log(`📚 Adding ${messages.length} previous messages to conversation`)
+                
+                // Agregar cada mensaje previo como conversation item
+                // Esto es lo que hacen ChatGPT y Grok para mantener contexto
+                for (const msg of messages) {
+                  try {
+                    dc.send(JSON.stringify({
+                      type: 'conversation.item.create',
+                      item: msg.item
+                    }))
+                  } catch (itemError) {
+                    console.error('Failed to add conversation item:', itemError)
+                  }
+                }
+                
+                console.log('✅ Conversation context loaded successfully')
+              } else {
+                console.log('ℹ️ No previous messages found for this chat')
+              }
+            } else {
+              console.log('⚠️ Could not fetch conversation context, continuing without it')
+            }
+          } catch (contextError) {
+            console.error('Error loading conversation context:', contextError)
+            // Continue without context - not a critical error
+          }
+        }
+        
+        // 3. Now ready to listen
+        setStatus('listening')
+        startTimeRef.current = Date.now()
+        monitorAudioLevel()
       }
 
       dc.onclose = () => {
@@ -250,7 +293,51 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           }
 
           if (event.type === 'conversation.item.input_audio_transcription.completed') {
-            console.log('📝 Transcription:', event.transcript)
+            console.log('📝 User transcription:', event.transcript)
+            
+            // NUEVO: Guardar transcripción del usuario en el chat
+            if (chatIdRef.current && event.transcript) {
+              try {
+                await fetch('/api/voice/transcript', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chatId: chatIdRef.current,
+                    role: 'user',
+                    content: event.transcript,
+                    sessionId: sessionIdRef.current
+                  })
+                })
+                console.log('💾 User transcript saved to chat')
+              } catch (saveError) {
+                console.error('Failed to save user transcript:', saveError)
+              }
+            }
+          }
+          
+          // NUEVO: Capturar respuesta de Cleo para guardarla
+          if (event.type === 'response.audio_transcript.done' || event.type === 'response.text.done') {
+            const assistantTranscript = event.transcript || event.text
+            
+            if (chatIdRef.current && assistantTranscript) {
+              console.log('📝 Assistant transcription:', assistantTranscript)
+              
+              try {
+                await fetch('/api/voice/transcript', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chatId: chatIdRef.current,
+                    role: 'assistant',
+                    content: assistantTranscript,
+                    sessionId: sessionIdRef.current
+                  })
+                })
+                console.log('💾 Assistant transcript saved to chat')
+              } catch (saveError) {
+                console.error('Failed to save assistant transcript:', saveError)
+              }
+            }
           }
 
           // Handle tool calls from Realtime API
