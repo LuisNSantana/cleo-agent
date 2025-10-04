@@ -11,7 +11,7 @@ export const AMI_AGENT: AgentConfig = {
   name: 'Ami',
   description: 'Executive assistant specializing in productivity, scheduling, email triage, and administrative coordination.',
   role: 'specialist',
-  model: 'openrouter:x-ai/grok-4-fast:free',
+  model: 'openrouter:x-ai/grok-4-fast',
   temperature: 0.5,
   maxTokens: 16384,
   tools: [

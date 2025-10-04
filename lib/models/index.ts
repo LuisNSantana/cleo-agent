@@ -6,13 +6,13 @@ import { openaiModels } from "./data/openai.clean"
 /**
  * Modelo unificado simplificado
  * Solo exponemos dos opciones claras en la UI:
- * - Faster (🚀): grok-4-free  -> texto rápido y económico
+ * - Faster (🚀): grok-4-fast  -> texto rápido y económico
  * - Smarter (🧠): grok-4-fast-reasoning -> reasoning + visión/archivos
  *
  * Eliminados tiers antiguos (Fast/Balanced/Smarter multi‑proveedor) y modelos
  * legacy (Claude, GPT-5, Mistral, Gemini, etc.) para evitar duplicados y ruido.
  * Si llega un mensaje histórico con un id antiguo, la capa superior debe
- * hacer fallback a grok-4-free (se maneja fuera de esta lista) por compatibilidad.
+ * hacer fallback a grok-4-fast (se maneja fuera de esta lista) por compatibilidad.
  */
 function pickById(list: ModelConfig[], ids: string[]): ModelConfig[] {
   const set = new Set(ids)
@@ -31,9 +31,9 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Lista final: Faster (grok-4-free), Smarter (grok-4-fast-reasoning + gpt-5-mini)
+// Lista final: Faster (grok-4-fast), Smarter (grok-4-fast-reasoning + gpt-5-mini)
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-free', 'grok-4-fast-reasoning']),
+  ...pickById(grokModels, ['grok-4-fast', 'grok-4-fast-reasoning']),
   ...pickById(openaiModels, ['gpt-5-mini-2025-08-07'])
 ]
 

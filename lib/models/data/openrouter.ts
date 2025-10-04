@@ -854,8 +854,8 @@ export const openrouterModels: ModelConfig[] = [
       }).chat("x-ai/grok-3-mini-beta"),
   },
   {
-    id: "openrouter:x-ai/grok-4-fast:free",
-    name: "Grok-4-Fast (Free)",
+    id: "openrouter:x-ai/grok-4-fast",
+    name: "Grok-4-Fast",
     provider: "OpenRouter",
     providerId: "openrouter",
     modelFamily: "Grok",
@@ -888,7 +888,7 @@ export const openrouterModels: ModelConfig[] = [
             plugins: [{ id: "web", max_results: 3 }],
           },
         }),
-      }).chat("x-ai/grok-4-fast:free"),
+      }).chat("x-ai/grok-4-fast"),
   },
   {
     id: "openrouter:google/gemini-2.5-flash",

@@ -487,8 +487,8 @@ export function useChatCore({
   // (for example from legacy favorites or stale cached chats), fall back to the
   // application default model to avoid server-side 'Model not found' errors.
   let resolvedModel = getModelInfo(selectedModel) ? normalizeModelId(selectedModel) : MODEL_DEFAULT
-  // Auto-upgrade to multimodal model when user attaches files and current is text-only grok-4-free
-  if (resolvedModel === 'grok-4-free') {
+  // Auto-upgrade to multimodal model when user attaches files and current is text-only grok-4-fast
+  if (resolvedModel === 'grok-4-fast') {
     const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)
     if (hasAttachments) {
       resolvedModel = 'grok-4-multimodal'

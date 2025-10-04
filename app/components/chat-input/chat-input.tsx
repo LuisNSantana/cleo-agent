@@ -9,7 +9,7 @@ import {
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, CircleNotch, ImageSquare, Sparkle } from "@phosphor-icons/react"
+import { ArrowUpIcon, CircleNotch, ImageSquare, Sparkle, Stop } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -375,7 +375,7 @@ export function ChatInput({
                 aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
               >
                 {status === 'streaming' ? (
-                  <CircleNotch className="size-[18px] animate-spin" weight="bold" />
+                  <Stop className="size-[18px]" weight="fill" />
                 ) : imageMode ? (
                   <Sparkle className="size-[18px]" weight="fill" />
                 ) : (

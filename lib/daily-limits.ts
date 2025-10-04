@@ -90,8 +90,8 @@ export class DailyLimitsManager {
    * Get fallback model for vision tasks when primary model doesn't support vision
    */
   static getVisionFallbackModel(primaryModelId: string): string | null {
-    // If user is using grok-4-fast:free (no vision), fallback to vision-capable model
-    if (primaryModelId === 'openrouter:x-ai/grok-4-fast:free') {
+    // If user is using grok-4-fast (no vision), fallback to vision-capable model
+    if (primaryModelId === 'openrouter:x-ai/grok-4-fast') {
       return 'openrouter:google/gemini-2.5-flash-lite' // Economical multimodal option
     }
     

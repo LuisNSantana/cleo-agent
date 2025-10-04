@@ -118,7 +118,7 @@ export class ModelFactory {
 
     const normalized = normalizeModelId(modelName)
     const INTERNAL_MODEL_MAP: Record<string,string> = {
-      'grok-4-free': 'openrouter:x-ai/grok-4-fast:free',
+      'grok-4-fast': 'openrouter:x-ai/grok-4-fast',
     }
     const externalName = INTERNAL_MODEL_MAP[normalized] || normalized
     try {
@@ -144,8 +144,8 @@ export class ModelFactory {
       }
       
   // Final fallback to internal fast model
-  logger.warn(`[ModelFactory] Using final fallback: grok-4-free`)
-  const finalFallback = this.createModel('grok-4-free', config)
+  logger.warn(`[ModelFactory] Using final fallback: grok-4-fast`)
+  const finalFallback = this.createModel('grok-4-fast', config)
       this.modelCache.set(cacheKey, finalFallback)
       return finalFallback
     }

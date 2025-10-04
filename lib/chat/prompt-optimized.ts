@@ -313,7 +313,7 @@ Provide diverse examples showing:
 </claude_optimization>`
 
 export const FAST_MODEL_OPTIMIZATION = `<fast_model_optimization>
-<!-- For fast models like grok-4-free: be concise -->
+<!-- For fast models like grok-4-fast: be concise -->
 <concise_instructions>
 - Direct and to the point
 - No lengthy Chain of Thought

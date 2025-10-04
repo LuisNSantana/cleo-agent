@@ -16,7 +16,7 @@ import { openproviders } from "@/lib/openproviders"
 const grokModels: ModelConfig[] = [
   // New simplified public models
   {
-    id: "grok-4-free",
+    id: "grok-4-fast",
     name: "Faster",
     provider: "OpenRouter", // Se sirve vía OpenRouter
     providerId: "openrouter",
@@ -44,7 +44,7 @@ const grokModels: ModelConfig[] = [
     icon: "faster",
     defaults: { temperature: 0.3, topP: 0.9 },
     // Usamos el endpoint real de OpenRouter; la fábrica hará mapping interno también
-    apiSdk: (apiKey?: string) => openproviders("openrouter:x-ai/grok-4-fast:free", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("openrouter:x-ai/grok-4-fast", undefined, apiKey),
   },
   {
     id: "grok-4-multimodal",

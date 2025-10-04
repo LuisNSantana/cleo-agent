@@ -10,7 +10,7 @@ export const NORA_AGENT: AgentConfig = {
   name: 'Nora',
   description: 'Complete Community Manager & Social Media specialist with advanced content creation, analytics, scheduling, moderation, and audience engagement capabilities',
   role: 'specialist',
-  model: 'openrouter:x-ai/grok-4-fast:free',
+  model: 'openrouter:x-ai/grok-4-fast',
   temperature: 0.7,
   maxTokens: 32768,
   color: '#E879F9',

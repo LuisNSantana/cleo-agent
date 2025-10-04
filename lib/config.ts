@@ -17,7 +17,7 @@ export const DAILY_LIMIT_PRO_MODELS = 500
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: only validated tool-capable models
-  "openrouter:x-ai/grok-4-fast:free", // Replaced DeepSeek with Grok 4 Fast (better performance & still free)
+  "openrouter:x-ai/grok-4-fast", // Replaced DeepSeek with Grok 4 Fast (better performance & still free)
   "openrouter:z-ai/glm-4.5",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   // Keep one vision-capable emergency fallback
@@ -28,26 +28,26 @@ export const NON_AUTH_ALLOWED_MODELS = [
 export const FREE_MODELS_IDS = [
   // Curated free/tool-capable list for authenticated users
   // Top tier free models
-  "openrouter:x-ai/grok-4-fast:free",  // New Grok-4 fast model - excellent performance
+  "openrouter:x-ai/grok-4-fast",  // New Grok-4 fast model - excellent performance
   "openai/gpt-4o-mini",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   "openrouter:deepseek/deepseek-chat-v3.1:free",
   // High-end free options
   // paid Nemotron is excluded from FREE list
   // Economical models for user variety
-  "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast:free
+  "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast
   "gpt-5-nano",
   // Emergency fallback
   "gpt-4o-mini",
 ]
 
-// Default authenticated model: Sonoma Sky Alpha via OpenRouter
-// Nuevo modelo por defecto (solo texto): grok-4-free (alias interno)
-export const MODEL_DEFAULT = "grok-4-free"
+// Default authenticated model: Grok 4 Fast via OpenRouter
+// Nuevo modelo por defecto (solo texto): grok-4-fast (alias interno)
+export const MODEL_DEFAULT = "grok-4-fast"
 
 // MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (mejor rendimiento y herramientas soportadas)
 // Guest también usa el nuevo faster por defecto
-export const MODEL_DEFAULT_GUEST = "grok-4-free"
+export const MODEL_DEFAULT_GUEST = "grok-4-fast"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

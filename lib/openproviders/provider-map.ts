@@ -4,9 +4,9 @@ import type { Provider, SupportedModel } from "./types"
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Cleo simplified public models (added 2025-09-27)
   // These are the only two user-selectable chat models now.
-  // grok-4-free is routed internally to openrouter:x-ai/grok-4-fast:free
+  // grok-4-fast is routed internally to openrouter:x-ai/grok-4-fast
   // grok-4-fast-reasoning is the new multimodal primary (was grok-4-multimodal)
-  "grok-4-free": "openrouter",
+  "grok-4-fast": "openrouter",
   "grok-4-fast-reasoning": "xai",
   // Backward compatibility alias
   "grok-4-multimodal": "xai",
@@ -40,7 +40,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Additional OpenRouter free models
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
   // X.AI Grok models
-  "openrouter:x-ai/grok-4-fast:free": "openrouter",
+  "openrouter:x-ai/grok-4-fast": "openrouter",
   // Claude 4 models
   "openrouter:anthropic/claude-sonnet-4": "openrouter",
   "anthropic/claude-sonnet-4": "openrouter",

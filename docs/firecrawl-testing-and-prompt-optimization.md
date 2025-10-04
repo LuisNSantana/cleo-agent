@@ -389,7 +389,7 @@ This requires comprehensive competitive analysis. I'll delegate to Wex, our mark
 - Ejemplos diversos
 - Chain of thought prominente
 
-**Para modelos fast (grok-4-free):**
+**Para modelos fast (grok-4-fast):**
 - Instrucciones concisas
 - Sin Chain of Thought extenso
 - Direct y al punto
