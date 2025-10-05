@@ -58,14 +58,19 @@ export function SmartMessage({
 
   return (
     <div className="space-y-4">
-      {/* Contenido original - Diseño Cleo Rebrand con frosted glass effect */}
+      {/* Contenido original - Diseño Cleo Rebrand optimizado para dark mode */}
       <MessageContent
         className={cn(
-          // Mobile: softer frosted glass to avoid harsh white
+          // Base: frosted glass effect con mejor contraste
           "prose dark:prose-invert relative min-w-full rounded-2xl p-4 shadow-lg backdrop-blur-xl",
-          "bg-white/70 text-gray-900 border border-white/30 dark:bg-zinc-900/50 dark:text-zinc-50 dark:border-white/10",
-          // Desktop: keep current appearance
-          "md:bg-white/90 md:border md:border-white/20 md:backdrop-blur-md",
+          // Light mode: soft white glass
+          "bg-white/70 text-gray-900 border border-white/30",
+          // Dark mode: OPTIMIZADO - Fondo más claro para mejor contraste
+          "dark:bg-white/8 dark:text-zinc-50 dark:border-white/15",
+          // Desktop: slightly more opaque
+          "md:bg-white/90 md:border-white/20 md:backdrop-blur-md",
+          "md:dark:bg-white/10 md:dark:border-white/20",
+          // Typography
           "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-8 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-3 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-h4:scroll-m-20 prose-h5:scroll-m-20 prose-h6:scroll-m-20 prose-strong:font-medium prose-table:block prose-table:overflow-y-auto"
         )}
         markdown={true}
