@@ -17,6 +17,7 @@ import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue, useTransition } from "react"
 import { debounce } from "lodash"
 import { useGuestMemory } from "@/app/hooks/use-guest-memory"
+import { usePageVisibility } from "@/hooks/use-page-visibility"
 
 // 🔧 Performance & Robustness Utilities
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -287,6 +288,10 @@ export function useChatCore({
   const hasSentFirstMessageRef = useRef(false)
   const prevChatIdRef = useRef<string | null>(chatId)
   
+  // Track if there was an active stream that was interrupted
+  const wasStreamingRef = useRef(false)
+  const lastStreamMessageRef = useRef<string>('')
+  
   // 🎯 Performance: Memoized derived values
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
   
@@ -425,6 +430,30 @@ export function useChatCore({
 
   // Error state for UI consumers
   const [error, setError] = useState<Error | null>(null)
+
+  // 🔍 Page Visibility tracking - detect when screen locks/unlocks
+  usePageVisibility({
+    onVisible: useCallback((state: { hiddenDuration: number }) => {
+      // Page became visible again - check if stream was interrupted
+      console.log(`📱 Page visible again after ${state.hiddenDuration}ms`)
+      
+      // If page was hidden for more than 5 seconds and stream was active
+      if (state.hiddenDuration > 5000 && wasStreamingRef.current) {
+        console.warn('⚠️ Stream may have been interrupted by screen lock/background')
+        
+        // Show notification to user
+        toast({
+          title: 'Connection may have been interrupted',
+          description: 'Your screen was locked during streaming. If the response is incomplete, try resending.',
+          status: 'warning'
+        })
+        
+        // Reset streaming flag
+        wasStreamingRef.current = false
+      }
+    }, []),
+    minHiddenDuration: 1000 // Only care about hides longer than 1 second
+  })
 
   // Core sendMessage with SSE streaming handling
   const sendMessage = useCallback(
@@ -566,9 +595,17 @@ export function useChatCore({
           setMessages((prev: ChatMessage[]) => [...prev, assistantMessageObj])
         })
 
+        // 🔍 Mark that streaming is active (for page visibility detection)
+        wasStreamingRef.current = true
+        lastStreamMessageRef.current = text
+
         while (true) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (done) {
+            // 🔍 Streaming completed successfully
+            wasStreamingRef.current = false
+            break
+          }
 
           const chunk = new TextDecoder().decode(value)
           buffer += chunk
@@ -1098,6 +1135,9 @@ export function useChatCore({
         
         setStatus("ready")
       } catch (err) {
+        // 🔍 Reset streaming flag on error
+        wasStreamingRef.current = false
+        
         const error = err as Error
         if (error.name !== "AbortError") {
           setError(error)
