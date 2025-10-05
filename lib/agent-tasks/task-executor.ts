@@ -203,33 +203,18 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     // Create task-specific prompt based on agent and task type
     const taskPrompt = createTaskPrompt(task, TIMEOUT_MS);
     
-    // Initialize the graph builder with proper configuration
-    const modelFactory = new ModelFactory();
-    const eventEmitter = new EventEmitter();
-    const executionManager = new ExecutionManager({
-      eventEmitter,
-      errorHandler: globalErrorHandler
-    });
-
-    const graphBuilder = new GraphBuilder({
-      modelFactory,
-      eventEmitter, 
-      executionManager
-    });
-    
+    // CRITICAL FIX: Use agent orchestrator instead of direct GraphBuilder
+    // This ensures delegation events are properly connected to CoreOrchestrator
     console.log(`⏱️ Task executing with ${TIMEOUT_MS/1000}s absolute timeout...`);
+    console.log(`🚀 Using agent orchestrator for ${agent.name} to support delegations...`);
     
-    console.log(`🚀 Building graph for agent: ${agent.name}`);
+    // Use the legacy orchestrator which has CoreOrchestrator with delegation support
+    const { getAgentOrchestrator } = await import('@/lib/agents/agent-orchestrator');
+    const orchestrator = getAgentOrchestrator();
     
-    // Build the graph for this agent
-    const graph = await graphBuilder.buildGraph(agent);
-    
-    // Compile and execute the graph
-    const compiledGraph = graph.compile();
-    
-    const initialState = {
-      messages: [new HumanMessage(taskPrompt)],
-      userId: task.user_id,  // CRITICAL: Required for context propagation
+    const initialMessage = {
+      role: 'user' as const,
+      content: taskPrompt,
       metadata: {
         isScheduledTask: true,
         taskId: task.task_id,
@@ -239,16 +224,42 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     console.log(`🚀 Starting agent execution...`);
     console.log(`📋 Initial state:`, {
-      hasMessages: !!initialState.messages?.length,
-      userId: initialState.userId,
-      isScheduledTask: initialState.metadata?.isScheduledTask,
-      taskId: initialState.metadata?.taskId
+      userId: task.user_id,
+      agentId: agent.id,
+      isScheduledTask: true,
+      taskId: task.task_id
     });
     
     // Execute within user context with timeout protection
     const resultPromise = withRequestContext(
       { userId: task.user_id, requestId: `task-${task.task_id}` },
-      () => compiledGraph.invoke(initialState)
+      async () => {
+        // Start execution with orchestrator (supports delegations)
+        const execution = orchestrator.startAgentExecutionWithHistory(
+          taskPrompt,
+          agent.id,
+          []
+        );
+        
+        // Poll for completion
+        const pollInterval = 500; // Poll every 500ms
+        const maxPolls = Math.floor(TIMEOUT_MS / pollInterval);
+        
+        for (let i = 0; i < maxPolls; i++) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          
+          const currentExecution = orchestrator.getExecution(execution.id);
+          if (!currentExecution) {
+            throw new Error('Execution disappeared from registry');
+          }
+          
+          if (currentExecution.status === 'completed' || currentExecution.status === 'failed') {
+            return currentExecution;
+          }
+        }
+        
+        throw new Error('Task execution timeout - polling expired');
+      }
     );
     
     // Race between execution and timeout
@@ -261,43 +272,86 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     execution_metadata.end_time = new Date().toISOString();
     execution_metadata.duration_ms = Date.now() - startTime;
 
-    // Extract result content from the graph response
-    const lastMessage = result.messages[result.messages.length - 1];
-    const resultContent = lastMessage?.content || 'Task completed';
+    // CRITICAL FIX: Extract result from orchestrator execution object
+    const execution = result as AgentExecution;
+    
+    // Check execution status
+    if (execution.status === 'failed') {
+      const errorMsg = typeof execution.error === 'string' 
+        ? execution.error 
+        : (execution.error as any)?.message || 'Execution failed';
+      console.log(`❌ Task failed: ${errorMsg}`);
+      
+      // Create failure notification
+      await createTaskNotification({
+        user_id: task.user_id,
+        task_id: task.task_id,
+        agent_id: task.agent_id,
+        agent_name: task.agent_name,
+        agent_avatar: task.agent_avatar || undefined,
+        notification_type: 'task_failed',
+        title: `❌ Task Failed: ${task.title}`,
+        message: `${task.agent_name} could not complete task "${task.title}". Reason: ${errorMsg}`,
+        task_result: {
+          error: errorMsg,
+          execution_time: execution_metadata.duration_ms,
+          failed_at: execution_metadata.end_time
+        },
+        priority: 'high'
+      }).catch(err => console.error('Failed to create failure notification:', err));
+
+      return {
+        success: false,
+        error: errorMsg,
+        execution_metadata
+      };
+    }
+
+    // Extract result content from the orchestrator execution
+    const lastMessage = execution.messages && execution.messages.length > 0
+      ? execution.messages[execution.messages.length - 1]
+      : null;
+    const resultContent = execution.result || lastMessage?.content || 'Task completed';
 
     // Check for tool failures in the message history
     let hasToolFailures = false;
     let failureReasons: string[] = [];
     
-    const agentMessages = Array.isArray(result.messages) ? coerceAgentMessages(result.messages) : [];
-    const toolCalls = Array.isArray(result.messages) ? extractToolCalls(result.messages) : [];
-    const normalizedResult = normalizeTaskResultPayload(resultContent);
-    normalizedResult.execution_metadata = execution_metadata;
-
-    for (const message of result.messages) {
-      // Check for tool messages with failures
-      const content = (message as Record<string, unknown>).content;
-      if (typeof content === 'string') {
-        if (content.includes('"success":false') || 
-            content.includes('Auth required') ||
-            content.includes('error') ||
-            content.includes('failed')) {
-          hasToolFailures = true;
-          if (content.includes('Auth required')) {
-            failureReasons.push('Authentication required');
+    const agentMessages = Array.isArray(execution.messages) ? coerceAgentMessages(execution.messages) : [];
+    const toolCalls: JsonObject[] = [];
+    
+    // Extract tool calls from execution steps
+    if (execution.steps && Array.isArray(execution.steps)) {
+      for (const step of execution.steps) {
+        if (step.metadata && typeof step.metadata === 'object') {
+          const metadata = step.metadata as Record<string, unknown>;
+          if (metadata.toolName || metadata.tool) {
+            toolCalls.push({
+              tool: String(metadata.toolName || metadata.tool || 'unknown'),
+              input: toJsonValue(metadata.input || metadata.args || null),
+              output: toJsonValue(metadata.result || metadata.output || null),
+              timestamp: step.timestamp ? new Date(step.timestamp).toISOString() : new Date().toISOString()
+            });
           }
         }
       }
-      // Check for tool call results
-      const maybeToolCalls = (message as { tool_calls?: unknown[] }).tool_calls;
-      if (Array.isArray(maybeToolCalls)) {
-        for (const toolCall of maybeToolCalls) {
-          const resultPayload = (toolCall as Record<string, unknown>).result;
-          if (resultPayload && typeof resultPayload === 'object') {
-            if ((resultPayload as { success?: boolean }).success === false) {
-              hasToolFailures = true;
-              const failureMessage = (resultPayload as { message?: string }).message;
-              failureReasons.push(failureMessage || 'Tool execution failed');
+    }
+    
+    const normalizedResult = normalizeTaskResultPayload(resultContent);
+    normalizedResult.execution_metadata = execution_metadata;
+
+    // Check messages for failures
+    if (execution.messages && Array.isArray(execution.messages)) {
+      for (const message of execution.messages) {
+        const content = (message as any)?.content;
+        if (typeof content === 'string') {
+          if (content.includes('"success":false') || 
+              content.includes('Auth required') ||
+              content.includes('error') ||
+              content.includes('failed')) {
+            hasToolFailures = true;
+            if (content.includes('Auth required')) {
+              failureReasons.push('Authentication required');
             }
           }
         }
