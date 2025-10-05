@@ -321,7 +321,7 @@ export function ChatInput({
                     <Button
                       size="sm"
                       variant={imageMode ? 'secondary' : 'ghost'}
-                      className="size-9 p-0 rounded-full hover:bg-muted/80 transition-all duration-200"
+                      className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 p-0 rounded-full hover:bg-muted/80 transition-all duration-200 touch-manipulation"
                       type="button"
                       aria-label="Toggle image generation mode"
                       aria-pressed={imageMode}
@@ -368,7 +368,7 @@ export function ChatInput({
             >
               <Button
                 size="sm"
-                className="size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation"
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}

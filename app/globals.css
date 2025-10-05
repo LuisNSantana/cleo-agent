@@ -26,6 +26,39 @@
   --spacing-app-header: 56px;
   --spacing-input-area: 134px;
 
+  /* === IMPROVED DARK MODE COLORS (GitHub Dark inspired) === */
+  /* Backgrounds - NO more pure black (#000000) */
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-tertiary: #21262d;
+  --color-bg-elevated: #1c2128;
+  --color-bg-overlay: rgba(13, 17, 23, 0.8);
+  
+  /* Text - Improved contrast for better readability */
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #7d8590;
+  --color-text-tertiary: #484f58;
+  --color-text-disabled: #30363d;
+  
+  /* Borders - Subtle and professional */
+  --color-border-default: #30363d;
+  --color-border-muted: #21262d;
+  --color-border-emphasis: #58a6ff;
+  
+  /* Accents - Soft and accessible */
+  --color-accent-primary: #58a6ff;
+  --color-accent-success: #3fb950;
+  --color-accent-warning: #d29922;
+  --color-accent-danger: #f85149;
+  --color-accent-purple: #bc8cff;
+  --color-accent-info: #79c0ff;
+  
+  /* Semantic colors */
+  --color-success-bg: rgba(63, 185, 80, 0.1);
+  --color-warning-bg: rgba(210, 153, 34, 0.1);
+  --color-danger-bg: rgba(248, 81, 73, 0.1);
+  --color-info-bg: rgba(88, 166, 255, 0.1);
+
   @keyframes loading-dots {
     0%, 100% { opacity: 0; }
     50% { opacity: 1; }
