@@ -49,12 +49,13 @@ export function getRuntimeConfig(): RuntimeConfig {
   }
 
   return {
-    // Default delegation timeout set to 300s to match API route maxDuration
-    delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 300_000),
+    // UPDATED: Increased to 600s (10 min) for complex workflows with Google Workspace
+    // Allows time for: Gmail API calls, attachments, multiple recipients, Drive operations
+    delegationTimeoutMs: intFromEnv('DELEGATION_TIMEOUT_MS', 600_000),
     delegationPollMs: intFromEnv('DELEGATION_POLL_MS', 2000), // OPTIMIZADO: 2s en lugar de 750ms (reduce carga 62%)
-    // Disable auto-extensions by default to avoid exceeding serverless function time limits
+    // Enable auto-extensions for long-running operations
     delegationExtendOnProgressMs: intFromEnv('DELEGATION_EXTEND_ON_PROGRESS_MS', 60_000),
-    delegationMaxExtensionMs: intFromEnv('DELEGATION_MAX_EXTENSION_MS', 0),
+    delegationMaxExtensionMs: intFromEnv('DELEGATION_MAX_EXTENSION_MS', 120_000), // Allow up to 2 min extension
   progressMinDeltaPercent: intFromEnv('PROGRESS_MIN_DELTA', 5),
   noProgressNoExtendMs: intFromEnv('NO_PROGRESS_NO_EXTEND_MS', 60_000),
 
