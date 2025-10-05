@@ -127,8 +127,8 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/30 hover:text-foreground group/chat relative w-full rounded-md transition-colors",
-        isActive && "bg-accent hover:bg-accent text-foreground"
+        "sidebar-item hover:bg-sidebar-accent hover:text-foreground group/chat relative w-full rounded-lg transition-all duration-200 hover:translate-x-1",
+        isActive && "bg-sidebar-accent text-foreground border-l-2 border-primary"
       ),
     [isActive]
   )
@@ -184,7 +184,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
             onClick={handleLinkClick}
           >
             <div
-              className="text-primary relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
+              className="text-sidebar-foreground relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-3 py-2.5 text-sm font-medium text-ellipsis whitespace-nowrap"
               title={displayTitle}
             >
               {displayTitle}

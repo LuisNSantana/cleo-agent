@@ -9,11 +9,11 @@ type SidebarListProps = {
 
 export function SidebarList({ title, items, currentChatId }: SidebarListProps) {
   return (
-    <div>
-      <h3 className="overflow-hidden px-2 pt-3 pb-2 text-xs font-semibold break-all text-ellipsis">
+    <div className="space-y-1">
+      <h3 className="overflow-hidden px-3 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground break-all text-ellipsis">
         {title}
       </h3>
-      <div className="space-y-0.5">
+      <div className="space-y-1 px-2">
         {items.map((chat) => (
           <SidebarItem
             key={chat.id}

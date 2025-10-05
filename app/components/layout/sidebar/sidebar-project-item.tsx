@@ -258,8 +258,8 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/30 hover:text-foreground group/project relative w-full rounded-md transition-colors",
-        isActive && "bg-accent hover:bg-accent text-foreground"
+        "sidebar-item hover:bg-sidebar-accent hover:text-foreground group/project relative w-full rounded-lg transition-all duration-200 hover:translate-x-1",
+        isActive && "bg-sidebar-accent text-foreground border-l-2 border-primary"
       ),
     [isActive]
   )
@@ -314,10 +314,10 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
             replace={true}
           >
             <div
-              className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap hover:bg-accent/30 hover:text-foreground transition-colors rounded-md"
+              className="text-sidebar-foreground relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-3 py-2.5 text-sm font-medium text-ellipsis whitespace-nowrap"
               title={displayName}
             >
-              <FolderIcon size={20} style={{ color: folderColor }} />
+              <FolderIcon size={18} weight="duotone" style={{ color: folderColor }} />
               {displayName}
             </div>
           </Link>
