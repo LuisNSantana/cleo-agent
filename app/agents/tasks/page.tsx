@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ListChecksIcon, CalendarIcon, ClockIcon, CheckCircleIcon, CircleIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, TrashIcon, ChatCircleIcon, PencilIcon } from '@phosphor-icons/react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ListChecksIcon, CalendarIcon, ClockIcon, CheckCircleIcon, CircleIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, TrashIcon, ChatCircleIcon, PencilIcon, Repeat } from '@phosphor-icons/react'
 import { Inbox, Bell } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -380,6 +381,41 @@ export default function AgentsTasksPage() {
     } catch (e) {
       console.error('Error retrying task:', e)
       alert('Error retrying task')
+    }
+  }
+
+  const handleRepeatTask = async (task: AgentTask, executeNow: boolean = false) => {
+    try {
+      // Calculate scheduled time
+      const scheduledFor = executeNow 
+        ? new Date().toISOString() 
+        : DateTime.now().setZone(userTimezone).plus({ minutes: 5 }).toISO()
+
+      const res = await fetch('/api/agent-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          agent_id: task.agent_id,
+          task_type: task.task_type,
+          priority: task.priority,
+          task_config: task.task_config,
+          context_data: task.context_data,
+          scheduled_for: scheduledFor
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        await fetchTasks()
+        alert(executeNow ? 'Task is executing now!' : 'Task scheduled successfully!')
+      } else {
+        console.error('Failed to repeat task:', data.error)
+        alert('Failed to repeat task: ' + (data.error || 'Unknown error'))
+      }
+    } catch (e) {
+      console.error('Error repeating task:', e)
+      alert('Error repeating task')
     }
   }
 
@@ -769,6 +805,7 @@ export default function AgentsTasksPage() {
                                   <PencilIcon className="w-4 h-4" />
                                 </Button>
                               )}
+                              {/* Botón de retry para tasks fallidas */}
                               {(task.status === 'failed' || task.status === 'cancelled') && (
                                 <Button
                                   variant="ghost"
@@ -779,6 +816,31 @@ export default function AgentsTasksPage() {
                                 >
                                   <ArrowClockwiseIcon className="w-4 h-4" />
                                 </Button>
+                              )}
+                              {/* Botón de repeat para tasks completadas */}
+                              {task.status === 'completed' && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                                      title="Repeat task"
+                                    >
+                                      <Repeat className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleRepeatTask(task, true)}>
+                                      <PlayIcon className="w-4 h-4 mr-2" />
+                                      Execute now
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleRepeatTask(task, false)}>
+                                      <ClockIcon className="w-4 h-4 mr-2" />
+                                      Schedule in 5 minutes
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                               <Button
                                 variant="ghost"

@@ -165,9 +165,10 @@ async function runDelegation(params: {
   const requestContext = getRequestContext()
   const isScheduledTask = requestContext?.requestId?.startsWith('task-')
   
-  // Use 7 minutes for scheduled tasks (allows for complex operations with retries)
+  // UPDATED: Use 10 minutes for scheduled tasks (allows for complex Google Workspace operations)
   // This supports hierarchical multi-agent workflows as per LangGraph best practices
-  let timeoutMs = isScheduledTask ? 420_000 : runtime.delegationTimeoutMs
+  // Increased from 7 to 10 min to allow: Research + Gmail API + attachments + multiple recipients
+  let timeoutMs = isScheduledTask ? 600_000 : runtime.delegationTimeoutMs
   const POLL_MS = runtime.delegationPollMs
   let lastProgressAt = startedAt
   
