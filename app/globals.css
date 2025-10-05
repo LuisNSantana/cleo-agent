@@ -115,14 +115,14 @@
   
   --radius: 0.625rem;
   
-  /* Sidebar colors - slightly differentiated */
-  --sidebar: #f8f9fa;
+  /* Sidebar colors - unified with main background */
+  --sidebar: #faf7f2;           /* Same as background */
   --sidebar-foreground: #1a1f2e;
   --sidebar-primary: #3b5bdb;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e9ecef;
+  --sidebar-accent: #e9ecef;    /* Same as muted */
   --sidebar-accent-foreground: #495057;
-  --sidebar-border: #dee2e6;
+  --sidebar-border: #dee2e6;    /* Same as border */
   --sidebar-ring: #3b5bdb;
 }
 
@@ -189,14 +189,14 @@ body {
   --chart-4: #f87171;
   --chart-5: #c084fc;
   
-  /* Sidebar - Slightly darker for hierarchy (Apple style) */
-  --sidebar: #09090b;           /* Deeper than main */
+  /* Sidebar - Unified with main background */
+  --sidebar: #0f0f10;           /* Same as background */
   --sidebar-foreground: #ededef;
   --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a1a1c;    /* Elevated from sidebar base */
+  --sidebar-accent: #1a1a1c;    /* Same as card */
   --sidebar-accent-foreground: #c5c5c7;
-  --sidebar-border: #27272a;    /* Subtle separation */
+  --sidebar-border: #2d2d30;    /* Same as border */
   --sidebar-ring: #3b82f6;
   
   /* Glow effects for interactive elements */
