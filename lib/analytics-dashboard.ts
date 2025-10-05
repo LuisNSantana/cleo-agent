@@ -40,14 +40,26 @@ export type DashboardData = {
     success_count?: number | null
     error_count?: number | null
     average_execution_time_ms?: number | null
+    success_rate?: number | null
+  }>
+  agentUsage: Array<{
+    agent_id: string
+    execution_count: number
+    success_count: number
+    error_count: number
+    success_rate: number
+    avg_execution_time_ms: number
+    delegations_sent?: number
+    delegations_received?: number
   }>
   totals: {
     messages: number
     inputTokens: number
     outputTokens: number
     activeDays: number
-  avgResponseMs: number
-  costUsd: number
+    avgResponseMs: number
+    costUsd: number
+    agentsUsed: number
   }
 }
 
@@ -269,6 +281,10 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
     }
   }
 
+  // Agent usage analytics (placeholder until migration runs)
+  let agentUsage: DashboardData['agentUsage'] = []
+  let uniqueAgents = 0
+
   const finalTotals = {
     messages: totals.messages,
     inputTokens: totals.inputTokens,
@@ -276,7 +292,8 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
     activeDays: totals.activeDays,
     avgResponseMs,
     costUsd: Number(totalCost.toFixed(2)),
+    agentsUsed: uniqueAgents,
   }
 
-  return { rangeDays, daily, modelUsage, featureUsage, toolUsage, totals: finalTotals }
+  return { rangeDays, daily, modelUsage, featureUsage, toolUsage, agentUsage, totals: finalTotals }
 }
