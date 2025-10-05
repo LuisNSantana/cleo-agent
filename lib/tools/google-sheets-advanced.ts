@@ -713,3 +713,721 @@ export const applyConditionalFormattingTool = tool({
     }
   }
 })
+
+// Insert advanced formulas helper
+export const insertGoogleSheetFormulasTool = tool({
+  description: 'Insert advanced formulas into Google Sheets cells. Supports SUM, AVERAGE, VLOOKUP, PIVOT tables, INDEX/MATCH, and custom formulas. Essential for creating functional, calculating spreadsheets.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    sheetId: z.number().describe('The sheet ID'),
+    formulas: z.array(z.object({
+      cell: z.object({
+        row: z.number().describe('Row index (0-indexed)'),
+        column: z.number().describe('Column index (0-indexed, A=0, B=1, etc.)')
+      }).describe('Target cell for the formula'),
+      formula: z.string().describe('Formula to insert (e.g., "=SUM(A1:A10)", "=VLOOKUP(B2,Data!A:B,2,FALSE)")'),
+      type: z.enum(['SUM', 'AVERAGE', 'VLOOKUP', 'INDEX_MATCH', 'COUNT', 'IF', 'PIVOT', 'CUSTOM']).optional().describe('Type of formula for categorization')
+    })).describe('Array of formulas to insert'),
+    autoResize: z.boolean().optional().describe('Auto-resize columns to fit content (default: true)')
+  }),
+  execute: async ({ spreadsheetId, sheetId, formulas, autoResize = true }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Inserting formulas:', { spreadsheetId, sheetId, count: formulas.length })
+
+    try {
+      const requests: any[] = []
+
+      // Insert formulas
+      for (const { cell, formula } of formulas) {
+        requests.push({
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: cell.row,
+              endRowIndex: cell.row + 1,
+              startColumnIndex: cell.column,
+              endColumnIndex: cell.column + 1
+            },
+            rows: [{
+              values: [{
+                userEnteredValue: { formulaValue: formula }
+              }]
+            }],
+            fields: 'userEnteredValue'
+          }
+        })
+      }
+
+      // Auto-resize columns if requested
+      if (autoResize) {
+        requests.push({
+          autoResizeDimensions: {
+            dimensions: {
+              sheetId,
+              dimension: 'COLUMNS',
+              startIndex: 0,
+              endIndex: 50 // Resize first 50 columns
+            }
+          }
+        })
+      }
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to insert formulas' }
+      }
+
+      await trackToolUsage(userId, 'insertGoogleSheetFormulas', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `${formulas.length} formulas inserted successfully`,
+        insertedFormulas: formulas.map(f => ({
+          cell: `${String.fromCharCode(65 + f.cell.column)}${f.cell.row + 1}`,
+          formula: f.formula,
+          type: f.type
+        })),
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Insert formulas error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to insert formulas'
+      }
+    }
+  }
+})
+
+// Data validation helper (dropdowns, ranges, etc.)
+export const addDataValidationTool = tool({
+  description: 'Add data validation to Google Sheets cells. Create dropdowns, number ranges, date ranges, custom validation. Perfect for forms, input controls, and data quality.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    sheetId: z.number().describe('The sheet ID'),
+    range: z.object({
+      startRow: z.number().describe('Start row (0-indexed)'),
+      endRow: z.number().describe('End row (exclusive)'),
+      startColumn: z.number().describe('Start column (0-indexed)'),
+      endColumn: z.number().describe('End column (exclusive)')
+    }).describe('Range to apply validation'),
+    validation: z.object({
+      type: z.enum([
+        'ONE_OF_LIST',      // Dropdown from list
+        'ONE_OF_RANGE',     // Dropdown from range
+        'NUMBER_BETWEEN',   // Number in range
+        'NUMBER_GREATER',   // Number greater than
+        'NUMBER_LESS',      // Number less than
+        'DATE_BETWEEN',     // Date in range
+        'TEXT_LENGTH',      // Text length validation
+        'CHECKBOX',         // Checkbox
+        'CUSTOM_FORMULA'    // Custom validation formula
+      ]).describe('Type of validation'),
+      values: z.array(z.string()).optional().describe('List values for ONE_OF_LIST type'),
+      sourceRange: z.string().optional().describe('Range reference for ONE_OF_RANGE (e.g., "Sheet1!A1:A10")'),
+      minValue: z.union([z.number(), z.string()]).optional().describe('Minimum value/date'),
+      maxValue: z.union([z.number(), z.string()]).optional().describe('Maximum value/date'),
+      formula: z.string().optional().describe('Custom validation formula'),
+      strict: z.boolean().optional().describe('Reject invalid input (default: true)'),
+      showDropdown: z.boolean().optional().describe('Show dropdown arrow (default: true)')
+    }).describe('Validation configuration'),
+    inputMessage: z.string().optional().describe('Help text shown when cell is selected'),
+    invalidMessage: z.string().optional().describe('Error message for invalid input')
+  }),
+  execute: async ({ spreadsheetId, sheetId, range, validation, inputMessage, invalidMessage }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Adding data validation:', { spreadsheetId, sheetId, type: validation.type })
+
+    try {
+      // Build validation rule
+      let condition: any = {}
+
+      switch (validation.type) {
+        case 'ONE_OF_LIST':
+          condition = {
+            type: 'ONE_OF_LIST',
+            values: validation.values?.map(v => ({ userEnteredValue: v })) || []
+          }
+          break
+        case 'ONE_OF_RANGE':
+          condition = {
+            type: 'ONE_OF_RANGE',
+            values: [{ userEnteredValue: validation.sourceRange }]
+          }
+          break
+        case 'NUMBER_BETWEEN':
+          condition = {
+            type: 'NUMBER_BETWEEN',
+            values: [
+              { userEnteredValue: String(validation.minValue) },
+              { userEnteredValue: String(validation.maxValue) }
+            ]
+          }
+          break
+        case 'NUMBER_GREATER':
+          condition = {
+            type: 'NUMBER_GREATER',
+            values: [{ userEnteredValue: String(validation.minValue) }]
+          }
+          break
+        case 'NUMBER_LESS':
+          condition = {
+            type: 'NUMBER_LESS',
+            values: [{ userEnteredValue: String(validation.maxValue) }]
+          }
+          break
+        case 'DATE_BETWEEN':
+          condition = {
+            type: 'DATE_BETWEEN',
+            values: [
+              { userEnteredValue: String(validation.minValue) },
+              { userEnteredValue: String(validation.maxValue) }
+            ]
+          }
+          break
+        case 'TEXT_LENGTH':
+          condition = {
+            type: 'TEXT_LENGTH',
+            values: [
+              { userEnteredValue: String(validation.minValue || 0) },
+              { userEnteredValue: String(validation.maxValue || 255) }
+            ]
+          }
+          break
+        case 'CHECKBOX':
+          condition = {
+            type: 'BOOLEAN'
+          }
+          break
+        case 'CUSTOM_FORMULA':
+          condition = {
+            type: 'CUSTOM_FORMULA',
+            values: [{ userEnteredValue: validation.formula }]
+          }
+          break
+      }
+
+      const request = {
+        setDataValidation: {
+          range: {
+            sheetId,
+            startRowIndex: range.startRow,
+            endRowIndex: range.endRow,
+            startColumnIndex: range.startColumn,
+            endColumnIndex: range.endColumn
+          },
+          rule: {
+            condition,
+            strict: validation.strict !== false,
+            showCustomUi: validation.showDropdown !== false,
+            ...(inputMessage && { inputMessage }),
+            ...(invalidMessage && { errorMessage: invalidMessage })
+          }
+        }
+      }
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, [request])
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to add data validation' }
+      }
+
+      await trackToolUsage(userId, 'addDataValidation', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `Data validation (${validation.type}) applied successfully`,
+        validation: {
+          type: validation.type,
+          range: `${String.fromCharCode(65 + range.startColumn)}${range.startRow + 1}:${String.fromCharCode(65 + range.endColumn - 1)}${range.endRow}`,
+          strict: validation.strict !== false
+        },
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Data validation error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to add data validation'
+      }
+    }
+  }
+})
+
+// Named ranges helper
+export const createNamedRangeTool = tool({
+  description: 'Create named ranges in Google Sheets for easier formula references. Instead of "A1:C10", use "SalesData". Essential for complex spreadsheets and maintainable formulas.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    name: z.string().describe('Name for the range (e.g., "SalesData", "ProductList")'),
+    range: z.object({
+      sheetId: z.number().describe('Sheet ID containing the range'),
+      startRow: z.number().describe('Start row (0-indexed)'),
+      endRow: z.number().describe('End row (exclusive)'),
+      startColumn: z.number().describe('Start column (0-indexed)'),
+      endColumn: z.number().describe('End column (exclusive)')
+    }).describe('Range to name')
+  }),
+  execute: async ({ spreadsheetId, name, range }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Creating named range:', { spreadsheetId, name })
+
+    try {
+      const request = {
+        addNamedRange: {
+          namedRange: {
+            name,
+            range: {
+              sheetId: range.sheetId,
+              startRowIndex: range.startRow,
+              endRowIndex: range.endRow,
+              startColumnIndex: range.startColumn,
+              endColumnIndex: range.endColumn
+            }
+          }
+        }
+      }
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, [request])
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to create named range' }
+      }
+
+      await trackToolUsage(userId, 'createNamedRange', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `Named range "${name}" created successfully`,
+        namedRange: {
+          name,
+          range: `${String.fromCharCode(65 + range.startColumn)}${range.startRow + 1}:${String.fromCharCode(65 + range.endColumn - 1)}${range.endRow}`,
+          usage: `Use "${name}" in formulas instead of cell references`
+        },
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Named range error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to create named range'
+      }
+    }
+  }
+})
+
+// Sheet protection helper
+export const protectSheetRangeTool = tool({
+  description: 'Protect cells or entire sheets in Google Sheets to prevent unwanted edits. Perfect for templates, formulas, and collaborative documents where certain areas should be read-only.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    protection: z.object({
+      type: z.enum(['SHEET', 'RANGE']).describe('Protect entire sheet or specific range'),
+      sheetId: z.number().describe('Sheet ID to protect'),
+      range: z.object({
+        startRow: z.number().describe('Start row (0-indexed)'),
+        endRow: z.number().describe('End row (exclusive)'),
+        startColumn: z.number().describe('Start column (0-indexed)'),
+        endColumn: z.number().describe('End column (exclusive)')
+      }).optional().describe('Range to protect (required for RANGE type)'),
+      description: z.string().optional().describe('Description of the protection'),
+      warningOnly: z.boolean().optional().describe('Show warning instead of blocking edits (default: false)'),
+      editors: z.array(z.string()).optional().describe('Email addresses of users who can edit (empty = only you)')
+    }).describe('Protection configuration')
+  }),
+  execute: async ({ spreadsheetId, protection }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Protecting range/sheet:', { spreadsheetId, type: protection.type })
+
+    try {
+      const protectedRange: any = {
+        description: protection.description || `Protected ${protection.type.toLowerCase()}`,
+        warningOnly: protection.warningOnly || false
+      }
+
+      if (protection.type === 'SHEET') {
+        protectedRange.protectedSheetProperties = {
+          sheetId: protection.sheetId
+        }
+      } else {
+        protectedRange.range = {
+          sheetId: protection.sheetId,
+          startRowIndex: protection.range!.startRow,
+          endRowIndex: protection.range!.endRow,
+          startColumnIndex: protection.range!.startColumn,
+          endColumnIndex: protection.range!.endColumn
+        }
+      }
+
+      // Add editors if specified
+      if (protection.editors && protection.editors.length > 0) {
+        protectedRange.editors = {
+          users: protection.editors
+        }
+      }
+
+      const request = {
+        addProtectedRange: {
+          protectedRange
+        }
+      }
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, [request])
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to protect range/sheet' }
+      }
+
+      await trackToolUsage(userId, 'protectSheetRange', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `${protection.type} protected successfully`,
+        protection: {
+          type: protection.type,
+          sheetId: protection.sheetId,
+          range: protection.range ? `${String.fromCharCode(65 + protection.range.startColumn)}${protection.range.startRow + 1}:${String.fromCharCode(65 + protection.range.endColumn - 1)}${protection.range.endRow}` : 'Entire sheet',
+          warningOnly: protection.warningOnly || false,
+          editors: protection.editors?.length || 0
+        },
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Protection error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to protect range/sheet'
+      }
+    }
+  }
+})
+
+// Auto filter and sorting helper
+export const addAutoFilterTool = tool({
+  description: 'Add auto-filter to Google Sheets ranges for easy sorting and filtering. Creates dropdown arrows on header row for interactive data exploration. Essential for data analysis.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    sheetId: z.number().describe('The sheet ID'),
+    range: z.object({
+      startRow: z.number().describe('Start row (0-indexed, usually 0 for headers)'),
+      endRow: z.number().describe('End row (exclusive)'),
+      startColumn: z.number().describe('Start column (0-indexed)'),
+      endColumn: z.number().describe('End column (exclusive)')
+    }).describe('Range to apply auto-filter'),
+    sortOrder: z.object({
+      columnIndex: z.number().describe('Column to sort by (0-indexed)'),
+      sortOrder: z.enum(['ASCENDING', 'DESCENDING']).describe('Sort direction')
+    }).optional().describe('Initial sort order (optional)')
+  }),
+  execute: async ({ spreadsheetId, sheetId, range, sortOrder }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Adding auto-filter:', { spreadsheetId, sheetId })
+
+    try {
+      const requests: any[] = []
+
+      // Add auto filter
+      requests.push({
+        setBasicFilter: {
+          filter: {
+            range: {
+              sheetId,
+              startRowIndex: range.startRow,
+              endRowIndex: range.endRow,
+              startColumnIndex: range.startColumn,
+              endColumnIndex: range.endColumn
+            },
+            ...(sortOrder && {
+              sortSpecs: [{
+                dimensionIndex: sortOrder.columnIndex,
+                sortOrder: sortOrder.sortOrder
+              }]
+            })
+          }
+        }
+      })
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to add auto-filter' }
+      }
+
+      await trackToolUsage(userId, 'addAutoFilter', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: 'Auto-filter added successfully',
+        filter: {
+          range: `${String.fromCharCode(65 + range.startColumn)}${range.startRow + 1}:${String.fromCharCode(65 + range.endColumn - 1)}${range.endRow}`,
+          sortedBy: sortOrder ? `Column ${String.fromCharCode(65 + sortOrder.columnIndex)} (${sortOrder.sortOrder})` : 'None',
+          instructions: 'Click dropdown arrows in header row to sort and filter data'
+        },
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Auto-filter error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to add auto-filter'
+      }
+    }
+  }
+})
+
+// Professional templates helper
+export const createProfessionalTemplateTool = tool({
+  description: 'Create professional Google Sheets templates with predefined layouts, formatting, and formulas. Choose from dashboard, financial report, project tracker, and more.',
+  inputSchema: z.object({
+    spreadsheetId: z.string().describe('The ID of the spreadsheet'),
+    template: z.enum([
+      'FINANCIAL_DASHBOARD',
+      'PROJECT_TRACKER', 
+      'SALES_REPORT',
+      'BUDGET_PLANNER',
+      'EMPLOYEE_TRACKER',
+      'INVENTORY_MANAGEMENT',
+      'EXPENSE_REPORT',
+      'KPI_DASHBOARD'
+    ]).describe('Template type to create'),
+    sheetName: z.string().optional().describe('Name for the new sheet (default: template name)'),
+    customization: z.object({
+      companyName: z.string().optional().describe('Company name for headers'),
+      dateRange: z.object({
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)')
+      }).optional().describe('Date range for the template'),
+      columns: z.array(z.string()).optional().describe('Custom column names (overrides default)')
+    }).optional().describe('Template customization options')
+  }),
+  execute: async ({ spreadsheetId, template, sheetName, customization = {} }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📊 [Advanced Sheets] Creating professional template:', { spreadsheetId, template })
+
+    try {
+      const requests: any[] = []
+      const templateName = sheetName || template.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+      
+      // First, add a new sheet for the template
+      const addSheetRequest = {
+        addSheet: {
+          properties: {
+            title: templateName,
+            gridProperties: {
+              rowCount: 100,
+              columnCount: 20
+            },
+            tabColor: { red: 0.2, green: 0.6, blue: 0.9 }
+          }
+        }
+      }
+      
+      requests.push(addSheetRequest)
+
+      // Apply initial template structure based on type
+      const templateData = getTemplateData(template, customization)
+      
+      // Add header row with formatting
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId: 0, // Will be updated after sheet creation
+            startRowIndex: 0,
+            endRowIndex: 1,
+            startColumnIndex: 0,
+            endColumnIndex: templateData.headers.length
+          },
+          rows: [{
+            values: templateData.headers.map((header: string) => ({
+              userEnteredValue: { stringValue: header },
+              userEnteredFormat: {
+                backgroundColor: { red: 0.2, green: 0.6, blue: 0.9 },
+                textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true },
+                horizontalAlignment: 'CENTER'
+              }
+            }))
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      })
+
+      // Add sample data if provided
+      if (templateData.sampleData && templateData.sampleData.length > 0) {
+        requests.push({
+          updateCells: {
+            range: {
+              sheetId: 0,
+              startRowIndex: 1,
+              endRowIndex: 1 + templateData.sampleData.length,
+              startColumnIndex: 0,
+              endColumnIndex: templateData.headers.length
+            },
+            rows: templateData.sampleData.map(row => ({
+              values: row.map(cell => ({
+                userEnteredValue: typeof cell === 'number' ? { numberValue: cell } : { stringValue: String(cell) }
+              }))
+            })),
+            fields: 'userEnteredValue'
+          }
+        })
+      }
+
+      // Add formulas if provided
+      if (templateData.formulas && templateData.formulas.length > 0) {
+        templateData.formulas.forEach(({ cell, formula }) => {
+          requests.push({
+            updateCells: {
+              range: {
+                sheetId: 0,
+                startRowIndex: cell.row,
+                endRowIndex: cell.row + 1,
+                startColumnIndex: cell.column,
+                endColumnIndex: cell.column + 1
+              },
+              rows: [{
+                values: [{
+                  userEnteredValue: { formulaValue: formula },
+                  userEnteredFormat: {
+                    backgroundColor: { red: 0.9, green: 0.9, blue: 1 },
+                    textFormat: { bold: true }
+                  }
+                }]
+              }],
+              fields: 'userEnteredValue,userEnteredFormat'
+            }
+          })
+        })
+      }
+
+      const result = await batchUpdateSpreadsheet(userId, spreadsheetId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to create template' }
+      }
+
+      await trackToolUsage(userId, 'createProfessionalTemplate', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `${template} template created successfully`,
+        template: {
+          name: templateName,
+          type: template,
+          features: templateData.features,
+          headerCount: templateData.headers.length,
+          sampleRows: templateData.sampleData?.length || 0,
+          formulas: templateData.formulas?.length || 0
+        },
+        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+      }
+    } catch (error) {
+      console.error('❌ [Advanced Sheets] Template creation error:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to create template'
+      }
+    }
+  }
+})
+
+// Helper function to get template data based on type
+function getTemplateData(template: string, customization: any) {
+  const companyName = customization.companyName || 'Your Company'
+  const currentDate = new Date().toISOString().split('T')[0]
+  
+  switch (template) {
+    case 'FINANCIAL_DASHBOARD':
+      return {
+        headers: customization.columns || ['Metric', 'Q1', 'Q2', 'Q3', 'Q4', 'Total', 'Growth %'],
+        sampleData: [
+          ['Revenue', 100000, 120000, 110000, 130000, '=SUM(B2:E2)', '=((F2-B2)/B2)*100'],
+          ['Expenses', 60000, 65000, 62000, 68000, '=SUM(B3:E3)', '=((F3-B3)/B3)*100'],
+          ['Profit', '=B2-B3', '=C2-C3', '=D2-D3', '=E2-E3', '=F2-F3', '=((F4-B4)/B4)*100']
+        ],
+        formulas: [
+          { cell: { row: 6, column: 1 }, formula: '=AVERAGE(B2:E2)' },
+          { cell: { row: 7, column: 1 }, formula: '=MAX(B2:E2)' }
+        ],
+        features: ['Quarterly financial tracking', 'Growth calculations', 'Summary formulas', 'Professional formatting']
+      }
+    
+    case 'PROJECT_TRACKER':
+      return {
+        headers: customization.columns || ['Task', 'Assignee', 'Start Date', 'Due Date', 'Status', 'Progress %', 'Priority'],
+        sampleData: [
+          ['Project Setup', 'John Doe', currentDate, '2024-12-15', 'In Progress', 75, 'High'],
+          ['Requirements Gathering', 'Jane Smith', currentDate, '2024-12-10', 'Completed', 100, 'High'],
+          ['Development Phase 1', 'Mike Johnson', '2024-12-11', '2024-12-25', 'Not Started', 0, 'Medium']
+        ],
+        formulas: [
+          { cell: { row: 5, column: 1 }, formula: '=AVERAGE(F2:F4)' },
+          { cell: { row: 6, column: 1 }, formula: '=COUNTIF(E2:E4,"Completed")' }
+        ],
+        features: ['Task management', 'Progress tracking', 'Status monitoring', 'Priority levels']
+      }
+
+    case 'SALES_REPORT':
+      return {
+        headers: customization.columns || ['Salesperson', 'Region', 'Product', 'Units Sold', 'Unit Price', 'Total Revenue', 'Commission'],
+        sampleData: [
+          ['Alice Johnson', 'North', 'Product A', 50, 100, '=D2*E2', '=F2*0.05'],
+          ['Bob Smith', 'South', 'Product B', 75, 150, '=D3*E3', '=F3*0.05'],
+          ['Carol Brown', 'East', 'Product A', 30, 100, '=D4*E4', '=F4*0.05']
+        ],
+        formulas: [
+          { cell: { row: 5, column: 3 }, formula: '=SUM(D2:D4)' },
+          { cell: { row: 5, column: 5 }, formula: '=SUM(F2:F4)' },
+          { cell: { row: 5, column: 6 }, formula: '=SUM(G2:G4)' }
+        ],
+        features: ['Sales tracking', 'Revenue calculations', 'Commission tracking', 'Regional analysis']
+      }
+
+    default:
+      return {
+        headers: ['Item', 'Description', 'Value', 'Status'],
+        sampleData: [
+          ['Sample 1', 'Description 1', 100, 'Active'],
+          ['Sample 2', 'Description 2', 200, 'Pending']
+        ],
+        formulas: [],
+        features: ['Basic template structure']
+      }
+  }
+}
