@@ -107,6 +107,29 @@ Be a real person, not a robot. Make every conversation feel genuine and warm.`,
     }
   }
 
+  // IMPORTANT: Realtime API requires committing the audio buffer
+  // before asking the model to respond. Without this, VAD may trigger,
+  // but the server will not process the appended audio.
+  commitAudio(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send({ type: 'input_audio_buffer.commit' })
+    }
+  }
+
+  // Ask the model to generate a response (text/audio per session modalities)
+  requestResponse(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send({ type: 'response.create' })
+    }
+  }
+
+  // Convenience: call after you finished streaming a user utterance
+  // Typical sequence: sendAudio() many times → endTurn()
+  endTurn(): void {
+    this.commitAudio()
+    this.requestResponse()
+  }
+
   onMessage(callback: (event: RealtimeEvent) => void): void {
     if (this.ws) {
       this.ws.onmessage = (event) => {
