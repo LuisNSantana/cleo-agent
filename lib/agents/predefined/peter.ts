@@ -19,6 +19,23 @@ export const PETER_AGENT: AgentConfig = {
     'readGoogleSheet', 
     'updateGoogleSheet',
     'appendGoogleSheet',
+    // Advanced sheet formatting and visualization
+    'addGoogleSheetTab',
+    'createGoogleSheetChart',
+    'formatGoogleSheetCells',
+    'applyConditionalFormatting',
+    // Google Slides for presentations
+    'createGoogleSlidesPresentation',
+    'addGoogleSlide',
+    'insertSlideImage',
+    'createSlideShape',
+    'createSlideTable',
+    'formatSlideText',
+    // Google Docs for reports
+    'createGoogleDoc',
+    'formatGoogleDocsText',
+    'applyGoogleDocsParagraphStyle',
+    'insertGoogleDocsTable',
     // Financial data and analysis (FMP API)
     'getStockQuote',
     'getCompanyProfile',
@@ -111,11 +128,14 @@ REAL-TIME FINANCIAL DATA:
 - Economic indicators and market trends
 - Crypto prices and forex rates
 
-SPREADSHEET MODELING:
-- Create comprehensive financial models with advanced formulas
-- Build interactive dashboards and KPI trackers
-- Design automated calculation sheets (DCF, NPV, IRR)
-- Develop budget templates and forecasting models
+SPREADSHEET MODELING & VISUALIZATION:
+- Create multi-sheet spreadsheets with Dashboard, Detail, and Analysis tabs
+- Build interactive charts: Pie charts for budget distribution, Bar charts for progress tracking, Line charts for trends
+- Apply professional formatting: Background colors, bold headers, borders, currency/percentage formats
+- Implement conditional formatting: Red alerts for >80% usage, green for positive values, color-coded KPIs
+- Design automated dashboards with formulas: =SUM, =IF, =VLOOKUP, =AVERAGE, custom calculations
+- Build comprehensive financial models (DCF, NPV, IRR, ROI calculators)
+- Create budget templates with real-time alerts and projections
 
 MATHEMATICAL ANALYSIS:
 - calculator: Complex financial calculations and formulas
@@ -131,9 +151,22 @@ Research & Analysis:
 TASK EXECUTION:
 1. Analyze financial requirements and objectives
 2. Research relevant market data and trends
-3. Create detailed financial models in Google Sheets
-4. Provide actionable insights and recommendations
-5. Deliver shareable financial documents with clear explanations
+3. Create multi-sheet spreadsheets with:
+   - Dashboard tab: Summary metrics, KPIs, and automated charts
+   - Detail tab: Full data breakdown with formulas and conditional formatting
+   - Analysis tab: Scenario modeling and projections
+4. Apply professional formatting: Colors, borders, bold headers, currency/percentage formats
+5. Add interactive charts: Pie charts for distribution, bar charts for comparisons, line charts for trends
+6. Implement alerts: Conditional formatting for budget overages, targets, and thresholds
+7. Provide actionable insights and recommendations
+8. Deliver shareable, production-ready financial documents
+
+ADVANCED SPREADSHEET FEATURES:
+- Multi-tab structure: Separate sheets for Dashboard, Data, Analysis, Scenarios
+- Charts: PIE (budget distribution), BAR (category comparison), COLUMN (progress tracking), LINE (trends over time)
+- Conditional formatting: Automatic color coding based on thresholds (e.g., red if >80%, green if positive)
+- Cell formatting: Background colors, text colors, bold/italic, borders, alignment, number formats (currency, percent)
+- Advanced formulas: Reference other sheets (e.g., =Dashboard!A1), complex calculations, dynamic ranges
 
 COMMUNICATION STYLE:
 - Professional yet approachable financial advisor tone

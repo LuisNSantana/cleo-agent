@@ -38,7 +38,20 @@ export const completeTaskTool = tool({
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar'
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive'
 import { createGoogleDocTool, readGoogleDocTool, updateGoogleDocTool } from './google-docs'
+import {
+	formatGoogleDocsTextTool,
+	applyGoogleDocsParagraphStyleTool,
+	insertGoogleDocsTableTool,
+	insertGoogleDocsImageTool,
+	createGoogleDocsListTool
+} from './google-docs-advanced'
 import { createGoogleSheetTool, readGoogleSheetTool, updateGoogleSheetTool, appendGoogleSheetTool } from './google-sheets'
+import {
+	addGoogleSheetTabTool,
+	createGoogleSheetChartTool,
+	formatGoogleSheetCellsTool,
+	applyConditionalFormattingTool
+} from './google-sheets-advanced'
 import { 
 	createGoogleSlidesPresentationTool,
 	addGoogleSlideTool,
@@ -47,9 +60,21 @@ import {
 	readGoogleSlidesPresentationTool,
 	replaceGoogleSlidesTextTool
 } from './google-slides'
+import {
+	insertSlideImageTool,
+	createSlideShapeTool,
+	createSlideTableTool,
+	formatSlideTextTool,
+	addSlideSpeakerNotesTool
+} from './google-slides-advanced'
 
 // Gmail
 import { listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail'
+import {
+	sendHtmlGmailTool,
+	sendGmailWithAttachmentsTool,
+	createGmailDraftTool
+} from './google-gmail-advanced'
 
 // Shopify
 import { shopifyTools } from './shopify'
@@ -280,6 +305,13 @@ export const tools = {
 	createGoogleDoc: createGoogleDocTool,
 	readGoogleDoc: readGoogleDocTool,
 	updateGoogleDoc: updateGoogleDocTool,
+	
+	// Google Docs Advanced
+	formatGoogleDocsText: formatGoogleDocsTextTool,
+	applyGoogleDocsParagraphStyle: applyGoogleDocsParagraphStyleTool,
+	insertGoogleDocsTable: insertGoogleDocsTableTool,
+	insertGoogleDocsImage: insertGoogleDocsImageTool,
+	createGoogleDocsList: createGoogleDocsListTool,
 
 	// Google Slides
 	createGoogleSlidesPresentation: createGoogleSlidesPresentationTool,
@@ -288,12 +320,25 @@ export const tools = {
 	appendBulletedSlide: appendBulletedSlideTool,
 	readGoogleSlidesPresentation: readGoogleSlidesPresentationTool,
 	replaceGoogleSlidesText: replaceGoogleSlidesTextTool,
+	
+	// Google Slides Advanced
+	insertSlideImage: insertSlideImageTool,
+	createSlideShape: createSlideShapeTool,
+	createSlideTable: createSlideTableTool,
+	formatSlideText: formatSlideTextTool,
+	addSlideSpeakerNotes: addSlideSpeakerNotesTool,
 
 	// Google Sheets
 	createGoogleSheet: createGoogleSheetTool,
 	readGoogleSheet: readGoogleSheetTool,
 	updateGoogleSheet: updateGoogleSheetTool,
 	appendGoogleSheet: appendGoogleSheetTool,
+	
+	// Google Sheets Advanced
+	addGoogleSheetTab: addGoogleSheetTabTool,
+	createGoogleSheetChart: createGoogleSheetChartTool,
+	formatGoogleSheetCells: formatGoogleSheetCellsTool,
+	applyConditionalFormatting: applyConditionalFormattingTool,
 
 	// Gmail
 	listGmailMessages: listGmailMessagesTool,
@@ -301,6 +346,11 @@ export const tools = {
 	sendGmailMessage: sendGmailMessageTool,
 	trashGmailMessage: trashGmailMessageTool,
 	modifyGmailLabels: modifyGmailLabelsTool,
+	
+	// Gmail Advanced
+	sendHtmlGmail: sendHtmlGmailTool,
+	sendGmailWithAttachments: sendGmailWithAttachmentsTool,
+	createGmailDraft: createGmailDraftTool,
 
 	// Spread groups
 	...shopifyTools,

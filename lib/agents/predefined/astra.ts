@@ -16,11 +16,18 @@ export const ASTRA_AGENT: AgentConfig = {
   temperature: 0.6,
   maxTokens: 16384,
   tools: [
-    // Email management suite
-    'listGmailMessages',
-    'getGmailMessage', 
     'sendGmailMessage',
-    'trashGmailMessage',
+    'createGmailDraft',
+    'getGmailMessage',
+    'listGmailMessages',
+    // Advanced Gmail features
+    'sendHtmlGmail',
+    'sendGmailWithAttachments',
+    'createGmailDraft',
+    // Research and context
+    'webSearch',
+    'firecrawl_scrape',
+    'firecrawl_search',
     'complete_task'
   ],
   tags: ['email', 'communication', 'writing', 'gmail'],
