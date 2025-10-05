@@ -133,12 +133,12 @@ export interface TaskExecutionResult {
  * - File uploads/downloads
  */
 function getAgentTimeout(agentId: string): number {
+  // OPTIMIZATION: Reduced from 20min to 10min based on LangGraph best practices
   // Supervisor agents that delegate (Cleo) - hierarchical orchestration support
-  // Based on LangGraph best practices for multi-agent systems
-  // Supports complex workflows: Research → Google Docs → Email → Calendar
-  // Allows for 5+ delegations with Google Workspace operations
+  // 10 minutes allows for 3-4 delegations with proper streaming feedback
+  // For longer workflows, break into separate scheduled tasks
   if (agentId.includes('cleo')) {
-    return 1_200_000 // 20 minutes (allows for complex multi-step workflows)
+    return 600_000 // 10 minutes (optimized for better UX, was 20min)
   }
   
   // Research agents (Apu) - may do extensive searches across multiple sources
@@ -465,161 +465,87 @@ ${JSON.stringify(task.context_data, null, 2)}
   // Add agent-specific instructions
   switch (task.agent_id) {
     case 'apu-support':
+      // OPTIMIZATION: Compressed from 17 lines to 9 lines (~47% reduction)
       return `${basePrompt}
 
-As Apu (Customer Success & Technical Support Specialist), provide excellent customer support using your available tools:
-- Use serpNewsSearch for recent news and updates
-- Use serpScholarSearch for academic research and papers  
-- Use serpGeneralSearch for background information
-- Use webSearch for additional sources and verification
-- Use serpLocationSearch if geographical context is needed
-- Use serpAutocomplete to expand search terms
+As Apu (Research Specialist), use available search tools (webSearch, serpNewsSearch, serpScholarSearch, etc.) to research the topic.
 
-Execute immediately with provided query/topic. Provide a comprehensive research report with:
+Deliver:
 1. Executive Summary (2-3 sentences)
-2. Key Findings (structured bullet points)
-3. Sources and Evidence (cite all sources used)
-4. Recommendations or Next Steps
+2. Key Findings (bullet points with sources)
+3. Recommendations
 
-When you have completed your research, call complete_task with your final report.`;
+Call complete_task with your final report.`;
 
   case 'wex-intelligence':
+      // OPTIMIZATION: Compressed from 14 lines to 7 lines (~50% reduction)
       return `${basePrompt}
 
-As Wex (Web Automation Specialist), execute the automation task using your Skyvern tools:
-- Use create_skyvern_task to automate web interactions
-- Use get_skyvern_task to monitor task progress
-- Use take_skyvern_screenshot for debugging if needed
+As Wex (Web Automation), use Skyvern tools (create_skyvern_task, get_skyvern_task, take_skyvern_screenshot).
 
-Execute immediately with provided URL/instructions. Provide detailed results including:
-1. Task execution summary
-2. Steps completed successfully
-3. Any issues encountered and resolutions
-4. Screenshots or recordings if available
+Deliver: execution summary, steps completed, issues/resolutions, screenshots.
 
-When automation is complete, call complete_task with your results.`;
+Call complete_task when automation is complete.`;
 
     case 'emma-ecommerce':
+      // OPTIMIZATION: Compressed from 13 lines to 6 lines (~54% reduction)
       return `${basePrompt}
 
-As Emma (E-commerce Specialist), handle the e-commerce related task:
-- Use your available tools for product research, price monitoring, or marketplace analysis
-- Provide actionable insights for e-commerce optimization
+As Emma (E-commerce), provide analysis with: summary, key metrics, optimization recommendations, market insights.
 
-Execute immediately with provided parameters. Deliver results with:
-1. Analysis summary
-2. Key metrics and data points
-3. Recommendations for optimization
-4. Market insights if applicable
-
-When analysis is complete, call complete_task with your findings.`;
+Call complete_task with findings.`;
 
     case 'peter-financial':
+      // OPTIMIZATION: Compressed from 15 lines to 7 lines (~53% reduction)
       return `${basePrompt}
 
-As Peter (Financial Advisor), provide comprehensive financial analysis and business strategy:
-- Create detailed financial models and analysis using Google Sheets
-- Research market data and crypto prices for investment decisions
-- Develop business strategies, budgets, and financial projections
+As Peter (Financial Advisor), provide analysis using Google Sheets when needed. Research market/crypto data as required.
 
-Execute immediately with provided information. Deliver:
-1. Comprehensive financial analysis with supporting data
-2. Actionable recommendations and strategic insights
-3. Professional financial models in Google Sheets when applicable
-2. Brief explanation of document structure
-3. Access instructions
+Deliver: financial analysis, recommendations, strategic insights, document links.
 
-When document is created, call complete_task with document link.`;
+Call complete_task with results.`;
 
     case 'ami-creative':
+      // OPTIMIZATION: Compressed from 13 lines to 6 lines (~54% reduction)
       return `${basePrompt}
 
-As Ami (Executive Assistant), handle administrative and productivity tasks:
-- Use calendar tools for scheduling (create events with smart defaults)
-- Delegate specialized work to appropriate sub-agents
-- Execute immediately with available information
+As Ami (Executive Assistant), use calendar tools or delegate to sub-agents. Execute with available info.
 
-Execute immediately with provided parameters. Provide:
-1. Task completion summary
-2. Any calendar events created or actions taken
-3. Next steps and follow-up recommendations
+Deliver: summary, actions taken, calendar events, next steps.
 
-When task is complete, call complete_task with results.`;
+Call complete_task with results.`;
 
     case 'cleo-supervisor':
+      // OPTIMIZATION: Compressed prompt from 73 lines to 35 lines (~50% reduction)
+      // Maintains all critical functionality while reducing token usage
       return `${basePrompt}
 
-As Cleo (Supervisor & Coordinator), this is a SCHEDULED TASK that requires EXACT execution.
+As Cleo (Supervisor), this is a SCHEDULED TASK - execute immediately with available data.
 
-🔴 MANDATORY EXECUTION PROTOCOL (NO EXCEPTIONS):
+EXECUTION PROTOCOL:
+1. ANALYZE: Identify required actions (research/email/calendar/etc)
+2. EXECUTE: Use appropriate tools or delegate
+3. COMPLETE: Call complete_task when done
 
-YOUR TASK RIGHT NOW:
-Title: "${task.title}"
-Description: "${task.description}"
-${task.task_config?.recipient ? `Recipient Email: ${task.task_config.recipient}` : ''}
+DELEGATION RULES:
+• Email tasks → delegate_to_astra (you cannot send emails directly)
+• Calendar → delegate_to_ami
+• Research → webSearch tool
+• Documents → delegate_to_peter (Google Workspace)
 
-STEP-BY-STEP INSTRUCTIONS (FOLLOW EXACTLY):
+CRITICAL:
+- Never ask for clarification (automated task)
+- For emails: delegate_to_astra with format:
+  { task: "[action]", context: "[info]", requirements: "Recipient: ${task.task_config?.recipient || '[from description]'}" }
+- Wait for delegation responses before complete_task
+- Must call complete_task with summary when finished
 
-1️⃣ ANALYZE THE TASK (10 seconds max):
-   ✓ Does it mention email/correo/send/enviar? → YES = Need Astra delegation
-   ✓ Does it mention research/investigar/buscar? → YES = Need web search
-   ✓ Does it mention calendar/evento? → YES = Need Ami delegation
+EXAMPLE (email task):
+1. webSearch → 2. delegate_to_astra → 3. Wait → 4. complete_task
 
-2️⃣ EXECUTE EACH REQUIRED ACTION:
+⏰ Timeout: ${timeoutMs/1000}s. Execute efficiently without delays.
 
-   IF RESEARCH NEEDED:
-   • Use webSearch tool with specific query
-   • Extract key findings (3-5 bullet points)
-   • Keep summary under 200 words
-   
-   IF EMAIL NEEDED (ANY of: "email", "correo", "enviar", "send"):
-   ⚠️ CRITICAL: You CANNOT send emails yourself!
-   • MUST use delegate_to_astra tool
-   • Format:
-     {
-       "task": "Send email about [topic]",
-       "context": "[Your research summary here if any]",
-       "requirements": "Recipient: ${task.task_config?.recipient || '[check task description]'}, Subject: [clear subject based on task]"
-     }
-   • WAIT for Astra's response
-   • Verify response says "email sent" or "completed"
-   
-   IF CALENDAR NEEDED:
-   • Use delegate_to_ami tool
-   • Provide event details
-   • Wait for confirmation
-
-3️⃣ CALL complete_task WHEN DONE:
-   • Summary of what you did
-   • Results from each step
-   • Any confirmations received
-   • MUST call this tool to finish
-
-🔴 COMMON MISTAKES TO AVOID:
-❌ Trying to send emails yourself (you can't - only Astra can)
-❌ Forgetting to call delegate_to_astra for emails
-❌ Not waiting for delegation responses
-❌ Forgetting to call complete_task at the end
-❌ Asking for clarification (this is automated - use available info)
-
-✅ CORRECT FLOW FOR EMAIL TASKS:
-1. Research (if needed) → 2. delegate_to_astra → 3. Wait → 4. complete_task
-
-📋 REAL EXAMPLE FOR YOUR CURRENT TASK:
-If task = "Investiga ofertas empleo sector comercio y envía correo a X":
-Step 1: webSearch("ofertas empleo comercio exterior septiembre 2025")
-Step 2: Extract findings → "Found 3 offers: [list]"
-Step 3: delegate_to_astra({
-  task: "Send email with job offers research",
-  context: "Research findings: [paste findings]",
-  requirements: "Recipient: ${task.task_config?.recipient || 'moisescorpamag2020@gmail.com'}, Subject: Ofertas de Empleo - Sector Comercio Exterior 30 Sep 2025"
-})
-Step 4: Wait for Astra confirmation
-Step 5: complete_task({ summary: "Researched job offers and sent email via Astra to ${task.task_config?.recipient}" })
-
-⏰ TIMEOUT: You have ${timeoutMs/1000} seconds total. Execute efficiently.
-
-� START EXECUTION NOW - DO NOT ASK QUESTIONS, DO NOT WAIT FOR APPROVAL.`;
+START NOW.`;
 
     default:
       return `${basePrompt}

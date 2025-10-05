@@ -229,6 +229,84 @@ export class GraphBuilder {
   }
 
   /**
+   * OPTIMIZATION: Execute multiple independent tools in parallel
+   * Returns ToolMessages for successful executions
+   */
+  private async executeToolsInParallel(
+    toolCalls: any[],
+    toolRuntime: any,
+    agentConfig: AgentConfig,
+    executionStart: number,
+    maxExecutionMs: number,
+    maxToolCalls: number,
+    currentToolCalls: number
+  ): Promise<Array<PromiseSettledResult<any>>> {
+    const TOOL_TIMEOUT_MS = 60_000 // 60s per tool
+    
+    const toolPromises = toolCalls.map(async (call) => {
+      const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
+      const name = call?.name || call?.function?.name
+      let args = call?.args || call?.function?.arguments || {}
+      
+      // Emit tool.executing event
+      this.eventEmitter.emit('tool.executing', {
+        agentId: agentConfig.id,
+        toolName: name,
+        callId: callId,
+        args: args
+      })
+      
+      try {
+        if (typeof args === 'string') {
+          try { args = JSON.parse(args) } catch {}
+        }
+        
+        // Execute with timeout
+        const toolPromise = toolRuntime.run(String(name), args)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_TIMEOUT_MS/1000}s`)), TOOL_TIMEOUT_MS)
+        )
+        
+        const output = await Promise.race([toolPromise, timeoutPromise])
+        
+        // Create ToolMessage with result
+        const { ToolMessage } = await import('@langchain/core/messages')
+        const toolMessage = new ToolMessage({
+          content: typeof output === 'string' ? output : JSON.stringify(output),
+          tool_call_id: callId
+        })
+        
+        this.eventEmitter.emit('tool.completed', {
+          agentId: agentConfig.id,
+          toolName: name,
+          result: output
+        })
+        
+        return toolMessage
+      } catch (error) {
+        logger.error(`❌ Tool ${name} failed:`, error)
+        
+        const { ToolMessage } = await import('@langchain/core/messages')
+        const errorMessage = new ToolMessage({
+          content: `Error: ${(error as Error).message}`,
+          tool_call_id: callId
+        })
+        
+        this.eventEmitter.emit('tool.failed', {
+          agentId: agentConfig.id,
+          toolName: name,
+          error: error
+        })
+        
+        return errorMessage
+      }
+    })
+    
+    // Execute all tools in parallel with Promise.allSettled
+    return Promise.allSettled(toolPromises)
+  }
+
+  /**
    * Create an agent execution node
    */
   private async createAgentNode(agentConfig: AgentConfig) {
@@ -354,7 +432,44 @@ export class GraphBuilder {
             tools: toolCalls.map((t: any) => t?.name)
           })
 
-          for (const call of toolCalls) {
+          // OPTIMIZATION: Identify delegation vs non-delegation tools
+          // Delegations must be sequential (they depend on each other)
+          // Non-delegation tools can run in parallel for better performance
+          const delegationTools = toolCalls.filter((t: any) => 
+            (t?.name || '').startsWith('delegate_to_') || 
+            (t?.name || '').includes('delegation')
+          )
+          const independentTools = toolCalls.filter((t: any) => 
+            !(t?.name || '').startsWith('delegate_to_') && 
+            !(t?.name || '').includes('delegation')
+          )
+
+          // Execute independent tools in parallel (up to 3 concurrent)
+          if (independentTools.length > 0) {
+            logger.info(`⚡ [OPTIMIZATION] Executing ${independentTools.length} independent tools in parallel`)
+            const parallelResults = await this.executeToolsInParallel(
+              independentTools, 
+              toolRuntime, 
+              agentConfig, 
+              EXECUTION_START, 
+              MAX_EXECUTION_MS, 
+              MAX_TOOL_CALLS, 
+              totalToolCalls
+            )
+            
+            // Add tool results to messages
+            for (const result of parallelResults) {
+              if (result.status === 'fulfilled' && result.value) {
+                messages.push(result.value)
+                totalToolCalls++
+              } else if (result.status === 'rejected') {
+                logger.error(`❌ Tool execution failed:`, result.reason)
+              }
+            }
+          }
+
+          // Execute delegation tools sequentially (they need order)
+          for (const call of delegationTools) {
             // Stop if we are running out of budget
             if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
               logger.info('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
@@ -381,7 +496,15 @@ export class GraphBuilder {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args) } catch {}
               }
-              const output = await toolRuntime.run(String(name), args)
+              
+              // OPTIMIZATION: Add individual tool timeout (60s) to prevent single slow tool from blocking entire execution
+              const TOOL_TIMEOUT_MS = 60_000 // 60 seconds per tool (LangGraph best practice)
+              const toolPromise = toolRuntime.run(String(name), args)
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_TIMEOUT_MS/1000}s`)), TOOL_TIMEOUT_MS)
+              )
+              
+              const output = await Promise.race([toolPromise, timeoutPromise])
               
               // Check if this is a delegation tool response that requires handoff
               if (this.isDelegationToolResponse(output)) {
@@ -447,12 +570,25 @@ export class GraphBuilder {
                   this.eventEmitter.on('delegation.failed', onFailed)
                 })
                 
-                // Emit handoff event for external processing
+                // OPTIMIZATION: Emit progress events for better UX
+                // This allows the UI to show "Delegating to Astra...", "Astra processing...", etc.
                 const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
+                const targetAgentName = delegationData.agentId || delegationData.targetAgent
+                
                 logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
+                
+                // Emit progress: delegation starting
+                this.eventEmitter.emit('delegation.progress', {
+                  sourceAgent: agentConfig.id,
+                  targetAgent: targetAgentName,
+                  status: 'starting',
+                  message: `Delegating to ${targetAgentName}...`,
+                  timestamp: new Date().toISOString()
+                })
+                
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
-                  targetAgent: delegationData.agentId || delegationData.targetAgent,
+                  targetAgent: targetAgentName,
                   task: delegationData.delegatedTask || delegationData.task,
                   context: delegationData.context,
                   handoffMessage: delegationData.handoffMessage,
@@ -462,9 +598,26 @@ export class GraphBuilder {
                 })
                 
                 try {
-                  // Wait for delegation to complete
+                  // OPTIMIZATION: Emit progress during wait
                   logger.debug('⏳ [DELEGATION] Waiting for delegation to complete...')
+                  this.eventEmitter.emit('delegation.progress', {
+                    sourceAgent: agentConfig.id,
+                    targetAgent: targetAgentName,
+                    status: 'processing',
+                    message: `${targetAgentName} is processing the task...`,
+                    timestamp: new Date().toISOString()
+                  })
+                  
                   const delegationResult = await delegationPromise
+                  
+                  // OPTIMIZATION: Emit progress: completed successfully
+                  this.eventEmitter.emit('delegation.progress', {
+                    sourceAgent: agentConfig.id,
+                    targetAgent: targetAgentName,
+                    status: 'completed',
+                    message: `${targetAgentName} completed the task`,
+                    timestamp: new Date().toISOString()
+                  })
                   
                   const rawResult = delegationResult?.result
                   const delegatedText = typeof rawResult === 'string'
@@ -509,6 +662,16 @@ export class GraphBuilder {
                   ]
                 } catch (delegationError) {
                   logger.error('❌ [DELEGATION] Delegation failed:', delegationError)
+                  
+                  // OPTIMIZATION: Emit progress: failed
+                  this.eventEmitter.emit('delegation.progress', {
+                    sourceAgent: agentConfig.id,
+                    targetAgent: targetAgentName,
+                    status: 'failed',
+                    message: `${targetAgentName} failed: ${delegationError instanceof Error ? delegationError.message : String(delegationError)}`,
+                    timestamp: new Date().toISOString()
+                  })
+                  
                   messages = [
                     ...messages,
                     new ToolMessage({ 

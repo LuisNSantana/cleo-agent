@@ -96,6 +96,8 @@ export async function trackToolUsage(
     const ok = opts?.ok ?? true
     const exec = Math.max(0, Math.floor(opts?.execMs ?? 0))
 
+    // OPTIMIZATION: Use upsert with conflict handling to avoid race conditions
+    // This prevents "duplicate key" errors when multiple tools run in parallel
     const { data: existing, error: selErr } = await sb
       .from('tool_usage_analytics')
       .select('id, invocation_count, success_count, error_count, avg_execution_time_ms, total_execution_time_ms')
@@ -104,14 +106,29 @@ export async function trackToolUsage(
       .eq('usage_date', usageDate)
       .maybeSingle()
 
-    if (selErr && selErr.code !== 'PGRST116') {
-      console.error('trackToolUsage select error', selErr)
+    // OPTIMIZATION: Better error handling for network failures
+    if (selErr) {
+      if (selErr.code === 'PGRST116') {
+        // No rows found - this is fine, we'll insert below
+      } else if (selErr.message?.includes('fetch failed')) {
+        console.warn('[Analytics] Network error in trackToolUsage (non-fatal):', selErr.message)
+        return // Graceful failure - analytics should never block execution
+      } else {
+        console.error('trackToolUsage select error', { 
+          message: selErr.message,
+          details: selErr.details || 'No details',
+          hint: selErr.hint || '',
+          code: selErr.code || ''
+        })
+        return // Bail out to prevent cascade failures
+      }
     }
 
     if (!existing) {
+      // OPTIMIZATION: Use upsert to handle race conditions
       const { error: insErr } = await sb
         .from('tool_usage_analytics')
-        .insert({
+        .upsert({
           user_id: userId,
           tool_name: toolName,
           usage_date: usageDate,
@@ -122,8 +139,23 @@ export async function trackToolUsage(
           total_execution_time_ms: exec,
           popular_parameters: opts?.params ?? null,
           error_types: opts?.errorType ? [opts.errorType] : [],
+        }, {
+          onConflict: 'user_id,tool_name,usage_date',
+          ignoreDuplicates: false // Update if exists
         })
-      if (insErr) console.error('trackToolUsage insert error', insErr)
+      
+      if (insErr) {
+        if (insErr.message?.includes('fetch failed')) {
+          console.warn('[Analytics] Network error during insert (non-fatal)')
+        } else if (insErr.code !== '23505') { // Ignore duplicate key errors
+          console.error('trackToolUsage insert error', {
+            code: insErr.code || '',
+            details: insErr.details || 'No details',
+            hint: insErr.hint || null,
+            message: insErr.message
+          })
+        }
+      }
       return
     }
 
@@ -150,9 +182,17 @@ export async function trackToolUsage(
         popular_parameters: opts?.params ?? null,
       })
       .eq('id', (existing as any).id)
-    if (updErr) console.error('trackToolUsage update error', updErr)
+    
+    if (updErr) {
+      if (updErr.message?.includes('fetch failed')) {
+        console.warn('[Analytics] Network error during update (non-fatal)')
+      } else {
+        console.error('trackToolUsage update error', updErr)
+      }
+    }
   } catch (_e) {
-    // Silent fail
+    // OPTIMIZATION: Log critical errors but never throw
+    console.warn('[Analytics] trackToolUsage failed (non-fatal):', _e instanceof Error ? _e.message : 'Unknown error')
   }
 }
 

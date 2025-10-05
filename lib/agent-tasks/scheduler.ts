@@ -235,9 +235,10 @@ class AgentTaskScheduler {
     const startedAt = new Date().toISOString();
     
     // CRITICAL: Absolute max timeout for hierarchical multi-agent workflows
-    // UPDATED: Increased for complex Google Workspace workflows
-    // Supports: Research → Google Docs → Email → Calendar (5+ delegations)
-    const ABSOLUTE_MAX_TIMEOUT = 1_200_000; // 20 minutes max (was 15)
+    // OPTIMIZATION: Reduced from 20min to 10min per LangGraph best practices
+    // 10 minutes allows for 3-4 delegations with proper streaming feedback
+    // For longer workflows, break into separate scheduled tasks
+    const ABSOLUTE_MAX_TIMEOUT = 600_000; // 10 minutes max (optimized from 20min)
     
     try {
       console.log(`🔄 Processing task: ${task.title} (${task.agent_name})`);
