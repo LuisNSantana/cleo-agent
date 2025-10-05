@@ -300,14 +300,14 @@ export function ChatInput({
             <div className="mx-3 mb-2 flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs text-purple-700 shadow-sm dark:border-purple-700 dark:bg-purple-900/30 dark:text-purple-200">
               <Sparkle className="mt-0.5 size-4 flex-shrink-0" weight="fill" />
               <div className="flex-1 leading-snug">
-                <span className="block text-sm font-semibold">Modo imagen activado</span>
-                Describe la escena, estilo o iluminación y Cleo la generará con FLUX Pro. Si falla, se intentará automáticamente con OpenAI gpt-image-1.
+                <span className="block text-sm font-semibold">Image Mode Active</span>
+                Describe the scene, style, or lighting and Cleo will generate it with FLUX Pro. Falls back to OpenAI if needed.
               </div>
             </div>
           )}
           
           <PromptInputTextarea
-            placeholder={imageMode ? "Describe la imagen que quieres generar (estilo, iluminación, composición)..." : (placeholder || "Ask Cleo...")}
+            placeholder={imageMode ? "Describe the image you want to generate (style, lighting, composition)..." : (placeholder || "Ask Cleo...")}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
@@ -332,15 +332,15 @@ export function ChatInput({
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
                     {imageMode
-                      ? "Modo imagen activo"
-                      : "Generar imagen con IA"}
+                      ? "Image mode active - Click to disable"
+                      : "Generate image with AI"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               {imageMode && (
                 <div className="hidden md:flex items-center gap-1.5 rounded-full border border-purple-200/60 bg-purple-50/60 dark:bg-purple-900/20 px-2.5 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 backdrop-blur-sm">
                   <Sparkle className="size-3.5" weight="fill" />
-                  <span>Imagen</span>
+                  <span>Image</span>
                 </div>
               )}
               <ButtonFileUpload
@@ -364,7 +364,7 @@ export function ChatInput({
               ) : null}
             </div>
             <PromptInputAction
-              tooltip={status === "streaming" ? "Detener" : imageMode ? "Generar imagen" : "Enviar"}
+              tooltip={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send"}
             >
               <Button
                 size="sm"
@@ -372,7 +372,7 @@ export function ChatInput({
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
-                aria-label={status === "streaming" ? "Detener" : imageMode ? "Generar imagen" : "Enviar mensaje"}
+                aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
               >
                 {status === 'streaming' ? (
                   <Stop className="size-[18px]" weight="fill" />
