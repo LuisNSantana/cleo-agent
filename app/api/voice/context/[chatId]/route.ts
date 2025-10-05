@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -32,7 +32,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const chatId = params.chatId
+    const { chatId } = await params
 
     // Obtener últimos 10 mensajes del chat
     // Siguiendo best practice de ChatGPT: ventana de 5-20 mensajes
