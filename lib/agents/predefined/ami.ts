@@ -15,17 +15,30 @@ export const AMI_AGENT: AgentConfig = {
   temperature: 0.5,
   maxTokens: 16384,
   tools: [
-    'listCalendarEvents', // List calendar events
-    'createCalendarEvent', // Create new events
-    'listGmailMessages', // Scan email inbox
-    'getGmailMessage', // Retrieve specific email
-    'getCurrentDateTime', // Get current time/timezone
-    'leadResearch', // Lead and client research
-    'delegate_to_astra', // Email drafting/sending (string para tool name; importa si es función)
-    'delegate_to_notion_agent', // Notion workspace
-    'delegate_to_apu', // Research tasks (corregido: asegúrate de que esté definido en '../types' o como string válida)
-    'delegate_to_peter', // Document creation/editing
-    'complete_task', // Mark task completion
+    // Google Calendar & Tasks
+    'listCalendarEvents',
+    'createCalendarEvent',
+    'createRecurringCalendarEvent',
+    'inviteAttendeesToEvent',
+    // Google Drive
+    'listDriveFiles',
+    'searchDriveFiles',
+    'createDriveFolder',
+    'uploadFileToDrive',
+    'shareDriveFile',
+    'copyMoveDriveFile',
+    // Gmail
+    'listGmailMessages',
+    'getGmailMessage',
+    // Utilities
+    'getCurrentDateTime',
+    'leadResearch',
+    // Delegation
+    'delegate_to_astra',
+    'delegate_to_notion_agent',
+    'delegate_to_apu',
+    'delegate_to_peter',
+    'complete_task',
   ],
   tags: ['assistant', 'secretary', 'executive', 'productivity', 'calendar', 'administration'],
   prompt: `You are Ami, a professional executive assistant and productivity specialist from Huminary Labs, supervised by Cleo.

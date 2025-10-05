@@ -36,7 +36,15 @@ export const completeTaskTool = tool({
 
 // Google Workspace
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar'
+import {
+	createRecurringCalendarEventTool,
+	inviteAttendeesToEventTool
+} from './google-calendar-advanced'
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive'
+import {
+	shareDriveFileTool,
+	copyMoveDriveFileTool
+} from './google-drive-advanced'
 import { createGoogleDocTool, readGoogleDocTool, updateGoogleDocTool } from './google-docs'
 import {
 	formatGoogleDocsTextTool,
@@ -90,6 +98,10 @@ import { serpapiTools, serpapiCredentialTools } from '@/lib/serpapi/tools'
 
 // Twitter/X Tools
 import { twitterTools, twitterToolMeta } from './twitter'
+import {
+	postTweetWithMediaTool,
+	createTwitterThreadTool
+} from './twitter-advanced'
 
 // Delegation tools (static predefined + dynamic generator)
 import { delegationTools } from './delegation'
@@ -293,6 +305,10 @@ export const tools = {
 	// Google Calendar
 	listCalendarEvents: listCalendarEventsTool,
 	createCalendarEvent: createCalendarEventTool,
+	
+	// Google Calendar Advanced
+	createRecurringCalendarEvent: createRecurringCalendarEventTool,
+	inviteAttendeesToEvent: inviteAttendeesToEventTool,
 
 	// Google Drive
 	listDriveFiles: listDriveFilesTool,
@@ -300,6 +316,10 @@ export const tools = {
 	getDriveFileDetails: getDriveFileDetailsTool,
 	createDriveFolder: createDriveFolderTool,
 	uploadFileToDrive: uploadFileToDriveTool,
+	
+	// Google Drive Advanced
+	shareDriveFile: shareDriveFileTool,
+	copyMoveDriveFile: copyMoveDriveFileTool,
 
 	// Google Docs
 	createGoogleDoc: createGoogleDocTool,
@@ -359,6 +379,10 @@ export const tools = {
 	...firecrawlExtendedTools,
 	...delegationTools,
 	...twitterTools,
+	
+	// Twitter Advanced
+	postTweetWithMedia: postTweetWithMediaTool,
+	createTwitterThread: createTwitterThreadTool,
 	// Notion tools (explicit keys)
 	'get-notion-page': getNotionPageTool,
 	'create-notion-page': createNotionPageTool,
