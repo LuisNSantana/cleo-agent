@@ -256,7 +256,7 @@ export function ChatInput({
     <div className="order-2 md:order-1 sticky bottom-0 z-40 border-t border-transparent bg-transparent px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)] supports-[backdrop-filter]:bg-transparent">
         <PromptInput
       /* Frosted-glass input: lighter and blurrier on mobile; keep original on md+ */
-      className="relative z-10 p-0 pt-1 shadow-lg backdrop-blur-lg bg-white/70 dark:bg-zinc-900/50 ring-1 ring-white/30 dark:ring-white/10 md:bg-popover md:backdrop-blur-xl md:ring-0 md:shadow-xs"
+      className="input-glow relative z-10 p-0 pt-1 shadow-lg backdrop-blur-lg bg-white/70 dark:bg-zinc-900/50 ring-1 ring-white/30 dark:ring-white/10 md:bg-popover md:backdrop-blur-xl md:ring-0 md:shadow-xs"
           maxHeight={200}
           value={value}
           onValueChange={handleValueChange}
@@ -368,11 +368,11 @@ export function ChatInput({
             >
               <Button
                 size="sm"
-                className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation glow-primary-hover scale-on-active"
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
-                aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
+                aria-label={status === "streaming" ? "Detener" : imageMode ? "Generar imagen" : "Enviar mensaje"}
               >
                 {status === 'streaming' ? (
                   <Stop className="size-[18px]" weight="fill" />

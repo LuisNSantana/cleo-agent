@@ -763,3 +763,193 @@ label, .label-text {
     transition-duration: 0ms !important;
   }
 }
+
+/* ====================================================================
+   QUICK WINS - UI/UX IMPROVEMENTS 2025
+   High-impact utilities for better user experience
+   ==================================================================== */
+
+/* Hover lift effect for cards and interactive elements */
+.hover-lift {
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Interactive glow on hover */
+.interactive-glow {
+  transition: box-shadow 200ms ease;
+}
+
+.interactive-glow:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Better custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+  transition: background 200ms ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+/* Smooth message reveal animation */
+@keyframes message-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-enter {
+  animation: message-reveal 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar item improvements */
+.sidebar-item {
+  position: relative;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--primary);
+  transform: scaleY(0);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-item:hover::before,
+.sidebar-item.active::before {
+  transform: scaleY(1);
+}
+
+/* Input focus glow */
+.input-glow:focus-within {
+  box-shadow: 
+    0 0 0 3px rgba(59, 130, 246, 0.1),
+    var(--glow-primary);
+  transition: box-shadow 200ms ease;
+}
+
+/* Better focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scale on active for buttons */
+.scale-on-active:active {
+  transform: scale(0.98);
+}
+
+/* Typing indicator animation */
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-8px);
+  }
+}
+
+.typing-dot {
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Pulse animation for badges */
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.badge-pulse {
+  animation: subtle-pulse 3s ease-in-out infinite;
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--muted-foreground) 20%,
+    var(--muted) 40%,
+    var(--muted) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Message hover actions */
+.message-actions {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.message-item:hover .message-actions {
+  opacity: 1;
+}
+
+/* Smooth height transitions */
+.smooth-height {
+  transition: height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Better button transitions */
+button {
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.98);
+}

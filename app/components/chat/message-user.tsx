@@ -118,7 +118,7 @@ export function MessageUser({
   return (
     <MessageContainer
       className={cn(
-        "group flex w-full max-w-3xl flex-col items-end gap-0.5 px-6 pb-2",
+        "message-item group flex w-full max-w-3xl flex-col items-end gap-2 px-4 md:px-6 py-6 message-enter transition-colors",
         hasScrollAnchor && "min-h-scroll-anchor",
         className
       )}
@@ -257,11 +257,10 @@ export function MessageUser({
           />
         </>
       )}
-      <MessageActions className="flex gap-0 opacity-0 transition-opacity duration-0 group-hover:opacity-100">
-        {/* TEMPORARILY DISABLED TO TEST ERROR
-        <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
+      <MessageActions className="message-actions flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <MessageAction tooltip={copied ? "Copiado!" : "Copiar texto"} side="bottom">
           <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
             aria-label="Copy text"
             onClick={handleCopyToClipboard}
             type="button"
@@ -273,25 +272,9 @@ export function MessageUser({
             )}
           </button>
         </MessageAction>
-        */}
-        {/* @todo: add when ready */}
-        {/* <MessageAction
-          tooltip={isEditing ? "Save" : "Edit"}
-          side="bottom"
-          delayDuration={0}
-        >
+        <MessageAction tooltip="Eliminar" side="bottom">
           <button
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition"
-            aria-label="Edit"
-            onClick={() => setIsEditing(!isEditing)}
-            type="button"
-          >
-            <PencilSimple className="size-4" />
-          </button>
-        </MessageAction> */}
-        <MessageAction tooltip="Delete" side="bottom">
-          <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+            className="hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
             aria-label="Delete"
             onClick={handleDelete}
             type="button"

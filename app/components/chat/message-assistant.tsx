@@ -249,12 +249,12 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-  "group flex w-full max-w-4xl flex-1 items-start gap-4 px-6 pb-2",
+        "message-item group flex w-full max-w-4xl flex-1 items-start gap-4 px-4 md:px-6 py-6 message-enter transition-colors bg-muted/20",
         hasScrollAnchor && "min-h-scroll-anchor",
         className
       )}
     >
-      <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
+      <div className={cn("flex min-w-full flex-col gap-3", isLast && "pb-8")}>
         {/* Show reasoning when available (prefer parts, else <thinking>) or while streaming */}
         {(effectiveReasoningText || status === "streaming") && (
           <Reasoning
@@ -307,15 +307,15 @@ export function MessageAssistant({
   {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
           <MessageActions
             className={cn(
-              "-ml-2 flex gap-0 opacity-0 transition-opacity group-hover:opacity-100"
+              "message-actions -ml-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
             )}
           >
             <MessageAction
-              tooltip={copied ? "Copied!" : "Copy text"}
+              tooltip={copied ? "Copiado!" : "Copiar texto"}
               side="bottom"
             >
               <button
-                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
                 aria-label="Copy text"
                 onClick={handleCopyToClipboard}
                 type="button"
@@ -329,12 +329,12 @@ export function MessageAssistant({
             </MessageAction>
             {isLast ? (
               <MessageAction
-                tooltip="Regenerate"
+                tooltip="Regenerar"
                 side="bottom"
                 delayDuration={0}
               >
                 <button
-                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
                   aria-label="Regenerate"
                   onClick={onReloadAction}
                   type="button"

@@ -9,6 +9,7 @@ import { OptimizationInsights, extractPipelineOptimizations } from './optimizati
 import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus } from './real-time-optimization'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { PerformanceMetrics } from './performance-metrics'
+import { TypingIndicator } from "@/components/ui/typing-indicator"
 
 type ConversationProps = {
   messages: MessageType[]
@@ -130,10 +131,9 @@ export function Conversation({
       </div>
       <ChatContainerRoot className="relative w-full">
         <ChatContainerContent
-          className="flex w-full h-full flex-col items-center pt-16 md:pt-20"
+          className="custom-scrollbar flex w-full h-full flex-col items-center pt-16 md:pt-20"
           style={{
             scrollbarGutter: "stable both-edges",
-            scrollbarWidth: "none",
             // IMPROVED: Add dynamic bottom padding with extra margin to prevent input overlay
             // Increased default from 88px to 120px + 16px safety margin
             paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 16px)`,
@@ -274,6 +274,11 @@ export function Conversation({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Show TypingIndicator when streaming but no content yet */}
+          {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length === 0 && (
+            <TypingIndicator />
           )}
 
           {/* Simple In-Chat Confirmation */}
