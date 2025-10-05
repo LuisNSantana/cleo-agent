@@ -40,25 +40,76 @@ export const GeneratedImage = memo(function GeneratedImage({
 }: GeneratedImageProps) {
   const handleDownload = async () => {
     try {
-      const response = await fetch(imageUrl)
+      // Try to download via fetch with CORS mode
+      const response = await fetch(imageUrl, { mode: 'cors' })
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`
+      link.download = `cleo_${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.png`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to download image:', error)
-      // Fallback: open in new tab
-      window.open(imageUrl, '_blank')
+      // Fallback: try direct download attribute
+      try {
+        const link = document.createElement('a')
+        link.href = imageUrl
+        link.download = `cleo_${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.png`
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } catch (e) {
+        // Last resort: copy URL to clipboard
+        navigator.clipboard.writeText(imageUrl).then(() => {
+          alert('Image URL copied to clipboard. You can paste it in a new tab to download.')
+        }).catch(() => {
+          alert('Unable to download. Please right-click the image and select "Save image as..."')
+        })
+      }
     }
   }
 
   const handleOpenFullsize = () => {
-    window.open(imageUrl, '_blank')
+    // Create a temporary window with the image
+    const newWindow = window.open('', '_blank')
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background: #000;
+              }
+              img {
+                max-width: 100%;
+                max-height: 100vh;
+                object-fit: contain;
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${imageUrl}" alt="${title}" />
+          </body>
+        </html>
+      `)
+      newWindow.document.close()
+    } else {
+      // Fallback if popup blocked
+      alert('Please allow popups to view the image in full size.')
+    }
   }
 
   const formatDimensions = () => {
@@ -150,7 +201,7 @@ export const GeneratedImage = memo(function GeneratedImage({
             className="h-8 w-8 rounded-full bg-white/65 text-slate-700 hover:bg-white dark:bg-white/15 dark:text-slate-100"
           >
             <Maximize2 className="h-4 w-4" />
-            <span className="sr-only">Ver imagen en tamaño completo</span>
+            <span className="sr-only">View full size image</span>
           </Button>
           <Button
             variant="ghost"
@@ -159,19 +210,19 @@ export const GeneratedImage = memo(function GeneratedImage({
             className="h-8 w-8 rounded-full bg-white/65 text-slate-700 hover:bg-white dark:bg-white/15 dark:text-slate-100"
           >
             <Download className="h-4 w-4" />
-            <span className="sr-only">Descargar imagen</span>
+            <span className="sr-only">Download image</span>
           </Button>
         </div>
 
         {fallbackUsed && failedAttemptsCount > 0 && (
           <div className="text-[10px] leading-tight text-muted-foreground">
-            {failedAttemptsCount} intento{failedAttemptsCount === 1 ? '' : 's'} fallido{failedAttemptsCount === 1 ? '' : 's'} antes del fallback.
+            {failedAttemptsCount} failed attempt{failedAttemptsCount === 1 ? '' : 's'} before fallback.
           </div>
         )}
 
         {usage && (
           <div className="text-[10px] font-medium uppercase tracking-wide text-purple-600/80 dark:text-purple-300/80">
-            {usage.remaining} imágenes restantes hoy
+            {usage.remaining} images remaining today
           </div>
         )}
       </figure>

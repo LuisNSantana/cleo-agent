@@ -315,6 +315,25 @@ export function ChatInput({
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2 items-center">
+              <ButtonFileUpload
+                onFileUploadAction={onFileUploadAction}
+                isUserAuthenticated={isUserAuthenticated}
+                model={selectedModel}
+              />
+              {!hideModelSelector && (
+                <ModelSelector
+                  selectedModelId={selectedModel}
+                  setSelectedModelIdAction={onSelectModelAction}
+                  isUserAuthenticated={isUserAuthenticated}
+                />
+              )}
+              {hasSearchSupport ? (
+                <ButtonSearch
+                  isSelected={enableSearch}
+                  onToggle={setEnableSearchAction}
+                  isAuthenticated={isUserAuthenticated}
+                />
+              ) : null}
               <TooltipProvider delayDuration={120}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -343,25 +362,6 @@ export function ChatInput({
                   <span>Image</span>
                 </div>
               )}
-              <ButtonFileUpload
-                onFileUploadAction={onFileUploadAction}
-                isUserAuthenticated={isUserAuthenticated}
-                model={selectedModel}
-              />
-              {!hideModelSelector && (
-                <ModelSelector
-                  selectedModelId={selectedModel}
-                  setSelectedModelIdAction={onSelectModelAction}
-                  isUserAuthenticated={isUserAuthenticated}
-                />
-              )}
-              {hasSearchSupport ? (
-                <ButtonSearch
-                  isSelected={enableSearch}
-                  onToggle={setEnableSearchAction}
-                  isAuthenticated={isUserAuthenticated}
-                />
-              ) : null}
             </div>
             <PromptInputAction
               tooltip={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send"}
