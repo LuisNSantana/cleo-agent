@@ -58,10 +58,10 @@ export function SmartMessage({
 
   return (
     <div className="space-y-4">
-      {/* Contenido original - SIEMPRE mostrar (minimalist, no bubble) */}
+      {/* Contenido original con bubble para mejor estética */}
     <MessageContent
         className={cn(
-          // Plain text block, no surface/background; rely on page bg
+          // Bubble style with background
       "prose dark:prose-invert w-full max-w-[72ch]",
           // Subtle typography polish for readability
       "leading-relaxed tracking-[0.003em]",
@@ -76,7 +76,7 @@ export function SmartMessage({
           "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-6 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-2 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-p:my-3 prose-li:my-1.5 prose-table:block prose-table:overflow-y-auto"
         )}
   markdown={true}
-  variant="plain"
+  variant="bubble"
       >
         {cleanResponse}
       </MessageContent>
