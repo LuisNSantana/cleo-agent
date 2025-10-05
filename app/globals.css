@@ -167,7 +167,7 @@ body {
   
   /* Muted elements - Better contrast */
   --muted: #2f2f2f;             /* Lighter muted background */
-  --muted-foreground: #b0b0b0;  /* Lighter text for readability */
+  --muted-foreground: #c0c0c0;  /* 15% lighter for better readability */
   
   /* Accent - Vibrant blue */
   --accent: #4a9eff;

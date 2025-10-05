@@ -105,19 +105,11 @@ export function SidebarVoiceButton() {
         )}
       >
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Microphone size={18} weight="duotone" className="transition-transform group-hover/voice:scale-110" />
-            <div className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 animate-pulse" />
-          </div>
-          <span className="font-medium">Talk to Cleo</span>
+          <Microphone size={18} weight="duotone" />
+          <span className="font-medium">Voz</span>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-            Voice
-          </span>
-          <div className="text-muted-foreground text-xs opacity-0 duration-150 group-hover/voice:opacity-100">
-            ⌘⇧V
-          </div>
+        <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/voice:opacity-100">
+          ⌘⇧V
         </div>
       </Button>
 

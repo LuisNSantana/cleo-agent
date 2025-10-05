@@ -81,11 +81,12 @@ export function AppSidebar() {
     },
   ], [handleOpenSettings])
 
+  // OPTIMIZED: Grok-style navigation - cleaner without excessive badges
   const primaryNav = [
     { href: "/", label: "Home", icon: HouseIcon, iconWeight: "duotone" as const },
-    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, badge: "New", iconWeight: "duotone" as const },
-    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, badge: "New", iconWeight: "duotone" as const },
-    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, badge: "New", iconWeight: "duotone" as const },
+    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, iconWeight: "duotone" as const },
+    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, iconWeight: "duotone" as const },
+    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, iconWeight: "duotone" as const },
     { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, iconWeight: "duotone" as const },
     { href: "/docs", label: "Docs", icon: DocsIcon, iconWeight: "duotone" as const },
   ]
@@ -113,7 +114,7 @@ export function AppSidebar() {
           <SidebarGroup className="mb-1">
             <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Navigation</SidebarGroupLabel>
             <SidebarMenu className="space-y-1">
-              {primaryNav.map(({ href, label, icon: Icon, badge, iconWeight }) => {
+              {primaryNav.map(({ href, label, icon: Icon, iconWeight }) => {
                 const isActive = href === "/"
                   ? pathname === "/"
                   : pathname === href || pathname.startsWith(href + "/")
@@ -127,7 +128,7 @@ export function AppSidebar() {
                       <Link
                         href={href}
                         prefetch
-                        className="flex items-center justify-between w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
+                        className="flex items-center w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
                         onClick={() => {
                           if (isMobile) {
                             setOpenMobile(false)
@@ -138,11 +139,6 @@ export function AppSidebar() {
                           <Icon className="size-[18px]" weight={iconWeight} />
                           <span className="text-[13.5px]">{label}</span>
                         </div>
-                        {badge && (
-                          <span className="ml-auto px-1.5 py-0.5 text-[9px] font-medium bg-primary/8 text-primary/60 border border-primary/10 rounded-md tracking-wide animate-in fade-in duration-300">
-                            {badge}
-                          </span>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -187,30 +183,7 @@ export function AppSidebar() {
             />
             <SidebarVoiceButton />
           </div>
-          {quickActions.length > 0 && (
-            <SidebarGroup className="mb-6">
-              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Quick links</SidebarGroupLabel>
-              <div className="mt-3 space-y-2">
-                {quickActions.map(({ id, label, description, icon: Icon, action }) => (
-                  <Button
-                    key={id}
-                    type="button"
-                    variant="ghost"
-                    onClick={action}
-                    className="h-auto w-full justify-start rounded-lg border border-border/40 bg-background/60 px-3 py-3 text-left transition-all duration-200 hover:bg-background hover:translate-x-0.5"
-                  >
-                    <div className="flex items-center gap-3 text-[13px] font-medium">
-                      <Icon className="size-[18px]" weight="duotone" />
-                      <span>{label}</span>
-                    </div>
-                    <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/80">
-                      {description}
-                    </p>
-                  </Button>
-                ))}
-              </div>
-            </SidebarGroup>
-          )}
+          {/* OPTIMIZED: Quick links removed for Grok-style minimal sidebar */}
           <SidebarProject />
           {isLoading ? (
             <div className="h-full" />

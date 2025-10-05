@@ -58,22 +58,34 @@ export function SmartMessage({
 
   return (
     <div className="space-y-4">
-      {/* Contenido original - Diseño Cleo Rebrand optimizado para dark mode */}
+      {/* OPTIMIZED: ChatGPT/Claude style - NO bubble for assistant, plain text */}
       <MessageContent
         className={cn(
-          // Base: frosted glass effect con mejor contraste
-          "prose dark:prose-invert relative min-w-full rounded-2xl p-4 shadow-lg backdrop-blur-xl",
-          // Light mode: soft white glass
-          "bg-white/70 text-gray-900 border border-white/30",
-          // Dark mode: OPTIMIZADO - Fondo más claro para mejor contraste
-          "dark:bg-white/8 dark:text-zinc-50 dark:border-white/15",
-          // Desktop: slightly more opaque
-          "md:bg-white/90 md:border-white/20 md:backdrop-blur-md",
-          "md:dark:bg-white/10 md:dark:border-white/20",
-          // Typography
-          "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold prose-h2:mt-8 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-3 prose-h2:font-medium prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium prose-h4:scroll-m-20 prose-h5:scroll-m-20 prose-h6:scroll-m-20 prose-strong:font-medium prose-table:block prose-table:overflow-y-auto"
+          // Base: Plain text, no bubble (modern chat UI best practice)
+          "prose prose-lg dark:prose-invert w-full max-w-none",
+          // Clean typography without background
+          "text-gray-900 dark:text-zinc-100",
+          // Better line height for readability
+          "leading-relaxed tracking-[-0.011em]",
+          // Typography refinements
+          "prose-h1:scroll-m-20 prose-h1:text-2xl prose-h1:font-semibold",
+          "prose-h2:mt-8 prose-h2:scroll-m-20 prose-h2:text-xl prose-h2:mb-3 prose-h2:font-medium",
+          "prose-h3:scroll-m-20 prose-h3:text-base prose-h3:font-medium",
+          "prose-h4:scroll-m-20 prose-h5:scroll-m-20 prose-h6:scroll-m-20",
+          "prose-strong:font-medium",
+          "prose-p:my-3 prose-li:my-1.5",
+          "prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md",
+          "prose-pre:bg-muted prose-pre:border prose-pre:border-border",
+          "prose-table:block prose-table:overflow-y-auto",
+          // Links
+          "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+          // Lists
+          "prose-ul:my-4 prose-ol:my-4",
+          // Blockquotes
+          "prose-blockquote:border-l-primary prose-blockquote:bg-muted/50 prose-blockquote:py-1 prose-blockquote:px-4"
         )}
         markdown={true}
+        variant="plain"
       >
         {cleanResponse}
       </MessageContent>
