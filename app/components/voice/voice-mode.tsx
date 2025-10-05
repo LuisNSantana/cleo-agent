@@ -98,9 +98,28 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
 
   const handleStart = async () => {
     try {
+      // Check if microphone is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Tu navegador no soporta acceso al micrófono. Por favor usa Chrome, Edge o Safari.')
+      }
+
+      // Check microphone permissions before starting
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        console.log('🎤 Microphone permission status:', permissionStatus.state)
+        
+        if (permissionStatus.state === 'denied') {
+          throw new Error('Acceso al micrófono denegado. Por favor permite el acceso en la configuración de tu navegador.')
+        }
+      } catch (permErr) {
+        // Permission API might not be available in all browsers, continue anyway
+        console.log('⚠️ Could not check microphone permissions, will request during session start')
+      }
+
       await startSession(chatId)
     } catch (err) {
       console.error('Failed to start voice session:', err)
+      // Error will be displayed via the error state in useVoiceWebRTC
     }
   }
 
@@ -307,9 +326,23 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 rounded-xl bg-red-500/10 border border-red-500/20"
               >
-                <p className="text-sm text-red-400 text-center">
-                  {error.message}
-                </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center mt-0.5">
+                    <span className="text-red-400 text-xs font-bold">!</span>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm text-red-400 font-medium">
+                      {error.message}
+                    </p>
+                    {error.message.includes('micrófono') && (
+                      <p className="text-xs text-red-300/70">
+                        • Verifica que tu micrófono esté conectado<br/>
+                        • Permite el acceso al micrófono cuando el navegador lo solicite<br/>
+                        • Revisa la configuración de permisos en tu navegador
+                      </p>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             )}
           </div>

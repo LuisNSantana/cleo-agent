@@ -92,24 +92,58 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         ? config.instructions.trim()
         : undefined
 
-      // Request microphone permission
+      // Request microphone permission with detailed constraints
+      console.log('🎤 Requesting microphone access...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: { ideal: 48000 }
         }
       })
 
+      console.log('✅ Microphone access granted')
+      console.log('📊 Stream info:', {
+        active: stream.active,
+        tracks: stream.getTracks().length,
+        audioTracks: stream.getAudioTracks().length
+      })
+
+      // Verify we got audio tracks
+      const audioTracks = stream.getAudioTracks()
+      if (audioTracks.length === 0) {
+        throw new Error('No se pudo acceder al micrófono. Por favor verifica los permisos.')
+      }
+
+      const audioTrack = audioTracks[0]
+      console.log('🎙️ Audio track info:', {
+        label: audioTrack.label,
+        enabled: audioTrack.enabled,
+        muted: audioTrack.muted,
+        readyState: audioTrack.readyState,
+        settings: audioTrack.getSettings()
+      })
+
+      // Ensure track is enabled
+      if (!audioTrack.enabled) {
+        console.log('⚠️ Audio track was disabled, enabling it...')
+        audioTrack.enabled = true
+      }
+
       mediaStreamRef.current = stream
 
-      // Setup audio analyzer
+      // Setup audio analyzer for visual feedback
       const audioContext = new AudioContext()
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
       source.connect(analyser)
       analyserRef.current = analyser
+      
+      console.log('🔊 Audio analyzer configured')
 
       // Create voice session in database
       const sessionResponse = await fetch('/api/voice/session', {
@@ -143,12 +177,42 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         }
       }
 
-      // Add local audio track (microphone)
-      const audioTrack = stream.getAudioTracks()[0]
-      if (audioTrack && audioTrack.enabled === false) {
-        audioTrack.enabled = true
+      // Add local audio track (microphone) to peer connection
+      const micTrack = stream.getAudioTracks()[0]
+      
+      if (!micTrack) {
+        throw new Error('No se encontró track de audio en el stream')
       }
-      pc.addTrack(audioTrack, stream)
+      
+      console.log('🎤 Adding microphone track to peer connection:', {
+        id: micTrack.id,
+        label: micTrack.label,
+        enabled: micTrack.enabled,
+        muted: micTrack.muted
+      })
+      
+      // Double-check track is enabled before adding
+      if (!micTrack.enabled) {
+        console.warn('⚠️ Track was disabled, enabling...')
+        micTrack.enabled = true
+      }
+      
+      // Add track to peer connection
+      const sender = pc.addTrack(micTrack, stream)
+      console.log('✅ Microphone track added to peer connection:', sender)
+      
+      // Monitor track state changes
+      micTrack.onmute = () => {
+        console.warn('⚠️ Microphone track muted')
+      }
+      micTrack.onunmute = () => {
+        console.log('✅ Microphone track unmuted')
+      }
+      micTrack.onended = () => {
+        console.error('❌ Microphone track ended')
+        setError(new Error('El micrófono se desconectó'))
+        setStatus('error')
+      }
 
       // Create data channel for events (must be done before createOffer)
       const dc = pc.createDataChannel('oai-events')
@@ -465,7 +529,37 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
     } catch (err) {
       console.error('Voice session error:', err)
-      setError(err as Error)
+      
+      // Handle specific error types
+      let errorMessage = 'Error al iniciar la sesión de voz'
+      
+      if (err instanceof Error) {
+        const errName = err.name
+        const errMsg = err.message.toLowerCase()
+        
+        // Microphone permission denied
+        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+          errorMessage = 'Acceso al micrófono denegado. Por favor permite el acceso en tu navegador.'
+        }
+        // No microphone found
+        else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+          errorMessage = 'No se encontró ningún micrófono. Por favor conecta uno e intenta de nuevo.'
+        }
+        // Microphone in use by another app
+        else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+          errorMessage = 'El micrófono está siendo usado por otra aplicación. Ciérrala e intenta de nuevo.'
+        }
+        // Browser not supported
+        else if (errMsg.includes('getusermedia') || errMsg.includes('not supported')) {
+          errorMessage = 'Tu navegador no soporta acceso al micrófono. Usa Chrome, Edge o Safari.'
+        }
+        // Use original message if available
+        else if (err.message) {
+          errorMessage = err.message
+        }
+      }
+      
+      setError(new Error(errorMessage))
       setStatus('error')
       cleanup()
     }
@@ -545,9 +639,15 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
     if (mediaStreamRef.current) {
       const audioTrack = mediaStreamRef.current.getAudioTracks()[0]
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled
-        setIsMuted(!audioTrack.enabled)
+        const newMutedState = !audioTrack.enabled
+        audioTrack.enabled = !newMutedState
+        setIsMuted(newMutedState)
+        console.log(newMutedState ? '🔇 Micrófono silenciado' : '🔊 Micrófono activado')
+      } else {
+        console.error('❌ No audio track found for mute toggle')
       }
+    } else {
+      console.error('❌ No media stream found for mute toggle')
     }
   }, [])
 
