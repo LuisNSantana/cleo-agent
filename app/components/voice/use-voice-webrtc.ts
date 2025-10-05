@@ -136,6 +136,11 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       // Setup audio analyzer for visual feedback
       const audioContext = new AudioContext()
+      console.log('🎵 AudioContext created:', {
+        state: audioContext.state,
+        sampleRate: audioContext.sampleRate
+      })
+      
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
@@ -143,7 +148,17 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       source.connect(analyser)
       analyserRef.current = analyser
       
-      console.log('🔊 Audio analyzer configured')
+      console.log('🔊 Audio analyzer configured:', {
+        fftSize: analyser.fftSize,
+        frequencyBinCount: analyser.frequencyBinCount,
+        smoothingTimeConstant: analyser.smoothingTimeConstant
+      })
+      
+      // Test if we're getting audio data
+      const testDataArray = new Uint8Array(analyser.frequencyBinCount)
+      analyser.getByteFrequencyData(testDataArray)
+      const testAvg = testDataArray.reduce((a, b) => a + b) / testDataArray.length
+      console.log('🎤 Initial audio level test:', testAvg > 0 ? `${testAvg}/255 (DETECTED)` : '0 (silent or not detected yet)')
 
       // Create voice session in database
       const sessionResponse = await fetch('/api/voice/session', {
@@ -199,7 +214,20 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       
       // Add track to peer connection
       const sender = pc.addTrack(micTrack, stream)
-      console.log('✅ Microphone track added to peer connection:', sender)
+      console.log('✅ Microphone track added to peer connection')
+      console.log('📡 RTC Sender info:', {
+        track: sender.track?.id,
+        trackEnabled: sender.track?.enabled,
+        trackLabel: sender.track?.label,
+        trackMuted: sender.track?.muted
+      })
+      
+      // Verify track is being sent
+      const parameters = sender.getParameters()
+      console.log('📤 Sender parameters:', {
+        encodings: parameters.encodings,
+        transactionId: parameters.transactionId
+      })
       
       // Monitor track state changes
       micTrack.onmute = () => {
