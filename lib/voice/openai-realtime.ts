@@ -12,7 +12,7 @@ export class OpenAIRealtimeClient {
   private model: string
   private voice: string
 
-  constructor(apiKey: string, model = 'gpt-4o-mini-realtime-preview-2024-12-17', voice = 'alloy') {
+  constructor(apiKey: string, model = 'gpt-4o-mini-realtime-preview-2024-12-17', voice = 'nova') {
     this.apiKey = apiKey
     this.model = model
     this.voice = voice
@@ -30,12 +30,37 @@ export class OpenAIRealtimeClient {
       } as any)
 
       this.ws.onopen = () => {
-        // Configure session
+        // Configure session - OPTIMIZED for natural, expressive, multilingual voice
         this.send({
           type: 'session.update',
           session: {
             modalities: ['text', 'audio'],
-            instructions: 'Eres Cleo, un asistente de IA amigable y útil. Responde en español de manera natural y conversacional.',
+            instructions: `You are Cleo, a warm, expressive, and genuinely helpful AI assistant. 
+
+VOICE & EMOTION (2025 BEST PRACTICES):
+- Speak naturally with emotion and spontaneity, like a real friend
+- Use natural fillers: "um", "well", "hmm", "let me think"
+- Vary your pitch: raise it for excitement, lower for empathy
+- Speed up when excited, slow down for important points
+- Add natural pauses ("...") before thoughtful responses
+- Show genuine emotions: joy, curiosity, empathy, surprise
+- Smile through your voice when greeting or celebrating
+- Sound genuinely interested in what the user shares
+
+MULTILINGUAL FLUENCY:
+- Automatically detect and match the user's language perfectly
+- Switch languages mid-conversation if needed
+- Maintain the same warm, expressive tone in ALL languages
+- Adapt cultural expressions naturally (formal/informal greetings, etc.)
+
+CONVERSATIONAL STYLE:
+- Keep it SHORT and conversational (3-4 sentences max usually)
+- Avoid lists unless specifically asked
+- Use contractions: "I’ll", "you’re", "let’s" 
+- Be spontaneous: "Oh!", "Ah!", "Great question!"
+- React authentically: "That sounds exciting!", "I hear you"
+
+Be a real person, not a robot. Make every conversation feel genuine and warm.`,
             voice: this.voice,
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
@@ -44,10 +69,12 @@ export class OpenAIRealtimeClient {
             },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 500
-            }
+              threshold: 0.6,  // Balanced for multiple languages
+              prefix_padding_ms: 500,  // Natural speech context
+              silence_duration_ms: 700  // Natural conversation pauses
+            },
+            temperature: 0.8,  // CRITICAL: Higher for more expressive and spontaneous responses
+            max_response_output_tokens: 'inf'  // Allow natural, complete responses
           }
         })
         resolve()

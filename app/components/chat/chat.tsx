@@ -82,6 +82,17 @@ export function Chat() {
     handleFileRemove,
   } = useFileUpload()
 
+  // FIX: Clear visual state when navigating to New Chat
+  // This prevents old messages from showing until refresh
+  const prevChatIdRef = useRef<string | null>(chatId)
+  useEffect(() => {
+    if (prevChatIdRef.current !== chatId) {
+      // chatId changed - force cleanup of any stale UI state
+      prevChatIdRef.current = chatId
+      setFiles([]) // Clear files immediately
+    }
+  }, [chatId, setFiles])
+
   // Model selection
   const { selectedModel, handleModelChange } = useModel({
     currentChat: currentChat || null,

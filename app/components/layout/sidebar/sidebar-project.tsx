@@ -1,6 +1,6 @@
 "use client"
 
-import { FolderPlusIcon } from "@phosphor-icons/react"
+import { FolderPlusIcon, Folders as FoldersIcon } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import { useState, useMemo } from "react"
 import { DialogCreateProject } from "./dialog-create-project"
@@ -40,35 +40,53 @@ export function SidebarProject() {
 
   return (
     <SidebarGroup className="mb-6">
-      <SidebarGroupLabel className="text-xs text-muted-foreground/80">Projects</SidebarGroupLabel>
+      {/* GROK-STYLE: Header con icono */}
+      <div className="flex items-center gap-2 px-3 pb-3">
+        <FoldersIcon size={20} weight="duotone" className="text-foreground" />
+        <span className="text-base font-semibold text-foreground">Proyectos</span>
+      </div>
       <Accordion type="single" collapsible defaultValue="project-library" className="w-full">
         <AccordionItem value="project-library" className="border-none">
-          <AccordionTrigger className="px-2 text-sm font-medium text-foreground hover:no-underline">
+          <AccordionTrigger className="px-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:no-underline">
             {projectCountLabel}
           </AccordionTrigger>
-          <AccordionContent className="space-y-3 px-1 pb-1 pt-0">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 rounded-md border border-border/40 bg-background/60 px-2.5 py-2 text-sm"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <FolderPlusIcon size={18} />
-              New project
-            </Button>
+          <AccordionContent className="space-y-1.5 px-1 pb-1 pt-0">
             {isLoading ? (
-              <div className="text-muted-foreground px-2 text-xs">Loading projects…</div>
+              <div className="text-muted-foreground px-3 py-2 text-xs">Cargando proyectos…</div>
             ) : projects.length > 0 ? (
-              <div className="space-y-1">
-                {projects.map((project) => (
-                  <SidebarProjectItem key={project.id} project={project} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-0.5">
+                  {projects.map((project) => (
+                    <SidebarProjectItem key={project.id} project={project} />
+                  ))}
+                </div>
+                {/* GROK-STYLE: Ver todas button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 mt-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  Ver todas
+                </Button>
+              </>
             ) : (
-              <div className="text-muted-foreground/70 rounded-md border border-dashed border-border/40 bg-background/40 px-3 py-4 text-center text-xs">
-                You haven’t created any projects yet.
-              </div>
+              <>
+                <div className="text-muted-foreground/70 rounded-lg border border-dashed border-border/40 bg-background/30 px-3 py-4 text-center text-xs">
+                  No tienes proyectos aún
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 mt-2 rounded-md border border-border/40 bg-background/60 px-2.5 py-2 text-sm"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  <FolderPlusIcon size={18} />
+                  Nuevo proyecto
+                </Button>
+              </>
             )}
           </AccordionContent>
         </AccordionItem>
