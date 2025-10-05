@@ -300,3 +300,411 @@ export const inviteAttendeesToEventTool = tool({
     }
   }
 })
+
+// Add conference details (Google Meet, Zoom, etc.)
+export const addConferenceDetailsTool = tool({
+  description: 'Add video conference details to a calendar event. Automatically creates Google Meet link or adds custom Zoom/Teams links. Essential for virtual meetings.',
+  inputSchema: z.object({
+    eventId: z.string().describe('Calendar event ID'),
+    conferenceType: z.enum(['GOOGLE_MEET', 'ZOOM', 'MICROSOFT_TEAMS', 'CUSTOM']).describe('Type of conference'),
+    customLink: z.string().url().optional().describe('Custom conference link (required for ZOOM, TEAMS, CUSTOM)'),
+    customLabel: z.string().optional().describe('Custom label for the conference (e.g., "Zoom Meeting")')
+  }),
+  execute: async ({ eventId, conferenceType, customLink, customLabel }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleCalendarAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Calendar not connected' }
+    }
+
+    console.log('📅 [Calendar Advanced] Adding conference details:', { eventId, conferenceType })
+
+    try {
+      // Get current event
+      const event = await makeGoogleCalendarRequest(token, `calendars/primary/events/${eventId}`)
+
+      let updateData: any = { ...event }
+
+      if (conferenceType === 'GOOGLE_MEET') {
+        // Create Google Meet conference
+        updateData.conferenceData = {
+          createRequest: {
+            requestId: `meet_${Date.now()}`,
+            conferenceSolutionKey: { type: 'hangoutsMeet' }
+          }
+        }
+      } else {
+        // Add custom conference link to location
+        const conferenceInfo = customLabel || conferenceType.replace('_', ' ')
+        updateData.location = customLink || event.location
+        updateData.description = (event.description || '') + `\n\n📹 ${conferenceInfo}: ${customLink}`
+      }
+
+      const result = await makeGoogleCalendarRequest(
+        token,
+        `calendars/primary/events/${eventId}?conferenceDataVersion=1`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        }
+      )
+
+      await trackToolUsage(userId, 'addConferenceDetails', { ok: true, execMs: Date.now() - started })
+
+      const meetLink = result.hangoutLink || result.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || customLink
+
+      return {
+        success: true,
+        message: `Conference details added: ${conferenceType}`,
+        event: {
+          id: result.id,
+          summary: result.summary,
+          htmlLink: result.htmlLink,
+          conferenceLink: meetLink,
+          conferenceType
+        }
+      }
+    } catch (error) {
+      console.error('Error adding conference details:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to add conference details'
+      }
+    }
+  }
+})
+
+// Update calendar event
+export const updateCalendarEventTool = tool({
+  description: 'Update an existing calendar event: change time, title, description, location, attendees. Essential for managing schedule changes.',
+  inputSchema: z.object({
+    eventId: z.string().describe('Calendar event ID to update'),
+    updates: z.object({
+      summary: z.string().optional().describe('New event title'),
+      description: z.string().optional().describe('New description'),
+      location: z.string().optional().describe('New location'),
+      startDateTime: z.string().optional().describe('New start date-time in ISO format'),
+      endDateTime: z.string().optional().describe('New end date-time in ISO format'),
+      timeZone: z.string().optional().describe('Timezone (e.g., "America/New_York")'),
+      attendees: z.array(z.string().email()).optional().describe('New list of attendees (replaces existing)')
+    }).describe('Fields to update'),
+    sendNotifications: z.boolean().optional().default(true).describe('Send update notifications to attendees')
+  }),
+  execute: async ({ eventId, updates, sendNotifications }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleCalendarAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Calendar not connected' }
+    }
+
+    console.log('📅 [Calendar Advanced] Updating event:', { eventId, fields: Object.keys(updates) })
+
+    try {
+      // Get current event
+      const event = await makeGoogleCalendarRequest(token, `calendars/primary/events/${eventId}`)
+
+      // Apply updates
+      const updateData: any = { ...event }
+      
+      if (updates.summary) updateData.summary = updates.summary
+      if (updates.description) updateData.description = updates.description
+      if (updates.location) updateData.location = updates.location
+      
+      if (updates.startDateTime) {
+        updateData.start = {
+          dateTime: updates.startDateTime,
+          timeZone: updates.timeZone || event.start.timeZone || 'UTC'
+        }
+      }
+      
+      if (updates.endDateTime) {
+        updateData.end = {
+          dateTime: updates.endDateTime,
+          timeZone: updates.timeZone || event.end.timeZone || 'UTC'
+        }
+      }
+      
+      if (updates.attendees) {
+        updateData.attendees = updates.attendees.map(email => ({ email }))
+      }
+
+      const result = await makeGoogleCalendarRequest(
+        token,
+        `calendars/primary/events/${eventId}?sendUpdates=${sendNotifications ? 'all' : 'none'}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        }
+      )
+
+      await trackToolUsage(userId, 'updateCalendarEvent', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: 'Event updated successfully',
+        event: {
+          id: result.id,
+          summary: result.summary,
+          htmlLink: result.htmlLink,
+          start: result.start.dateTime || result.start.date,
+          end: result.end.dateTime || result.end.date,
+          updated: result.updated
+        }
+      }
+    } catch (error) {
+      console.error('Error updating event:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update event'
+      }
+    }
+  }
+})
+
+// Check availability (free/busy)
+export const checkAvailabilityTool = tool({
+  description: 'Check availability for users/calendars during a time range. Returns free/busy information. Essential for scheduling meetings without conflicts.',
+  inputSchema: z.object({
+    emails: z.array(z.string().email()).describe('Email addresses to check availability'),
+    timeMin: z.string().describe('Start of time range in ISO format (e.g., "2024-01-15T09:00:00Z")'),
+    timeMax: z.string().describe('End of time range in ISO format'),
+    timeZone: z.string().optional().default('UTC').describe('Timezone for the query')
+  }),
+  execute: async ({ emails, timeMin, timeMax, timeZone }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleCalendarAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Calendar not connected' }
+    }
+
+    console.log('📅 [Calendar Advanced] Checking availability:', { emails: emails.length, timeMin, timeMax })
+
+    try {
+      const response = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          timeMin,
+          timeMax,
+          timeZone,
+          items: emails.map(email => ({ id: email }))
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`FreeBusy API error: ${response.status} ${errorText}`)
+      }
+
+      const data = await response.json()
+
+      await trackToolUsage(userId, 'checkAvailability', { ok: true, execMs: Date.now() - started })
+
+      // Process results
+      const availability = Object.entries(data.calendars || {}).map(([email, calData]: [string, any]) => ({
+        email,
+        busy: calData.busy || [],
+        errors: calData.errors || [],
+        isFree: !calData.busy || calData.busy.length === 0
+      }))
+
+      // Find common free slots (simplified)
+      const allBusy = availability.flatMap(a => a.busy)
+      const hasFreeSlot = availability.every(a => a.isFree)
+
+      return {
+        success: true,
+        message: `Checked availability for ${emails.length} calendar(s)`,
+        timeRange: { timeMin, timeMax, timeZone },
+        availability,
+        summary: {
+          totalChecked: emails.length,
+          allFree: hasFreeSlot,
+          someBusy: allBusy.length > 0
+        }
+      }
+    } catch (error) {
+      console.error('Error checking availability:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to check availability'
+      }
+    }
+  }
+})
+
+// Set event reminders
+export const setEventRemindersTool = tool({
+  description: 'Add or update reminders for a calendar event. Supports email and popup notifications. Essential for ensuring no missed meetings.',
+  inputSchema: z.object({
+    eventId: z.string().describe('Calendar event ID'),
+    reminders: z.array(z.object({
+      method: z.enum(['email', 'popup']).describe('Reminder method'),
+      minutes: z.number().min(0).describe('Minutes before event to remind (e.g., 30 for 30 minutes before)')
+    })).describe('List of reminders to set'),
+    useDefaultReminders: z.boolean().optional().default(false).describe('Use default calendar reminders instead')
+  }),
+  execute: async ({ eventId, reminders, useDefaultReminders }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleCalendarAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Calendar not connected' }
+    }
+
+    console.log('📅 [Calendar Advanced] Setting reminders:', { eventId, count: reminders.length })
+
+    try {
+      // Get current event
+      const event = await makeGoogleCalendarRequest(token, `calendars/primary/events/${eventId}`)
+
+      // Update reminders
+      const updateData: any = {
+        ...event,
+        reminders: useDefaultReminders 
+          ? { useDefault: true }
+          : {
+              useDefault: false,
+              overrides: reminders.map(r => ({
+                method: r.method,
+                minutes: r.minutes
+              }))
+            }
+      }
+
+      const result = await makeGoogleCalendarRequest(
+        token,
+        `calendars/primary/events/${eventId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        }
+      )
+
+      await trackToolUsage(userId, 'setEventReminders', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: useDefaultReminders 
+          ? 'Default reminders enabled'
+          : `${reminders.length} reminder(s) set`,
+        event: {
+          id: result.id,
+          summary: result.summary,
+          htmlLink: result.htmlLink,
+          reminders: result.reminders
+        }
+      }
+    } catch (error) {
+      console.error('Error setting reminders:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to set reminders'
+      }
+    }
+  }
+})
+
+// Search calendar events
+export const searchCalendarEventsTool = tool({
+  description: 'Search for calendar events by keywords, date range, attendees. Essential for finding specific events quickly.',
+  inputSchema: z.object({
+    query: z.string().optional().describe('Free text search query (searches title, description, location)'),
+    timeMin: z.string().optional().describe('Start of time range in ISO format'),
+    timeMax: z.string().optional().describe('End of time range in ISO format'),
+    maxResults: z.number().min(1).max(2500).optional().default(50).describe('Maximum number of results'),
+    orderBy: z.enum(['startTime', 'updated']).optional().default('startTime').describe('Sort order'),
+    singleEvents: z.boolean().optional().default(true).describe('Expand recurring events into instances')
+  }),
+  execute: async ({ query, timeMin, timeMax, maxResults, orderBy, singleEvents }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleCalendarAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Calendar not connected' }
+    }
+
+    console.log('📅 [Calendar Advanced] Searching events:', { query, timeMin, timeMax })
+
+    try {
+      const params = new URLSearchParams()
+      params.append('maxResults', (maxResults || 50).toString())
+      params.append('orderBy', orderBy || 'startTime')
+      params.append('singleEvents', (singleEvents !== false).toString())
+
+      if (query) params.append('q', query)
+      if (timeMin) params.append('timeMin', timeMin)
+      if (timeMax) params.append('timeMax', timeMax)
+
+      const result = await makeGoogleCalendarRequest(
+        token,
+        `calendars/primary/events?${params.toString()}`
+      )
+
+      await trackToolUsage(userId, 'searchCalendarEvents', { ok: true, execMs: Date.now() - started })
+
+      const events = (result.items || []).map((event: any) => ({
+        id: event.id,
+        summary: event.summary,
+        description: event.description,
+        location: event.location,
+        start: event.start.dateTime || event.start.date,
+        end: event.end.dateTime || event.end.date,
+        htmlLink: event.htmlLink,
+        attendees: event.attendees?.length || 0,
+        organizer: event.organizer?.email,
+        status: event.status,
+        hangoutLink: event.hangoutLink
+      }))
+
+      return {
+        success: true,
+        message: `Found ${events.length} event(s)`,
+        query: {
+          searchQuery: query,
+          timeMin,
+          timeMax
+        },
+        events,
+        totalFound: events.length
+      }
+    } catch (error) {
+      console.error('Error searching events:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to search events'
+      }
+    }
+  }
+})

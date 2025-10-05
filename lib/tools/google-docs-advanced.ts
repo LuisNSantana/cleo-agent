@@ -550,3 +550,515 @@ export const createGoogleDocsListTool = tool({
     }
   }
 })
+
+// Insert page break
+export const insertPageBreakTool = tool({
+  description: 'Insert a page break into Google Docs at a specific position. Essential for structuring multi-page documents with clear sections.',
+  inputSchema: z.object({
+    documentId: z.string().describe('The ID of the document'),
+    insertIndex: z.number().describe('Position to insert the page break (1-based)')
+  }),
+  execute: async ({ documentId, insertIndex }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📄 [Docs Advanced] Inserting page break:', { documentId, insertIndex })
+
+    try {
+      const request = {
+        insertPageBreak: {
+          location: { index: insertIndex }
+        }
+      }
+
+      const result = await docsBatchUpdate(userId, documentId, [request])
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to insert page break' }
+      }
+
+      await trackToolUsage(userId, 'insertPageBreak', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: 'Page break inserted successfully',
+        webViewLink: `https://docs.google.com/document/d/${documentId}/edit`
+      }
+    } catch (error) {
+      console.error('Error inserting page break:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to insert page break'
+      }
+    }
+  }
+})
+
+// Add header/footer
+export const addHeaderFooterTool = tool({
+  description: 'Add or update header and footer in Google Docs. Perfect for adding page numbers, document titles, company names, dates. Essential for professional documents.',
+  inputSchema: z.object({
+    documentId: z.string().describe('The ID of the document'),
+    type: z.enum(['HEADER', 'FOOTER']).describe('Header or footer'),
+    content: z.string().describe('Text content to add'),
+    formatting: z.object({
+      bold: z.boolean().optional().describe('Make text bold'),
+      italic: z.boolean().optional().describe('Make text italic'),
+      fontSize: z.number().optional().describe('Font size in points'),
+      alignment: z.enum(['START', 'CENTER', 'END']).optional().describe('Text alignment')
+    }).optional().describe('Text formatting options')
+  }),
+  execute: async ({ documentId, type, content, formatting }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📄 [Docs Advanced] Adding header/footer:', { documentId, type })
+
+    try {
+      // First, get the document to find header/footer IDs
+      const doc = await getDocument(userId, documentId)
+      if (!doc) {
+        return { success: false, message: 'Failed to get document' }
+      }
+
+      // Get the default header/footer ID (first section)
+      const headerFooterId = type === 'HEADER' 
+        ? doc.headers?.[doc.documentStyle?.defaultHeaderId || 'default']?.headerId
+        : doc.footers?.[doc.documentStyle?.defaultFooterId || 'default']?.footerId
+
+      if (!headerFooterId) {
+        return { success: false, message: `No ${type.toLowerCase()} found in document` }
+      }
+
+      // Get the header/footer content to find the insert index
+      const headerFooterContent = type === 'HEADER'
+        ? doc.headers?.[doc.documentStyle?.defaultHeaderId || 'default']?.content
+        : doc.footers?.[doc.documentStyle?.defaultFooterId || 'default']?.content
+
+      // Find insertion point (end of existing content or start)
+      let insertIndex = 1
+      if (headerFooterContent && headerFooterContent.length > 0) {
+        const lastElement = headerFooterContent[headerFooterContent.length - 1]
+        insertIndex = lastElement.endIndex || 1
+      }
+
+      const requests: any[] = [
+        {
+          insertText: {
+            location: {
+              segmentId: headerFooterId,
+              index: insertIndex
+            },
+            text: content
+          }
+        }
+      ]
+
+      // Apply formatting if provided
+      if (formatting) {
+        const textStyle: any = {}
+        
+        if (formatting.bold !== undefined) textStyle.bold = formatting.bold
+        if (formatting.italic !== undefined) textStyle.italic = formatting.italic
+        if (formatting.fontSize) {
+          textStyle.fontSize = { magnitude: formatting.fontSize, unit: 'PT' }
+        }
+
+        if (Object.keys(textStyle).length > 0) {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                segmentId: headerFooterId,
+                startIndex: insertIndex,
+                endIndex: insertIndex + content.length
+              },
+              textStyle,
+              fields: Object.keys(textStyle).join(',')
+            }
+          })
+        }
+
+        if (formatting.alignment) {
+          requests.push({
+            updateParagraphStyle: {
+              range: {
+                segmentId: headerFooterId,
+                startIndex: insertIndex,
+                endIndex: insertIndex + content.length
+              },
+              paragraphStyle: {
+                alignment: formatting.alignment
+              },
+              fields: 'alignment'
+            }
+          })
+        }
+      }
+
+      const result = await docsBatchUpdate(userId, documentId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to add header/footer' }
+      }
+
+      await trackToolUsage(userId, 'addHeaderFooter', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `${type === 'HEADER' ? 'Header' : 'Footer'} added successfully`,
+        webViewLink: `https://docs.google.com/document/d/${documentId}/edit`
+      }
+    } catch (error) {
+      console.error('Error adding header/footer:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to add header/footer'
+      }
+    }
+  }
+})
+
+// Replace text (find and replace)
+export const replaceTextTool = tool({
+  description: 'Find and replace text in Google Docs. Supports case-sensitive matching and replace all occurrences. Essential for bulk text updates and corrections.',
+  inputSchema: z.object({
+    documentId: z.string().describe('The ID of the document'),
+    findText: z.string().describe('Text to find'),
+    replaceText: z.string().describe('Text to replace with'),
+    matchCase: z.boolean().optional().default(false).describe('Case-sensitive matching')
+  }),
+  execute: async ({ documentId, findText, replaceText, matchCase }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📄 [Docs Advanced] Replacing text:', { documentId, findText, replaceText })
+
+    try {
+      const request = {
+        replaceAllText: {
+          containsText: {
+            text: findText,
+            matchCase
+          },
+          replaceText
+        }
+      }
+
+      const result = await docsBatchUpdate(userId, documentId, [request])
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to replace text' }
+      }
+
+      const occurrencesReplaced = result.data?.replies?.[0]?.replaceAllText?.occurrencesChanged || 0
+
+      await trackToolUsage(userId, 'replaceText', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `Replaced ${occurrencesReplaced} occurrence(s)`,
+        occurrencesReplaced,
+        findText,
+        replaceText,
+        webViewLink: `https://docs.google.com/document/d/${documentId}/edit`
+      }
+    } catch (error) {
+      console.error('Error replacing text:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to replace text'
+      }
+    }
+  }
+})
+
+// Insert table of contents
+export const insertTableOfContentsTool = tool({
+  description: 'Insert an automatic table of contents in Google Docs based on heading styles (H1-H6). Updates automatically when headings change. Essential for long documents and reports.',
+  inputSchema: z.object({
+    documentId: z.string().describe('The ID of the document'),
+    insertIndex: z.number().describe('Position to insert the TOC (1-based)'),
+    style: z.enum(['WITH_PAGE_NUMBERS', 'LINKS_ONLY']).optional().default('WITH_PAGE_NUMBERS').describe('TOC style')
+  }),
+  execute: async ({ documentId, insertIndex, style }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📄 [Docs Advanced] Inserting table of contents:', { documentId, insertIndex, style })
+
+    try {
+      // Insert TOC text placeholder and then convert to TOC
+      const requests: any[] = [
+        {
+          insertText: {
+            location: { index: insertIndex },
+            text: '\n'
+          }
+        },
+        {
+          insertTableOfContents: {
+            location: { index: insertIndex }
+          }
+        }
+      ]
+
+      const result = await docsBatchUpdate(userId, documentId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to insert table of contents' }
+      }
+
+      await trackToolUsage(userId, 'insertTableOfContents', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: 'Table of contents inserted successfully',
+        note: 'TOC will automatically update based on heading styles (H1-H6) in the document',
+        webViewLink: `https://docs.google.com/document/d/${documentId}/edit`
+      }
+    } catch (error) {
+      console.error('Error inserting TOC:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to insert table of contents'
+      }
+    }
+  }
+})
+
+// Create document template
+export const createDocumentTemplateTool = tool({
+  description: 'Create professional Google Docs templates with predefined structure, formatting, and placeholders. Choose from business letter, report, contract, meeting notes, and more.',
+  inputSchema: z.object({
+    documentId: z.string().describe('The ID of the document'),
+    template: z.enum([
+      'BUSINESS_LETTER',
+      'TECHNICAL_REPORT',
+      'MEETING_NOTES',
+      'PROJECT_PROPOSAL',
+      'CONTRACT',
+      'RESUME',
+      'INVOICE',
+      'PRESS_RELEASE'
+    ]).describe('Template type to create'),
+    customization: z.object({
+      companyName: z.string().optional().describe('Company name for headers'),
+      authorName: z.string().optional().describe('Author/sender name'),
+      date: z.string().optional().describe('Date (defaults to today)'),
+      title: z.string().optional().describe('Document title')
+    }).optional().describe('Template customization options')
+  }),
+  execute: async ({ documentId, template, customization = {} }) => {
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    console.log('📄 [Docs Advanced] Creating document template:', { documentId, template })
+
+    try {
+      const companyName = customization.companyName || '[Company Name]'
+      const authorName = customization.authorName || '[Author Name]'
+      const date = customization.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      const title = customization.title || template.replace('_', ' ')
+
+      const templateData = getDocumentTemplateData(template, { companyName, authorName, date, title })
+      
+      const requests: any[] = []
+      let currentIndex = 1
+
+      // Insert content blocks
+      for (const block of templateData.blocks) {
+        // Insert text
+        requests.push({
+          insertText: {
+            location: { index: currentIndex },
+            text: block.text
+          }
+        })
+
+        const endIndex = currentIndex + block.text.length
+
+        // Apply named style if specified
+        if (block.style) {
+          requests.push({
+            updateParagraphStyle: {
+              range: { startIndex: currentIndex, endIndex },
+              paragraphStyle: { namedStyleType: block.style },
+              fields: 'namedStyleType'
+            }
+          })
+        }
+
+        // Apply text formatting
+        if (block.formatting) {
+          const textStyle: any = {}
+          const fmt = block.formatting as any
+          if (fmt.bold) textStyle.bold = true
+          if (fmt.italic) textStyle.italic = true
+          if (fmt.fontSize) {
+            textStyle.fontSize = { magnitude: fmt.fontSize, unit: 'PT' }
+          }
+
+          if (Object.keys(textStyle).length > 0) {
+            requests.push({
+              updateTextStyle: {
+                range: { startIndex: currentIndex, endIndex },
+                textStyle,
+                fields: Object.keys(textStyle).join(',')
+              }
+            })
+          }
+        }
+
+        currentIndex = endIndex
+      }
+
+      const result = await docsBatchUpdate(userId, documentId, requests)
+
+      if (!result.success) {
+        return { success: false, message: result.error || 'Failed to create template' }
+      }
+
+      await trackToolUsage(userId, 'createDocumentTemplate', { ok: true, execMs: Date.now() - started })
+
+      return {
+        success: true,
+        message: `${template} template created successfully`,
+        template: {
+          type: template,
+          blocks: templateData.blocks.length,
+          features: templateData.features
+        },
+        webViewLink: `https://docs.google.com/document/d/${documentId}/edit`
+      }
+    } catch (error) {
+      console.error('Error creating template:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to create template'
+      }
+    }
+  }
+})
+
+// Helper function to get document template data
+function getDocumentTemplateData(template: string, customization: any) {
+  const { companyName, authorName, date, title } = customization
+
+  switch (template) {
+    case 'BUSINESS_LETTER':
+      return {
+        blocks: [
+          { text: `${companyName}\n`, style: 'TITLE', formatting: { bold: true, fontSize: 16 } },
+          { text: `${date}\n\n`, style: 'NORMAL_TEXT' },
+          { text: '[Recipient Name]\n[Recipient Title]\n[Company Name]\n[Address]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Dear [Recipient Name],\n\n', style: 'NORMAL_TEXT' },
+          { text: '[Opening paragraph - State the purpose of your letter]\n\n', style: 'NORMAL_TEXT' },
+          { text: '[Body paragraphs - Provide details, context, and supporting information]\n\n', style: 'NORMAL_TEXT' },
+          { text: '[Closing paragraph - Summarize key points and call to action]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Sincerely,\n\n', style: 'NORMAL_TEXT' },
+          { text: `${authorName}\n`, style: 'NORMAL_TEXT', formatting: { bold: true } },
+          { text: '[Title]\n', style: 'NORMAL_TEXT' }
+        ],
+        features: ['Professional letterhead', 'Proper business format', 'Placeholder text']
+      }
+
+    case 'TECHNICAL_REPORT':
+      return {
+        blocks: [
+          { text: `${title}\n`, style: 'TITLE', formatting: { bold: true, fontSize: 20 } },
+          { text: `Prepared by: ${authorName}\n`, style: 'SUBTITLE' },
+          { text: `Date: ${date}\n\n`, style: 'SUBTITLE' },
+          { text: 'Executive Summary\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Brief overview of the report - 2-3 paragraphs summarizing key findings and recommendations]\n\n', style: 'NORMAL_TEXT' },
+          { text: '1. Introduction\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Background and context for the report]\n\n', style: 'NORMAL_TEXT' },
+          { text: '2. Methodology\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Describe research methods and data collection]\n\n', style: 'NORMAL_TEXT' },
+          { text: '3. Findings\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Present key findings and data]\n\n', style: 'NORMAL_TEXT' },
+          { text: '4. Analysis\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Interpret findings and discuss implications]\n\n', style: 'NORMAL_TEXT' },
+          { text: '5. Recommendations\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Provide actionable recommendations based on findings]\n\n', style: 'NORMAL_TEXT' },
+          { text: '6. Conclusion\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Summary of key points]\n\n', style: 'NORMAL_TEXT' }
+        ],
+        features: ['Structured sections', 'Executive summary', 'Professional formatting', 'Clear headings']
+      }
+
+    case 'MEETING_NOTES':
+      return {
+        blocks: [
+          { text: 'Meeting Notes\n', style: 'TITLE', formatting: { bold: true, fontSize: 18 } },
+          { text: `Date: ${date}\n`, style: 'NORMAL_TEXT' },
+          { text: `Attendees: ${authorName}, [Other attendees]\n`, style: 'NORMAL_TEXT' },
+          { text: 'Location: [Location/Video link]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Agenda\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '• [Agenda item 1]\n• [Agenda item 2]\n• [Agenda item 3]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Discussion\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Notes from discussion]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Action Items\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '• [Action item] - Assigned to: [Name] - Due: [Date]\n', style: 'NORMAL_TEXT' },
+          { text: '• [Action item] - Assigned to: [Name] - Due: [Date]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Next Steps\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Follow-up actions and next meeting date]\n', style: 'NORMAL_TEXT' }
+        ],
+        features: ['Agenda tracking', 'Action items', 'Attendee list', 'Clear structure']
+      }
+
+    case 'PROJECT_PROPOSAL':
+      return {
+        blocks: [
+          { text: `Project Proposal: ${title}\n`, style: 'TITLE', formatting: { bold: true, fontSize: 20 } },
+          { text: `Submitted by: ${authorName}\n`, style: 'SUBTITLE' },
+          { text: `${companyName}\n`, style: 'SUBTITLE' },
+          { text: `${date}\n\n`, style: 'SUBTITLE' },
+          { text: 'Executive Summary\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Brief project overview - goals, scope, expected outcomes]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Project Objectives\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '• [Objective 1]\n• [Objective 2]\n• [Objective 3]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Scope of Work\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Detailed description of work to be performed]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Timeline\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Project milestones and deliverables with dates]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Budget\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Cost breakdown and resource requirements]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Team\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[Key team members and their roles]\n\n', style: 'NORMAL_TEXT' },
+          { text: 'Success Metrics\n', style: 'HEADING_1', formatting: { bold: true } },
+          { text: '[How project success will be measured]\n', style: 'NORMAL_TEXT' }
+        ],
+        features: ['Complete proposal structure', 'Budget section', 'Timeline', 'Success metrics']
+      }
+
+    default:
+      return {
+        blocks: [
+          { text: `${title}\n`, style: 'TITLE', formatting: { bold: true, fontSize: 18 } },
+          { text: `${date}\n\n`, style: 'NORMAL_TEXT' },
+          { text: '[Document content]\n', style: 'NORMAL_TEXT' }
+        ],
+        features: ['Basic template structure']
+      }
+  }
+}
