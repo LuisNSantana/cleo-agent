@@ -10,8 +10,9 @@ import { withRequestContext } from '@/lib/server/request-context'
  */
 export async function POST(
   request: Request,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const { taskId } = await params
   const startTime = Date.now()
   
   try {
@@ -35,7 +36,7 @@ export async function POST(
     // Get task from database using context-aware function
     const taskResult = await withRequestContext(
       { userId: user.id },
-      () => getAgentTask(params.taskId)
+      () => getAgentTask(taskId)
     )
 
     if (!taskResult.success || !taskResult.task) {

@@ -9,9 +9,10 @@ import { withRequestContext } from '@/lib/server/request-context'
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const { taskId } = await params
     const supabase = await createClient()
     if (!supabase) {
       return NextResponse.json(
@@ -45,7 +46,7 @@ export async function PATCH(
     if (tags !== undefined) updates.tags = tags
 
     // Update task using admin function
-    const result = await updateAgentTaskAdmin(params.taskId, updates)
+    const result = await updateAgentTaskAdmin(taskId, updates)
 
     if (!result.success || !result.task) {
       return NextResponse.json(
@@ -54,7 +55,7 @@ export async function PATCH(
       )
     }
 
-    console.log(`✅ Task updated: ${title || result.task.title} (${params.taskId})`)
+    console.log(`✅ Task updated: ${title || result.task.title} (${taskId})`)
 
     return NextResponse.json({
       success: true,
@@ -77,9 +78,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const { taskId } = await params
     const supabase = await createClient()
     if (!supabase) {
       return NextResponse.json(
@@ -100,7 +102,7 @@ export async function DELETE(
     // Delete task using context-aware function
     const result = await withRequestContext(
       { userId: user.id },
-      () => deleteAgentTask(params.taskId)
+      () => deleteAgentTask(taskId)
     )
 
     if (!result.success) {
@@ -110,7 +112,7 @@ export async function DELETE(
       )
     }
 
-    console.log(`🗑️ Task deleted: ${params.taskId}`)
+    console.log(`🗑️ Task deleted: ${taskId}`)
 
     return NextResponse.json({
       success: true,
