@@ -125,40 +125,53 @@ export interface TaskExecutionResult {
  */
 /**
  * Get timeout based on agent type (delegations need more time)
- * CRITICAL: Timeouts must account for potential delegations
+ * CRITICAL: Timeouts must account for potential delegations and Google Workspace operations
+ * 
+ * UPDATED: Increased timeouts for complex workflows with Google Workspace:
+ * - Research + Document creation + Email + Calendar
+ * - Multiple delegations in sequence
+ * - File uploads/downloads
  */
 function getAgentTimeout(agentId: string): number {
   // Supervisor agents that delegate (Cleo) - hierarchical orchestration support
   // Based on LangGraph best practices for multi-agent systems
-  // Supports up to 3 complex delegations with proper timeout hierarchy
+  // Supports complex workflows: Research → Google Docs → Email → Calendar
+  // Allows for 5+ delegations with Google Workspace operations
   if (agentId.includes('cleo')) {
-    return 900_000 // 15 minutes (allows for 3 delegations: 3x240s + 180s overhead)
+    return 1_200_000 // 20 minutes (allows for complex multi-step workflows)
   }
   
-  // Research agents (Apu) - may do extensive searches
+  // Research agents (Apu) - may do extensive searches across multiple sources
+  // Increased for deep research with multiple queries
   if (agentId.includes('apu')) {
-    return 300_000 // 5 minutes
+    return 480_000 // 8 minutes (multiple search queries + analysis)
   }
   
   // Email agents (Astra) - need time for email composition and sending
-  // Increased for complex emails with attachments or multiple recipients
+  // Increased for complex emails with attachments, Google Workspace integration
   if (agentId.includes('astra')) {
-    return 300_000 // 5 minutes
+    return 600_000 // 10 minutes (Gmail API + attachments + multiple recipients)
   }
   
   // Workflow and calendar agents (Ami)
-  // Increased for complex calendar operations
+  // Increased for complex calendar operations, Google Workspace integration
   if (agentId.includes('ami')) {
-    return 300_000 // 5 minutes
+    return 600_000 // 10 minutes (Calendar API + multiple events + Drive operations)
+  }
+  
+  // Financial/Document agents (Peter) - Google Sheets/Docs creation
+  // Need time for spreadsheet creation, data analysis, Drive uploads
+  if (agentId.includes('peter')) {
+    return 600_000 // 10 minutes (Google Sheets API + complex calculations)
   }
   
   // Automation (Wex with Skyvern)
   if (agentId.includes('wex')) {
-    return 360_000 // 6 minutes
+    return 480_000 // 8 minutes (web automation can be slow)
   }
   
   // Standard agents
-  return 180_000 // 3 minutes
+  return 300_000 // 5 minutes (increased from 3 to allow more operations)
 }
 
 export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionResult> {
