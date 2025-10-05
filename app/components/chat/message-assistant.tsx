@@ -249,7 +249,7 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-        "message-item group flex w-full max-w-4xl flex-1 items-start gap-4 px-4 md:px-6 py-6 message-enter transition-colors bg-muted/20",
+        "message-item group flex w-full max-w-4xl flex-1 items-start gap-4 px-4 md:px-6 py-6 message-enter transition-colors",
         hasScrollAnchor && "min-h-scroll-anchor",
         className
       )}
