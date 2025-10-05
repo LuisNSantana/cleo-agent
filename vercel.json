@@ -4,5 +4,11 @@
     "app/api/*/*/route.ts": { "maxDuration": 300 },
     "app/api/*/*/*/route.ts": { "maxDuration": 300 },
     "app/api/*/*/*/*/route.ts": { "maxDuration": 300 }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/agent-tasks/scheduler/process",
+      "schedule": "* * * * *"
+    }
+  ]
 }
