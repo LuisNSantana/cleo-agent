@@ -192,34 +192,44 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       // CRITICAL: TURN servers are needed when behind restrictive NAT/firewall
       const pc = new RTCPeerConnection({
         iceServers: [
-          // Google STUN servers
+          // Google STUN servers (fast, reliable)
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          // Public TURN servers (fallback for restrictive networks)
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          // OpenRelay TURN servers (public, free)
           { 
-            urls: 'turn:openrelay.metered.ca:80',
+            urls: [
+              'turn:openrelay.metered.ca:80',
+              'turn:openrelay.metered.ca:80?transport=tcp',
+              'turn:openrelay.metered.ca:443',
+              'turn:openrelay.metered.ca:443?transport=tcp'
+            ],
             username: 'openrelayproject',
             credential: 'openrelayproject'
           },
+          // Backup STUN/TURN from different providers
+          { urls: 'stun:stun.relay.metered.ca:80' },
           {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: [
+              'turn:global.relay.metered.ca:80',
+              'turn:global.relay.metered.ca:80?transport=tcp',
+              'turn:global.relay.metered.ca:443',
+              'turns:global.relay.metered.ca:443?transport=tcp'
+            ],
+            username: 'b8e0632fb87ea196d00fdda1',
+            credential: 'UXkdZUNpW9SZm0i1'
           }
         ],
         // Optimize for real-time audio
         iceTransportPolicy: 'all', // Try all candidates (relay, srflx, host)
         bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require'
+        rtcpMuxPolicy: 'require',
+        iceCandidatePoolSize: 10 // Pre-gather more candidates for faster connection
       })
       peerConnectionRef.current = pc
-      console.log('🔗 Peer connection created with STUN + TURN servers')
+      console.log('🔗 Peer connection created with multiple STUN + TURN servers')
 
       // Setup audio element for remote audio
       const audioElement = new Audio()
@@ -240,13 +250,36 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          const candidate = event.candidate
           console.log('🧊 ICE candidate:', {
-            type: event.candidate.type,
-            protocol: event.candidate.protocol,
-            address: event.candidate.address
+            type: candidate.type,
+            protocol: candidate.protocol,
+            address: candidate.address,
+            port: candidate.port,
+            relatedAddress: candidate.relatedAddress,
+            relatedPort: candidate.relatedPort
           })
+          
+          // Highlight TURN relay candidates (critical for debugging)
+          if (candidate.type === 'relay') {
+            console.log('✅ TURN relay candidate found! This means TURN is working.')
+          }
         } else {
           console.log('🧊 ICE gathering complete')
+          
+          // Check if we got relay candidates
+          const stats = pc.getStats()
+          stats.then(report => {
+            let hasRelay = false
+            report.forEach(stat => {
+              if (stat.type === 'local-candidate' && stat.candidateType === 'relay') {
+                hasRelay = true
+              }
+            })
+            if (!hasRelay) {
+              console.warn('⚠️ WARNING: No TURN relay candidates found. This may cause connection issues in restrictive networks.')
+            }
+          })
         }
       }
       
