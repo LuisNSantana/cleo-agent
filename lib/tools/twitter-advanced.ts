@@ -14,6 +14,7 @@ import { getActiveTwitterCredentials, getSystemTwitterCredentials } from '@/lib/
 import { requestConfirmation } from '@/lib/confirmation/unified'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { trackToolUsage } from '@/lib/analytics'
+import { createHmac } from 'crypto'
 
 async function getTwitterCredentials() {
   try {
@@ -33,35 +34,117 @@ async function getTwitterCredentials() {
   }
 }
 
+/**
+ * Generate OAuth 1.0a signature for Twitter API v2 requests
+ * Required for write endpoints (POST /tweets)
+ */
+function generateOAuth1Signature(
+  method: string,
+  url: string,
+  credentials: any,
+  bodyParams: Record<string, any> = {}
+) {
+  const nonce = Math.random().toString(36).substring(2)
+  const timestamp = Math.floor(Date.now() / 1000).toString()
+  
+  const baseParams: Record<string, string> = {
+    oauth_consumer_key: credentials.api_key,
+    oauth_nonce: nonce,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_token: credentials.access_token,
+    oauth_version: '1.0',
+    ...bodyParams
+  }
+  
+  const enc = (v: string) => encodeURIComponent(v).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16))
+  const paramString = Object.keys(baseParams).sort().map(k => `${enc(k)}=${enc(baseParams[k])}`).join('&')
+  const baseString = [method.toUpperCase(), enc(url), enc(paramString)].join('&')
+  const signingKey = `${enc(credentials.api_secret)}&${enc(credentials.access_token_secret)}`
+  const signature = createHmac('sha1', signingKey).update(baseString).digest('base64')
+  
+  const authParams: Record<string, string> = {
+    oauth_consumer_key: credentials.api_key,
+    oauth_nonce: nonce,
+    oauth_signature: signature,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_token: credentials.access_token,
+    oauth_version: '1.0'
+  }
+  
+  return 'OAuth ' + Object.entries(authParams)
+    .map(([k, v]) => `${enc(k)}="${enc(v)}"`).join(', ')
+}
+
 async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
   const credentials = await getTwitterCredentials()
   
-  if (!credentials.bearer_token && !credentials.access_token) {
-    throw new Error('No Twitter API credentials available')
+  // Check if we have OAuth 1.0a credentials
+  const hasOAuth1 = !!credentials.api_key && !!credentials.api_secret && 
+                    !!credentials.access_token && !!credentials.access_token_secret
+  
+  if (!hasOAuth1 && !credentials.bearer_token) {
+    throw new Error('No Twitter API credentials available. Please configure OAuth 1.0a credentials (api_key, api_secret, access_token, access_token_secret) for posting tweets.')
   }
   
-  const token = credentials.bearer_token || credentials.access_token
+  const method = options.method || 'GET'
+  const isWriteRequest = method !== 'GET'
   
-  const response = await fetch(`https://api.twitter.com/2${endpoint}`, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...options.headers
+  // Write requests (POST, PUT, DELETE) REQUIRE OAuth 1.0a User Context
+  if (isWriteRequest && hasOAuth1) {
+    const url = `https://api.twitter.com/2${endpoint}`
+    const authHeader = generateOAuth1Signature(method, url, credentials)
+    
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Twitter API error: ${errorData.detail || errorData.title || response.statusText}`)
     }
-  })
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(`Twitter API error: ${errorData.detail || response.statusText}`)
+    
+    return response.json()
   }
   
-  return response.json()
+  // Fallback to Bearer token for read-only requests
+  if (credentials.bearer_token) {
+    const response = await fetch(`https://api.twitter.com/2${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${credentials.bearer_token}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Twitter API error: ${errorData.detail || response.statusText}`)
+    }
+    
+    return response.json()
+  }
+  
+  throw new Error('Cannot perform write operation: OAuth 1.0a credentials required for posting tweets')
 }
 
 async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> {
   const credentials = await getTwitterCredentials()
-  const token = credentials.bearer_token || credentials.access_token
+  
+  // Check if we have OAuth 1.0a credentials (required for media upload)
+  const hasOAuth1 = !!credentials.api_key && !!credentials.api_secret && 
+                    !!credentials.access_token && !!credentials.access_token_secret
+  
+  if (!hasOAuth1) {
+    throw new Error('OAuth 1.0a credentials required for media upload')
+  }
 
   // Download media
   const mediaResponse = await fetch(mediaUrl)
@@ -71,21 +154,25 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
 
   const mediaBuffer = await mediaResponse.arrayBuffer()
   const mediaBase64 = Buffer.from(mediaBuffer).toString('base64')
+  
+  // Generate OAuth 1.0a signature for v1.1 media upload endpoint
+  const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json'
+  const bodyParams = { media_data: mediaBase64 }
+  const authHeader = generateOAuth1Signature('POST', uploadUrl, credentials, bodyParams)
 
   // Upload to Twitter (v1.1 endpoint for media upload)
-  const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
+  const uploadResponse = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': authHeader,
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: new URLSearchParams({
-      media_data: mediaBase64
-    })
+    body: new URLSearchParams(bodyParams)
   })
 
   if (!uploadResponse.ok) {
-    throw new Error('Failed to upload media to Twitter')
+    const errorData = await uploadResponse.json().catch(() => ({}))
+    throw new Error(`Failed to upload media to Twitter: ${errorData.errors?.[0]?.message || uploadResponse.statusText}`)
   }
 
   const uploadResult = await uploadResponse.json()
@@ -93,10 +180,13 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
 
   // Add alt text if provided
   if (altText) {
-    await fetch('https://upload.twitter.com/1.1/media/metadata/create.json', {
+    const metadataUrl = 'https://upload.twitter.com/1.1/media/metadata/create.json'
+    const metadataAuthHeader = generateOAuth1Signature('POST', metadataUrl, credentials)
+    
+    await fetch(metadataUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': metadataAuthHeader,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({

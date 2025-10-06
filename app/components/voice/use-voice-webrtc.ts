@@ -169,7 +169,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
         
-        // 1. First, send session.update with instructions and VAD config
+        // 1. First, send session.update with instructions, VAD config, and transcription
         try {
           const sessionUpdate: any = {
             type: 'session.update',
@@ -179,6 +179,11 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
               turn_detection: {
                 type: 'server_vad',
                 silence_duration_ms: 500
+              },
+              // CRÍTICO: Habilitar transcripción de audio del usuario
+              // Sin esto, OpenAI NO transcribe la voz del usuario
+              input_audio_transcription: {
+                model: 'whisper-1'
               }
             }
           }
@@ -186,7 +191,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             sessionUpdate.session.instructions = instructions
           }
           dc.send(JSON.stringify(sessionUpdate))
-          console.log('🧠 Sent session.update (VAD config + instructions)')
+          console.log('🧠 Sent session.update (VAD config + transcription + instructions)')
         } catch (sendError) {
           console.error('Failed to send session.update:', sendError)
         }
