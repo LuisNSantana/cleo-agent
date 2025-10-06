@@ -153,10 +153,21 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       // Create data channel for events (must be done before createOffer)
       const dc = pc.createDataChannel('oai-events')
       dataChannelRef.current = dc
-      console.log('📡 Created data channel: oai-events')
+      console.log('📡 Created data channel: oai-events, initial state:', dc.readyState)
+
+      dc.onerror = (error) => {
+        console.error('❌ Data channel error:', error)
+      }
+
+      dc.onclose = () => {
+        console.log('🔌 Data channel closed')
+      }
 
       dc.onopen = async () => {
         console.log('✅ Data channel opened')
+        setStatus('listening')
+        startTimeRef.current = Date.now()
+        monitorAudioLevel()
         
         // 1. First, send session.update with instructions and VAD config
         try {
@@ -452,16 +463,27 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       await pc.setRemoteDescription(answer)
       console.log('✅ WebRTC connection established')
+      console.log('📡 Data channel state after setRemoteDescription:', dc.readyState)
+      console.log('🔗 Peer connection state:', {
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState
+      })
 
-      // Fallback: Si el data channel no se abre en 3 segundos, cambiar a listening de todos modos
+      // Fallback: Si el data channel no se abre en 5 segundos, cambiar a listening de todos modos
       setTimeout(() => {
         if (dataChannelRef.current?.readyState !== 'open') {
-          console.log('⚠️ Data channel timeout, switching to listening anyway')
+          console.log('⚠️ Data channel timeout! Current state:', dataChannelRef.current?.readyState)
+          console.log('🔗 Peer connection info:', {
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            signalingState: pc.signalingState
+          })
           setStatus('listening')
           startTimeRef.current = Date.now()
           monitorAudioLevel()
         }
-      }, 3000)
+      }, 5000)
 
     } catch (err) {
       console.error('Voice session error:', err)
