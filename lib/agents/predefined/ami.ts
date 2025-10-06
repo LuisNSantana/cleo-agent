@@ -20,6 +20,12 @@ export const AMI_AGENT: AgentConfig = {
     'createCalendarEvent',
     'createRecurringCalendarEvent',
     'inviteAttendeesToEvent',
+    // Advanced Calendar Management
+    'addConferenceDetails',
+    'updateCalendarEvent',
+    'checkAvailability',
+    'setEventReminders',
+    'searchCalendarEvents',
     // Google Drive
     'listDriveFiles',
     'searchDriveFiles',

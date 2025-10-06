@@ -38,7 +38,12 @@ export const completeTaskTool = tool({
 import { listCalendarEventsTool, createCalendarEventTool } from './google-calendar'
 import {
 	createRecurringCalendarEventTool,
-	inviteAttendeesToEventTool
+	inviteAttendeesToEventTool,
+	addConferenceDetailsTool,
+	updateCalendarEventTool,
+	checkAvailabilityTool,
+	setEventRemindersTool,
+	searchCalendarEventsTool
 } from './google-calendar-advanced'
 import { listDriveFilesTool, searchDriveFilesTool, getDriveFileDetailsTool, createDriveFolderTool, uploadFileToDriveTool } from './google-drive'
 import {
@@ -316,6 +321,11 @@ export const tools = {
 	// Google Calendar Advanced
 	createRecurringCalendarEvent: createRecurringCalendarEventTool,
 	inviteAttendeesToEvent: inviteAttendeesToEventTool,
+	addConferenceDetails: addConferenceDetailsTool,
+	updateCalendarEvent: updateCalendarEventTool,
+	checkAvailability: checkAvailabilityTool,
+	setEventReminders: setEventRemindersTool,
+	searchCalendarEvents: searchCalendarEventsTool,
 
 	// Google Drive
 	listDriveFiles: listDriveFilesTool,

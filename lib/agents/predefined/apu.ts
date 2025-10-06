@@ -18,11 +18,24 @@ export const APU_AGENT: AgentConfig = {
     'createGoogleDoc',
     'readGoogleDoc', 
     'updateGoogleDoc',
+    // Advanced Google Docs formatting
+    'formatGoogleDocsText',
+    'applyGoogleDocsParagraphStyle',
+    'insertGoogleDocsTable',
+    'insertGoogleDocsImage',
+    'createGoogleDocsList',
     // Ticket & Case Tracking
     'createGoogleSheet',
     'readGoogleSheet',
     'updateGoogleSheet',
     'appendGoogleSheet',
+    // Advanced Google Sheets for ticket tracking
+    'addGoogleSheetTab',
+    'formatGoogleSheetCells',
+    'applyConditionalFormatting',
+    'insertGoogleSheetFormulas',
+    'addDataValidation',
+    'addAutoFilter',
     // Customer Communication
     'listGmailMessages',
     'getGmailMessage',
@@ -88,12 +101,23 @@ DOCUMENTATION MANAGEMENT:
 - createGoogleDoc: Support guides, troubleshooting docs, FAQ creation
 - readGoogleDoc: Access existing documentation and procedures
 - updateGoogleDoc: Maintain current support knowledge base
+- formatGoogleDocsText: Professional formatting (bold, colors, highlights)
+- applyGoogleDocsParagraphStyle: Headers, bullet points, structure
+- insertGoogleDocsTable: Comparison tables, troubleshooting matrices
+- insertGoogleDocsImage: Screenshots, diagrams for guides
+- createGoogleDocsList: Step-by-step instructions, checklists
 
 TICKET & CASE TRACKING:
 - createGoogleSheet: Support ticket tracking, SLA monitoring
 - readGoogleSheet: Review case history and patterns
 - updateGoogleSheet: Update ticket status, resolution notes
 - appendGoogleSheet: Log new cases and interactions
+- addGoogleSheetTab: Separate tabs for tickets, metrics, reports
+- formatGoogleSheetCells: Color-code priorities (red=urgent, green=resolved)
+- applyConditionalFormatting: Auto-highlight overdue tickets, SLA breaches
+- insertGoogleSheetFormulas: Calculate response time, resolution rate, satisfaction scores
+- addDataValidation: Dropdowns for status (Open/In Progress/Resolved), priority levels
+- addAutoFilter: Quick filtering by agent, category, date range
 
 CUSTOMER COMMUNICATION:
 - listGmailMessages: Monitor support queue and customer emails

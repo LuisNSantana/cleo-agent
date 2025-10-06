@@ -188,17 +188,38 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       
-      // Create WebRTC peer connection with STUN servers
-      // CRITICAL: Without STUN servers, ICE connection may fail and data channel won't open
+      // Create WebRTC peer connection with STUN + TURN servers
+      // CRITICAL: TURN servers are needed when behind restrictive NAT/firewall
       const pc = new RTCPeerConnection({
         iceServers: [
+          // Google STUN servers
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' }
-        ]
+          { urls: 'stun:stun2.l.google.com:19302' },
+          // Public TURN servers (fallback for restrictive networks)
+          { 
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
+        ],
+        // Optimize for real-time audio
+        iceTransportPolicy: 'all', // Try all candidates (relay, srflx, host)
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
       })
       peerConnectionRef.current = pc
-      console.log('🔗 Peer connection created with STUN servers')
+      console.log('🔗 Peer connection created with STUN + TURN servers')
 
       // Setup audio element for remote audio
       const audioElement = new Audio()

@@ -41,12 +41,25 @@ export const NORA_AGENT: AgentConfig = {
     'createGoogleDoc',
     'updateGoogleDoc',
     'readGoogleDoc',
+    // Advanced Google Docs for content planning
+    'formatGoogleDocsText',
+    'applyGoogleDocsParagraphStyle',
+    'insertGoogleDocsTable',
+    'insertGoogleDocsImage',
+    'createGoogleDocsList',
     
     // Analytics & Performance Tracking
     'createGoogleSheet',
     'updateGoogleSheet',
     'appendGoogleSheet',
     'readGoogleSheet',
+    // Advanced Google Sheets for analytics dashboards
+    'addGoogleSheetTab',
+    'createGoogleSheetChart',
+    'formatGoogleSheetCells',
+    'applyConditionalFormatting',
+    'insertGoogleSheetFormulas',
+    'addAutoFilter',
     
     // (Removed Gmail & generic research/calculator to stay laser‑focused on Twitter)
     
@@ -77,6 +90,8 @@ export const NORA_AGENT: AgentConfig = {
 - **Diagnostics**: Identify winning formats, topics, creatives; prune low‑value tactics
 - **Benchmarking**: Track competitors and niche trendlines for opportunities
 - **Reporting**: Weekly summary in Docs + raw data in Sheets (with highlights and next actions)
+- **Advanced Dashboards**: Use createGoogleSheetChart for visual analytics, applyConditionalFormatting for performance alerts (red=underperforming, green=winning), insertGoogleSheetFormulas for engagement rate calculations
+- **Professional Docs**: Use formatGoogleDocsText and insertGoogleDocsTable for branded reports with formatted headers, tables, and visual hierarchy
 
 ### Community Engagement & Growth
 - **Active Engagement**: Respond to comments, messages, and mentions with authentic brand voice
