@@ -92,87 +92,24 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         ? config.instructions.trim()
         : undefined
 
-      // Request microphone permission with detailed constraints
-      console.log('🎤 Requesting microphone access...')
+      // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1,
-          sampleRate: { ideal: 48000 }
+          autoGainControl: true
         }
       })
 
-      console.log('✅ Microphone access granted')
-      console.log('📊 Stream info:', {
-        active: stream.active,
-        tracks: stream.getTracks().length,
-        audioTracks: stream.getAudioTracks().length
-      })
-
-      // Verify we got audio tracks
-      const audioTracks = stream.getAudioTracks()
-      if (audioTracks.length === 0) {
-        throw new Error('No se pudo acceder al micrófono. Por favor verifica los permisos.')
-      }
-
-      const audioTrack = audioTracks[0]
-      console.log('🎙️ Audio track info:', {
-        label: audioTrack.label,
-        enabled: audioTrack.enabled,
-        muted: audioTrack.muted,
-        readyState: audioTrack.readyState,
-        settings: audioTrack.getSettings()
-      })
-
-      // Ensure track is enabled
-      if (!audioTrack.enabled) {
-        console.log('⚠️ Audio track was disabled, enabling it...')
-        audioTrack.enabled = true
-      }
-
       mediaStreamRef.current = stream
 
-      // Setup audio analyzer for visual feedback
+      // Setup audio analyzer
       const audioContext = new AudioContext()
-      console.log('🎵 AudioContext created:', {
-        state: audioContext.state,
-        sampleRate: audioContext.sampleRate
-      })
-      
-      // Resume AudioContext if suspended (required in some browsers)
-      if (audioContext.state === 'suspended') {
-        console.log('🔄 Resuming suspended AudioContext...')
-        await audioContext.resume()
-      }
-      
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.8
       source.connect(analyser)
       analyserRef.current = analyser
-      
-      console.log('🔊 Audio analyzer configured:', {
-        fftSize: analyser.fftSize,
-        frequencyBinCount: analyser.frequencyBinCount,
-        smoothingTimeConstant: analyser.smoothingTimeConstant
-      })
-      
-      // Wait a bit for microphone to warm up (especially for Bluetooth/Continuity devices)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Test if we're getting audio data
-      const testDataArray = new Uint8Array(analyser.frequencyBinCount)
-      analyser.getByteFrequencyData(testDataArray)
-      const testAvg = testDataArray.reduce((a, b) => a + b) / testDataArray.length
-      console.log('🎤 Initial audio level test:', testAvg > 0 ? `${testAvg.toFixed(1)}/255 (DETECTED)` : '0 (silent - mic may need warm-up time)')
-      
-      // If still silent, log a warning but continue
-      if (testAvg === 0) {
-        console.warn('⚠️ No audio detected initially. This is common for Bluetooth/Continuity mics. Will continue anyway.')
-      }
 
       // Create voice session in database
       const sessionResponse = await fetch('/api/voice/session', {
@@ -187,157 +124,39 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       }
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
-      
-      // Create WebRTC peer connection with minimal STUN configuration
-      // We need at least Google STUN to get srflx candidates
-      // OpenAI may provide additional TURN servers via Trickle ICE if needed
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
-      })
-      peerConnectionRef.current = pc
-      console.log('🔗 Peer connection created with Google STUN server')
-      console.log('💡 Will get srflx candidates, OpenAI may provide TURN if needed')
+      sessionIdRef.current = voiceSessionId
 
-      // Setup audio element for remote audio
-      const audioElement = new Audio()
+      // Create WebRTC peer connection
+      const pc = new RTCPeerConnection()
+      peerConnectionRef.current = pc
+
+      // Set up audio element for remote audio playback
+      const audioElement = document.createElement('audio')
       audioElement.autoplay = true
       audioElementRef.current = audioElement
 
+      // Handle remote audio stream from OpenAI
       pc.ontrack = (e) => {
         console.log('📻 Received remote audio track')
         if (audioElement) {
           audioElement.srcObject = e.streams[0]
         }
       }
-      
-      // Monitor ICE candidates gathering (critical for debugging)
-      pc.onicegatheringstatechange = () => {
-        console.log('🧊 ICE gathering state:', pc.iceGatheringState)
-      }
-      
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          const candidate = event.candidate
-          console.log('🧊 ICE candidate:', {
-            type: candidate.type,
-            protocol: candidate.protocol,
-            address: candidate.address,
-            port: candidate.port,
-            relatedAddress: candidate.relatedAddress,
-            relatedPort: candidate.relatedPort
-          })
-          
-          // Highlight TURN relay candidates (critical for debugging)
-          if (candidate.type === 'relay') {
-            console.log('✅ TURN relay candidate found! This means TURN is working.')
-          }
-        } else {
-          console.log('🧊 ICE gathering complete')
-          
-          // Check if we got relay candidates
-          const stats = pc.getStats()
-          stats.then(report => {
-            let hasRelay = false
-            report.forEach(stat => {
-              if (stat.type === 'local-candidate' && stat.candidateType === 'relay') {
-                hasRelay = true
-              }
-            })
-            if (!hasRelay) {
-              console.warn('⚠️ WARNING: No TURN relay candidates found. This may cause connection issues in restrictive networks.')
-            }
-          })
-        }
-      }
-      
-      // Monitor ICE connection state (critical for data channel)
-      pc.oniceconnectionstatechange = () => {
-        console.log('🧊 ICE connection state:', pc.iceConnectionState)
-        if (pc.iceConnectionState === 'failed') {
-          console.error('❌ ICE connection failed! This prevents data channel from opening.')
-          console.error('💡 Possible causes: Firewall blocking UDP, symmetric NAT, no STUN/TURN access')
-          setError(new Error('Conexión de red fallida (ICE). Verifica tu firewall o red.'))
-          setStatus('error')
-        }
-        if (pc.iceConnectionState === 'connected') {
-          console.log('✅ ICE connection established - data channel should open soon')
-        }
-      }
-      
-      // Monitor connection state
-      pc.onconnectionstatechange = () => {
-        console.log('🔗 Connection state:', pc.connectionState)
-        if (pc.connectionState === 'failed') {
-          console.error('❌ Peer connection failed!')
-          setError(new Error('Conexión fallida con el servidor de voz.'))
-          setStatus('error')
-        }
-        if (pc.connectionState === 'connected') {
-          console.log('✅ Peer connection established successfully')
-        }
-      }
 
-      // Add local audio track (microphone) to peer connection
-      const micTrack = stream.getAudioTracks()[0]
-      
-      if (!micTrack) {
-        throw new Error('No se encontró track de audio en el stream')
+      // Add local audio track (microphone)
+      const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack && audioTrack.enabled === false) {
+        audioTrack.enabled = true
       }
-      
-      console.log('🎤 Adding microphone track to peer connection:', {
-        id: micTrack.id,
-        label: micTrack.label,
-        enabled: micTrack.enabled,
-        muted: micTrack.muted
-      })
-      
-      // Double-check track is enabled before adding
-      if (!micTrack.enabled) {
-        console.warn('⚠️ Track was disabled, enabling...')
-        micTrack.enabled = true
-      }
-      
-      // Add track to peer connection
-      const sender = pc.addTrack(micTrack, stream)
-      console.log('✅ Microphone track added to peer connection')
-      console.log('📡 RTC Sender info:', {
-        track: sender.track?.id,
-        trackEnabled: sender.track?.enabled,
-        trackLabel: sender.track?.label,
-        trackMuted: sender.track?.muted
-      })
-      
-      // Verify track is being sent
-      const parameters = sender.getParameters()
-      console.log('📤 Sender parameters:', {
-        encodings: parameters.encodings,
-        transactionId: parameters.transactionId
-      })
-      
-      // Monitor track state changes
-      micTrack.onmute = () => {
-        console.warn('⚠️ Microphone track muted')
-      }
-      micTrack.onunmute = () => {
-        console.log('✅ Microphone track unmuted')
-      }
-      micTrack.onended = () => {
-        console.error('❌ Microphone track ended')
-        setError(new Error('El micrófono se desconectó'))
-        setStatus('error')
-      }
+      pc.addTrack(audioTrack, stream)
 
       // Create data channel for events (must be done before createOffer)
-      const dc = pc.createDataChannel('oai-events', {
-        ordered: true
-      })
+      const dc = pc.createDataChannel('oai-events')
       dataChannelRef.current = dc
-      console.log('📡 Created data channel: oai-events, initial state:', dc.readyState)
+      console.log('📡 Created data channel: oai-events')
 
       dc.onopen = async () => {
-        console.log('✅ Data channel opened, state:', dc.readyState)
+        console.log('✅ Data channel opened')
         
         // 1. First, send session.update with instructions and VAD config
         try {
@@ -626,17 +445,6 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       // Get answer from OpenAI (via our backend)
       const answerSdp = await sdpResponse.text()
-      console.log('📥 Received SDP answer length:', answerSdp.length)
-      console.log('📥 SDP answer preview:', answerSdp.substring(0, 100))
-      
-      // Check if answer includes data channel (SCTP)
-      const hasDataChannel = answerSdp.includes('m=application')
-      console.log('📡 SDP answer includes data channel:', hasDataChannel)
-      
-      if (!hasDataChannel) {
-        console.warn('⚠️ WARNING: SDP answer does not include data channel! This may cause issues.')
-      }
-      
       const answer: RTCSessionDescriptionInit = {
         type: 'answer',
         sdp: answerSdp
@@ -644,73 +452,20 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       await pc.setRemoteDescription(answer)
       console.log('✅ WebRTC connection established')
-      console.log('📡 Data channel state after setRemoteDescription:', dataChannelRef.current?.readyState)
-      
-      // Log peer connection state
-      console.log('🔗 Peer connection state:', {
-        connectionState: pc.connectionState,
-        iceConnectionState: pc.iceConnectionState,
-        signalingState: pc.signalingState
-      })
 
-      // Fallback: Si el data channel no se abre en 5 segundos, mostrar error más claro
+      // Fallback: Si el data channel no se abre en 3 segundos, cambiar a listening de todos modos
       setTimeout(() => {
         if (dataChannelRef.current?.readyState !== 'open') {
-          const dcState = dataChannelRef.current?.readyState || 'null'
-          console.error(`❌ Data channel timeout! Current state: ${dcState}`)
-          console.error('🔗 Peer connection info:', {
-            connectionState: pc.connectionState,
-            iceConnectionState: pc.iceConnectionState,
-            signalingState: pc.signalingState
-          })
-          
-          // If data channel never opened, this is a critical error
-          if (dcState === 'connecting') {
-            setError(new Error('No se pudo establecer la conexión con OpenAI. El data channel no se abrió.'))
-            setStatus('error')
-          } else {
-            // Try to continue anyway
-            console.log('⚠️ Data channel timeout, attempting to continue anyway')
-            setStatus('listening')
-            startTimeRef.current = Date.now()
-            monitorAudioLevel()
-          }
+          console.log('⚠️ Data channel timeout, switching to listening anyway')
+          setStatus('listening')
+          startTimeRef.current = Date.now()
+          monitorAudioLevel()
         }
-      }, 5000)
+      }, 3000)
 
     } catch (err) {
       console.error('Voice session error:', err)
-      
-      // Handle specific error types
-      let errorMessage = 'Error al iniciar la sesión de voz'
-      
-      if (err instanceof Error) {
-        const errName = err.name
-        const errMsg = err.message.toLowerCase()
-        
-        // Microphone permission denied
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-          errorMessage = 'Acceso al micrófono denegado. Por favor permite el acceso en tu navegador.'
-        }
-        // No microphone found
-        else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
-          errorMessage = 'No se encontró ningún micrófono. Por favor conecta uno e intenta de nuevo.'
-        }
-        // Microphone in use by another app
-        else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
-          errorMessage = 'El micrófono está siendo usado por otra aplicación. Ciérrala e intenta de nuevo.'
-        }
-        // Browser not supported
-        else if (errMsg.includes('getusermedia') || errMsg.includes('not supported')) {
-          errorMessage = 'Tu navegador no soporta acceso al micrófono. Usa Chrome, Edge o Safari.'
-        }
-        // Use original message if available
-        else if (err.message) {
-          errorMessage = err.message
-        }
-      }
-      
-      setError(new Error(errorMessage))
+      setError(err as Error)
       setStatus('error')
       cleanup()
     }
@@ -790,15 +545,9 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
     if (mediaStreamRef.current) {
       const audioTrack = mediaStreamRef.current.getAudioTracks()[0]
       if (audioTrack) {
-        const newMutedState = !audioTrack.enabled
-        audioTrack.enabled = !newMutedState
-        setIsMuted(newMutedState)
-        console.log(newMutedState ? '🔇 Micrófono silenciado' : '🔊 Micrófono activado')
-      } else {
-        console.error('❌ No audio track found for mute toggle')
+        audioTrack.enabled = !audioTrack.enabled
+        setIsMuted(!audioTrack.enabled)
       }
-    } else {
-      console.error('❌ No media stream found for mute toggle')
     }
   }, [])
 
