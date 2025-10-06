@@ -450,6 +450,9 @@ ensureToolsHaveRequestContext(tools)
 // Export tool metadata maps for UI consumption
 export const toolMeta = {
 	twitter: twitterToolMeta,
+	// Advanced Twitter tools (ensure X icon appears in UI)
+	createTwitterThread: { icon: '/icons/x_twitter.png', label: 'Create Thread' },
+	postTweetWithMedia: { icon: '/icons/x_twitter.png', label: 'Post with Media' },
 }
 
 export type ToolName = keyof typeof tools

@@ -155,18 +155,37 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       }
       pc.addTrack(audioTrack, stream)
 
-      // Create data channel for events (must be done before createOffer)
+      // Helper to attach handlers to a data channel
+      const bindDataChannel = (channel: RTCDataChannel) => {
+        dataChannelRef.current = channel
+        channel.onopen = () => {
+          console.log('✅ Data channel opened')
+          setStatus('listening')
+          startTimeRef.current = Date.now()
+          monitorAudioLevel()
+        }
+        channel.onclose = () => {
+          console.log('🔌 Data channel closed')
+        }
+        channel.onerror = (error) => {
+          console.error('❌ Data channel error:', error)
+          setError(new Error('Data channel error'))
+          setStatus('error')
+        }
+        // Attach message handler below after definition
+      }
+
+      // Prefer remote-created channel if the server provides it
+      pc.ondatachannel = (e) => {
+        console.log('📡 Remote data channel received:', e.channel.label, 'state:', e.channel.readyState)
+        bindDataChannel(e.channel)
+        // message handler is assigned after definition below
+      }
+
+      // Create data channel for events (must be done before createOffer). Some providers expect client-initiated.
       const dc = pc.createDataChannel('oai-events')
-      dataChannelRef.current = dc
+      bindDataChannel(dc)
       console.log('📡 Created data channel: oai-events, initial state:', dc.readyState)
-
-      dc.onerror = (error) => {
-        console.error('❌ Data channel error:', error)
-      }
-
-      dc.onclose = () => {
-        console.log('🔌 Data channel closed')
-      }
 
       dc.onopen = async () => {
         console.log('✅ Data channel opened')
@@ -256,7 +275,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         setStatus('error')
       }
 
-      dc.onmessage = async (e) => {
+      const onDCMessage = async (e: MessageEvent) => {
         try {
           const event = JSON.parse(e.data)
           console.log('Event:', event.type)
@@ -429,6 +448,11 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         } catch (err) {
           console.error('Error processing event:', err)
         }
+      }
+      // Assign message handler to whichever channel is active now
+      dc.onmessage = onDCMessage
+      if (dataChannelRef.current && dataChannelRef.current !== dc) {
+        dataChannelRef.current.onmessage = onDCMessage
       }
 
 
