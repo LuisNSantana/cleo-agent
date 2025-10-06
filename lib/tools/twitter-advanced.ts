@@ -78,6 +78,8 @@ function generateOAuth1Signature(
 }
 
 async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
+  // Best practice: only allow WRITE operations with user-linked OAuth 1.0a credentials
+  const userId = getCurrentUserId?.()
   const credentials = await getTwitterCredentials()
   
   // Check if we have OAuth 1.0a credentials
@@ -92,7 +94,15 @@ async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
   const isWriteRequest = method !== 'GET'
   
   // Write requests (POST, PUT, DELETE) REQUIRE OAuth 1.0a User Context
-  if (isWriteRequest && hasOAuth1) {
+  // For write operations, require a logged-in user context and OAuth1 credentials
+  if (isWriteRequest) {
+    if (!userId) {
+      throw new Error('Twitter posting requires a logged-in user with connected Twitter credentials. Please connect your Twitter account in Integrations.')
+    }
+    if (!hasOAuth1) {
+      throw new Error('Missing user OAuth 1.0a credentials for Twitter posting. Connect your Twitter account in Integrations (api_key, api_secret, access_token, access_token_secret).')
+    }
+
     const url = `https://api.twitter.com/2${endpoint}`
     const authHeader = generateOAuth1Signature(method, url, credentials)
     
@@ -113,7 +123,7 @@ async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
     return response.json()
   }
   
-  // Fallback to Bearer token for read-only requests
+  // Fallback to Bearer token for read-only requests (system-level allowed)
   if (credentials.bearer_token) {
     const response = await fetch(`https://api.twitter.com/2${endpoint}`, {
       ...options,
@@ -136,6 +146,11 @@ async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
 }
 
 async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> {
+  // Enforce user-linked credentials for write (media upload)
+  const userId = getCurrentUserId?.()
+  if (!userId) {
+    throw new Error('Twitter media upload requires a logged-in user with connected Twitter credentials. Connect your Twitter account in Integrations.')
+  }
   const credentials = await getTwitterCredentials()
   
   // Check if we have OAuth 1.0a credentials (required for media upload)
@@ -143,7 +158,7 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
                     !!credentials.access_token && !!credentials.access_token_secret
   
   if (!hasOAuth1) {
-    throw new Error('OAuth 1.0a credentials required for media upload')
+    throw new Error('Missing user OAuth 1.0a credentials for Twitter media upload. Connect your Twitter account in Integrations.')
   }
 
   // Download media

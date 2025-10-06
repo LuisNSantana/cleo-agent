@@ -32,29 +32,24 @@ async function getTwitterCredentials() {
   }
 }
 
-// Helper function for Twitter API requests
+// Helper function for read-only requests (Bearer allowed)
 async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
   const credentials = await getTwitterCredentials()
-  
-  if (!credentials.bearer_token && !credentials.access_token) {
-    throw new Error('No Twitter API credentials available. Please configure Twitter API keys in settings.')
+  if (!credentials.bearer_token) {
+    throw new Error('Read-only Twitter API call requires a Bearer token (system-level).')
   }
-  const token = credentials.bearer_token || credentials.access_token
-  
   const response = await fetch(`https://api.twitter.com/2${endpoint}`, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${credentials.bearer_token}`,
       'Content-Type': 'application/json',
       ...options.headers
     }
   })
-  
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(`Twitter API error: ${errorData.detail || response.statusText}`)
   }
-  
   return response.json()
 }
 

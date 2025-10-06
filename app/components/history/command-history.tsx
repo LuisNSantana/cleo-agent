@@ -451,23 +451,27 @@ export function CommandHistory({
       const isEditOrDeleteMode = editingId || deletingId
       const isSelected = chat.id === selectedChatId
 
-      return (
-        <CommandItem
-          key={chat.id}
-          onSelect={() => {
-            if (preferences.showConversationPreviews) {
-              setSelectedChatId(chat.id)
-            }
+          return (
+            <CommandItem
+              key={chat.id}
+              onSelect={() => {
+                if (preferences.showConversationPreviews) {
+                  setSelectedChatId(chat.id)
+                }
 
-            if (isCurrentChatSession) {
-              setIsOpen(false)
-              return
-            }
-            if (!editingId && !deletingId) {
-              router.push(`/c/${chat.id}`)
-            }
-          }}
-          className={cn(
+                if (isCurrentChatSession) {
+                  setIsOpen(false)
+                  return
+                }
+                if (!editingId && !deletingId) {
+                  router.push(`/c/${chat.id}`)
+                  // Force a refresh to ensure providers and caches reset for the new chat
+                  // This avoids users needing to manually refresh
+                  setTimeout(() => router.refresh(), 0)
+                  setIsOpen(false)
+                }
+              }}
+              className={cn(
             "group group data-[selected=true]:bg-accent flex w-full items-center justify-between rounded-md",
             isCurrentChatEditOrDelete ? "!py-2" : "py-2",
             isCurrentChatEditOrDelete &&
