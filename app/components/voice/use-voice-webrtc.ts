@@ -188,48 +188,22 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       
-      // Create WebRTC peer connection with STUN + TURN servers
-      // CRITICAL: TURN servers are needed when behind restrictive NAT/firewall
+      // Create WebRTC peer connection
+      // OPTION 1: Try without TURN first (simplest, works if network allows)
+      // OPTION 2: If fails, OpenAI's servers should provide their own TURN via Trickle ICE
       const pc = new RTCPeerConnection({
         iceServers: [
-          // Google STUN servers (fast, reliable)
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          // OpenRelay TURN servers (public, free)
-          { 
-            urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:80?transport=tcp',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:443?transport=tcp'
-            ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          // Backup STUN/TURN from different providers
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          {
-            urls: [
-              'turn:global.relay.metered.ca:80',
-              'turn:global.relay.metered.ca:80?transport=tcp',
-              'turn:global.relay.metered.ca:443',
-              'turns:global.relay.metered.ca:443?transport=tcp'
-            ],
-            username: 'b8e0632fb87ea196d00fdda1',
-            credential: 'UXkdZUNpW9SZm0i1'
-          }
+          // Google STUN servers only - let OpenAI handle TURN if needed
+          { urls: 'stun:stun.l.google.com:19302' }
         ],
-        // Optimize for real-time audio
-        iceTransportPolicy: 'all', // Try all candidates (relay, srflx, host)
+        // Let WebRTC try all connection types
+        iceTransportPolicy: 'all',
         bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require',
-        iceCandidatePoolSize: 10 // Pre-gather more candidates for faster connection
+        rtcpMuxPolicy: 'require'
       })
       peerConnectionRef.current = pc
-      console.log('🔗 Peer connection created with multiple STUN + TURN servers')
+      console.log('🔗 Peer connection created (STUN only, OpenAI provides TURN if needed)')
+      console.log('💡 If connection fails, OpenAI servers will provide relay candidates via Trickle ICE')
 
       // Setup audio element for remote audio
       const audioElement = new Audio()
