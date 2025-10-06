@@ -188,22 +188,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       
-      // Create WebRTC peer connection
-      // OPTION 1: Try without TURN first (simplest, works if network allows)
-      // OPTION 2: If fails, OpenAI's servers should provide their own TURN via Trickle ICE
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          // Google STUN servers only - let OpenAI handle TURN if needed
-          { urls: 'stun:stun.l.google.com:19302' }
-        ],
-        // Let WebRTC try all connection types
-        iceTransportPolicy: 'all',
-        bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require'
-      })
+      // Create WebRTC peer connection WITHOUT iceServers configuration
+      // OpenAI provides STUN/TURN servers automatically via Trickle ICE
+      // This is the configuration that worked in commit 5619f66f
+      const pc = new RTCPeerConnection()
       peerConnectionRef.current = pc
-      console.log('🔗 Peer connection created (STUN only, OpenAI provides TURN if needed)')
-      console.log('💡 If connection fails, OpenAI servers will provide relay candidates via Trickle ICE')
+      console.log('🔗 Peer connection created (OpenAI will provide STUN/TURN automatically)')
+      console.log('💡 Using default config - OpenAI handles ICE candidates via Trickle ICE')
 
       // Setup audio element for remote audio
       const audioElement = new Audio()
