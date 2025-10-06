@@ -130,7 +130,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const pc = new RTCPeerConnection({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+          { urls: 'stun:global.stun.twilio.com:3478' }
         ]
       })
       peerConnectionRef.current = pc

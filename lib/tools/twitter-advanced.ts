@@ -34,6 +34,15 @@ async function getTwitterCredentials() {
   }
 }
 
+// Ensure text is within 280 characters; keeps composed Unicode code points intact
+function trimTo280(input: string): string {
+  const arr = Array.from(input || '')
+  if (arr.length <= 280) return input
+  const sliced = arr.slice(0, 280)
+  // avoid ending with half punctuation spacing, optional cleanup
+  return sliced.join('').replace(/[\s.,;:!\-]+$/u, '')
+}
+
 // Helper: generate OAuth1 header for arbitrary URL + params (used for v1.1 fallback)
 function buildOAuth1Header(method: string, url: string, credentials: any, params: Record<string, string>) {
   const nonce = Math.random().toString(36).substring(2)
@@ -248,7 +257,7 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
 export const postTweetWithMediaTool = tool({
   description: 'Post a tweet with images, videos, or GIFs. Tweets with media get 150% more engagement. Supports up to 4 images or 1 video. Perfect for visual content, product launches, event photos.',
   inputSchema: z.object({
-    text: z.string().min(1).max(280).describe('Tweet text (max 280 characters)'),
+    text: z.string().min(1).describe('Tweet text (will be trimmed to 280 characters if longer)'),
     media: z.array(z.object({
       url: z.string().url().describe('URL of the image/video to upload'),
       altText: z.string().optional().describe('Alt text for accessibility (recommended)')
@@ -287,7 +296,7 @@ export const postTweetWithMediaTool = tool({
 
           // Create tweet with media
           const tweetData: any = {
-            text: params.text,
+            text: trimTo280(params.text),
             media: {
               media_ids: mediaIds
             }
@@ -362,7 +371,7 @@ export const createTwitterThreadTool = tool({
   description: 'Create a Twitter thread (series of connected tweets). Perfect for storytelling, tutorials, announcements, thought leadership. Automatically threads tweets in sequence.',
   inputSchema: z.object({
     tweets: z.array(z.object({
-      text: z.string().min(1).max(280).describe('Tweet text (max 280 characters)'),
+      text: z.string().min(1).describe('Tweet text (will be trimmed to 280 characters if longer)'),
       mediaUrls: z.array(z.string().url()).optional().describe('Optional media URLs for this tweet')
     })).min(2).max(25).describe('Array of tweets to post in sequence (2-25 tweets)'),
     delayBetweenTweets: z.number().min(0).max(10000).optional().default(2000).describe('Milliseconds to wait between tweets (default: 2000ms)')
@@ -383,6 +392,7 @@ export const createTwitterThreadTool = tool({
 
           for (let i = 0; i < params.tweets.length; i++) {
             const tweet = params.tweets[i]
+            tweet.text = trimTo280(tweet.text)
 
             // Upload media if provided
             let mediaIds: string[] | undefined
@@ -400,7 +410,7 @@ export const createTwitterThreadTool = tool({
 
             // Create tweet
             const tweetData: any = {
-              text: tweet.text
+              text: trimTo280(tweet.text)
             }
 
             if (mediaIds && mediaIds.length > 0) {
