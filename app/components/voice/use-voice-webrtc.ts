@@ -187,9 +187,18 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       }
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
-      // Create WebRTC peer connection
-      const pc = new RTCPeerConnection()
+      
+      // Create WebRTC peer connection with STUN servers
+      // CRITICAL: Without STUN servers, ICE connection may fail and data channel won't open
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      })
       peerConnectionRef.current = pc
+      console.log('🔗 Peer connection created with STUN servers')
 
       // Setup audio element for remote audio
       const audioElement = new Audio()
@@ -203,13 +212,34 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         }
       }
       
+      // Monitor ICE candidates gathering (critical for debugging)
+      pc.onicegatheringstatechange = () => {
+        console.log('🧊 ICE gathering state:', pc.iceGatheringState)
+      }
+      
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log('🧊 ICE candidate:', {
+            type: event.candidate.type,
+            protocol: event.candidate.protocol,
+            address: event.candidate.address
+          })
+        } else {
+          console.log('🧊 ICE gathering complete')
+        }
+      }
+      
       // Monitor ICE connection state (critical for data channel)
       pc.oniceconnectionstatechange = () => {
         console.log('🧊 ICE connection state:', pc.iceConnectionState)
         if (pc.iceConnectionState === 'failed') {
-          console.error('❌ ICE connection failed!')
+          console.error('❌ ICE connection failed! This prevents data channel from opening.')
+          console.error('💡 Possible causes: Firewall blocking UDP, symmetric NAT, no STUN/TURN access')
           setError(new Error('Conexión de red fallida (ICE). Verifica tu firewall o red.'))
           setStatus('error')
+        }
+        if (pc.iceConnectionState === 'connected') {
+          console.log('✅ ICE connection established - data channel should open soon')
         }
       }
       
@@ -220,6 +250,9 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           console.error('❌ Peer connection failed!')
           setError(new Error('Conexión fallida con el servidor de voz.'))
           setStatus('error')
+        }
+        if (pc.connectionState === 'connected') {
+          console.log('✅ Peer connection established successfully')
         }
       }
 
