@@ -141,6 +141,12 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         sampleRate: audioContext.sampleRate
       })
       
+      // Resume AudioContext if suspended (required in some browsers)
+      if (audioContext.state === 'suspended') {
+        console.log('🔄 Resuming suspended AudioContext...')
+        await audioContext.resume()
+      }
+      
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
@@ -154,11 +160,19 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         smoothingTimeConstant: analyser.smoothingTimeConstant
       })
       
+      // Wait a bit for microphone to warm up (especially for Bluetooth/Continuity devices)
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
       // Test if we're getting audio data
       const testDataArray = new Uint8Array(analyser.frequencyBinCount)
       analyser.getByteFrequencyData(testDataArray)
       const testAvg = testDataArray.reduce((a, b) => a + b) / testDataArray.length
-      console.log('🎤 Initial audio level test:', testAvg > 0 ? `${testAvg}/255 (DETECTED)` : '0 (silent or not detected yet)')
+      console.log('🎤 Initial audio level test:', testAvg > 0 ? `${testAvg.toFixed(1)}/255 (DETECTED)` : '0 (silent - mic may need warm-up time)')
+      
+      // If still silent, log a warning but continue
+      if (testAvg === 0) {
+        console.warn('⚠️ No audio detected initially. This is common for Bluetooth/Continuity mics. Will continue anyway.')
+      }
 
       // Create voice session in database
       const sessionResponse = await fetch('/api/voice/session', {
@@ -173,22 +187,39 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       }
 
       const { sessionId: voiceSessionId } = await sessionResponse.json()
-      sessionIdRef.current = voiceSessionId
-
       // Create WebRTC peer connection
       const pc = new RTCPeerConnection()
       peerConnectionRef.current = pc
 
-      // Set up audio element for remote audio playback
-      const audioElement = document.createElement('audio')
+      // Setup audio element for remote audio
+      const audioElement = new Audio()
       audioElement.autoplay = true
       audioElementRef.current = audioElement
 
-      // Handle remote audio stream from OpenAI
       pc.ontrack = (e) => {
         console.log('📻 Received remote audio track')
         if (audioElement) {
           audioElement.srcObject = e.streams[0]
+        }
+      }
+      
+      // Monitor ICE connection state (critical for data channel)
+      pc.oniceconnectionstatechange = () => {
+        console.log('🧊 ICE connection state:', pc.iceConnectionState)
+        if (pc.iceConnectionState === 'failed') {
+          console.error('❌ ICE connection failed!')
+          setError(new Error('Conexión de red fallida (ICE). Verifica tu firewall o red.'))
+          setStatus('error')
+        }
+      }
+      
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        console.log('🔗 Connection state:', pc.connectionState)
+        if (pc.connectionState === 'failed') {
+          console.error('❌ Peer connection failed!')
+          setError(new Error('Conexión fallida con el servidor de voz.'))
+          setStatus('error')
         }
       }
 
@@ -243,12 +274,14 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       }
 
       // Create data channel for events (must be done before createOffer)
-      const dc = pc.createDataChannel('oai-events')
+      const dc = pc.createDataChannel('oai-events', {
+        ordered: true
+      })
       dataChannelRef.current = dc
-      console.log('📡 Created data channel: oai-events')
+      console.log('📡 Created data channel: oai-events, initial state:', dc.readyState)
 
       dc.onopen = async () => {
-        console.log('✅ Data channel opened')
+        console.log('✅ Data channel opened, state:', dc.readyState)
         
         // 1. First, send session.update with instructions and VAD config
         try {
@@ -537,6 +570,17 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       // Get answer from OpenAI (via our backend)
       const answerSdp = await sdpResponse.text()
+      console.log('📥 Received SDP answer length:', answerSdp.length)
+      console.log('📥 SDP answer preview:', answerSdp.substring(0, 100))
+      
+      // Check if answer includes data channel (SCTP)
+      const hasDataChannel = answerSdp.includes('m=application')
+      console.log('📡 SDP answer includes data channel:', hasDataChannel)
+      
+      if (!hasDataChannel) {
+        console.warn('⚠️ WARNING: SDP answer does not include data channel! This may cause issues.')
+      }
+      
       const answer: RTCSessionDescriptionInit = {
         type: 'answer',
         sdp: answerSdp
@@ -544,16 +588,39 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
       await pc.setRemoteDescription(answer)
       console.log('✅ WebRTC connection established')
+      console.log('📡 Data channel state after setRemoteDescription:', dataChannelRef.current?.readyState)
+      
+      // Log peer connection state
+      console.log('🔗 Peer connection state:', {
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState
+      })
 
-      // Fallback: Si el data channel no se abre en 3 segundos, cambiar a listening de todos modos
+      // Fallback: Si el data channel no se abre en 5 segundos, mostrar error más claro
       setTimeout(() => {
         if (dataChannelRef.current?.readyState !== 'open') {
-          console.log('⚠️ Data channel timeout, switching to listening anyway')
-          setStatus('listening')
-          startTimeRef.current = Date.now()
-          monitorAudioLevel()
+          const dcState = dataChannelRef.current?.readyState || 'null'
+          console.error(`❌ Data channel timeout! Current state: ${dcState}`)
+          console.error('🔗 Peer connection info:', {
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            signalingState: pc.signalingState
+          })
+          
+          // If data channel never opened, this is a critical error
+          if (dcState === 'connecting') {
+            setError(new Error('No se pudo establecer la conexión con OpenAI. El data channel no se abrió.'))
+            setStatus('error')
+          } else {
+            // Try to continue anyway
+            console.log('⚠️ Data channel timeout, attempting to continue anyway')
+            setStatus('listening')
+            startTimeRef.current = Date.now()
+            monitorAudioLevel()
+          }
         }
-      }, 3000)
+      }, 5000)
 
     } catch (err) {
       console.error('Voice session error:', err)

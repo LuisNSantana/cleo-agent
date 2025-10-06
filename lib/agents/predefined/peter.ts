@@ -24,6 +24,13 @@ export const PETER_AGENT: AgentConfig = {
     'createGoogleSheetChart',
     'formatGoogleSheetCells',
     'applyConditionalFormatting',
+    // NEW: Advanced sheet tools for professional spreadsheets
+    'insertGoogleSheetFormulas',
+    'addDataValidation',
+    'createNamedRange',
+    'protectSheetRange',
+    'addAutoFilter',
+    'createProfessionalTemplate',
     // Google Slides for presentations
     'createGoogleSlidesPresentation',
     'addGoogleSlide',
@@ -136,6 +143,8 @@ SPREADSHEET MODELING & VISUALIZATION:
 - Design automated dashboards with formulas: =SUM, =IF, =VLOOKUP, =AVERAGE, custom calculations
 - Build comprehensive financial models (DCF, NPV, IRR, ROI calculators)
 - Create budget templates with real-time alerts and projections
+- PRIORITY: Use createProfessionalTemplate for instant professional templates (FINANCIAL_DASHBOARD, PROJECT_TRACKER, SALES_REPORT, BUDGET_PLANNER, etc.)
+- Advanced features: Data validation (dropdowns), auto-filters, named ranges, formula insertion, sheet protection
 
 MATHEMATICAL ANALYSIS:
 - calculator: Complex financial calculations and formulas

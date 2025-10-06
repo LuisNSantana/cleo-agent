@@ -58,7 +58,14 @@ import {
 	addGoogleSheetTabTool,
 	createGoogleSheetChartTool,
 	formatGoogleSheetCellsTool,
-	applyConditionalFormattingTool
+	applyConditionalFormattingTool,
+	// New advanced tools
+	insertGoogleSheetFormulasTool,
+	addDataValidationTool,
+	createNamedRangeTool,
+	protectSheetRangeTool,
+	addAutoFilterTool,
+	createProfessionalTemplateTool
 } from './google-sheets-advanced'
 import { 
 	createGoogleSlidesPresentationTool,
@@ -359,6 +366,13 @@ export const tools = {
 	createGoogleSheetChart: createGoogleSheetChartTool,
 	formatGoogleSheetCells: formatGoogleSheetCellsTool,
 	applyConditionalFormatting: applyConditionalFormattingTool,
+	// New advanced sheet tools
+	insertGoogleSheetFormulas: insertGoogleSheetFormulasTool,
+	addDataValidation: addDataValidationTool,
+	createNamedRange: createNamedRangeTool,
+	protectSheetRange: protectSheetRangeTool,
+	addAutoFilter: addAutoFilterTool,
+	createProfessionalTemplate: createProfessionalTemplateTool,
 
 	// Gmail
 	listGmailMessages: listGmailMessagesTool,
