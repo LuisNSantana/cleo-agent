@@ -34,6 +34,36 @@ async function getTwitterCredentials() {
   }
 }
 
+// Helper: generate OAuth1 header for arbitrary URL + params (used for v1.1 fallback)
+function buildOAuth1Header(method: string, url: string, credentials: any, params: Record<string, string>) {
+  const nonce = Math.random().toString(36).substring(2)
+  const timestamp = Math.floor(Date.now() / 1000).toString()
+  const baseParams: Record<string, string> = {
+    oauth_consumer_key: credentials.api_key,
+    oauth_nonce: nonce,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_token: credentials.access_token,
+    oauth_version: '1.0',
+    ...params
+  }
+  const enc = (v: string) => encodeURIComponent(v).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16))
+  const paramString = Object.keys(baseParams).sort().map(k => `${enc(k)}=${enc(baseParams[k])}`).join('&')
+  const baseString = [method.toUpperCase(), enc(url), enc(paramString)].join('&')
+  const signingKey = `${enc(credentials.api_secret)}&${enc(credentials.access_token_secret)}`
+  const signature = createHmac('sha1', signingKey).update(baseString).digest('base64')
+  const authParams: Record<string, string> = {
+    oauth_consumer_key: credentials.api_key,
+    oauth_nonce: nonce,
+    oauth_signature: signature,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_token: credentials.access_token,
+    oauth_version: '1.0'
+  }
+  return 'OAuth ' + Object.entries(authParams).map(([k, v]) => `${enc(k)}="${enc(v)}"`).join(', ')
+}
+
 /**
  * Generate OAuth 1.0a signature for Twitter API v2 requests
  * Required for write endpoints (POST /tweets)
@@ -269,10 +299,37 @@ export const postTweetWithMediaTool = tool({
             }
           }
 
-          const result = await makeTwitterRequest('/tweets', {
-            method: 'POST',
-            body: JSON.stringify(tweetData)
-          })
+          let result: any
+          try {
+            result = await makeTwitterRequest('/tweets', {
+              method: 'POST',
+              body: JSON.stringify(tweetData)
+            })
+          } catch (err) {
+            const msg = err instanceof Error ? err.message.toLowerCase() : ''
+            const permsError = msg.includes('oauth1 app permissions') || msg.includes('not configured with the appropriate oauth1')
+            if (!permsError) throw err
+            // Fallback to v1.1 statuses/update.json with OAuth1
+            const credentials = await getTwitterCredentials()
+            const hasOAuth1 = !!credentials.api_key && !!credentials.api_secret && !!credentials.access_token && !!credentials.access_token_secret
+            if (!hasOAuth1) throw err
+            const url = 'https://api.twitter.com/1.1/statuses/update.json'
+            const bodyParams: Record<string, string> = { status: params.text }
+            if (mediaIds.length > 0) bodyParams.media_ids = mediaIds.join(',')
+            if (params.replyToId) bodyParams.in_reply_to_status_id = params.replyToId
+            const authHeader = buildOAuth1Header('POST', url, credentials, bodyParams)
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { 'Authorization': authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams(bodyParams).toString()
+            })
+            if (!resp.ok) {
+              const e = await resp.json().catch(() => ({}))
+              throw new Error(`Twitter v1.1 post failed: ${e?.errors?.[0]?.message || resp.statusText}`)
+            }
+            const v11 = await resp.json()
+            result = { data: { id: v11.id_str, text: v11.text } }
+          }
 
           if (userId) {
             await trackToolUsage(userId, 'postTweetWithMedia', { ok: true, execMs: Date.now() - started })
@@ -356,10 +413,37 @@ export const createTwitterThreadTool = tool({
               }
             }
 
-            const result = await makeTwitterRequest('/tweets', {
-              method: 'POST',
-              body: JSON.stringify(tweetData)
-            })
+            let result: any
+            try {
+              result = await makeTwitterRequest('/tweets', {
+                method: 'POST',
+                body: JSON.stringify(tweetData)
+              })
+            } catch (err) {
+              const msg = err instanceof Error ? err.message.toLowerCase() : ''
+              const permsError = msg.includes('oauth1 app permissions') || msg.includes('not configured with the appropriate oauth1')
+              if (!permsError) throw err
+              // Fallback to v1.1 statuses/update.json with OAuth1 per tweet
+              const credentials = await getTwitterCredentials()
+              const hasOAuth1 = !!credentials.api_key && !!credentials.api_secret && !!credentials.access_token && !!credentials.access_token_secret
+              if (!hasOAuth1) throw err
+              const url = 'https://api.twitter.com/1.1/statuses/update.json'
+              const bodyParams: Record<string, string> = { status: tweet.text }
+              if (mediaIds && mediaIds.length > 0) bodyParams.media_ids = mediaIds.join(',')
+              if (previousTweetId) bodyParams.in_reply_to_status_id = previousTweetId
+              const authHeader = buildOAuth1Header('POST', url, credentials, bodyParams)
+              const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(bodyParams).toString()
+              })
+              if (!resp.ok) {
+                const e = await resp.json().catch(() => ({}))
+                throw new Error(`Twitter v1.1 post failed: ${e?.errors?.[0]?.message || resp.statusText}`)
+              }
+              const v11 = await resp.json()
+              result = { data: { id: v11.id_str, text: v11.text } }
+            }
 
             postedTweets.push({
               id: result.data.id,

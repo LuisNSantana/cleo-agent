@@ -126,8 +126,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       sessionIdRef.current = voiceSessionId
 
-      // Create WebRTC peer connection
-      const pc = new RTCPeerConnection()
+      // Create WebRTC peer connection with public STUN for NAT traversal
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      })
       peerConnectionRef.current = pc
 
       // Set up audio element for remote audio playback
@@ -431,11 +436,25 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
+      // Ensure ICE gathering completes (no trickle) before sending offer
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve()
+        const timeout = setTimeout(() => resolve(), 3000)
+        const check = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check)
+            clearTimeout(timeout)
+            resolve()
+          }
+        }
+        pc.addEventListener('icegatheringstatechange', check)
+      })
+
       console.log('📤 Sending SDP offer to backend...')
       console.log('📤 SDP length:', offer.sdp?.length)
       console.log('📤 SDP preview:', offer.sdp?.substring(0, 100))
 
-      // Send offer to our backend which will forward to OpenAI
+      // Send offer (with gathered ICE candidates) to our backend which will forward to OpenAI
       const sdpResponse = await fetch('/api/voice/webrtc/session', {
         method: 'POST',
         headers: {
