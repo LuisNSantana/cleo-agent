@@ -148,6 +148,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       wsRef.current = ws
 
       let sessionReady = false
+      const configRef = { current: config }
 
       ws.onopen = () => {
         console.log('✅ Railway WebSocket connected, waiting for session.created...')
@@ -171,10 +172,46 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Using default session config')
+            console.log('✅ session.created - Sending session configuration...')
             
-            // Don't send session.update - use OpenAI defaults
-            // This avoids server errors from invalid configurations
+            // Send session.update with minimal stable configuration
+            const sessionUpdate: any = {
+              type: 'session.update',
+              session: {
+                modalities: ['text', 'audio'],
+                voice: configRef.current.voice || 'alloy',
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 200
+                }
+              }
+            }
+
+            // Add instructions if available (max 1500 chars to avoid errors)
+            if (configRef.current.instructions) {
+              const maxLength = 1500
+              const instructions = configRef.current.instructions
+              sessionUpdate.session.instructions = instructions.length > maxLength 
+                ? instructions.substring(0, maxLength) 
+                : instructions
+            }
+
+            // TEMPORARILY DISABLE TOOLS to test basic functionality
+            // Tools will be re-enabled once basic connection is stable
+            // if (configRef.current.tools && Array.isArray(configRef.current.tools)) {
+            //   sessionUpdate.session.tools = configRef.current.tools
+            // }
+
+            try {
+              ws.send(JSON.stringify(sessionUpdate))
+              console.log('📤 Sent session.update (basic config, tools disabled)')
+            } catch (sendError) {
+              console.error('Failed to send session.update:', sendError)
+            }
             
             sessionReady = true
             setStatus('listening')
