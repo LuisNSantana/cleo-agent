@@ -155,9 +155,13 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
       ws.onmessage = async (event) => {
         try {
-          // Handle text messages (JSON events)
+          // Skip binary data (Blob or ArrayBuffer) - we only handle JSON text events
+          if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+            return
+          }
+
+          // Handle only string messages (JSON events)
           if (typeof event.data !== 'string') {
-            console.warn('Unknown message type:', typeof event.data)
             return
           }
 
