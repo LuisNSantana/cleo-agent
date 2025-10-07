@@ -126,14 +126,29 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       sessionIdRef.current = voiceSessionId
 
-      // Create WebRTC peer connection with public STUN for NAT traversal
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
-      })
+      // Create WebRTC peer connection
+      // Note: STUN servers are optional - they help with NAT traversal in complex networks
+      // but are not required for direct connections
+      const pc = new RTCPeerConnection()
       peerConnectionRef.current = pc
+
+      // Monitor ICE candidate generation
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log('🧊 ICE candidate generated:', event.candidate.candidate.substring(0, 50))
+        } else {
+          console.log('✅ ICE candidate gathering complete (null candidate)')
+        }
+      }
+
+      // Monitor connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log('🔗 Connection state:', pc.connectionState)
+      }
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('🧊 ICE connection state:', pc.iceConnectionState)
+      }
 
       // Set up audio element for remote audio playback
       const audioElement = document.createElement('audio')
@@ -460,23 +475,40 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
-      // Ensure ICE gathering completes (no trickle) before sending offer
+      // CRITICAL: Wait for ICE gathering to complete before sending offer
+      // This ensures all ICE candidates are included in the SDP
+      console.log('⏳ Waiting for ICE gathering... Current state:', pc.iceGatheringState)
       await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === 'complete') return resolve()
-        const timeout = setTimeout(() => resolve(), 3000)
+        if (pc.iceGatheringState === 'complete') {
+          console.log('✅ ICE gathering already complete')
+          return resolve()
+        }
+        const timeout = setTimeout(() => {
+          console.log('⚠️ ICE gathering timeout after 5s, proceeding anyway')
+          resolve()
+        }, 5000)
         const check = () => {
+          console.log('📡 ICE gathering state changed:', pc.iceGatheringState)
           if (pc.iceGatheringState === 'complete') {
             pc.removeEventListener('icegatheringstatechange', check)
             clearTimeout(timeout)
+            console.log('✅ ICE gathering complete')
             resolve()
           }
         }
         pc.addEventListener('icegatheringstatechange', check)
       })
 
+      // Get the updated local description with all ICE candidates
+      const finalOffer = pc.localDescription
+      if (!finalOffer || !finalOffer.sdp) {
+        throw new Error('Failed to get local description with ICE candidates')
+      }
+
       console.log('📤 Sending SDP offer to backend...')
-      console.log('📤 SDP length:', offer.sdp?.length)
-      console.log('📤 SDP preview:', offer.sdp?.substring(0, 100))
+      console.log('📤 SDP length:', finalOffer.sdp.length)
+      console.log('📤 SDP preview:', finalOffer.sdp.substring(0, 100))
+      console.log('📤 ICE candidates in SDP:', (finalOffer.sdp.match(/a=candidate/g) || []).length)
 
       // Send offer (with gathered ICE candidates) to our backend which will forward to OpenAI
       const sdpResponse = await fetch('/api/voice/webrtc/session', {
@@ -485,7 +517,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          sdp: offer.sdp,
+          sdp: finalOffer.sdp,
           session: {
             model: config?.model,
             voice: config?.voice,
