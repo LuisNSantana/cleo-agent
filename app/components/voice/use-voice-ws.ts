@@ -1,6 +1,7 @@
 /**
- * Voice Mode - Pure WebSocket Implementation
- * Works with Railway proxy server for direct OpenAI Realtime API connection
+ * Voice Mode - WebSocket Implementation
+ * Uses Railway proxy server for WebSocket connection
+ * RESTORED FROM WORKING VERSION
  */
 
 'use client'
@@ -34,9 +35,9 @@ export function useVoiceWS(): UseVoiceReturn {
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const startTimeRef = useRef<number | null>(null)
+  const audioElementRef = useRef<HTMLAudioElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number | null>(null)
 
   // Duration tracking
   useEffect(() => {
@@ -50,35 +51,29 @@ export function useVoiceWS(): UseVoiceReturn {
   }, [status])
 
   const monitorAudioLevel = useCallback(() => {
-    if (!analyserRef.current) return
+    const analyser = analyserRef.current
+    if (!analyser) return
 
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
-    
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
     const updateLevel = () => {
-      if (!analyserRef.current || status === 'idle') return
-
-      analyserRef.current.getByteFrequencyData(dataArray)
+      analyser.getByteFrequencyData(dataArray)
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length
       setAudioLevel(average / 255)
-
       animationFrameRef.current = requestAnimationFrame(updateLevel)
     }
 
     updateLevel()
-  }, [status])
+  }, [])
 
   const startSession = useCallback(async (chatId?: string) => {
     try {
-      setError(null)
       setStatus('connecting')
+      setError(null)
       console.log('🎤 Starting WebSocket voice session...')
 
       // Get Railway proxy URL from environment
-      const wsProxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL
-      if (!wsProxyUrl) {
-        throw new Error('NEXT_PUBLIC_WS_PROXY_URL no está configurada')
-      }
-
+      const wsProxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
       console.log('🔗 Connecting to Railway proxy:', wsProxyUrl)
 
       // Request microphone access
@@ -113,11 +108,7 @@ export function useVoiceWS(): UseVoiceReturn {
 
       // Connect to Railway WebSocket proxy
       const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
-      const wsUrl = wsProxyUrl.includes('?') 
-        ? `${wsProxyUrl}&model=${encodeURIComponent(model)}`
-        : `${wsProxyUrl}?model=${encodeURIComponent(model)}`
-      
-      const ws = new WebSocket(wsUrl)
+      const ws = new WebSocket(`${wsProxyUrl}?model=${encodeURIComponent(model)}`)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -126,8 +117,7 @@ export function useVoiceWS(): UseVoiceReturn {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        // Send session configuration immediately (like the working version)
-        console.log('📤 Sending session.update...')
+        // Send session configuration
         ws.send(JSON.stringify({
           type: 'session.update',
           session: {
@@ -135,33 +125,28 @@ export function useVoiceWS(): UseVoiceReturn {
               type: 'server_vad',
               silence_duration_ms: 500
             },
-            instructions: 'You are a helpful AI assistant. Keep responses concise and natural for voice conversation.',
+            instructions: `You are a helpful AI assistant. Keep responses concise and natural for voice conversation.`,
             voice: 'alloy',
-            modalities: ['text', 'audio'],
-            input_audio_transcription: {
-              model: 'whisper-1'
-            }
+            modalities: ['text', 'audio']
           }
         }))
 
-        // Start streaming audio from microphone immediately
-        console.log('🎤 Starting audio stream...')
+        // Start streaming audio from microphone
         startAudioStreaming(stream, ws)
       }
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
-          console.log('📨 Received:', message.type)
           
           // Handle different event types
           switch (message.type) {
             case 'session.created':
-              console.log('✅ Session created:', message.session?.id)
+              console.log('✅ Session created:', message.session.id)
               break
             
             case 'session.updated':
-              console.log('✅ Session updated - ready to receive audio')
+              console.log('✅ Session updated')
               break
             
             case 'input_audio_buffer.speech_started':
@@ -175,42 +160,29 @@ export function useVoiceWS(): UseVoiceReturn {
               break
             
             case 'response.audio.delta':
-            case 'response.audio_transcript.delta':
-              setStatus('active')
+              // Play audio delta
+              if (message.delta) {
+                playAudioDelta(message.delta)
+              }
               break
             
-            case 'response.audio.done':
+            case 'response.audio_transcript.delta':
+              console.log('📝 AI transcript:', message.delta)
+              break
+            
             case 'response.done':
               console.log('✅ Response completed')
               setStatus('listening')
               break
             
-            case 'conversation.item.input_audio_transcription.completed':
-              console.log('📝 User transcript:', message.transcript)
-              break
-            
             case 'error':
-              console.error('❌ OpenAI Error:', {
-                type: message.error?.type,
-                code: message.error?.code,
-                message: message.error?.message,
-                param: message.error?.param,
-                event_id: message.error?.event_id
-              })
-              setError(new Error(message.error?.message || 'Server error'))
+              console.error('❌ Server error:', message.error)
+              setError(new Error(message.error.message || 'Server error'))
               setStatus('error')
-              break
-            
-            default:
-              // Log unknown message types for debugging
-              if (!message.type.includes('delta') && !message.type.includes('done')) {
-                console.log('ℹ️ Unhandled message type:', message.type)
-              }
               break
           }
         } catch (err) {
-          // Might receive non-JSON pings, ignore
-          console.log('⚠️ Non-JSON message received (probably ping/pong)')
+          console.error('❌ Failed to parse message:', err)
         }
       }
 
@@ -221,22 +193,21 @@ export function useVoiceWS(): UseVoiceReturn {
       }
 
       ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed')
-        console.log('  Code:', event.code)
-        console.log('  Reason:', event.reason || '(no reason provided)')
-        console.log('  Clean:', event.wasClean)
-        
+        console.log('🔌 WebSocket closed:', event.code, event.reason)
         if (status !== 'idle') {
           setStatus('idle')
         }
       }
 
-    } catch (err: any) {
+      // Start audio level monitoring
+      monitorAudioLevel()
+
+    } catch (err) {
       console.error('❌ Voice WS error:', err)
-      setError(err instanceof Error ? err : new Error(String(err)))
+      setError(err instanceof Error ? err : new Error('Failed to start session'))
       setStatus('error')
     }
-  }, [monitorAudioLevel, status])
+  }, [monitorAudioLevel])
 
   const startAudioStreaming = (stream: MediaStream, ws: WebSocket) => {
     const audioTrack = stream.getAudioTracks()[0]
@@ -245,112 +216,82 @@ export function useVoiceWS(): UseVoiceReturn {
       return
     }
 
-    console.log('🎤 Audio track:', {
-      enabled: audioTrack.enabled,
-      muted: audioTrack.muted,
-      readyState: audioTrack.readyState
+    // Create MediaRecorder to stream audio
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus',
+      audioBitsPerSecond: 16000
     })
 
-    try {
-      // Create MediaRecorder to stream audio
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 16000
-      })
-      mediaRecorderRef.current = mediaRecorder
-
-      let chunkCount = 0
-
-      mediaRecorder.ondataavailable = (event) => {
-        chunkCount++
-        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          // Log every 10th chunk to avoid spam
-          if (chunkCount % 10 === 0) {
-            console.log(`📤 Sending audio chunk #${chunkCount}, size: ${event.data.size} bytes`)
-          }
-          
-          // Convert to base64 and send
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            const base64Audio = (reader.result as string).split(',')[1]
-            ws.send(JSON.stringify({
-              type: 'input_audio_buffer.append',
-              audio: base64Audio
-            }))
-          }
-          reader.readAsDataURL(event.data)
-        } else if (ws.readyState !== WebSocket.OPEN) {
-          console.warn('⚠️ WebSocket not open, cannot send audio')
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+        // Convert to base64 and send
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const base64Audio = (reader.result as string).split(',')[1]
+          ws.send(JSON.stringify({
+            type: 'input_audio_buffer.append',
+            audio: base64Audio
+          }))
         }
+        reader.readAsDataURL(event.data)
       }
-
-      mediaRecorder.onerror = (event) => {
-        console.error('❌ MediaRecorder error:', event)
-      }
-
-      mediaRecorder.onstart = () => {
-        console.log('✅ MediaRecorder started')
-      }
-
-      mediaRecorder.onstop = () => {
-        console.log('⏹️ MediaRecorder stopped')
-      }
-
-      // Send audio chunks every 100ms
-      mediaRecorder.start(100)
-      console.log('🎤 MediaRecorder configured and started')
-    } catch (err) {
-      console.error('❌ Failed to start MediaRecorder:', err)
     }
+
+    // Send audio chunks every 100ms
+    mediaRecorder.start(100)
+    console.log('🎤 Started streaming microphone audio to OpenAI')
+  }
+
+  const playAudioDelta = (base64Audio: string) => {
+    // Decode base64 to audio and play
+    const audioData = atob(base64Audio)
+    const arrayBuffer = new Uint8Array(audioData.length)
+    for (let i = 0; i < audioData.length; i++) {
+      arrayBuffer[i] = audioData.charCodeAt(i)
+    }
+
+    const audioContext = audioContextRef.current
+    if (!audioContext) return
+
+    audioContext.decodeAudioData(arrayBuffer.buffer, (buffer) => {
+      const source = audioContext.createBufferSource()
+      source.buffer = buffer
+      source.connect(audioContext.destination)
+      source.start()
+    })
   }
 
   const endSession = useCallback(async () => {
-    try {
-      console.log('🛑 Stopping WebSocket voice session...')
+    console.log('🛑 Stopping WebSocket voice session...')
 
-      // Stop animation frame
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-
-      // Stop MediaRecorder
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop()
-        mediaRecorderRef.current = null
-      }
-
-      // Disconnect analyser
-      if (analyserRef.current) {
-        analyserRef.current.disconnect()
-        analyserRef.current = null
-      }
-
-      // Close WebSocket
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
-
-      // Stop media stream
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop())
-        mediaStreamRef.current = null
-      }
-
-      // Close audio context
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
-
-      setStatus('idle')
-      setAudioLevel(0)
-      setDuration(0)
-      setIsMuted(false)
-    } catch (err) {
-      console.error('❌ Error ending session:', err)
+    // Stop animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
     }
+
+    // Close WebSocket
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
+    }
+
+    // Stop media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
+
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+
+    setStatus('idle')
+    setAudioLevel(0)
+    setDuration(0)
+    setIsMuted(false)
   }, [])
 
   const toggleMute = useCallback(() => {
@@ -362,14 +303,15 @@ export function useVoiceWS(): UseVoiceReturn {
     setIsMuted(!track.enabled)
   }, [])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      endSession()
+      if (wsRef.current) wsRef.current.close()
+      if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach(t => t.stop())
+      if (audioContextRef.current) audioContextRef.current.close()
     }
-  }, [endSession])
+  }, [])
 
-  const isActive = status === 'connecting' || status === 'listening' || status === 'speaking' || status === 'active'
+  const isActive = status !== 'idle' && status !== 'error'
 
   return {
     startSession,
