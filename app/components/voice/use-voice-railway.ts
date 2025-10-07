@@ -39,6 +39,8 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
   const chatIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const playbackContextRef = useRef<AudioContext | null>(null)
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -153,7 +155,52 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
       ws.onmessage = async (event) => {
         try {
+          // Handle text messages (JSON events)
+          if (typeof event.data !== 'string') {
+            console.warn('Unknown message type:', typeof event.data)
+            return
+          }
+
           const data = JSON.parse(event.data)
+          
+          // Handle audio delta events (base64 encoded PCM16 audio)
+          if (data.type === 'response.audio.delta' && data.delta) {
+            // Decode base64 PCM16 audio and play it
+            try {
+              const audioData = atob(data.delta)
+              const int16Array = new Int16Array(audioData.length / 2)
+              
+              // Convert base64 string to Int16 array
+              for (let i = 0; i < int16Array.length; i++) {
+                const byte1 = audioData.charCodeAt(i * 2)
+                const byte2 = audioData.charCodeAt(i * 2 + 1)
+                int16Array[i] = (byte2 << 8) | byte1
+              }
+              
+              // Initialize playback context if needed
+              if (!playbackContextRef.current) {
+                playbackContextRef.current = new AudioContext({ sampleRate: 24000 })
+              }
+              
+              // Convert Int16 PCM to Float32 for Web Audio API
+              const float32Array = new Float32Array(int16Array.length)
+              for (let i = 0; i < int16Array.length; i++) {
+                float32Array[i] = int16Array[i] / (int16Array[i] < 0 ? 32768 : 32767)
+              }
+              
+              // Create audio buffer and play
+              const audioBuffer = playbackContextRef.current.createBuffer(1, float32Array.length, 24000)
+              audioBuffer.getChannelData(0).set(float32Array)
+              
+              const source = playbackContextRef.current.createBufferSource()
+              source.buffer = audioBuffer
+              source.connect(playbackContextRef.current.destination)
+              source.start()
+            } catch (audioError) {
+              console.error('Error playing audio:', audioError)
+            }
+            return
+          }
           
           // Wait for session.created
           if (data.type === 'session.created' && !sessionReady) {
@@ -259,9 +306,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
       // Audio processor function
       const startAudioProcessor = () => {
-        if (!processor) return
+        if (!processorRef.current) return
 
-        processor.onaudioprocess = (e) => {
+        processorRef.current.onaudioprocess = (e) => {
           if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
             const inputData = e.inputBuffer.getChannelData(0)
             
@@ -348,13 +395,19 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       processorRef.current = null
     }
 
-    // Close audio context
+    // Close audio contexts
     if (audioContextRef.current) {
       audioContextRef.current.close()
       audioContextRef.current = null
     }
+    
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close()
+      playbackContextRef.current = null
+    }
 
     analyserRef.current = null
+    audioElementRef.current = null
     sessionIdRef.current = null
     startTimeRef.current = null
 
