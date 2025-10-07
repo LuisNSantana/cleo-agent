@@ -11,6 +11,11 @@ import { requestConfirmation } from '@/lib/confirmation/unified'
 import { redactInput } from '@/lib/actions/snapshot-store'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { createHmac } from 'crypto'
+import { 
+  executeWithRateLimit, 
+  getRateLimitStatus, 
+  tweetQueue 
+} from '@/lib/twitter/rate-limiter'
 
 // Helper function to get Twitter credentials
 async function getTwitterCredentials() {
@@ -113,36 +118,57 @@ export const postTweetTool = tool({
       }
 
       if (hasBearer) {
-        // v2 create tweet
+        // v2 create tweet with rate limit handling
         const tweetData: any = { text: analysis.suggested }
         if (reply_to_id) tweetData.reply = { in_reply_to_tweet_id: reply_to_id }
         if (quote_tweet_id) tweetData.quote_tweet_id = quote_tweet_id
-        const response = await fetch('https://api.twitter.com/2/tweets', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${credentials.bearer_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(tweetData)
-        })
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          return { success: false, error: `Failed to post tweet: ${errorData.detail || response.statusText}`, details: errorData }
+        
+        const result = await executeWithRateLimit<any>(() => 
+          fetch('https://api.twitter.com/2/tweets', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${credentials.bearer_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(tweetData)
+          })
+        )
+
+        if (!result.success) {
+          // If rate limited and should queue, offer to queue the tweet
+          if (result.shouldQueue) {
+            const queueId = tweetQueue.add(analysis.suggested, { reply_to_id, quote_tweet_id }, 60000) // Queue for 1 minute later
+            return {
+              success: false,
+              error: result.error,
+              suggestion: `💡 Tip: El tweet ha sido agregado a la cola y se intentará publicar automáticamente cuando el límite se resetee.`,
+              rate_limit_status: result.rateLimitInfo ? getRateLimitStatus(result.rateLimitInfo) : undefined,
+              queued: true,
+              queue_id: queueId
+            }
+          }
+          
+          return { 
+            success: false, 
+            error: result.error,
+            rate_limit_status: result.rateLimitInfo ? getRateLimitStatus(result.rateLimitInfo) : undefined
+          }
         }
-        const result = await response.json()
+
         return {
           success: true,
           message: 'Tweet posted successfully!',
           data: {
-            tweet_id: result.data?.id,
-            tweet_url: result.data?.id ? `https://x.com/i/web/status/${result.data.id}` : undefined,
+            tweet_id: result.data?.data?.id,
+            tweet_url: result.data?.data?.id ? `https://x.com/i/web/status/${result.data.data.id}` : undefined,
             content: analysis.suggested,
             posted_at: new Date().toISOString(),
             hashtags: analysis.hashtags,
             mentions: analysis.mentions,
             urls: analysis.urls,
             char_count: analysis.charCount,
-          }
+          },
+          rate_limit_status: result.rateLimitInfo ? getRateLimitStatus(result.rateLimitInfo) : undefined
         }
       }
 
@@ -519,6 +545,67 @@ export const twitterAnalyticsTool = tool({
   }
 })
 
+/**
+ * Check Twitter API rate limit status
+ */
+export const checkRateLimitTool = tool({
+  description: 'Check current Twitter/X API rate limit status and queued tweets.',
+  inputSchema: z.object({
+    endpoint: z.enum(['tweets', 'search', 'users']).default('tweets').describe('API endpoint to check rate limits for')
+  }),
+  execute: async ({ endpoint }) => {
+    try {
+      const credentials = await getTwitterCredentials()
+      if (!credentials.bearer_token) {
+        return { success: false, error: 'No Bearer token available for rate limit check' }
+      }
+
+      // Check rate limit status for the endpoint
+      const result = await executeWithRateLimit<any>(() =>
+        fetch(`https://api.twitter.com/1.1/application/rate_limit_status.json?resources=${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${credentials.bearer_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      )
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error,
+          queue_status: {
+            queued_tweets: tweetQueue.size(),
+            ready_to_send: tweetQueue.getReady().length
+          }
+        }
+      }
+
+      return {
+        success: true,
+        rate_limit_status: result.rateLimitInfo ? getRateLimitStatus(result.rateLimitInfo) : 'No disponible',
+        rate_limit_details: result.rateLimitInfo,
+        queue_status: {
+          queued_tweets: tweetQueue.size(),
+          ready_to_send: tweetQueue.getReady().length
+        },
+        recommendations: [
+          'Espacia tus tweets para evitar alcanzar el límite',
+          'Usa la cola automática cuando alcances el límite',
+          'El límite se resetea cada 24 horas para publicaciones',
+          'Considera programar tweets para distribuir el uso'
+        ]
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error checking rate limit status'
+      }
+    }
+  }
+})
+
 // ============================================================================
 // EXPORT ALL TOOLS
 // ============================================================================
@@ -528,7 +615,8 @@ export const twitterTools = {
   generateTweet: generateTweetTool,
   hashtagResearch: hashtagResearchTool,
   twitterTrendsAnalysis: twitterTrendsAnalysisTool,
-  twitterAnalytics: twitterAnalyticsTool
+  twitterAnalytics: twitterAnalyticsTool,
+  checkRateLimit: checkRateLimitTool
 }
 
 export type TwitterToolNames = keyof typeof twitterTools
@@ -539,5 +627,6 @@ export const twitterToolMeta: Record<TwitterToolNames, { icon: string; label?: s
   generateTweet: { icon: '/icons/x_twitter.png', label: 'Generate Tweet' },
   hashtagResearch: { icon: '/icons/x_twitter.png', label: 'Hashtag Research' },
   twitterTrendsAnalysis: { icon: '/icons/x_twitter.png', label: 'Trends Analysis' },
-  twitterAnalytics: { icon: '/icons/x_twitter.png', label: 'Analytics' }
+  twitterAnalytics: { icon: '/icons/x_twitter.png', label: 'Analytics' },
+  checkRateLimit: { icon: '/icons/x_twitter.png', label: 'Rate Limit Status' }
 }
