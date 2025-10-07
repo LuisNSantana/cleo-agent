@@ -172,10 +172,41 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Using default config (NO session.update)')
+            console.log('✅ session.created - Sending full configuration...')
             
-            // DON'T send session.update - use OpenAI defaults
-            // This is a test to see if session.update is causing the error
+            // Send complete session configuration with tools
+            const sessionUpdate: any = {
+              type: 'session.update',
+              session: {
+                modalities: ['text', 'audio'],
+                voice: configRef.current.voice || 'alloy',
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 500
+                }
+              }
+            }
+
+            // Add instructions if available
+            if (configRef.current.instructions) {
+              sessionUpdate.session.instructions = configRef.current.instructions
+            }
+
+            // Add tools if available
+            if (configRef.current.tools && Array.isArray(configRef.current.tools)) {
+              sessionUpdate.session.tools = configRef.current.tools
+            }
+
+            try {
+              ws.send(JSON.stringify(sessionUpdate))
+              console.log('📤 Sent session.update with full config (instructions + tools)')
+            } catch (sendError) {
+              console.error('Failed to send session.update:', sendError)
+            }
             
             sessionReady = true
             setStatus('listening')
@@ -194,7 +225,16 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           if (eventType === 'error') {
             console.error('❌ OpenAI Error:', data)
-            setError(new Error(data.error?.message || 'OpenAI connection error'))
+            const errorMessage = data.error?.message || 'OpenAI connection error'
+            
+            // Check if it's a server error (500)
+            if (data.error?.type === 'server_error') {
+              console.warn('⚠️ OpenAI server error - this is on their side')
+              setError(new Error('OpenAI is experiencing issues. The service may be temporarily unavailable.'))
+            } else {
+              setError(new Error(errorMessage))
+            }
+            
             setStatus('error')
             return
           }

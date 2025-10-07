@@ -76,7 +76,8 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
     isActive,
     audioLevel,
     duration,
-    cost
+    cost,
+    provider
   } = useVoice()
 
   useEffect(() => {
@@ -192,15 +193,38 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
 
           <div className="relative p-8 space-y-6">
             {/* Status indicator */}
-            <div className="flex items-center justify-center gap-2">
-              <div className={cn(
-                "w-2 h-2 rounded-full animate-pulse",
-                getStatusColor()
-              )} />
-              <span className="text-sm font-medium text-zinc-300">
-                {getStatusText()}
-              </span>
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-2 h-2 rounded-full animate-pulse",
+                  getStatusColor()
+                )} />
+                <span className="text-sm font-medium text-zinc-300">
+                  {getStatusText()}
+                </span>
+              </div>
+              
+              {/* Provider indicator */}
+              {(provider as any) && (
+                <div className="text-xs text-zinc-500">
+                  {(provider as any) === 'elevenlabs' ? '🎙️ ElevenLabs Voice' : '🤖 OpenAI'}
+                </div>
+              )}
             </div>
+
+            {/* OpenAI Server Error Warning */}
+            {error && error.message.includes('experiencing issues') && (
+              <div className="mx-auto max-w-sm p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center mt-0.5">
+                    <span className="text-yellow-500 text-xs">⚠️</span>
+                  </div>
+                  <div className="flex-1 text-xs text-yellow-200/90 leading-relaxed">
+                    <strong>OpenAI está experimentando problemas.</strong> Este es un error temporal de su servidor. Por favor intenta de nuevo en unos minutos.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Main content */}
             {!isActive ? (
