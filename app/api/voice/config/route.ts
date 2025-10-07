@@ -328,11 +328,11 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
     ]
 
     // Return configuration for voice session with tools
-    // OPTIMIZED: 'nova' voice is most natural for Spanish
+    // Using stable gpt-4o-realtime instead of mini (mini version has 500 errors)
     return NextResponse.json({
       apiKey,
-      model: 'gpt-4o-mini-realtime-preview-2024-12-17',
-      voice: 'nova',  // Most natural voice for Spanish (2025 best practice)
+      model: 'gpt-4o-realtime-preview-2024-12-17',  // Stable version without "mini"
+      voice: 'alloy',  // Alloy is most reliable voice
       instructions,
       tools: voiceTools
     })

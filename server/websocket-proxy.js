@@ -32,7 +32,7 @@ wss.on('connection', (clientWs, req) => {
   
   // Extract model from query params
   const url = new URL(req.url, `http://${req.headers.host}`)
-  const model = url.searchParams.get('model') || 'gpt-4o-mini-realtime-preview-2024-12-17'
+  const model = url.searchParams.get('model') || 'gpt-4o-realtime-preview-2024-12-17'  // Use stable version
   
   // Connect to OpenAI Realtime API
   const openaiUrl = `wss://api.openai.com/v1/realtime?model=${model}`
