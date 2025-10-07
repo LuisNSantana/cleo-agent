@@ -114,16 +114,21 @@ export function useVoiceElevenLabs() {
       sessionIdRef.current = sessionId
 
       // Get ElevenLabs signed URL
+      const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_1301k707t7ybf60bby0zc3q49eqt'
+      console.log('🎯 Using ElevenLabs Agent ID:', agentId)
+      
       const signedUrlResponse = await fetch('/api/voice/elevenlabs/signed-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          agent_id: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID 
+          agent_id: agentId
         })
       })
 
       if (!signedUrlResponse.ok) {
-        throw new Error('Failed to get ElevenLabs signed URL')
+        const errorText = await signedUrlResponse.text()
+        console.error('❌ ElevenLabs signed URL error:', signedUrlResponse.status, errorText)
+        throw new Error(`Failed to get ElevenLabs signed URL: ${signedUrlResponse.status}`)
       }
 
       const { signed_url } = await signedUrlResponse.json()

@@ -2,21 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    console.log('📥 Received ElevenLabs signed URL request')
+    
+    const body = await req.json().catch(() => ({}))
     const { agent_id } = body
 
     const apiKey = process.env.ELEVENLABS_API_KEY
     if (!apiKey) {
+      console.error('❌ ELEVENLABS_API_KEY not configured')
       return NextResponse.json(
         { error: 'ElevenLabs API key not configured' },
         { status: 500 }
       )
     }
 
-    // Use provided agent_id or default from env
-    const agentId = agent_id || process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID
+    // Use provided agent_id or default
+    const agentId = agent_id || process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_1301k707t7ybf60bby0zc3q49eqt'
+    console.log('🎯 Using Agent ID:', agentId)
 
     if (!agentId) {
+      console.error('❌ No agent ID available')
       return NextResponse.json(
         { error: 'No agent ID provided' },
         { status: 400 }
@@ -36,14 +41,15 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('ElevenLabs API error:', errorData)
+      console.error('❌ ElevenLabs API error:', response.status, errorData)
       return NextResponse.json(
-        { error: 'Failed to get signed URL from ElevenLabs' },
+        { error: 'Failed to get signed URL from ElevenLabs', details: errorData },
         { status: response.status }
       )
     }
 
     const data = await response.json()
+    console.log('✅ Got signed URL from ElevenLabs')
 
     return NextResponse.json({
       signed_url: data.signed_url || data.url
