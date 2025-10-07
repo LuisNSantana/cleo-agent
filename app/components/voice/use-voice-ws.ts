@@ -126,7 +126,8 @@ export function useVoiceWS(): UseVoiceReturn {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        // Send session configuration
+        // Send session configuration immediately (like the working version)
+        console.log('📤 Sending session.update...')
         ws.send(JSON.stringify({
           type: 'session.update',
           session: {
@@ -143,13 +144,15 @@ export function useVoiceWS(): UseVoiceReturn {
           }
         }))
 
-        // Start streaming audio from microphone
+        // Start streaming audio from microphone immediately
+        console.log('🎤 Starting audio stream...')
         startAudioStreaming(stream, ws)
       }
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
+          console.log('📨 Received:', message.type)
           
           // Handle different event types
           switch (message.type) {
@@ -158,7 +161,7 @@ export function useVoiceWS(): UseVoiceReturn {
               break
             
             case 'session.updated':
-              console.log('✅ Session updated')
+              console.log('✅ Session updated - ready to receive audio')
               break
             
             case 'input_audio_buffer.speech_started':
@@ -187,13 +190,27 @@ export function useVoiceWS(): UseVoiceReturn {
               break
             
             case 'error':
-              console.error('❌ Server error:', message.error)
+              console.error('❌ OpenAI Error:', {
+                type: message.error?.type,
+                code: message.error?.code,
+                message: message.error?.message,
+                param: message.error?.param,
+                event_id: message.error?.event_id
+              })
               setError(new Error(message.error?.message || 'Server error'))
               setStatus('error')
+              break
+            
+            default:
+              // Log unknown message types for debugging
+              if (!message.type.includes('delta') && !message.type.includes('done')) {
+                console.log('ℹ️ Unhandled message type:', message.type)
+              }
               break
           }
         } catch (err) {
           // Might receive non-JSON pings, ignore
+          console.log('⚠️ Non-JSON message received (probably ping/pong)')
         }
       }
 
@@ -204,7 +221,11 @@ export function useVoiceWS(): UseVoiceReturn {
       }
 
       ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason)
+        console.log('🔌 WebSocket closed')
+        console.log('  Code:', event.code)
+        console.log('  Reason:', event.reason || '(no reason provided)')
+        console.log('  Clean:', event.wasClean)
+        
         if (status !== 'idle') {
           setStatus('idle')
         }
@@ -224,6 +245,12 @@ export function useVoiceWS(): UseVoiceReturn {
       return
     }
 
+    console.log('🎤 Audio track:', {
+      enabled: audioTrack.enabled,
+      muted: audioTrack.muted,
+      readyState: audioTrack.readyState
+    })
+
     try {
       // Create MediaRecorder to stream audio
       const mediaRecorder = new MediaRecorder(stream, {
@@ -232,8 +259,16 @@ export function useVoiceWS(): UseVoiceReturn {
       })
       mediaRecorderRef.current = mediaRecorder
 
+      let chunkCount = 0
+
       mediaRecorder.ondataavailable = (event) => {
+        chunkCount++
         if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+          // Log every 10th chunk to avoid spam
+          if (chunkCount % 10 === 0) {
+            console.log(`📤 Sending audio chunk #${chunkCount}, size: ${event.data.size} bytes`)
+          }
+          
           // Convert to base64 and send
           const reader = new FileReader()
           reader.onloadend = () => {
@@ -244,12 +279,26 @@ export function useVoiceWS(): UseVoiceReturn {
             }))
           }
           reader.readAsDataURL(event.data)
+        } else if (ws.readyState !== WebSocket.OPEN) {
+          console.warn('⚠️ WebSocket not open, cannot send audio')
         }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('❌ MediaRecorder error:', event)
+      }
+
+      mediaRecorder.onstart = () => {
+        console.log('✅ MediaRecorder started')
+      }
+
+      mediaRecorder.onstop = () => {
+        console.log('⏹️ MediaRecorder stopped')
       }
 
       // Send audio chunks every 100ms
       mediaRecorder.start(100)
-      console.log('🎤 Started streaming microphone audio to OpenAI')
+      console.log('🎤 MediaRecorder configured and started')
     } catch (err) {
       console.error('❌ Failed to start MediaRecorder:', err)
     }
