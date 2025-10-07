@@ -1,14 +1,8 @@
-/**
- * Voice Mode - WebSocket Implementation
- * Uses Railway proxy server for WebSocket connection
- * RESTORED FROM WORKING VERSION
- */
-
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
-export type VoiceStatus = 'idle' | 'connecting' | 'active' | 'listening' | 'speaking' | 'error'
+export type VoiceStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error'
 
 export interface UseVoiceReturn {
   startSession: (chatId?: string) => Promise<void>
@@ -29,51 +23,59 @@ export function useVoiceWS(): UseVoiceReturn {
   const [isMuted, setIsMuted] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [cost] = useState(0)
+  const [cost, setCost] = useState(0)
 
-  const wsRef = useRef<WebSocket | null>(null)
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
+  const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
-  const animationFrameRef = useRef<number | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  const chatIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const hasActiveResponseRef = useRef<boolean>(false)
+  const enableBargeInRef = useRef<boolean>(false)
 
-  // Duration tracking
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (startTimeRef.current && (status === 'active' || status === 'listening' || status === 'speaking')) {
-        const secs = Math.floor((Date.now() - startTimeRef.current) / 1000)
-        setDuration(secs)
-      }
-    }, 500)
-    return () => clearInterval(id)
-  }, [status])
-
+  // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
-    const analyser = analyserRef.current
-    if (!analyser) return
+    if (!analyserRef.current) return
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+    
     const updateLevel = () => {
-      analyser.getByteFrequencyData(dataArray)
+      if (!analyserRef.current || status === 'idle') return
+
+      analyserRef.current.getByteFrequencyData(dataArray)
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length
       setAudioLevel(average / 255)
+
       animationFrameRef.current = requestAnimationFrame(updateLevel)
     }
 
     updateLevel()
-  }, [])
+  }, [status])
+
+  // Duration tracking
+  useEffect(() => {
+    if (status === 'active' || status === 'speaking' || status === 'listening') {
+      const interval = setInterval(() => {
+        if (startTimeRef.current) {
+          setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000))
+        }
+      }, 1000)
+
+      return () => clearInterval(interval)
+    }
+  }, [status])
 
   const startSession = useCallback(async (chatId?: string) => {
     try {
       setStatus('connecting')
       setError(null)
-      console.log('🎤 Starting WebSocket voice session...')
+      chatIdRef.current = chatId || null
 
-      // IMPROVEMENT: Fetch voice configuration with contextual instructions
-      console.log('📋 Fetching voice configuration...')
+      // Fetch voice configuration with contextual instructions
       const configResponse = await fetch('/api/voice/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,269 +90,543 @@ export function useVoiceWS(): UseVoiceReturn {
       const config = await configResponse.json()
       const instructions = typeof config?.instructions === 'string'
         ? config.instructions.trim()
-        : 'You are a helpful AI assistant. Keep responses concise and natural for voice conversation.'
-      
-      const voice = config?.voice || 'nova'
-      const tools = config?.tools || []
+        : undefined
 
-      console.log('✅ Voice config loaded:', { voice, toolsCount: tools.length })
-
-      // Get Railway proxy URL from environment
-      const wsProxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
-      console.log('🔗 Connecting to Railway proxy:', wsProxyUrl)
-
-      // Request microphone access
-      console.log('🎤 Requesting microphone access...')
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1,
-          sampleRate: 24000 // OpenAI prefers 24kHz
-        } 
+          autoGainControl: true
+        }
       })
+
       mediaStreamRef.current = stream
-      console.log('✅ Microphone access granted')
 
-      // Setup audio context for visualization
-      const audioContext = new AudioContext({ sampleRate: 24000 })
-      audioContextRef.current = audioContext
-
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume()
-      }
-
+      // Setup audio analyzer
+      const audioContext = new AudioContext()
+      const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.8
+      source.connect(analyser)
       analyserRef.current = analyser
 
-      const source = audioContext.createMediaStreamSource(stream)
-      source.connect(analyser)
+      // Create voice session in database
+      const sessionResponse = await fetch('/api/voice/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId })
+      })
 
-      // Connect to Railway WebSocket proxy
-      const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
-      const ws = new WebSocket(`${wsProxyUrl}?model=${encodeURIComponent(model)}`)
-      wsRef.current = ws
+      if (!sessionResponse.ok) {
+        const errorData = await sessionResponse.json()
+        throw new Error(errorData.error || 'Failed to create voice session')
+      }
 
-      ws.onopen = () => {
-        console.log('✅ WebSocket connected to Railway proxy')
+      const { sessionId: voiceSessionId } = await sessionResponse.json()
+      sessionIdRef.current = voiceSessionId
+
+      // Create WebRTC peer connection with public STUN for NAT traversal
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      })
+      peerConnectionRef.current = pc
+
+      // Set up audio element for remote audio playback
+      const audioElement = document.createElement('audio')
+      audioElement.autoplay = true
+      audioElementRef.current = audioElement
+
+      // Handle remote audio stream from OpenAI
+      pc.ontrack = (e) => {
+        console.log('📻 Received remote audio track')
+        if (audioElement) {
+          audioElement.srcObject = e.streams[0]
+        }
+      }
+
+      // Add local audio track (microphone)
+      const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack && audioTrack.enabled === false) {
+        audioTrack.enabled = true
+      }
+      pc.addTrack(audioTrack, stream)
+
+      // Helper to attach handlers to a data channel
+      const bindDataChannel = (channel: RTCDataChannel) => {
+        dataChannelRef.current = channel
+        channel.onopen = () => {
+          console.log('✅ Data channel opened')
+          setStatus('listening')
+          startTimeRef.current = Date.now()
+          monitorAudioLevel()
+        }
+        channel.onclose = () => {
+          console.log('🔌 Data channel closed')
+        }
+        channel.onerror = (error) => {
+          console.error('❌ Data channel error:', error)
+          setError(new Error('Data channel error'))
+          setStatus('error')
+        }
+        // Attach message handler below after definition
+      }
+
+      // Prefer remote-created channel if the server provides it
+      pc.ondatachannel = (e) => {
+        console.log('📡 Remote data channel received:', e.channel.label, 'state:', e.channel.readyState)
+        bindDataChannel(e.channel)
+        // message handler is assigned after definition below
+      }
+
+      // Create data channel for events (must be done before createOffer). Some providers expect client-initiated.
+      const dc = pc.createDataChannel('oai-events')
+      bindDataChannel(dc)
+      console.log('📡 Created data channel: oai-events, initial state:', dc.readyState)
+
+      dc.onopen = async () => {
+        console.log('✅ Data channel opened')
         setStatus('listening')
         startTimeRef.current = Date.now()
         monitorAudioLevel()
-
-        // IMPROVEMENT: Send session configuration with voice, instructions, and tools
-        const sessionUpdate: any = {
-          type: 'session.update',
-          session: {
-            turn_detection: {
-              type: 'server_vad',
-              silence_duration_ms: 500
-            },
-            voice: voice,
-            modalities: ['text', 'audio'],
-            instructions: instructions,
-            input_audio_transcription: {
-              model: 'whisper-1'
+        
+        // 1. First, send session.update with instructions, VAD config, and transcription
+        try {
+          const sessionUpdate: any = {
+            type: 'session.update',
+            session: {
+              // Enable server-side VAD turn detection and tune pause before responding
+              // 500–700ms yields natural pauses; use 500ms for quicker detection
+              turn_detection: {
+                type: 'server_vad',
+                silence_duration_ms: 500
+              },
+              // CRÍTICO: Habilitar transcripción de audio del usuario
+              // Sin esto, OpenAI NO transcribe la voz del usuario
+              input_audio_transcription: {
+                model: 'whisper-1'
+              }
             }
           }
-        }
-
-        // Add tools if available
-        if (tools.length > 0) {
-          sessionUpdate.session.tools = tools
-          console.log('🔧 Added tools to session:', tools.map((t: any) => t.name).join(', '))
-        }
-
-        ws.send(JSON.stringify(sessionUpdate))
-        console.log('📤 Session configuration sent')
-
-        // Start streaming audio from microphone
-        startAudioStreaming(stream, ws)
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data)
-          
-          // Handle different event types
-          switch (message.type) {
-            case 'session.created':
-              console.log('✅ Session created:', message.session.id)
-              break
-            
-            case 'session.updated':
-              console.log('✅ Session updated')
-              break
-            
-            case 'input_audio_buffer.speech_started':
-              console.log('🎤 User started speaking')
-              setStatus('speaking')
-              break
-            
-            case 'input_audio_buffer.speech_stopped':
-              console.log('🎤 User stopped speaking')
-              setStatus('listening')
-              break
-            
-            case 'response.audio.delta':
-              // Play audio delta
-              if (message.delta) {
-                playAudioDelta(message.delta)
-              }
-              break
-            
-            case 'response.audio_transcript.delta':
-              console.log('📝 AI transcript:', message.delta)
-              break
-            
-            case 'response.done':
-              console.log('✅ Response completed')
-              setStatus('listening')
-              break
-            
-            case 'conversation.item.input_audio_transcription.completed':
-              console.log('📝 User transcript:', message.transcript)
-              break
-            
-            case 'error':
-              console.error('❌ Server error:', message.error)
-              setError(new Error(message.error.message || 'Server error'))
-              setStatus('error')
-              break
+          if (instructions && instructions.length > 0) {
+            sessionUpdate.session.instructions = instructions
           }
-        } catch (err) {
-          console.error('❌ Failed to parse message:', err)
+          dc.send(JSON.stringify(sessionUpdate))
+          console.log('🧠 Sent session.update (VAD config + transcription + instructions)')
+        } catch (sendError) {
+          console.error('Failed to send session.update:', sendError)
         }
+
+        // 2. NUEVO: Agregar mensajes previos del chat como conversation items
+        // Siguiendo best practices de ChatGPT y Grok
+        if (chatId) {
+          try {
+            console.log('📝 Fetching conversation context for chat:', chatId)
+            const contextResponse = await fetch(`/api/voice/context/${chatId}`)
+            
+            if (contextResponse.ok) {
+              const { messages } = await contextResponse.json()
+              
+              if (messages && messages.length > 0) {
+                console.log(`📚 Adding ${messages.length} previous messages to conversation`)
+                
+                // Agregar cada mensaje previo como conversation item
+                // Esto es lo que hacen ChatGPT y Grok para mantener contexto
+                for (const msg of messages) {
+                  try {
+                    dc.send(JSON.stringify({
+                      type: 'conversation.item.create',
+                      item: msg.item
+                    }))
+                  } catch (itemError) {
+                    console.error('Failed to add conversation item:', itemError)
+                  }
+                }
+                
+                console.log('✅ Conversation context loaded successfully')
+              } else {
+                console.log('ℹ️ No previous messages found for this chat')
+              }
+            } else {
+              console.log('⚠️ Could not fetch conversation context, continuing without it')
+            }
+          } catch (contextError) {
+            console.error('Error loading conversation context:', contextError)
+            // Continue without context - not a critical error
+          }
+        }
+        
+        // 3. Now ready to listen
+        setStatus('listening')
+        startTimeRef.current = Date.now()
+        monitorAudioLevel()
       }
 
-      ws.onerror = (event) => {
-        console.error('❌ WebSocket error:', event)
-        setError(new Error('WebSocket connection error'))
+      dc.onclose = () => {
+        console.log('❌ Data channel closed')
+      }
+
+      dc.onerror = (error) => {
+        console.error('❌ Data channel error:', error)
+        setError(new Error('Data channel error'))
         setStatus('error')
       }
 
-      ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason)
-        if (status !== 'idle') {
-          setStatus('idle')
+      const onDCMessage = async (e: MessageEvent) => {
+        try {
+          const event = JSON.parse(e.data)
+          console.log('Event:', event.type)
+
+          if (event.type === 'error') {
+            console.error('❌ OpenAI Error:', event)
+            setError(new Error(event.error?.message || 'OpenAI error'))
+            setStatus('error')
+            return
+          }
+
+          if (event.type === 'input_audio_buffer.speech_started') {
+            console.log('🎤 User started speaking')
+            setStatus('speaking')
+            // Barge-in: cancel any ongoing response so the model stops speaking immediately
+            try {
+              if (enableBargeInRef.current && hasActiveResponseRef.current) {
+                dc.send(JSON.stringify({ type: 'response.cancel' }))
+                console.log('⛔ Sent response.cancel for barge-in')
+                // Optimistically clear; model will also emit done events later
+                hasActiveResponseRef.current = false
+              } else {
+                console.log('ℹ️ No active response to cancel or barge-in disabled; skipping response.cancel')
+              }
+            } catch (cancelErr) {
+              console.error('Failed to send response.cancel:', cancelErr)
+            }
+          }
+
+          if (event.type === 'input_audio_buffer.speech_stopped') {
+            console.log('🎤 User stopped speaking')
+            setStatus('listening')
+          }
+
+          if (event.type === 'session.updated') {
+            console.log('✅ session.updated acknowledged by OpenAI')
+          }
+
+          if (event.type === 'response.audio.delta') {
+            setStatus('active')
+            hasActiveResponseRef.current = true
+          }
+
+          if (event.type === 'response.audio.done') {
+            setStatus('listening')
+            hasActiveResponseRef.current = false
+          }
+
+          // Text-only responses (if used) — set/clear active state too
+          if (event.type === 'response.output_text.delta') {
+            hasActiveResponseRef.current = true
+          }
+          if (event.type === 'response.output_text.done' || event.type === 'response.completed') {
+            hasActiveResponseRef.current = false
+          }
+
+          if (event.type === 'conversation.item.input_audio_transcription.completed') {
+            console.log('📝 User transcription:', event.transcript)
+            
+            // NUEVO: Guardar transcripción del usuario en el chat
+            if (chatIdRef.current && event.transcript) {
+              try {
+                await fetch('/api/voice/transcript', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chatId: chatIdRef.current,
+                    role: 'user',
+                    content: event.transcript,
+                    sessionId: sessionIdRef.current
+                  })
+                })
+                console.log('💾 User transcript saved to chat')
+              } catch (saveError) {
+                console.error('Failed to save user transcript:', saveError)
+              }
+            }
+          }
+          
+          // NUEVO: Capturar respuesta de Cleo para guardarla
+          if (event.type === 'response.audio_transcript.done' || event.type === 'response.text.done') {
+            const assistantTranscript = event.transcript || event.text
+            
+            if (chatIdRef.current && assistantTranscript) {
+              console.log('📝 Assistant transcription:', assistantTranscript)
+              
+              try {
+                await fetch('/api/voice/transcript', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chatId: chatIdRef.current,
+                    role: 'assistant',
+                    content: assistantTranscript,
+                    sessionId: sessionIdRef.current
+                  })
+                })
+                console.log('💾 Assistant transcript saved to chat')
+              } catch (saveError) {
+                console.error('Failed to save assistant transcript:', saveError)
+              }
+            }
+          }
+
+          // Handle tool calls from Realtime API
+          if (event.type === 'response.function_call_arguments.done') {
+            console.log('🔧 Tool call received:', event.name)
+            
+            try {
+              const toolCall = {
+                call_id: event.call_id,
+                name: event.name,
+                arguments: JSON.parse(event.arguments)
+              }
+              
+              console.log('🔧 Executing tool:', toolCall.name, toolCall.arguments)
+              
+              // Execute tool via backend
+              const toolResponse = await fetch('/api/voice/tools/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolCall })
+              })
+              
+              if (!toolResponse.ok) {
+                throw new Error('Tool execution failed')
+              }
+              
+              const toolResult = await toolResponse.json()
+              console.log('✅ Tool executed:', toolCall.name, 'Success:', JSON.parse(toolResult.output).success)
+              
+              // Send result back to Realtime API
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: toolCall.call_id,
+                  output: toolResult.output
+                }
+              }))
+              
+              // Trigger response generation with the tool result
+              dc.send(JSON.stringify({
+                type: 'response.create'
+              }))
+              
+              console.log('📤 Tool result sent back to OpenAI')
+            } catch (toolError) {
+              console.error('❌ Tool execution error:', toolError)
+              
+              // Send error back to OpenAI
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: event.call_id,
+                  output: JSON.stringify({
+                    success: false,
+                    error: (toolError as Error).message
+                  })
+                }
+              }))
+              
+              // Still trigger response so Cleo can explain the error
+              dc.send(JSON.stringify({
+                type: 'response.create'
+              }))
+            }
+          }
+        } catch (err) {
+          console.error('Error processing event:', err)
         }
       }
+      // Assign message handler to whichever channel is active now
+      dc.onmessage = onDCMessage
+      if (dataChannelRef.current && dataChannelRef.current !== dc) {
+        dataChannelRef.current.onmessage = onDCMessage
+      }
 
-      // Start audio level monitoring
-      monitorAudioLevel()
+
+      // Create offer
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+
+      // Ensure ICE gathering completes (no trickle) before sending offer
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve()
+        const timeout = setTimeout(() => resolve(), 3000)
+        const check = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check)
+            clearTimeout(timeout)
+            resolve()
+          }
+        }
+        pc.addEventListener('icegatheringstatechange', check)
+      })
+
+      console.log('📤 Sending SDP offer to backend...')
+      console.log('📤 SDP length:', offer.sdp?.length)
+      console.log('📤 SDP preview:', offer.sdp?.substring(0, 100))
+
+      // Send offer (with gathered ICE candidates) to our backend which will forward to OpenAI
+      const sdpResponse = await fetch('/api/voice/webrtc/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          session: {
+            model: config?.model,
+            voice: config?.voice,
+            instructions: config?.instructions
+          }
+        })
+      })
+
+      console.log('📥 Response status:', sdpResponse.status)
+
+      if (!sdpResponse.ok) {
+        const errorText = await sdpResponse.text()
+        console.error('❌ Backend error:', errorText)
+        throw new Error(`Failed to establish WebRTC connection: ${errorText}`)
+      }
+
+      // Get answer from OpenAI (via our backend)
+      const answerSdp = await sdpResponse.text()
+      const answer: RTCSessionDescriptionInit = {
+        type: 'answer',
+        sdp: answerSdp
+      }
+
+      await pc.setRemoteDescription(answer)
+      console.log('✅ WebRTC connection established')
+      console.log('📡 Data channel state after setRemoteDescription:', dc.readyState)
+      console.log('🔗 Peer connection state:', {
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState
+      })
+
+      // Fallback: Si el data channel no se abre en 5 segundos, cambiar a listening de todos modos
+      setTimeout(() => {
+        if (dataChannelRef.current?.readyState !== 'open') {
+          console.log('⚠️ Data channel timeout! Current state:', dataChannelRef.current?.readyState)
+          console.log('🔗 Peer connection info:', {
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            signalingState: pc.signalingState
+          })
+          setStatus('listening')
+          startTimeRef.current = Date.now()
+          monitorAudioLevel()
+        }
+      }, 5000)
 
     } catch (err) {
-      console.error('❌ Voice WS error:', err)
-      setError(err instanceof Error ? err : new Error('Failed to start session'))
+      console.error('Voice session error:', err)
+      setError(err as Error)
       setStatus('error')
+      cleanup()
     }
   }, [monitorAudioLevel])
 
-  const startAudioStreaming = (stream: MediaStream, ws: WebSocket) => {
-    const audioTrack = stream.getAudioTracks()[0]
-    if (!audioTrack) {
-      console.error('❌ No audio track found')
-      return
-    }
-
-    // Create MediaRecorder to stream audio
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'audio/webm;codecs=opus',
-      audioBitsPerSecond: 16000
-    })
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-        // Convert to base64 and send
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          const base64Audio = (reader.result as string).split(',')[1]
-          ws.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: base64Audio
-          }))
-        }
-        reader.readAsDataURL(event.data)
-      }
-    }
-
-    // Send audio chunks every 100ms
-    mediaRecorder.start(100)
-    console.log('🎤 Started streaming microphone audio to OpenAI')
-  }
-
-  const playAudioDelta = (base64Audio: string) => {
-    // Decode base64 to audio and play
-    const audioData = atob(base64Audio)
-    const arrayBuffer = new Uint8Array(audioData.length)
-    for (let i = 0; i < audioData.length; i++) {
-      arrayBuffer[i] = audioData.charCodeAt(i)
-    }
-
-    const audioContext = audioContextRef.current
-    if (!audioContext) return
-
-    audioContext.decodeAudioData(arrayBuffer.buffer, (buffer) => {
-      const source = audioContext.createBufferSource()
-      source.buffer = buffer
-      source.connect(audioContext.destination)
-      source.start()
-    })
-  }
-
   const endSession = useCallback(async () => {
-    console.log('🛑 Stopping WebSocket voice session...')
+    try {
+      if (sessionIdRef.current) {
+        const finalDuration = startTimeRef.current 
+          ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+          : 0
 
+        const response = await fetch(`/api/voice/session/${sessionIdRef.current}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            duration_seconds: finalDuration,
+            audio_input_tokens: 0,
+            audio_output_tokens: 0,
+            text_input_tokens: 0,
+            text_output_tokens: 0
+          })
+        })
+
+        if (response.ok) {
+          const { cost: finalCost } = await response.json()
+          setCost(finalCost)
+        }
+      }
+    } catch (err) {
+      console.error('Error ending session:', err)
+    } finally {
+      cleanup()
+    }
+  }, [])
+
+  const cleanup = useCallback(() => {
     // Stop animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = null
     }
 
-    // Close WebSocket
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
+    // Close data channel
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close()
+      dataChannelRef.current = null
     }
 
-    // Stop media stream
+    // Close peer connection
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+      peerConnectionRef.current = null
+    }
+
+    // Stop media tracks
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop())
       mediaStreamRef.current = null
     }
 
-    // Close audio context
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
+    // Remove audio element
+    if (audioElementRef.current) {
+      audioElementRef.current.srcObject = null
+      audioElementRef.current = null
     }
+
+    analyserRef.current = null
+    sessionIdRef.current = null
+    startTimeRef.current = null
 
     setStatus('idle')
     setAudioLevel(0)
     setDuration(0)
-    setIsMuted(false)
   }, [])
 
   const toggleMute = useCallback(() => {
-    const stream = mediaStreamRef.current
-    if (!stream) return
-    const track = stream.getAudioTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setIsMuted(!track.enabled)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) wsRef.current.close()
-      if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach(t => t.stop())
-      if (audioContextRef.current) audioContextRef.current.close()
+    if (mediaStreamRef.current) {
+      const audioTrack = mediaStreamRef.current.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled
+        setIsMuted(!audioTrack.enabled)
+      }
     }
   }, [])
 
-  const isActive = status !== 'idle' && status !== 'error'
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup()
+    }
+  }, [cleanup])
 
   return {
     startSession,
@@ -359,9 +635,9 @@ export function useVoiceWS(): UseVoiceReturn {
     status,
     error,
     isMuted,
-    isActive,
+    isActive: status !== 'idle' && status !== 'error',
     audioLevel,
     duration,
-    cost,
+    cost
   }
 }
