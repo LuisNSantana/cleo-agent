@@ -29,12 +29,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Get signed URL from ElevenLabs
+    const params = new URLSearchParams({ agent_id: agentId })
+    if (body?.include_conversation_id) {
+      params.set('include_conversation_id', 'true')
+    }
+
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/agents/${agentId}/websocket`,
+      `https://api.elevenlabs.io/v1/convai/conversation/signed-url?${params.toString()}`,
       {
         method: 'GET',
         headers: {
-          'xi-api-key': apiKey
+          'xi-api-key': apiKey,
+          Accept: 'application/json'
         }
       }
     )
