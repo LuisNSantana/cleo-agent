@@ -155,6 +155,7 @@ export function ChatInput({
   }, [hasPendingMessage, pendingMessage?.timestamp, onValueChangeAction, onFileUploadAction, onSendAction, consumePendingMessage]) // Agregar dependencias necesarias
 
   const handleSend = useCallback(() => {
+    // Image generation mode
     if (imageMode && onGenerateImageAction) {
       if (!isSubmitting && !isOnlyWhitespace(value)) {
         onGenerateImageAction(value)
@@ -162,10 +163,21 @@ export function ChatInput({
       }
       return
     }
-    if (isSubmitting) return
-    if (status === 'streaming') { stopAction(); return }
+    
+    // Stop streaming - check this FIRST before other conditions
+    if (status === 'streaming') {
+      stopAction()
+      return
+    }
+    
+    // Don't send if already submitting
+    if (isSubmitting) {
+      return
+    }
+    
+    // Send the message
     onSendAction()
-  }, [imageMode, onGenerateImageAction, isSubmitting, value, status, stopAction, onSendAction])
+  }, [status, stopAction, imageMode, onGenerateImageAction, isSubmitting, value, onSendAction])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -368,6 +380,7 @@ export function ChatInput({
             >
               <Button
                 size="sm"
+                variant={status === 'streaming' ? 'destructive' : 'default'}
                 className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation glow-primary-hover scale-on-active"
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"

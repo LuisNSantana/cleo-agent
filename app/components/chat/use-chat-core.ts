@@ -1158,17 +1158,13 @@ export function useChatCore({
       ensureChatExists,
     ])
 
-  // 🛑 Enhanced stop function with logging
+  // Stop streaming function
   const stop = useCallback(() => {
-    const stopStartTime = performance.now()
-    
     if (abortControllerRef.current) {
       try {
         abortControllerRef.current.abort()
         setStatus("ready")
         setIsSubmitting(false)
-        
-        const stopDuration = performance.now() - stopStartTime
         
         toast({
           title: "Message cancelled",
@@ -1178,9 +1174,11 @@ export function useChatCore({
         // Swallow error and keep UI responsive
       }
     } else {
-      // No active stream to cancel
+      // Force reset UI state even if no controller exists
+      setStatus("ready")
+      setIsSubmitting(false)
     }
-  }, [isSubmitting])
+  }, [])
 
   // Regenerate function
   const regenerate = useCallback(async () => {
