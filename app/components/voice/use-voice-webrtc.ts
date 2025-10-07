@@ -126,10 +126,16 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       sessionIdRef.current = voiceSessionId
 
-      // Create WebRTC peer connection
-      // Note: STUN servers are optional - they help with NAT traversal in complex networks
-      // but are not required for direct connections
-      const pc = new RTCPeerConnection()
+      // Create WebRTC peer connection with STUN servers for NAT traversal
+      // IMPORTANT: Without STUN servers, WebRTC may fail on networks with NAT/firewalls
+      // These are FREE public STUN servers (no account needed):
+      // - Google's public STUN server
+      // - Twilio's public STUN server (free, no account required)
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' }
+        ]
+      })
       peerConnectionRef.current = pc
 
       // Monitor ICE candidate generation
