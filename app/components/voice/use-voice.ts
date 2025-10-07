@@ -1,13 +1,11 @@
 'use client'
 
 import { useVoiceWebRTC } from './use-voice-webrtc'
-import { useVoiceWS } from './use-voice-ws'
 
+/**
+ * Main voice hook - uses WebRTC implementation with OpenAI Realtime API
+ * This is the most stable and feature-complete implementation
+ */
 export function useVoice() {
-  const transport = (process.env.NEXT_PUBLIC_VOICE_TRANSPORT || 'ws').toLowerCase()
-  if (transport === 'http') {
-    return useVoiceWebRTC()
-  }
-  // default to ws
-  return useVoiceWS()
+  return useVoiceWebRTC()
 }
