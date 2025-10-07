@@ -1,3 +1,8 @@
+/**
+ * Voice Mode - Pure WebSocket Implementation
+ * Works with Railway proxy server for direct OpenAI Realtime API connection
+ */
+
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -17,7 +22,6 @@ export interface UseVoiceReturn {
   cost: number
 }
 
-// Minimal WS-based implementation compatible with the UI expectations
 export function useVoiceWS(): UseVoiceReturn {
   const [status, setStatus] = useState<VoiceStatus>('idle')
   const [error, setError] = useState<Error | null>(null)
@@ -26,14 +30,15 @@ export function useVoiceWS(): UseVoiceReturn {
   const [duration, setDuration] = useState(0)
   const [cost] = useState(0)
 
-  const pcRef = useRef<RTCPeerConnection | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const localStreamRef = useRef<MediaStream | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const startTimeRef = useRef<number | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
 
-  const stopMeters = useRef<() => void>(() => {})
-
+  // Duration tracking
   useEffect(() => {
     const id = setInterval(() => {
       if (startTimeRef.current && (status === 'active' || status === 'listening' || status === 'speaking')) {
@@ -44,151 +49,276 @@ export function useVoiceWS(): UseVoiceReturn {
     return () => clearInterval(id)
   }, [status])
 
-  const monitorAudioLevel = () => {
-    try {
-      const stream = localStreamRef.current
-      if (!stream) return
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const src = ctx.createMediaStreamSource(stream)
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 256
-      src.connect(analyser)
-      analyserRef.current = analyser
+  const monitorAudioLevel = useCallback(() => {
+    if (!analyserRef.current) return
 
-      let raf = 0
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      const tick = () => {
-        analyser.getByteFrequencyData(data)
-        const avg = data.reduce((a, b) => a + b, 0) / data.length
-        setAudioLevel(Math.min(1, avg / 255))
-        raf = requestAnimationFrame(tick)
-      }
-      raf = requestAnimationFrame(tick)
-      stopMeters.current = () => cancelAnimationFrame(raf)
-    } catch {}
-  }
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+    
+    const updateLevel = () => {
+      if (!analyserRef.current || status === 'idle') return
+
+      analyserRef.current.getByteFrequencyData(dataArray)
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length
+      setAudioLevel(average / 255)
+
+      animationFrameRef.current = requestAnimationFrame(updateLevel)
+    }
+
+    updateLevel()
+  }, [status])
 
   const startSession = useCallback(async (chatId?: string) => {
     try {
       setError(null)
       setStatus('connecting')
+      console.log('🎤 Starting WebSocket voice session...')
 
-      const wsUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL
-      if (!wsUrl) throw new Error('NEXT_PUBLIC_WS_PROXY_URL no está configurada')
-
-      // Prepare local media
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      localStreamRef.current = stream
-
-      // PeerConnection for audio via WebRTC transport (negotiated over WS signaling)
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
-      })
-      pcRef.current = pc
-
-      // Remote audio playback
-      const audio = document.createElement('audio')
-      audio.autoplay = true
-      pc.ontrack = (e) => { audio.srcObject = e.streams[0] }
-
-      // Add mic
-      const track = stream.getAudioTracks()[0]
-      if (track && track.enabled === false) track.enabled = true
-      pc.addTrack(track, stream)
-
-      // Data channel (optional; many flows rely purely on WS for control)
-      const dc = pc.createDataChannel('oai-events')
-      dc.onopen = () => {
-        // Optional: can send session.update here via WS in parallel
+      // Get Railway proxy URL from environment
+      const wsProxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL
+      if (!wsProxyUrl) {
+        throw new Error('NEXT_PUBLIC_WS_PROXY_URL no está configurada')
       }
 
-      // Create offer
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
+      console.log('🔗 Connecting to Railway proxy:', wsProxyUrl)
 
-      // Connect WebSocket to proxy (append model if needed)
+      // Request microphone access
+      console.log('🎤 Requesting microphone access...')
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 24000 // OpenAI prefers 24kHz
+        } 
+      })
+      mediaStreamRef.current = stream
+      console.log('✅ Microphone access granted')
+
+      // Setup audio context for visualization
+      const audioContext = new AudioContext({ sampleRate: 24000 })
+      audioContextRef.current = audioContext
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
+      analyserRef.current = analyser
+
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+
+      // Connect to Railway WebSocket proxy
       const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
-      const url = wsUrl.includes('?') ? `${wsUrl}&model=${encodeURIComponent(model)}` : `${wsUrl}?model=${encodeURIComponent(model)}`
-      const ws = new WebSocket(url)
+      const wsUrl = wsProxyUrl.includes('?') 
+        ? `${wsProxyUrl}&model=${encodeURIComponent(model)}`
+        : `${wsProxyUrl}?model=${encodeURIComponent(model)}`
+      
+      const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
-        // Send WebRTC SDP offer over WS signaling
-        ws.send(JSON.stringify({ type: 'webrtc.offer', sdp: offer.sdp }))
+        console.log('✅ WebSocket connected to Railway proxy')
+        setStatus('listening')
+        startTimeRef.current = Date.now()
+        monitorAudioLevel()
+
+        // Send session configuration
+        ws.send(JSON.stringify({
+          type: 'session.update',
+          session: {
+            turn_detection: {
+              type: 'server_vad',
+              silence_duration_ms: 500
+            },
+            instructions: 'You are a helpful AI assistant. Keep responses concise and natural for voice conversation.',
+            voice: 'alloy',
+            modalities: ['text', 'audio'],
+            input_audio_transcription: {
+              model: 'whisper-1'
+            }
+          }
+        }))
+
+        // Start streaming audio from microphone
+        startAudioStreaming(stream, ws)
       }
 
-      ws.onerror = (evt: Event | any) => {
-        setError(new Error(evt?.message || 'WebSocket error'))
-        setStatus('error')
-      }
-
-      ws.onmessage = async (msg) => {
+      ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(msg.data)
-          if (data.type === 'webrtc.answer' && data.sdp) {
-            await pc.setRemoteDescription({ type: 'answer', sdp: data.sdp })
-            startTimeRef.current = Date.now()
-            monitorAudioLevel()
-            setStatus('listening')
+          const message = JSON.parse(event.data)
+          
+          // Handle different event types
+          switch (message.type) {
+            case 'session.created':
+              console.log('✅ Session created:', message.session?.id)
+              break
+            
+            case 'session.updated':
+              console.log('✅ Session updated')
+              break
+            
+            case 'input_audio_buffer.speech_started':
+              console.log('🎤 User started speaking')
+              setStatus('speaking')
+              break
+            
+            case 'input_audio_buffer.speech_stopped':
+              console.log('🎤 User stopped speaking')
+              setStatus('listening')
+              break
+            
+            case 'response.audio.delta':
+            case 'response.audio_transcript.delta':
+              setStatus('active')
+              break
+            
+            case 'response.audio.done':
+            case 'response.done':
+              console.log('✅ Response completed')
+              setStatus('listening')
+              break
+            
+            case 'conversation.item.input_audio_transcription.completed':
+              console.log('📝 User transcript:', message.transcript)
+              break
+            
+            case 'error':
+              console.error('❌ Server error:', message.error)
+              setError(new Error(message.error?.message || 'Server error'))
+              setStatus('error')
+              break
           }
-          // Forward other events to UI states if desired
-          if (data.type === 'response.output_audio.delta') {
-            setStatus('speaking')
-          }
-          if (data.type === 'response.completed') {
-            setStatus('listening')
-          }
-        } catch (e) {
-          // Might receive non-JSON pings
+        } catch (err) {
+          // Might receive non-JSON pings, ignore
         }
       }
 
-      ws.onclose = () => {
-        // Cleanup when server closes
-        setStatus('idle')
+      ws.onerror = (event) => {
+        console.error('❌ WebSocket error:', event)
+        setError(new Error('WebSocket connection error'))
+        setStatus('error')
+      }
+
+      ws.onclose = (event) => {
+        console.log('🔌 WebSocket closed:', event.code, event.reason)
+        if (status !== 'idle') {
+          setStatus('idle')
+        }
       }
 
     } catch (err: any) {
-      console.error('Voice WS error:', err)
+      console.error('❌ Voice WS error:', err)
       setError(err instanceof Error ? err : new Error(String(err)))
       setStatus('error')
     }
-  }, [])
+  }, [monitorAudioLevel, status])
+
+  const startAudioStreaming = (stream: MediaStream, ws: WebSocket) => {
+    const audioTrack = stream.getAudioTracks()[0]
+    if (!audioTrack) {
+      console.error('❌ No audio track found')
+      return
+    }
+
+    try {
+      // Create MediaRecorder to stream audio
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 16000
+      })
+      mediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+          // Convert to base64 and send
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const base64Audio = (reader.result as string).split(',')[1]
+            ws.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: base64Audio
+            }))
+          }
+          reader.readAsDataURL(event.data)
+        }
+      }
+
+      // Send audio chunks every 100ms
+      mediaRecorder.start(100)
+      console.log('🎤 Started streaming microphone audio to OpenAI')
+    } catch (err) {
+      console.error('❌ Failed to start MediaRecorder:', err)
+    }
+  }
 
   const endSession = useCallback(async () => {
     try {
-      stopMeters.current?.()
-      analyserRef.current?.disconnect()
-      analyserRef.current = null
+      console.log('🛑 Stopping WebSocket voice session...')
 
-      pcRef.current?.getSenders().forEach(s => s.track?.stop())
-      pcRef.current?.close()
-      pcRef.current = null
+      // Stop animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
 
-      localStreamRef.current?.getTracks().forEach(t => t.stop())
-      localStreamRef.current = null
+      // Stop MediaRecorder
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+        mediaRecorderRef.current = null
+      }
 
-      wsRef.current?.close()
-      wsRef.current = null
+      // Disconnect analyser
+      if (analyserRef.current) {
+        analyserRef.current.disconnect()
+        analyserRef.current = null
+      }
+
+      // Close WebSocket
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+
+      // Stop media stream
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+
+      // Close audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
 
       setStatus('idle')
       setAudioLevel(0)
       setDuration(0)
       setIsMuted(false)
-    } catch {}
+    } catch (err) {
+      console.error('❌ Error ending session:', err)
+    }
   }, [])
 
   const toggleMute = useCallback(() => {
-    const stream = localStreamRef.current
+    const stream = mediaStreamRef.current
     if (!stream) return
     const track = stream.getAudioTracks()[0]
     if (!track) return
     track.enabled = !track.enabled
     setIsMuted(!track.enabled)
   }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      endSession()
+    }
+  }, [endSession])
 
   const isActive = status === 'connecting' || status === 'listening' || status === 'speaking' || status === 'active'
 
