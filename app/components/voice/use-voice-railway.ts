@@ -150,89 +150,31 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       let sessionReady = false
 
       ws.onopen = () => {
-        console.log('✅ Railway WebSocket connected')
+        console.log('✅ Railway WebSocket connected, waiting for session.created...')
       }
 
-      ws.onmessage = async (event) => {
+      ws.onmessage = async (event: MessageEvent) => {
         try {
-          // Skip binary data (Blob or ArrayBuffer) - we only handle JSON text events
-          if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
-            return
+          let messageText: string
+          if (event.data instanceof Blob) {
+            messageText = await event.data.text()
+          } else if (typeof event.data === 'string') {
+            messageText = event.data
+          } else {
+            return // Skip other types
           }
 
-          // Handle only string messages (JSON events)
-          if (typeof event.data !== 'string') {
-            return
-          }
-
-          const data = JSON.parse(event.data)
+          const data = JSON.parse(messageText)
+          const eventType = data.type
           
-          // Handle audio delta events (base64 encoded PCM16 audio)
-          if (data.type === 'response.audio.delta' && data.delta) {
-            // Decode base64 PCM16 audio and play it
-            try {
-              const audioData = atob(data.delta)
-              const int16Array = new Int16Array(audioData.length / 2)
-              
-              // Convert base64 string to Int16 array
-              for (let i = 0; i < int16Array.length; i++) {
-                const byte1 = audioData.charCodeAt(i * 2)
-                const byte2 = audioData.charCodeAt(i * 2 + 1)
-                int16Array[i] = (byte2 << 8) | byte1
-              }
-              
-              // Initialize playback context if needed
-              if (!playbackContextRef.current) {
-                playbackContextRef.current = new AudioContext({ sampleRate: 24000 })
-              }
-              
-              // Convert Int16 PCM to Float32 for Web Audio API
-              const float32Array = new Float32Array(int16Array.length)
-              for (let i = 0; i < int16Array.length; i++) {
-                float32Array[i] = int16Array[i] / (int16Array[i] < 0 ? 32768 : 32767)
-              }
-              
-              // Create audio buffer and play
-              const audioBuffer = playbackContextRef.current.createBuffer(1, float32Array.length, 24000)
-              audioBuffer.getChannelData(0).set(float32Array)
-              
-              const source = playbackContextRef.current.createBufferSource()
-              source.buffer = audioBuffer
-              source.connect(playbackContextRef.current.destination)
-              source.start()
-            } catch (audioError) {
-              console.error('Error playing audio:', audioError)
-            }
-            return
-          }
+          console.log('📨 Event:', eventType)
           
-          // Wait for session.created
-          if (data.type === 'session.created' && !sessionReady) {
-            console.log('✅ Session created by OpenAI')
+          // Wait for session.created FIRST
+          if (eventType === 'session.created' && !sessionReady) {
+            console.log('✅ session.created - Using default session config')
             
-            // Send session.update with configuration
-            const sessionUpdate: any = {
-              type: 'session.update',
-              session: {
-                turn_detection: {
-                  type: 'server_vad',
-                  silence_duration_ms: 500
-                },
-                input_audio_transcription: {
-                  model: 'whisper-1'
-                }
-              }
-            }
-
-            if (config?.instructions) {
-              sessionUpdate.session.instructions = config.instructions
-            }
-            if (config?.voice) {
-              sessionUpdate.session.voice = config.voice
-            }
-
-            ws.send(JSON.stringify(sessionUpdate))
-            console.log('📤 Session configuration sent')
+            // Don't send session.update - use OpenAI defaults
+            // This avoids server errors from invalid configurations
             
             sessionReady = true
             setStatus('listening')
@@ -244,26 +186,54 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             return
           }
 
-          // Handle other events
-          if (data.type === 'input_audio_buffer.speech_started') {
+          // Handle other event types
+          if (eventType === 'session.updated') {
+            console.log('✅ session.updated')
+          }
+          
+          if (eventType === 'error') {
+            console.error('❌ OpenAI Error:', data)
+            setError(new Error(data.error?.message || 'OpenAI connection error'))
+            setStatus('error')
+            return
+          }
+          
+          if (eventType === 'input_audio_buffer.speech_started') {
             console.log('🎤 User started speaking')
             setStatus('speaking')
           }
 
-          if (data.type === 'input_audio_buffer.speech_stopped') {
+          if (eventType === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
           }
 
-          if (data.type === 'response.audio.delta') {
-            setStatus('active')
+          if (eventType === 'response.audio.delta' && data.delta) {
+            setStatus('speaking')
+            
+            // Decode and play audio (simplified - same as working version)
+            try {
+              const audioData = atob(data.delta)
+              const pcm16 = new Int16Array(audioData.length / 2)
+              for (let i = 0; i < pcm16.length; i++) {
+                pcm16[i] = (audioData.charCodeAt(i * 2) | (audioData.charCodeAt(i * 2 + 1) << 8))
+              }
+              
+              // Play audio using simple Audio element
+              const audioBlob = new Blob([pcm16], { type: 'audio/pcm' })
+              const audioUrl = URL.createObjectURL(audioBlob)
+              const audio = new Audio(audioUrl)
+              audio.play().catch(console.error)
+            } catch (audioError) {
+              console.error('Error playing audio:', audioError)
+            }
           }
 
-          if (data.type === 'response.audio.done') {
+          if (eventType === 'response.audio.done') {
             setStatus('listening')
           }
 
-          if (data.type === 'conversation.item.input_audio_transcription.completed') {
+          if (eventType === 'conversation.item.input_audio_transcription.completed') {
             console.log('📝 User transcript:', data.transcript)
             
             // Save transcript
@@ -285,17 +255,12 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             }
           }
 
-          if (data.type === 'error') {
-            console.error('❌ OpenAI Error:', data)
-            setError(new Error(data.error?.message || 'OpenAI error'))
-            setStatus('error')
-          }
         } catch (err) {
           console.error('Error processing message:', err)
         }
       }
 
-      ws.onerror = (error) => {
+      ws.onerror = (error: Event) => {
         console.error('❌ WebSocket error:', error)
         setError(new Error('WebSocket connection error'))
         setStatus('error')
