@@ -328,11 +328,10 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
     ]
 
     // Return configuration for voice session with tools
-    // Using stable gpt-4o-realtime instead of mini (mini version has 500 errors)
     return NextResponse.json({
       apiKey,
-      model: 'gpt-4o-realtime-preview-2024-12-17',  // Stable version without "mini"
-      voice: 'alloy',  // Alloy is most reliable voice
+      model: 'gpt-4o-mini-realtime-preview-2024-12-17',
+      voice: 'alloy',
       instructions,
       tools: voiceTools
     })

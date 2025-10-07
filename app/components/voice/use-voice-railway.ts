@@ -140,7 +140,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
       // Connect to Railway WebSocket proxy
       const proxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
-      const model = config?.model || 'gpt-4o-realtime-preview-2024-12-17'  // Use stable version
+      const model = config?.model || 'gpt-4o-mini-realtime-preview-2024-12-17'
       const wsUrl = `${proxyUrl}?model=${encodeURIComponent(model)}`
       
       console.log('🔗 Connecting to Railway proxy:', wsUrl)
@@ -172,46 +172,10 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Sending session configuration...')
+            console.log('✅ session.created - Using default config (NO session.update)')
             
-            // Send session.update with minimal stable configuration
-            const sessionUpdate: any = {
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                voice: configRef.current.voice || 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 200
-                }
-              }
-            }
-
-            // Add instructions if available (max 1500 chars to avoid errors)
-            if (configRef.current.instructions) {
-              const maxLength = 1500
-              const instructions = configRef.current.instructions
-              sessionUpdate.session.instructions = instructions.length > maxLength 
-                ? instructions.substring(0, maxLength) 
-                : instructions
-            }
-
-            // TEMPORARILY DISABLE TOOLS to test basic functionality
-            // Tools will be re-enabled once basic connection is stable
-            // if (configRef.current.tools && Array.isArray(configRef.current.tools)) {
-            //   sessionUpdate.session.tools = configRef.current.tools
-            // }
-
-            try {
-              ws.send(JSON.stringify(sessionUpdate))
-              console.log('📤 Sent session.update (basic config, tools disabled)')
-            } catch (sendError) {
-              console.error('Failed to send session.update:', sendError)
-            }
+            // DON'T send session.update - use OpenAI defaults
+            // This is a test to see if session.update is causing the error
             
             sessionReady = true
             setStatus('listening')
