@@ -72,6 +72,29 @@ export function useVoiceWS(): UseVoiceReturn {
       setError(null)
       console.log('🎤 Starting WebSocket voice session...')
 
+      // IMPROVEMENT: Fetch voice configuration with contextual instructions
+      console.log('📋 Fetching voice configuration...')
+      const configResponse = await fetch('/api/voice/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId })
+      })
+
+      if (!configResponse.ok) {
+        const errorData = await configResponse.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to get voice configuration')
+      }
+
+      const config = await configResponse.json()
+      const instructions = typeof config?.instructions === 'string'
+        ? config.instructions.trim()
+        : 'You are a helpful AI assistant. Keep responses concise and natural for voice conversation.'
+      
+      const voice = config?.voice || 'nova'
+      const tools = config?.tools || []
+
+      console.log('✅ Voice config loaded:', { voice, toolsCount: tools.length })
+
       // Get Railway proxy URL from environment
       const wsProxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
       console.log('🔗 Connecting to Railway proxy:', wsProxyUrl)
@@ -117,19 +140,31 @@ export function useVoiceWS(): UseVoiceReturn {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        // Send session configuration
-        ws.send(JSON.stringify({
+        // IMPROVEMENT: Send session configuration with voice, instructions, and tools
+        const sessionUpdate: any = {
           type: 'session.update',
           session: {
             turn_detection: {
               type: 'server_vad',
               silence_duration_ms: 500
             },
-            instructions: `You are a helpful AI assistant. Keep responses concise and natural for voice conversation.`,
-            voice: 'alloy',
-            modalities: ['text', 'audio']
+            voice: voice,
+            modalities: ['text', 'audio'],
+            instructions: instructions,
+            input_audio_transcription: {
+              model: 'whisper-1'
+            }
           }
-        }))
+        }
+
+        // Add tools if available
+        if (tools.length > 0) {
+          sessionUpdate.session.tools = tools
+          console.log('🔧 Added tools to session:', tools.map((t: any) => t.name).join(', '))
+        }
+
+        ws.send(JSON.stringify(sessionUpdate))
+        console.log('📤 Session configuration sent')
 
         // Start streaming audio from microphone
         startAudioStreaming(stream, ws)
@@ -173,6 +208,10 @@ export function useVoiceWS(): UseVoiceReturn {
             case 'response.done':
               console.log('✅ Response completed')
               setStatus('listening')
+              break
+            
+            case 'conversation.item.input_audio_transcription.completed':
+              console.log('📝 User transcript:', message.transcript)
               break
             
             case 'error':
