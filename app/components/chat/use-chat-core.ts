@@ -1232,11 +1232,17 @@ export function useChatCore({
       return
     }
     
+    // 🔧 CRITICAL FIX: Don't sync if initialMessages is empty but we have local messages
+    // This prevents clearing optimistic messages before server responds
+    if (initialMessages.length === 0 && messages.length > 0) {
+      return
+    }
+    
     // Sync messages when chatId changes or when server has more messages
     if (chatIdChanged || initialMessages.length > messages.length) {
       setMessages(initialMessages as ChatMessage[])
     }
-  }, [initialMessages, isSubmitting, chatId])
+  }, [initialMessages, isSubmitting, chatId, messages.length])
 
   // Reset messages when navigating from a chat to home (new chat)
   if (
