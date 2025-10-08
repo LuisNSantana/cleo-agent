@@ -30,9 +30,16 @@ export function useVoice() {
   
   // Monitor OpenAI errors and fallback to ElevenLabs
   useEffect(() => {
-    if (openai.error && openai.error.message.includes('experiencing issues')) {
-      console.warn('⚠️ OpenAI failed, switching to ElevenLabs fallback')
-      setProvider('elevenlabs')
+    if (openai.error) {
+      const errorMessage = openai.error.message.toLowerCase()
+      // Fallback on server errors or connection issues
+      if (errorMessage.includes('experiencing issues') || 
+          errorMessage.includes('server error') ||
+          errorMessage.includes('connection error') ||
+          errorMessage.includes('websocket')) {
+        console.warn('⚠️ OpenAI failed, switching to ElevenLabs fallback')
+        setProvider('elevenlabs')
+      }
     }
   }, [openai.error])
   
@@ -54,8 +61,12 @@ export function useVoice() {
   }, [provider, openai, elevenlabs])
   
   const endSession = useCallback(() => {
+    // Reset provider to OpenAI for next session after ending
     if (provider === 'elevenlabs') {
-      return elevenlabs.endSession()
+      const result = elevenlabs.endSession()
+      // Try OpenAI first next time
+      setTimeout(() => setProvider('openai'), 100)
+      return result
     }
     return openai.endSession()
   }, [provider, openai, elevenlabs])

@@ -144,18 +144,31 @@ export function useVoiceElevenLabs() {
         monitorAudioLevel()
 
         // Start sending audio
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'audio/webm;codecs=opus'
-        })
+        // Check supported MIME types
+        let mimeType = 'audio/webm;codecs=opus'
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/webm'
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/ogg;codecs=opus'
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              console.warn('⚠️ No optimal audio codec found, using default')
+              mimeType = ''
+            }
+          }
+        }
+        
+        const mediaRecorder = new MediaRecorder(stream, 
+          mimeType ? { mimeType } : {}
+        )
 
         mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN && !isMuted) {
             // Convert to base64 and send
             const reader = new FileReader()
             reader.onloadend = () => {
               const base64 = (reader.result as string).split(',')[1]
               ws.send(JSON.stringify({
-                type: 'audio',
+                type: 'audio_input',
                 audio: base64
               }))
             }
@@ -164,42 +177,103 @@ export function useVoiceElevenLabs() {
         }
 
         mediaRecorder.start(100) // Send chunks every 100ms
+        
+        // Store recorder reference for cleanup
+        ;(wsRef as any).mediaRecorder = mediaRecorder
       }
 
       ws.onmessage = async (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data)
-
-          if (data.type === 'audio') {
-            setStatus('speaking')
-            // Play audio response
-            const audioData = atob(data.audio)
-            const audioArray = new Uint8Array(audioData.length)
-            for (let i = 0; i < audioData.length; i++) {
-              audioArray[i] = audioData.charCodeAt(i)
+          // ElevenLabs can send both JSON and binary data
+          if (typeof event.data === 'string') {
+            // JSON message
+            const data = JSON.parse(event.data)
+            
+            if (data.type === 'audio' && data.audio) {
+              setStatus('speaking')
+              
+              try {
+                // Check if audio is base64 encoded
+                let audioArray: Uint8Array
+                
+                // Try to decode as base64
+                if (typeof data.audio === 'string') {
+                  // Remove data URL prefix if present
+                  const base64Audio = data.audio.replace(/^data:audio\/[^;]+;base64,/, '')
+                  const audioData = atob(base64Audio)
+                  audioArray = new Uint8Array(audioData.length)
+                  for (let i = 0; i < audioData.length; i++) {
+                    audioArray[i] = audioData.charCodeAt(i)
+                  }
+                } else {
+                  // If it's already binary data
+                  audioArray = new Uint8Array(data.audio)
+                }
+                
+                const audioBlob = new Blob([audioArray.buffer as ArrayBuffer], { type: 'audio/mp3' })
+                const audioUrl = URL.createObjectURL(audioBlob)
+                const audio = new Audio(audioUrl)
+                
+                audio.play().catch((playError) => {
+                  console.error('Error playing audio:', playError)
+                })
+                
+                audio.onended = () => {
+                  setStatus('listening')
+                  URL.revokeObjectURL(audioUrl)
+                }
+              } catch (audioError) {
+                console.error('Error processing audio:', audioError)
+                // Continue listening even if audio fails
+                setStatus('listening')
+              }
             }
-
-            const audioBlob = new Blob([audioArray], { type: 'audio/pcm' })
-            const audioUrl = URL.createObjectURL(audioBlob)
+            
+            if (data.type === 'transcript') {
+              console.log('📝 Transcript:', data.text)
+              
+              // Save transcript to database if available
+              if (chatIdRef.current && data.text) {
+                try {
+                  await fetch('/api/voice/transcript', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      chatId: chatIdRef.current,
+                      role: data.role || 'assistant',
+                      content: data.text,
+                      sessionId: sessionIdRef.current
+                    })
+                  })
+                } catch (err) {
+                  console.error('Failed to save transcript:', err)
+                }
+              }
+            }
+            
+            if (data.type === 'error') {
+              console.error('❌ ElevenLabs Error:', data)
+              setError(new Error(data.message || 'ElevenLabs error'))
+              setStatus('error')
+            }
+          } else if (event.data instanceof Blob) {
+            // Binary audio data directly
+            setStatus('speaking')
+            const audioUrl = URL.createObjectURL(event.data)
             const audio = new Audio(audioUrl)
-            audio.play()
-
+            
+            audio.play().catch((playError) => {
+              console.error('Error playing audio:', playError)
+            })
+            
             audio.onended = () => {
               setStatus('listening')
               URL.revokeObjectURL(audioUrl)
             }
           }
-
-          if (data.type === 'transcript') {
-            console.log('📝 Transcript:', data.text)
-          }
-
-          if (data.type === 'error') {
-            console.error('❌ ElevenLabs Error:', data)
-            throw new Error(data.message || 'ElevenLabs error')
-          }
         } catch (err) {
           console.error('Error processing message:', err)
+          // Don't throw to prevent disconnection on individual message errors
         }
       }
 
@@ -254,6 +328,14 @@ export function useVoiceElevenLabs() {
   const cleanup = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
+    }
+
+    // Stop media recorder if exists
+    if ((wsRef as any).mediaRecorder) {
+      try {
+        (wsRef as any).mediaRecorder.stop()
+      } catch {}
+      (wsRef as any).mediaRecorder = null
     }
 
     if (wsRef.current) {
