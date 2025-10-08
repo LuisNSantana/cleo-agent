@@ -1222,80 +1222,39 @@ export function useChatCore({
     }
   }, [prompt])
 
-  // Sync messages and handle chat transitions
+  // Sync local messages state with initialMessages when it changes (e.g., switching chats)
+  // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
   useEffect(() => {
-    const chatIdChanged = prevChatIdRef.current !== chatId;
-
-    // CASE 1: Navigating to a new, empty chat page (clear state safely)
-    if (chatIdChanged && chatId === null) {
-      // 🔧 FIX: Use startUiTransition to prevent race conditions
-      startUiTransition(() => {
-        setMessages([]);
-      });
-      setStatus('ready');
-      setError(null);
-      setPendingToolConfirmation(null);
-      seenConfirmationIdsRef.current.clear();
-      hasSentFirstMessageRef.current = false;
-      // 🔧 FIX: Clear input when switching to new chat
-      setInput('');
-      // 🔧 FIX: Cancel any ongoing streams when switching to new chat
-      if (abortControllerRef.current) {
-        try {
-          abortControllerRef.current.abort();
-        } catch {}
-        abortControllerRef.current = null;
-      }
-      wasStreamingRef.current = false;
-      prevChatIdRef.current = null;
-      return;
+    const chatIdChanged = prevChatIdRef.current !== chatId
+    
+    // Don't sync if actively submitting - preserve optimistic updates
+    if (isSubmitting) {
+      return
     }
-
-    // CASE 2: Switching to a different chat or first load of an existing chat
-    if (chatIdChanged) {
-      // If we are creating a new chat (null -> id) while submitting, keep optimistic message
-      if (prevChatIdRef.current === null && chatId !== null && isSubmitting) {
-        prevChatIdRef.current = chatId; // just update ref and do not overwrite
-        return;
-      }
-
-      // 🔧 FIX: Cancel ongoing streams when switching chats
-      if (abortControllerRef.current && prevChatIdRef.current !== null) {
-        try {
-          abortControllerRef.current.abort();
-        } catch {}
-        abortControllerRef.current = null;
-      }
-      wasStreamingRef.current = false;
-
-      // Normal switch: load messages from server for the selected chat
-      // 🔧 FIX: Use startUiTransition for smoother updates
-      startUiTransition(() => {
-        setMessages(initialMessages as ChatMessage[]);
-      });
-      prevChatIdRef.current = chatId;
-      return;
+    
+    // Sync messages when chatId changes or when server has more messages
+    if (chatIdChanged || initialMessages.length > messages.length) {
+      setMessages(initialMessages as ChatMessage[])
     }
+  }, [initialMessages, isSubmitting, chatId])
 
-    // CASE 3: Same chat, server pushed new messages
-    if (!isSubmitting) {
-      // Only sync forward to avoid clobbering optimistic messages
-      if (initialMessages.length > messages.length) {
-        startUiTransition(() => {
-          setMessages(initialMessages as ChatMessage[]);
-        });
-        return;
-      }
-
-      // If content differs but lengths match, sync only when we have no optimistic
-      const hasOptimistic = messages.some(m => !(initialMessages as any).find((im: any) => im.id === m.id));
-      if (!hasOptimistic && JSON.stringify(initialMessages) !== JSON.stringify(messages)) {
-        startUiTransition(() => {
-          setMessages(initialMessages as ChatMessage[]);
-        });
-      }
-    }
-  }, [chatId, isSubmitting, initialMessages])
+  // Reset messages when navigating from a chat to home (new chat)
+  if (
+    prevChatIdRef.current !== null &&
+    chatId === null &&
+    messages.length > 0
+  ) {
+    setMessages([])
+    setInput('')
+    setStatus('ready')
+    setError(null)
+    setPendingToolConfirmation(null)
+    seenConfirmationIdsRef.current.clear()
+    hasSentFirstMessageRef.current = false
+    prevChatIdRef.current = chatId
+  } else {
+    prevChatIdRef.current = chatId
+  }
 
   // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.
 
