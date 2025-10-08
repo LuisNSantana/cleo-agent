@@ -1224,40 +1224,49 @@ export function useChatCore({
 
   // Sync messages and handle chat transitions
   useEffect(() => {
-    const chatIdChanged = prevChatIdRef.current !== chatId
-    
-    // Case 1: Navigating to "New Chat" (chatId becomes null)
-    if (chatIdChanged && prevChatIdRef.current !== null && chatId === null) {
-      setMessages([])
-      setStatus('ready')
-      setError(null)
-      setPendingToolConfirmation(null)
-      seenConfirmationIdsRef.current.clear()
-      hasSentFirstMessageRef.current = false
-      prevChatIdRef.current = chatId
-      return
+    const chatIdChanged = prevChatIdRef.current !== chatId;
+
+    // CASE 1: Navigating to a new, empty chat page (clear state safely)
+    if (chatIdChanged && chatId === null) {
+      setMessages([]);
+      setStatus('ready');
+      setError(null);
+      setPendingToolConfirmation(null);
+      seenConfirmationIdsRef.current.clear();
+      hasSentFirstMessageRef.current = false;
+      prevChatIdRef.current = null;
+      return;
     }
-    
-    // Case 2: Switching to a different chat or initial load
+
+    // CASE 2: Switching to a different chat or first load of an existing chat
     if (chatIdChanged) {
-      // Don't clear if we're in the middle of creating a new chat from null -> new id
+      // If we are creating a new chat (null -> id) while submitting, keep optimistic message
       if (prevChatIdRef.current === null && chatId !== null && isSubmitting) {
-        // Creating new chat, keep optimistic message
-        prevChatIdRef.current = chatId
-        return
+        prevChatIdRef.current = chatId; // just update ref and do not overwrite
+        return;
       }
-      
-      // Load messages from server for the new chat
-      setMessages(initialMessages as ChatMessage[])
-      prevChatIdRef.current = chatId
-      return
+
+      // Normal switch: load messages from server for the selected chat
+      setMessages(initialMessages as ChatMessage[]);
+      prevChatIdRef.current = chatId;
+      return;
     }
-    
-    // Case 3: Same chat, initialMessages updated (don't overwrite optimistic messages)
-    if (!isSubmitting && initialMessages.length > messages.length) {
-      setMessages(initialMessages as ChatMessage[])
+
+    // CASE 3: Same chat, server pushed new messages
+    if (!isSubmitting) {
+      // Only sync forward to avoid clobbering optimistic messages
+      if (initialMessages.length > messages.length) {
+        setMessages(initialMessages as ChatMessage[]);
+        return;
+      }
+
+      // If content differs but lengths match, sync only when we have no optimistic
+      const hasOptimistic = messages.some(m => !(initialMessages as any).find((im: any) => im.id === m.id));
+      if (!hasOptimistic && JSON.stringify(initialMessages) !== JSON.stringify(messages)) {
+        setMessages(initialMessages as ChatMessage[]);
+      }
     }
-  }, [initialMessages, isSubmitting, chatId, messages.length])
+  }, [chatId, isSubmitting, initialMessages])
 
   // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.
 
