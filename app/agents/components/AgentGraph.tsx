@@ -291,19 +291,42 @@ export function AgentGraph({
         if (edgeData.source === 'response-node' || edgeData.target === 'response-node') return false
         return true
       })
-  .map((edgeData) => ({
-      id: edgeData.id,
-      source: edgeData.source,
-      target: edgeData.target,
-      type: edgeData.type === 'handoff' ? 'handoff' : 'default',
-      animated: edgeData.animated,
-  label: minimalMode ? undefined : edgeData.label,
-  data: { ...(edgeData.data || {}), minimal: minimalMode },
-      style: {
-        stroke: edgeData.type === 'handoff' ? '#FF6B6B' : '#64748B',
-        strokeWidth: edgeData.type === 'handoff' ? 3 : 2,
-      }
-    }))
+  .map((edgeData) => {
+        // Check if this edge is currently active (being used in delegation)
+        const isActiveDelegation = currentExecution?.status === 'running' && currentExecution.steps?.some(step => 
+          step.action === 'delegating' && 
+          (
+            (step.metadata?.sourceAgent === edgeData.source && step.metadata?.delegatedTo === edgeData.target) ||
+            (step.agent === edgeData.source && step.metadata?.delegatedTo === edgeData.target)
+          )
+        )
+        
+        const wasRecentlyUsed = (() => {
+          if (!currentExecution || currentExecution.status !== 'completed') return false
+          return currentExecution.steps?.some(step => 
+            step.action === 'delegating' &&
+            (
+              (step.metadata?.sourceAgent === edgeData.source && step.metadata?.delegatedTo === edgeData.target) ||
+              (step.agent === edgeData.source && step.metadata?.delegatedTo === edgeData.target)
+            )
+          )
+        })()
+
+        return {
+          id: edgeData.id,
+          source: edgeData.source,
+          target: edgeData.target,
+          type: edgeData.type === 'handoff' ? 'handoff' : 'default',
+          animated: isActiveDelegation || edgeData.animated,
+          label: minimalMode ? undefined : (isActiveDelegation ? '🔄 delegating...' : edgeData.label),
+          data: { ...(edgeData.data || {}), minimal: minimalMode },
+          style: {
+            stroke: isActiveDelegation ? '#10b981' : (wasRecentlyUsed ? '#8b5cf6' : (edgeData.type === 'handoff' ? '#FF6B6B' : '#64748B')),
+            strokeWidth: isActiveDelegation ? 4 : (edgeData.type === 'handoff' ? 3 : 2),
+            strokeDasharray: isActiveDelegation ? '8 4' : undefined
+          }
+        }
+      })
 
     // Add router edges: router -> specialists (highlight if used recently)
   const routerEdges: Edge[] = []
@@ -453,7 +476,7 @@ export function AgentGraph({
     })()
 
   return [...baseEdges, ...routerEdges, ...finalizeEdges, directEdge, respEdge]
-  }, [storeEdges, currentExecution, executions, storeNodes, minimalMode])
+  }, [storeEdges, currentExecution, executions, storeNodes, minimalMode, currentStep])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
