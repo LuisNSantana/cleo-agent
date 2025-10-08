@@ -5,9 +5,14 @@
 
 import { EventEmitter } from './event-emitter'
 import { SubAgentService, SubAgent, SubAgentData } from '../services/sub-agent-service'
-import { tools as appTools } from '@/lib/tools'
 import { z } from 'zod'
 import logger from '@/lib/utils/logger'
+
+// Dynamic import for tools to avoid server-only code in client bundle
+async function getAppTools() {
+  const { tools } = await import('@/lib/tools')
+  return tools
+}
 
 export interface SubAgentTemplate {
   name: string
@@ -276,13 +281,13 @@ export class SubAgentManager {
       for (const parentAgentId of Object.keys(statistics.subAgentsByParent)) {
         const subAgents = await SubAgentService.getSubAgents(parentAgentId)
         
-        subAgents.forEach(subAgent => {
+        for (const subAgent of subAgents) {
           this.subAgentsCache.set(subAgent.id, subAgent)
           
           // Create delegation tool
-          const delegationTool = this.createDelegationTool(subAgent)
+          const delegationTool = await this.createDelegationTool(subAgent)
           this.delegationTools.set(subAgent.delegationToolName, delegationTool)
-        })
+        }
       }
 
       this.lastCacheUpdate = Date.now()
@@ -294,7 +299,7 @@ export class SubAgentManager {
   /**
    * Create a delegation tool for a sub-agent
    */
-  private createDelegationTool(subAgent: SubAgent): any {
+  private async createDelegationTool(subAgent: SubAgent): Promise<any> {
     const toolName = subAgent.delegationToolName
     
     // Return a simple tool object instead of using the 'tool' helper
@@ -327,7 +332,9 @@ export class SubAgentManager {
 
     // Register into global tools registry so agents can bind and call it by name
     try {
-      (appTools as any)[toolName] = toolImpl
+      const appTools = await getAppTools()
+      const toolsRegistry = appTools as any
+      toolsRegistry[toolName] = toolImpl
     } catch (e) {
       logger.warn('[SUB-AGENT-MANAGER] Failed to register delegation tool globally:', toolName, e)
     }
