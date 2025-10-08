@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversations/get-signed-url?${params.toString()}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?${params.toString()}`,
       {
         method: 'GET',
         headers: {

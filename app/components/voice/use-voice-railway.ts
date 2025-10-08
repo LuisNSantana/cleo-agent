@@ -172,16 +172,16 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Sending full configuration...')
-            
-            // Send complete session configuration with tools
+            console.log('✅ session.created - Sending streamlined configuration...')
+
             const sessionUpdate: any = {
               type: 'session.update',
               session: {
                 modalities: ['text', 'audio'],
                 voice: configRef.current.voice || 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
+                input_audio_transcription: {
+                  model: 'whisper-1'
+                },
                 turn_detection: {
                   type: 'server_vad',
                   threshold: 0.5,
@@ -191,23 +191,21 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
               }
             }
 
-            // Add instructions if available
-            if (configRef.current.instructions) {
-              sessionUpdate.session.instructions = configRef.current.instructions
-            }
-
-            // Add tools if available
-            if (configRef.current.tools && Array.isArray(configRef.current.tools)) {
-              sessionUpdate.session.tools = configRef.current.tools
+            if (configRef.current.instructions && typeof configRef.current.instructions === 'string') {
+              const MAX_INSTRUCTION_LENGTH = 4000
+              sessionUpdate.session.instructions =
+                configRef.current.instructions.length > MAX_INSTRUCTION_LENGTH
+                  ? configRef.current.instructions.slice(0, MAX_INSTRUCTION_LENGTH)
+                  : configRef.current.instructions
             }
 
             try {
               ws.send(JSON.stringify(sessionUpdate))
-              console.log('📤 Sent session.update with full config (instructions + tools)')
+              console.log('📤 Sent streamlined session.update (voice + VAD + instructions)')
             } catch (sendError) {
               console.error('Failed to send session.update:', sendError)
             }
-            
+
             sessionReady = true
             setStatus('listening')
             startTimeRef.current = Date.now()
@@ -226,6 +224,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'error') {
             console.error('❌ OpenAI Error:', data)
             const errorMessage = data.error?.message || 'OpenAI connection error'
+            if (data.error) {
+              console.error('OpenAI error payload:', JSON.stringify(data.error, null, 2))
+            }
             
             // Check if it's a server error (500)
             if (data.error?.type === 'server_error') {

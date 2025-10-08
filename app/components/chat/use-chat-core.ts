@@ -480,6 +480,7 @@ export function useChatCore({
       startUiTransition(() => {
         setMessages((prev) => [...prev, userMessage])
       })
+      hasSentFirstMessageRef.current = true
 
       // Prepare controller
       if (abortControllerRef.current) {
@@ -1226,12 +1227,25 @@ export function useChatCore({
   // Also, only sync if the chatId has changed to avoid conflicts during message streaming
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
-    // Remove messages.length from dependencies to prevent infinite loop (React Error #185)
-    // Instead, check if initialMessages is different from current messages
-    if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
+    if (isSubmitting) {
+      return
+    }
+
+    const hasLocalMessages = messages.length > 0
+
+    if (chatIdChanged) {
+      if (hasLocalMessages && initialMessages.length === 0) {
+        // Keep optimistic messages until server data arrives
+        return
+      }
+      setMessages(initialMessages as ChatMessage[])
+      return
+    }
+
+    if (initialMessages.length > messages.length) {
       setMessages(initialMessages as ChatMessage[])
     }
-  }, [initialMessages, isSubmitting, chatId]) // Removed messages.length to fix infinite loop
+  }, [initialMessages, isSubmitting, chatId, messages.length])
 
   // Reset messages when navigating from a chat to home
   if (
