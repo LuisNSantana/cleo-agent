@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
       await initializeDynamicOrchestrator(user?.id)
     }
     
-    // Get enhanced Cleo configuration
-    const dynamicCleoConfig = await getCleoDynamicConfig()
+    // Get enhanced Cleo configuration with userId
+    const dynamicCleoConfig = await getCleoDynamicConfig(user?.id)
     
     // Update Cleo in the orchestrator
     try {

@@ -29,8 +29,14 @@ export async function getCleoDynamicConfig(userId?: string): Promise<AgentConfig
     const discoveryService = getAgentDiscoveryService(eventEmitter)
     
     // Discover all available agents
+    console.log('[Cleo Dynamic] Starting agent discovery for userId:', userId)
     await discoveryService.initialize(userId)
     const discoveredAgents = discoveryService.getDiscoveredAgents()
+    
+    console.log('[Cleo Dynamic] Discovered agents:', {
+      count: discoveredAgents.length,
+      agents: discoveredAgents.map(a => ({ id: a.id, name: a.name, toolName: a.delegationToolName }))
+    })
     
     // Get all delegation tool names
     const delegationTools = discoveredAgents.map(agent => agent.delegationToolName)
@@ -38,6 +44,13 @@ export async function getCleoDynamicConfig(userId?: string): Promise<AgentConfig
     // Generate enhanced prompt with discovered agents
     const delegationPrompt = discoveryService.generateDelegationPrompt()
     const basePrompt = getCleoPrompt(sanitizeModelName('gpt-4o-mini'), 'default')
+    
+    console.log('[Cleo Dynamic] Final configuration:', {
+      totalTools: CLEO_AGENT.tools.length + delegationTools.length,
+      baseTools: CLEO_AGENT.tools.length,
+      delegationTools: delegationTools.length,
+      allTools: [...CLEO_AGENT.tools, ...delegationTools]
+    })
     
     return {
       ...CLEO_AGENT,
