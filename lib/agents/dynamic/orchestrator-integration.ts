@@ -7,7 +7,7 @@
 import { AgentConfig } from '../types'
 import { AgentDiscoveryService } from './agent-discovery'
 import { EventEmitter } from '../core/event-emitter'
-import { getCleoDynamicConfig } from '../predefined/cleo'
+import { getCleoDynamicConfig } from '../predefined/cleo-dynamic'
 import logger from '@/lib/utils/logger'
 
 export class DynamicOrchestratorEnhancer {
