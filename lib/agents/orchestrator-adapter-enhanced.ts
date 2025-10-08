@@ -104,7 +104,7 @@ export function getAgentOrchestrator() {
     },
 
     // Dual-mode execution for UI with enhanced context
-    startAgentExecutionForUI(
+    async startAgentExecutionForUI(
       input: string, 
       agentId?: string, 
       _threadId?: string, 
@@ -112,6 +112,23 @@ export function getAgentOrchestrator() {
       prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
       _forceSupervised?: boolean
     ) {
+      // If starting Cleo, refresh with dynamic configuration
+      if (agentId === 'cleo-supervisor' || agentId === 'cleo') {
+        try {
+          const { getCleoDynamicConfig } = await import('./predefined/cleo-dynamic')
+          const dynamicCleo = await getCleoDynamicConfig(_userId)
+          
+          // Re-register Cleo with updated configuration
+          this.registerRuntimeAgent(dynamicCleo)
+          console.log('✅ [ENHANCED ADAPTER] Cleo updated with dynamic config:', {
+            toolCount: dynamicCleo.tools.length,
+            userId: _userId
+          })
+        } catch (error) {
+          console.warn('⚠️ [ENHANCED ADAPTER] Failed to update Cleo with dynamic config, using static:', error)
+        }
+      }
+      
       // If userId is explicitly provided, use it in a new request context
       if (_userId) {
         return createAndRunExecutionWithContext(input, agentId, prior || [], _userId)

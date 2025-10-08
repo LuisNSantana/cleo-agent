@@ -1019,14 +1019,14 @@ export async function POST(req: Request) {
 
         // Build minimal prior (we avoid replaying tool messages)
         const prior: Array<{ role: 'user'|'assistant'|'system'; content: string; metadata?: any }> = []
-        const exec = orchestrator.startAgentExecutionForUI?.(
+        const exec = await (orchestrator.startAgentExecutionForUI?.(
           userText,
           'cleo-supervisor',
           effectiveThreadId || undefined,
           realUserId || undefined,
           prior,
           true
-        ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor')
+        ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor'))
 
   const execId: string | undefined = exec?.id
         const startedAt = Date.now()
