@@ -1222,75 +1222,68 @@ export function useChatCore({
     }
   }, [prompt])
 
-  // Sync local messages state with initialMessages when it changes (e.g., switching chats)
-  // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
-  // Also, only sync if the chatId has changed to avoid conflicts during message streaming
+  // Unified effect for managing messages when chatId or initialMessages change
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
 
-    // Don't sync if actively submitting or streaming - preserve optimistic updates
-    if (isSubmitting || status === 'in_progress') {
-      return
-    }
-
-    const hasLocalMessages = messages.length > 0
-    const hasOptimisticMessage = messages.some(m => 
-      !initialMessages.find((im: any) => im.id === m.id)
-    )
-
+    // CASE 1: ChatId changed
     if (chatIdChanged) {
-      // When switching chats, only update if we don't have optimistic messages
-      if (hasLocalMessages && initialMessages.length === 0) {
-        // Keep optimistic messages until server data arrives
-        return
-      }
-      // Only replace if we're not in the middle of sending the first message
-      if (!hasOptimisticMessage) {
-        setMessages(initialMessages as ChatMessage[])
-      }
-      return
-    }
+      const wasNull = prevChatIdRef.current === null
+      const isNowNull = chatId === null
+      const wasCreatingNewChat = wasNull && chatId !== null && hasSentFirstMessageRef.current
 
-    // Only sync if server has more messages AND we're not holding optimistic updates
-    if (initialMessages.length > messages.length && !hasOptimisticMessage) {
-      setMessages(initialMessages as ChatMessage[])
-    }
-  }, [initialMessages, isSubmitting, chatId, messages.length, status])
-
-  // Reset messages when navigating from a chat to home or switching between chats
-  // Use effect to avoid issues with concurrent state updates
-  useEffect(() => {
-    if (prevChatIdRef.current !== chatId) {
-      // Don't clear if we're in the middle of sending a message
-      if (status === 'in_progress' || isSubmitting) {
+      // Don't interfere if we're actively working
+      if (isSubmitting || status === 'in_progress') {
         prevChatIdRef.current = chatId
         return
       }
 
-      // Don't clear when transitioning from null to a new chat (first message scenario)
-      if (prevChatIdRef.current === null && chatId !== null && hasSentFirstMessageRef.current) {
-        // This is the first message creating a new chat - keep messages
-        prevChatIdRef.current = chatId
-        return
-      }
-
-      if (chatId === null) {
-        // Switching to New Chat - clear everything
+      // Sub-case A: Going to "New Chat" (clearing)
+      if (isNowNull) {
         setMessages([])
         setStatus('ready')
         setError(null)
         setPendingToolConfirmation(null)
         seenConfirmationIdsRef.current.clear()
         hasSentFirstMessageRef.current = false
-      } else if (prevChatIdRef.current !== null) {
-        // Switching from one existing chat to another - clear current messages first
-        // The new messages will be loaded from initialMessages
-        setMessages([])
-        setStatus('ready')
+        prevChatIdRef.current = chatId
+        return
       }
+
+      // Sub-case B: First message created a new chat (keep optimistic messages)
+      if (wasCreatingNewChat) {
+        // Keep current messages, just update the ref
+        prevChatIdRef.current = chatId
+        return
+      }
+
+      // Sub-case C: Switching between existing chats
+      // Load new chat's messages from initialMessages
+      setMessages(initialMessages as ChatMessage[])
+      setStatus('ready')
       prevChatIdRef.current = chatId
+      return
     }
-  }, [chatId, status, isSubmitting])
+
+    // CASE 2: Same chat, but initialMessages updated (server data arrived)
+    // Only sync if we're not in the middle of sending/streaming
+    if (!isSubmitting && status !== 'in_progress') {
+      // Check if we have optimistic messages (messages not yet in initialMessages)
+      const hasOptimistic = messages.some(m => 
+        !initialMessages.find((im: any) => im.id === m.id)
+      )
+
+      // If we have optimistic messages, don't overwrite them
+      if (hasOptimistic) {
+        return
+      }
+
+      // Sync with server if server has more/different messages
+      if (initialMessages.length !== messages.length) {
+        setMessages(initialMessages as ChatMessage[])
+      }
+    }
+  }, [initialMessages, chatId, isSubmitting, status, messages.length])
 
   // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.
 
