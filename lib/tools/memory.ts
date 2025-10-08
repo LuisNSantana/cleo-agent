@@ -1,8 +1,5 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
-import { indexDocument } from '@/lib/rag/index-document'
-import { getCurrentUserId } from '@/lib/server/request-context'
 
 export const memoryAddNoteTool = tool({
   description: 'Persist a small, stable memory about the user (preferences, facts, long-term goals). Creates/updates user_memory_auto.md and reindexes it for RAG.',
@@ -13,7 +10,12 @@ export const memoryAddNoteTool = tool({
   }),
   execute: async ({ topic, note, importance }) => {
     try {
-  const userId = getCurrentUserId()
+      // Dynamic imports to avoid build issues with server-only code
+      const { getCurrentUserId } = await import('@/lib/server/request-context')
+      const { createClient } = await import('@/lib/supabase/server')
+      const { indexDocument } = await import('@/lib/rag/index-document')
+      
+      const userId = getCurrentUserId()
       if (!userId) return { success: false, message: 'No user context available' }
 
       const supabase = await createClient()

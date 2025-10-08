@@ -1,4 +1,9 @@
-import { RequestContext, getRequestContext, withRequestContext } from '../server/request-context'
+// Types for request context (avoid importing from server-only module)
+type RequestContext = {
+  userId?: string
+  model?: string
+  requestId?: string
+}
 
 const WRAPPED_FLAG = Symbol.for('cleo.tool.requestContextWrapped')
 
@@ -32,28 +37,36 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
 
   const originalExecute = toolDef.execute.bind(toolDef)
 
-  toolDef.execute = async (...args: any[]) => {
-    const current = getRequestContext()
-    const hasFullContext = Boolean(current?.userId) && Boolean(current?.model)
+  toolDef.execute = async function wrappedExecute(...args: any[]) {
+    try {
+      // Dynamic import to avoid build issues
+      let existing: RequestContext | undefined
+      let withRequestContext: any
+      try {
+        const serverContext = await import('../server/request-context')
+        existing = serverContext.getRequestContext?.()
+        withRequestContext = serverContext.withRequestContext
+      } catch {}
+      
+      const snapshot = buildContextSnapshot(existing)
+      const hasFullContext = Boolean(snapshot?.userId) && Boolean(snapshot?.model)
 
-    if (hasFullContext) {
+      if (hasFullContext || !withRequestContext) {
+        // If we have full context or can't use withRequestContext, just execute directly
+        return originalExecute(...args)
+      }
+
+      // Use snapshot as context for the run
+      if (!snapshot?.userId || !snapshot?.model) {
+        console.warn(`⚠️ [ContextGuard] Tool '${toolName}' executed with missing request context fields. Applying safeguarded context.`)
+      }
+
+      return withRequestContext(snapshot, () => originalExecute(...args))
+    } catch (error) {
+      console.error(`Error in wrapped tool execution for ${toolName}:`, error)
+      // Fallback to direct execution on error
       return originalExecute(...args)
     }
-
-    const contextForRun = buildContextSnapshot(current)
-
-    if (!contextForRun.userId && !contextForRun.model) {
-      if (!current?.requestId) {
-        contextForRun.requestId = generateFallbackRequestId()
-      }
-      return withRequestContext({ ...current, requestId: contextForRun.requestId }, () => originalExecute(...args))
-    }
-
-    if (!current?.userId || !current?.model) {
-      console.warn(`⚠️ [ContextGuard] Tool '${toolName}' executed with missing request context fields. Applying safeguarded context.`)
-    }
-
-    return withRequestContext({ ...contextForRun }, () => originalExecute(...args))
   }
 
   Object.defineProperty(toolDef, WRAPPED_FLAG, {

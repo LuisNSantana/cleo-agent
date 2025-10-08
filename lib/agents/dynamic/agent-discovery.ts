@@ -7,7 +7,6 @@
 
 import { AgentConfig } from '../types'
 import { SubAgentManager, SubAgent } from '../core/sub-agent-manager'
-import { createClient } from '@/lib/supabase/server-admin'
 import logger from '@/lib/utils/logger'
 import { EventEmitter } from '../core/event-emitter'
 import { z } from 'zod'
@@ -159,6 +158,14 @@ export class AgentDiscoveryService {
    */
   private async discoverDatabaseAgents(userId?: string): Promise<DiscoveredAgent[]> {
     try {
+      // Only try to access database in server context
+      if (typeof window !== 'undefined') {
+        // Client-side: skip database discovery
+        return []
+      }
+      
+      // Dynamic import to avoid build issues
+      const { createClient } = await import('@/lib/supabase/server-admin')
       const supabase = createClient()
       
       // Query for all agents (user's agents and shared agents)

@@ -3,7 +3,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
-import { getCurrentUserId } from '@/lib/server/request-context'
 import { ensureToolsHaveRequestContext, wrapToolExecuteWithRequestContext } from './context-wrapper'
 
 // Core single tools
@@ -471,7 +470,13 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 			}),
 			execute: async ({ task, context, priority, requirements }) => {
 				const orchestrator = getAgentOrchestrator() as any
-				const userId = getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
+				// Dynamic import to avoid build issues
+				let userId = '00000000-0000-0000-0000-000000000000'
+				try {
+					const { getCurrentUserId } = await import('@/lib/server/request-context')
+					userId = getCurrentUserId?.() || userId
+				} catch {}
+				
 				const input = [
 					`Tarea: ${task}`,
 					context ? `Contexto: ${context}` : null,

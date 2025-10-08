@@ -53,8 +53,15 @@ export const CLEO_AGENT: AgentConfig = {
  * Get Cleo configuration with dynamically discovered agents
  * This function should be called at runtime to get the latest agent list
  */
-export async function getCleoDynamicConfig(): Promise<AgentConfig> {
+export async function getCleoDynamicConfig(userId?: string): Promise<AgentConfig> {
   try {
+    // Only try dynamic discovery in server context
+    if (typeof window !== 'undefined') {
+      // Client-side: return static configuration
+      return CLEO_AGENT
+    }
+    
+    // Dynamic imports to avoid build issues
     const { getAgentDiscoveryService } = await import('../dynamic/agent-discovery')
     const { EventEmitter } = await import('../core/event-emitter')
     
@@ -62,7 +69,7 @@ export async function getCleoDynamicConfig(): Promise<AgentConfig> {
     const discoveryService = getAgentDiscoveryService(eventEmitter)
     
     // Discover all available agents
-    await discoveryService.initialize()
+    await discoveryService.initialize(userId)
     const discoveredAgents = discoveryService.getDiscoveredAgents()
     
     // Get all delegation tool names
