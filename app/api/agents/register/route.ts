@@ -24,9 +24,27 @@ export async function POST(req: Request) {
         console.log('[API/register] Registered runtime agent with icon:', { id: cfg.id, icon: cfg.icon })
       }
 
-      // Auto-refresh delegation tools for Cleo
+      // Trigger dynamic discovery refresh for Cleo
       try {
-        const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/auto-refresh-delegation`, {
+        const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/refresh-cleo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ forceRefresh: true })
+        })
+        
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          console.log('[API/register] Refreshed Cleo with dynamic configuration:', refreshData)
+        } else {
+          console.warn('[API/register] Failed to refresh Cleo configuration')
+        }
+      } catch (refreshError) {
+        console.error('[API/register] Error refreshing Cleo:', refreshError)
+      }
+      
+      // Also call legacy auto-refresh for backward compatibility
+      try {
+        const legacyResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/auto-refresh-delegation`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -35,28 +53,11 @@ export async function POST(req: Request) {
           })
         })
         
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          console.log('[API/register] Auto-refreshed delegation tools:', refreshData)
-        } else {
-          console.warn('[API/register] Failed to auto-refresh delegation tools')
+        if (legacyResponse.ok) {
+          console.log('[API/register] Legacy delegation tools updated')
         }
-      } catch (refreshError) {
-        console.error('[API/register] Error auto-refreshing delegation:', refreshError)
-      }
-
-      // Clear delegation cache to pick up new agent
-      try {
-        const cacheResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/clear-delegation-cache`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
-        
-        if (cacheResponse.ok) {
-          console.log('[API/register] Cleared delegation cache for new agent')
-        }
-      } catch (cacheError) {
-        console.error('[API/register] Error clearing delegation cache:', cacheError)
+      } catch (legacyError) {
+        console.error('[API/register] Error with legacy refresh:', legacyError)
       }
 
       return NextResponse.json({ success: true, agentId: cfg.id })
@@ -68,37 +69,20 @@ export async function POST(req: Request) {
         recreateAgentOrchestrator()
         registerRuntimeAgent(cfg)
 
-        // Auto-refresh delegation tools for Cleo
+        // Trigger dynamic discovery refresh for Cleo (retry)
         try {
-          const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/auto-refresh-delegation`, {
+          const refreshResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/refresh-cleo`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              newAgentId: cfg.id, 
-              newAgentName: cfg.name 
-            })
+            body: JSON.stringify({ forceRefresh: true })
           })
           
           if (refreshResponse.ok) {
             const refreshData = await refreshResponse.json()
-            console.log('[API/register] Auto-refreshed delegation tools (retry):', refreshData)
+            console.log('[API/register] Refreshed Cleo with dynamic configuration (retry):', refreshData)
           }
         } catch (refreshError) {
-          console.error('[API/register] Error auto-refreshing delegation (retry):', refreshError)
-        }
-
-        // Clear delegation cache to pick up new agent
-        try {
-          const cacheResponse = await fetch(`${req.url.split('/api')[0]}/api/agents/clear-delegation-cache`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          })
-          
-          if (cacheResponse.ok) {
-            console.log('[API/register] Cleared delegation cache for new agent (retry)')
-          }
-        } catch (cacheError) {
-          console.error('[API/register] Error clearing delegation cache (retry):', cacheError)
+          console.error('[API/register] Error refreshing Cleo (retry):', refreshError)
         }
 
         return NextResponse.json({ success: true, agentId: cfg.id, recreated: true })

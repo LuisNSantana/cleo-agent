@@ -311,6 +311,27 @@ export class GraphBuilder {
    */
   private async createAgentNode(agentConfig: AgentConfig) {
     return async (state: any) => {
+      // Enhance agent with dynamic tools if applicable
+      let enhancedConfig = agentConfig
+      try {
+        const { shouldUseDynamicDiscovery, enhanceAgentWithDynamicTools, registerDynamicTools } = 
+          await import('./dynamic-agent-enhancement')
+        
+        if (shouldUseDynamicDiscovery(agentConfig)) {
+          // Register dynamic tools globally first
+          await registerDynamicTools(state.userId)
+          
+          // Enhance the agent configuration
+          enhancedConfig = await enhanceAgentWithDynamicTools(agentConfig, state.userId)
+          logger.info(`🚀 [GraphBuilder] Enhanced ${agentConfig.name} with ${enhancedConfig.tools.length} tools (was ${agentConfig.tools.length})`)
+        }
+      } catch (error) {
+        logger.warn(`⚠️ [GraphBuilder] Failed to enhance agent ${agentConfig.name}, using static config:`, error)
+      }
+      
+      // Use enhanced config for the rest of the execution
+      agentConfig = enhancedConfig
+      
       this.eventEmitter.emit('node.entered', {
         nodeId: agentConfig.id,
         agentId: agentConfig.id,

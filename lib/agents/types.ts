@@ -36,6 +36,7 @@ export interface AgentConfig {
   predefined?: boolean // Whether this is a built-in agent (true for the 7 core agents)
   dynamic?: boolean // Whether this agent is user-created or dynamically generated
   userId?: string // For user-created agents
+  useDynamicDiscovery?: boolean // Whether this agent should use dynamic agent discovery
 }
 
 export type AgentRole =
