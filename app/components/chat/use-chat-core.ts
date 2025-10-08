@@ -1222,68 +1222,34 @@ export function useChatCore({
     }
   }, [prompt])
 
-  // Unified effect for managing messages when chatId or initialMessages change
+  // Sync local messages state with initialMessages when it changes (e.g., switching chats)
+  // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
+  // Also, only sync if the chatId has changed to avoid conflicts during message streaming
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
-
-    // CASE 1: ChatId changed
-    if (chatIdChanged) {
-      const wasNull = prevChatIdRef.current === null
-      const isNowNull = chatId === null
-      const wasCreatingNewChat = wasNull && chatId !== null && hasSentFirstMessageRef.current
-
-      // Don't interfere if we're actively working
-      if (isSubmitting || status === 'in_progress') {
-        prevChatIdRef.current = chatId
-        return
-      }
-
-      // Sub-case A: Going to "New Chat" (clearing)
-      if (isNowNull) {
-        setMessages([])
-        setStatus('ready')
-        setError(null)
-        setPendingToolConfirmation(null)
-        seenConfirmationIdsRef.current.clear()
-        hasSentFirstMessageRef.current = false
-        prevChatIdRef.current = chatId
-        return
-      }
-
-      // Sub-case B: First message created a new chat (keep optimistic messages)
-      if (wasCreatingNewChat) {
-        // Keep current messages, just update the ref
-        prevChatIdRef.current = chatId
-        return
-      }
-
-      // Sub-case C: Switching between existing chats
-      // Load new chat's messages from initialMessages
+    // Remove messages.length from dependencies to prevent infinite loop (React Error #185)
+    // Instead, check if initialMessages is different from current messages
+    if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
       setMessages(initialMessages as ChatMessage[])
-      setStatus('ready')
-      prevChatIdRef.current = chatId
-      return
     }
+  }, [initialMessages, isSubmitting, chatId]) // Removed messages.length to fix infinite loop
 
-    // CASE 2: Same chat, but initialMessages updated (server data arrived)
-    // Only sync if we're not in the middle of sending/streaming
-    if (!isSubmitting && status !== 'in_progress') {
-      // Check if we have optimistic messages (messages not yet in initialMessages)
-      const hasOptimistic = messages.some(m => 
-        !initialMessages.find((im: any) => im.id === m.id)
-      )
-
-      // If we have optimistic messages, don't overwrite them
-      if (hasOptimistic) {
-        return
-      }
-
-      // Sync with server if server has more/different messages
-      if (initialMessages.length !== messages.length) {
-        setMessages(initialMessages as ChatMessage[])
-      }
-    }
-  }, [initialMessages, chatId, isSubmitting, status, messages.length])
+  // Reset messages when navigating from a chat to home
+  if (
+    prevChatIdRef.current !== null &&
+    chatId === null &&
+    messages.length > 0
+  ) {
+    setMessages([])
+    setStatus('ready')
+    setError(null)
+    setPendingToolConfirmation(null)
+    seenConfirmationIdsRef.current.clear()
+    hasSentFirstMessageRef.current = false
+    prevChatIdRef.current = chatId
+  } else {
+    prevChatIdRef.current = chatId
+  }
 
   // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.
 
