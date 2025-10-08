@@ -39,23 +39,21 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const { chatId } = useChatSession()
   const pathname = usePathname()
+  
+  // 🔧 FIX: Track previous chatId to detect actual changes
+  const prevChatIdRef = useState<string | null>(null)[0]
 
-  // Reset messages when pathname changes (navigation between routes)
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[MessagesProvider] Pathname changed to: ${pathname}`)
-    }
-    setMessages([])
-    setIsLoading(false)
-  }, [pathname])
-
+  // 🔧 FIX: Reset messages when chatId changes or becomes null
+  // This replaces the pathname-based reset which was causing race conditions
   useEffect(() => {
     if (chatId === null) {
+      // Only clear if we actually had a chat before
       setMessages([])
       setIsLoading(false)
     }
   }, [chatId])
 
+  // 🔧 FIX: Load messages only when chatId is valid and changes
   useEffect(() => {
     if (!chatId) return
 

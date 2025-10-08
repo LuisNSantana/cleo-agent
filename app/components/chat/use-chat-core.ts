@@ -1228,12 +1228,25 @@ export function useChatCore({
 
     // CASE 1: Navigating to a new, empty chat page (clear state safely)
     if (chatIdChanged && chatId === null) {
-      setMessages([]);
+      // 🔧 FIX: Use startUiTransition to prevent race conditions
+      startUiTransition(() => {
+        setMessages([]);
+      });
       setStatus('ready');
       setError(null);
       setPendingToolConfirmation(null);
       seenConfirmationIdsRef.current.clear();
       hasSentFirstMessageRef.current = false;
+      // 🔧 FIX: Clear input when switching to new chat
+      setInput('');
+      // 🔧 FIX: Cancel any ongoing streams when switching to new chat
+      if (abortControllerRef.current) {
+        try {
+          abortControllerRef.current.abort();
+        } catch {}
+        abortControllerRef.current = null;
+      }
+      wasStreamingRef.current = false;
       prevChatIdRef.current = null;
       return;
     }
@@ -1246,8 +1259,20 @@ export function useChatCore({
         return;
       }
 
+      // 🔧 FIX: Cancel ongoing streams when switching chats
+      if (abortControllerRef.current && prevChatIdRef.current !== null) {
+        try {
+          abortControllerRef.current.abort();
+        } catch {}
+        abortControllerRef.current = null;
+      }
+      wasStreamingRef.current = false;
+
       // Normal switch: load messages from server for the selected chat
-      setMessages(initialMessages as ChatMessage[]);
+      // 🔧 FIX: Use startUiTransition for smoother updates
+      startUiTransition(() => {
+        setMessages(initialMessages as ChatMessage[]);
+      });
       prevChatIdRef.current = chatId;
       return;
     }
@@ -1256,14 +1281,18 @@ export function useChatCore({
     if (!isSubmitting) {
       // Only sync forward to avoid clobbering optimistic messages
       if (initialMessages.length > messages.length) {
-        setMessages(initialMessages as ChatMessage[]);
+        startUiTransition(() => {
+          setMessages(initialMessages as ChatMessage[]);
+        });
         return;
       }
 
       // If content differs but lengths match, sync only when we have no optimistic
       const hasOptimistic = messages.some(m => !(initialMessages as any).find((im: any) => im.id === m.id));
       if (!hasOptimistic && JSON.stringify(initialMessages) !== JSON.stringify(messages)) {
-        setMessages(initialMessages as ChatMessage[]);
+        startUiTransition(() => {
+          setMessages(initialMessages as ChatMessage[]);
+        });
       }
     }
   }, [chatId, isSubmitting, initialMessages])
@@ -1280,7 +1309,15 @@ export function useChatCore({
   // 🧹 Cleanup debounced functions on unmount
   useEffect(() => {
     return () => {
-    debouncedHandleError.cancel()
+      debouncedHandleError.cancel()
+      // 🔧 FIX: Cancel any ongoing streams when component unmounts
+      if (abortControllerRef.current) {
+        try {
+          abortControllerRef.current.abort()
+        } catch {}
+        abortControllerRef.current = null
+      }
+      wasStreamingRef.current = false
     }
   }, [debouncedHandleError])
 
