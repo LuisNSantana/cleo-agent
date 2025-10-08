@@ -97,7 +97,8 @@ export async function POST(req: NextRequest) {
       return new Response('Error communicating with AI service', { status: 500 })
     }
 
-    // Crear stream de respuesta compatible con el cliente
+    // Crear stream de respuesta compatible con el cliente (JSON events)
+    let started = false
     const stream = new TransformStream({
       transform(chunk, controller) {
         const text = new TextDecoder().decode(chunk)
@@ -113,9 +114,13 @@ export async function POST(req: NextRequest) {
                 
                 if (content) {
                   const cleaned = sanitizeModelText(content)
-                  // El cliente espera texto plano que falle el JSON.parse 
-                  // para ser tratado como contenido directo
-                  const responseChunk = `data: ${cleaned}\n\n`
+                  // Emit a text-start once
+                  if (!started) {
+                    started = true
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'text-start' })}\n\n`))
+                  }
+                  // Emit text-delta JSON event
+                  const responseChunk = `data: ${JSON.stringify({ type: 'text-delta', delta: cleaned })}\n\n`
                   controller.enqueue(new TextEncoder().encode(responseChunk))
                 }
               }

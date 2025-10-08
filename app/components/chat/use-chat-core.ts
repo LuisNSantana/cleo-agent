@@ -621,10 +621,10 @@ export function useChatCore({
               continue
             }
             if (line.startsWith("data: ")) {
+              // Prefer JSON events; if parsing fails, treat as plain-text delta (guest/faster)
               try {
                 const data = JSON.parse(line.slice(6))
-                
-                // Handle different types of streaming data
+                // JSON event path
                 switch (data.type) {
                   case 'tool-confirmation': {
                     try {
