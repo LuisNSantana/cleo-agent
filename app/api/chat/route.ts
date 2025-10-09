@@ -875,6 +875,17 @@ export async function POST(req: Request) {
   } catch {}
   const orchestratorBacked = model?.startsWith('agents:') || process.env.GLOBAL_CHAT_SUPERVISED === 'true' || impliesDelegation
 
+  // If the last message includes file attachments, hint the supervisor to prefer Iris for insights over web search
+  try {
+    const lastMsg = messages[messages.length - 1] as any
+    const hasFiles = Array.isArray(lastMsg?.content) && lastMsg.content.some((p: any) => p?.type === 'file')
+    if (hasFiles) {
+      // Strengthen the system prompt with a targeted hint
+      finalSystemPrompt = `${finalSystemPrompt}\n\n[Supervisor Hint] The user provided attached documents. Prioritize analyzing attachments. Avoid web search unless explicitly requested. Prefer delegating to Iris for insight synthesis.`
+      console.log('[Delegation] Attachment-present hint added for Iris preference')
+    }
+  } catch {}
+
   // If using LangChain orchestration models BUT no delegation implied, forward to multi-model endpoint and pipe SSE
   if (originalModel && originalModel.startsWith('langchain:') && !orchestratorBacked) {
       try {
@@ -980,9 +991,52 @@ export async function POST(req: Request) {
         try {
           const orchestrator = getAgentOrchestrator() as any
         const lastMsg = messages[messages.length - 1]
-        const userText = Array.isArray((lastMsg as any)?.parts)
+        // Prefer AI SDK v5 parts text for base prompt
+        const baseUserText = Array.isArray((lastMsg as any)?.parts)
           ? ((lastMsg as any).parts.find((p: any) => p.type === 'text')?.text || '')
           : (typeof (lastMsg as any)?.content === 'string' ? (lastMsg as any).content : '')
+
+        // Detect attached files from the original payload
+        let hasFileAttachments = false
+        let attachedFilenames: string[] = []
+        try {
+          if (Array.isArray((lastMsg as any)?.content)) {
+            const fileParts = (lastMsg as any).content.filter((p: any) => p && p.type === 'file')
+            hasFileAttachments = fileParts.length > 0
+            attachedFilenames = fileParts.map((p: any) => p?.name).filter(Boolean)
+          }
+        } catch {}
+
+        // Reuse previously converted multimodal messages to obtain extracted text from PDFs/DOCX/etc.
+        let convertedUserText = ''
+        try {
+          const lastConvertedUser = [...(convertedMessages || [])].reverse().find((m: any) => m?.role === 'user') as any
+          if (lastConvertedUser) {
+            if (Array.isArray(lastConvertedUser.content)) {
+              convertedUserText = lastConvertedUser.content
+                .filter((p: any) => p?.type === 'text')
+                .map((p: any) => p.text || '')
+                .filter(Boolean)
+                .join('\n\n')
+            } else if (typeof lastConvertedUser.content === 'string') {
+              convertedUserText = lastConvertedUser.content
+            }
+          }
+        } catch {}
+
+        // Compose final user text for orchestrator: include attachment evidence when present
+        let userText = baseUserText
+        if (hasFileAttachments && convertedUserText) {
+          const fileList = attachedFilenames.length ? `Archivos adjuntos: ${attachedFilenames.join(', ')}` : ''
+          // Keep it explicit: prioritize attached evidence, avoid premature web search, prefer Iris for insights synthesis
+          userText = [
+            baseUserText || '',
+            fileList ? `[Adjuntos procesados] ${fileList}` : '[Adjuntos procesados] Archivos recibidos',
+            convertedUserText,
+            'Instrucciones: Analiza exclusivamente la evidencia adjunta para esta solicitud. No hagas búsqueda web salvo que yo lo pida explícitamente. Si corresponde generar un informe de insights, delega en la agente Iris.'
+          ].filter(Boolean).join('\n\n')
+          console.log('[Orchestrator] Attachments detected for supervised run:', { count: attachedFilenames.length, names: attachedFilenames })
+        }
 
         // Ensure a thread for Cleo-supervisor (supervised)
         let effectiveThreadId: string | null = null
@@ -1006,7 +1060,7 @@ export async function POST(req: Request) {
                 .single()
               effectiveThreadId = created?.data?.id || null
             }
-            // Save the user message
+            // Save the user message (including attachment-derived text when present)
             if (effectiveThreadId && userText) {
               await (supabase as any).from('agent_messages').insert({
                 thread_id: effectiveThreadId,
