@@ -521,7 +521,8 @@ export function useChatCore({
   if (resolvedModel === 'grok-4-fast') {
     const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)
     if (hasAttachments) {
-      resolvedModel = 'grok-4-multimodal'
+      // Use canonical ID directly to avoid later normalization issues
+      resolvedModel = 'grok-4-fast-reasoning'
     }
   }
   if (resolvedModel !== selectedModel) {
@@ -1365,10 +1366,20 @@ export function useChatCore({
           return isImage || !supaSet.has(key)
         })
 
-        const allAttachments = [
+        let allAttachments = [
           ...supaMapped,
           ...filteredLocal,
         ]
+
+        // Enforce cap of 5 attachments per message
+        if (allAttachments.length > 5) {
+          toast({
+            title: "Máximo 5 archivos por mensaje",
+            description: "Se enviarán solo los primeros 5 adjuntos.",
+            status: "info",
+          })
+          allAttachments = allAttachments.slice(0, 5)
+        }
 
   // Send message with attachments
 

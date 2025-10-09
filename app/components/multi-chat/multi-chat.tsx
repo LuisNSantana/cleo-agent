@@ -263,6 +263,16 @@ export function MultiChat() {
 
     setIsSubmitting(true)
 
+    // Enforce max attachments cap to keep prompts manageable
+    if (files.length > 5) {
+      toast({
+        title: "Máximo 5 archivos por mensaje",
+        description: "Se enviarán solo los primeros 5 adjuntos.",
+        status: "info",
+      })
+      setFiles((prev) => prev.slice(0, 5))
+    }
+
     try {
       const uid = await getOrCreateGuestUserId(user)
       if (!uid) return
@@ -340,7 +350,17 @@ export function MultiChat() {
   ])
 
   const handleFileUpload = useCallback((newFiles: File[]) => {
-    setFiles((prev) => [...prev, ...newFiles])
+    setFiles((prev) => {
+      const combined = [...prev, ...newFiles]
+      if (combined.length > 5) {
+        toast({
+          title: "Máximo 5 archivos por mensaje",
+          description: "Se conservarán los primeros 5.",
+          status: "info",
+        })
+      }
+      return combined.slice(0, 5)
+    })
   }, [])
 
   const handleFileRemove = useCallback((fileToRemove: File) => {

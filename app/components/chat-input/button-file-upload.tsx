@@ -19,6 +19,8 @@ import { isSupabaseEnabled } from "@/lib/supabase/config"
 import { cn } from "@/lib/utils"
 import { FileArrowUp, Paperclip } from "@phosphor-icons/react"
 import React from "react"
+import { toast } from "@/components/ui/toast"
+import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/config"
 import { PopoverContentAuth } from "./popover-content-auth"
 
 type ButtonFileUploadProps = {
@@ -84,9 +86,21 @@ export function ButtonFileUpload({
     )
   }
 
+  const handleFilesAdded = (files: File[]) => {
+    if (!Array.isArray(files) || files.length === 0) return
+    if (files.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      toast({
+        title: `Máximo ${MAX_ATTACHMENTS_PER_MESSAGE} archivos por mensaje`,
+        description: `Se adjuntarán solo los primeros ${MAX_ATTACHMENTS_PER_MESSAGE}.`,
+        status: "info",
+      })
+    }
+    onFileUploadAction(files.slice(0, MAX_ATTACHMENTS_PER_MESSAGE))
+  }
+
   return (
     <FileUpload
-  onFilesAdded={onFileUploadAction}
+  onFilesAdded={handleFilesAdded}
       multiple
       disabled={!isUserAuthenticated}
       accept=".txt,.md,.csv,.json,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/rtf,text/plain,text/markdown,application/json,text/csv,image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/heic,image/heif"

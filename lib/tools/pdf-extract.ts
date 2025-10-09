@@ -23,7 +23,25 @@ export const extractTextFromPdfTool = tool({
       const buffer = dataUrlToBuffer(pdfDataUrl)
       const options: any = {}
       if (maxPages) options.max = maxPages
+
+      // Silence noisy pdf.js font warnings while parsing
+      const originalWarn = console.warn
+      const originalInfo = console.info
+      try {
+        console.warn = (...args: any[]) => {
+          const msg = (args?.[0] || "").toString()
+          if (msg.includes("TT: undefined function") || msg.includes("TT: invalid function id")) return
+          originalWarn.apply(console, args as any)
+        }
+        console.info = (...args: any[]) => {
+          const msg = (args?.[0] || "").toString()
+          if (msg.includes("TT: undefined function") || msg.includes("TT: invalid function id")) return
+          originalInfo.apply(console, args as any)
+        }
+      } catch {}
+
       const result = await pdfParse(buffer, options)
+      try { console.warn = originalWarn; console.info = originalInfo } catch {}
       return {
         success: true,
         text: (result?.text as string) || '',

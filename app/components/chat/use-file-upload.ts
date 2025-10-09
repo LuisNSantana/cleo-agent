@@ -5,6 +5,7 @@ import {
   processFiles,
 } from "@/lib/file-handling"
 import { useCallback, useState } from "react"
+import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/config"
 
 export const useFileUpload = () => {
   const [files, setFiles] = useState<File[]>([])
@@ -53,7 +54,17 @@ export const useFileUpload = () => {
   }
 
   const handleFileUpload = useCallback((newFiles: File[]) => {
-    setFiles((prev) => [...prev, ...newFiles])
+    setFiles((prev) => {
+      const combined = [...prev, ...newFiles]
+      if (combined.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+        toast({
+          title: `Máximo ${MAX_ATTACHMENTS_PER_MESSAGE} archivos por mensaje`,
+          description: `Se conservarán los primeros ${MAX_ATTACHMENTS_PER_MESSAGE}.`,
+          status: "info",
+        })
+      }
+      return combined.slice(0, MAX_ATTACHMENTS_PER_MESSAGE)
+    })
   }, [])
 
   const handleFileRemove = useCallback((file: File) => {

@@ -6,7 +6,20 @@ import * as mammoth from "mammoth"
  */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
+    // pdf.js sometimes logs noisy font warnings like "TT: undefined function".
+    // Temporarily suppress only those specific warnings during parse.
+    const originalWarn = console.warn
+    try {
+      console.warn = (...args: any[]) => {
+        const msg = (args?.[0] || "").toString()
+        if (msg.includes("TT: undefined function") || msg.includes("TT: invalid function id")) {
+          return
+        }
+        originalWarn.apply(console, args as any)
+      }
+    } catch {}
     const data = await pdf(buffer)
+    try { console.warn = originalWarn } catch {}
 
     // Limit PDF text to prevent token overflow (Llama 4 Maverick has 300k TPM limit)
     const maxLength = 30000 // Reduced to ~7,500 tokens to be more conservative
