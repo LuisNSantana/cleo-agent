@@ -99,6 +99,8 @@ export function MultiChat() {
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
 
   const createPersistedGroups = useCallback(() => {
+    // When there's no active chat (Home), don't render persisted groups
+    if (!chatId) return {} as { [key: string]: GroupedMessage }
     const extractTextFromParts = (parts?: any[]): string => {
       if (!parts || !Array.isArray(parts)) return ""
       return parts
@@ -176,9 +178,11 @@ export function MultiChat() {
     })
 
     return persistedGroups
-  }, [persistedMessages, selectedModelIds, models])
+  }, [persistedMessages, selectedModelIds, models, chatId])
 
   const messageGroups = useMemo(() => {
+    // Home route (no chatId) must show a clean onboarding with no prior content
+    if (!chatId) return [] as GroupedMessage[]
     const extractTextFromParts = (parts?: any[]): string => {
       if (!parts || !Array.isArray(parts)) return ""
       return parts
@@ -243,7 +247,7 @@ export function MultiChat() {
     })
 
     return Object.values(liveGroups)
-  }, [createPersistedGroups, modelChats, prompt, selectedModelIds])
+  }, [createPersistedGroups, modelChats, prompt, selectedModelIds, chatId])
 
   const handleSubmit = useCallback(async () => {
     if (!prompt.trim()) return
