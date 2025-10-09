@@ -3,7 +3,8 @@ import pdf from "pdf-parse-debugging-disabled"
 import * as mammoth from "mammoth"
 
 /**
- * Extract text content from PDF buffer with size limits and cleanup
+ * Extract text content from PDF buffer with size limits optimized for Grok-4-Fast
+ * Grok-4-Fast supports 2M token context window, allowing analysis of multiple large documents
  */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
@@ -22,16 +23,17 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
     const data = await pdf(buffer)
     try { console.warn = originalWarn } catch {}
 
-    // Limit PDF text to prevent token overflow (Llama 4 Maverick has 300k TPM limit)
-    const maxLength = 30000 // Reduced to ~7,500 tokens to be more conservative
+    // Limit PDF text based on Grok-4-Fast's 2M token context window
+    // Assuming ~4 chars per token, allow up to 1.5M tokens (6M chars) for multiple documents
+    const maxLength = 6000000 // ~1.5M tokens worth of text to leave room for other context
     let text = data.text
 
     if (text.length > maxLength) {
-      // Take first part and last part to preserve context
+      // Take first 70% and last 30% to preserve context from both ends
       const firstPart = text.substring(0, Math.floor(maxLength * 0.7))
       const lastPart = text.substring(text.length - Math.floor(maxLength * 0.3))
 
-      text = `${firstPart}\n\n[... CONTENIDO TRUNCADO PARA EVITAR LÍMITE DE TOKENS - ${text.length} caracteres total ...]\n\n${lastPart}`
+      text = `${firstPart}\n\n[... CONTENIDO TRUNCADO PARA EVITAR LÍMITE DE TOKENS - ${text.length} caracteres total - CONTEXTO DISPONIBLE GROK-4-FAST: 2M TOKENS ...]\n\n${lastPart}`
     }
 
     // Clean up problematic characters that might cause display issues
@@ -107,13 +109,13 @@ export async function processFileContent(
     ) {
       const textContent = Buffer.from(base64Data, "base64").toString("utf-8")
 
-      // Limit text file size as well
-      const maxLength = 30000
+      // Limit text file size for Grok-4-Fast's 2M token context
+      const maxLength = 6000000 // ~1.5M tokens worth of text
       let content = textContent
       if (content.length > maxLength) {
         content =
           content.substring(0, maxLength) +
-          "\n\n[... ARCHIVO TRUNCADO POR TAMAÑO ...]"
+          "\n\n[... ARCHIVO TRUNCADO - CONTEXTO GROK-4-FAST: 2M TOKENS DISPONIBLES ...]"
       }
 
       const summary = createFileSummary(fileName, mimeType, content)
@@ -151,10 +153,10 @@ export async function processFileContent(
         if (!extracted) {
           extracted = "[El documento Word no contiene texto extraíble o está vacío]"
         }
-        // Limit length similar to PDFs/text
-        const maxLength = 30000
+        // Limit length similar to PDFs for Grok-4-Fast context
+        const maxLength = 6000000 // ~1.5M tokens
         if (extracted.length > maxLength) {
-          extracted = `${extracted.substring(0, maxLength)}\n\n[... DOCUMENTO TRUNCADO POR TAMAÑO ...]`
+          extracted = `${extracted.substring(0, maxLength)}\n\n[... DOCUMENTO TRUNCADO - GROK-4-FAST CONTEXTO: 2M TOKENS ...]`
         }
         const summary = createFileSummary(fileName, mimeType, extracted)
         return {

@@ -1,9 +1,24 @@
 {
   "functions": {
-    "app/api/*/route.ts": { "maxDuration": 300 },
-    "app/api/*/*/route.ts": { "maxDuration": 300 },
-    "app/api/*/*/*/route.ts": { "maxDuration": 300 },
-    "app/api/*/*/*/*/route.ts": { "maxDuration": 300 }
+    "app/api/*/route.ts": { 
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/*/*/route.ts": { 
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/*/*/*/route.ts": { 
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/*/*/*/*/route.ts": { 
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "framework": {
+    "maxRequestBodySize": "50mb"
   },
   "crons": [
     {

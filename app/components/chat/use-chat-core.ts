@@ -20,7 +20,7 @@ import { useGuestMemory } from "@/app/hooks/use-guest-memory"
 import { usePageVisibility } from "@/hooks/use-page-visibility"
 
 // 🔧 Performance & Robustness Utilities
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB - increased for Grok-4-Fast 2M token context
 const MAX_RETRY_ATTEMPTS = 3
 const RETRY_DELAY_BASE = 1000 // 1s base delay
 

@@ -80,3 +80,7 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
+// App Router Configuration - increase request body size limit for Grok-4-Fast 2M token support
+export const preferredRegion = 'auto'
+export const dynamic = 'force-dynamic'
