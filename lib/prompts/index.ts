@@ -54,6 +54,20 @@ const AGENT_DELEGATION_RULES = {
     description: "market & competitor intelligence, SEO/keyword & SERP analysis, positioning, pricing deltas, prospect/ICP signal discovery, opportunity & white space mapping, INSIGHT SYNTHESIS (SWOT, Five Forces, Opportunity Matrix, ICE/RICE)",
     role: "Intelligence & Insights Specialist: Multi-phase sourcing + structured synthesis turning fragmented research into actionable insights (insights accionables), frameworks, ranked opportunities, risks, and executive summaries."
   },
+  Jungi: {
+    keywords: [
+      'ingredientes','etiqueta','label','comparar','comparación','lista de ingredientes','ocr','pdf','envase','alérgenos','alergenos','aditivos','e-codes','e330','composición'
+    ],
+    description: 'comparación de listas de ingredientes: oficial vs extraída (PDF/imagen/OCR), detección de faltantes/nuevos, cambios de orden, sinónimos/aditivos y banderas críticas por alérgenos',
+    role: 'Ingredient Comparator: QA de etiquetas y control de calidad alimentario'
+  },
+  Iris: {
+    keywords: [
+      'insights','hallazgos','tendencias','riesgos','recomendaciones','resumen ejecutivo','caso','análisis','sintesis','sintetiza','pdf','documento','url','referencias','evidencias'
+    ],
+    description: 'síntesis de insights accionables desde PDFs/URLs/Docs/notas: hallazgos, tendencias, riesgos con severidad/probabilidad/confianza, recomendaciones y próximos pasos con referencias',
+    role: 'Insights Analyst: síntesis ejecutiva y priorizada basada en evidencia'
+  },
 
   // === SUB-AGENTS ===
   Khipu: {
@@ -145,6 +159,8 @@ Examples of routing logic:
 - Market intelligence/competitor analysis → Wex (firecrawl, webSearch, perplexity)
 - Research/documentation → Apu (customer support, troubleshooting)
 - E-commerce/Shopify → Emma (store management, analytics)
+ - Ingredient list comparison from PDF/label → Jungi (OCR-tolerant ingredient diff with allergen flags)
+ - Insight synthesis ("Caso" analysis, executive summary) → Iris (evidence gathering + structured insights)
 </decision_tree>
 
 <heuristics>
@@ -189,6 +205,7 @@ const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
  - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
  - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
  - For social media via Nora: complete community management including content creation, analytics, scheduling, and engagement. Nora handles all social media tasks directly with integrated tools.
+ - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Nora as the likely specialist (e.g., "¿Quieres que Nora gestione X/Y/Z?").
  - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
  - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Nora; "reporte de métricas" → Nora).
  - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
@@ -201,6 +218,8 @@ const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Financial analysis/Business planning → Peter
  - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
  - Social content creation/copywriting/analytics/metrics/reporting → Nora handles directly with integrated tools
+ - Evidence gathering (PDF/URL/Doc) → Iris synthesizes insights (Resumen Ejecutivo, Hallazgos, Tendencias, Riesgos, Recomendaciones, Próximos Pasos, Referencias)
+ - Ingredient list comparison (oficial vs extraída OCR) → Jungi genera reporte estructurado con coincidencias, faltantes/nuevos, orden, sinónimos/aditivos, y banderas de alérgenos
  - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
 Notes:
 - When Notion credentials exist, do NOT ask the user to connect. Proceed to Notion Agent and return the real URL.
@@ -224,6 +243,8 @@ ORCHESTRATION INTELLIGENCE:
 - Chain specialists with clean handoffs.`;
 // Inject explicit Wex routing guidance
 const SPECIALISTS_AWARENESS_ENHANCED = SPECIALISTS_AWARENESS + `\n- For strategic market / competitor / SEO / prospect intelligence (pricing comparisons, TAM sizing, SERP & keyword analysis, positioning matrices, opportunity/white space discovery, actionable insight synthesis / "insights accionables", executive summaries, frameworks like SWOT/Five Forces/Opportunity Matrix/ICE-RICE) → delegate to Wex early if high-signal context is present.`
+  + `\n- For ingredient label QA and OCR-based comparisons (faltantes, nuevos, orden, sinónimos/aditivos, alérgenos) → delegate to Jungi.`
+  + `\n- For evidence-based insight synthesis (Resumen ejecutivo, Hallazgos, Tendencias, Riesgos con severidad/probabilidad/confianza, Recomendaciones, Próximos pasos, Referencias) → delegate to Iris.`
 
 const JOURNALISM_COMMUNITY_MANAGER_SPECIALIZATION = `SPECIALIZATION: JOURNALISM & COMMUNITY
 - Tailor content to platform/audience with hooks, calendars, hashtags.

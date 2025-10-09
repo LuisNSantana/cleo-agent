@@ -14,6 +14,7 @@ export { EMMA_AGENT } from './emma'
 export { APU_AGENT } from './apu'
 export { ASTRA_AGENT } from './astra'
 export { JUNGI_AGENT } from './jungi'
+export { INSIGHTS_AGENT } from './insights'
 
 
 export { NOTION_AGENT } from './notion-agent'
@@ -30,6 +31,7 @@ import { EMMA_AGENT } from './emma'
 import { APU_AGENT } from './apu'
 import { ASTRA_AGENT } from './astra'
 import { JUNGI_AGENT } from './jungi'
+import { INSIGHTS_AGENT } from './insights'
 
 
 import { NOTION_AGENT } from './notion-agent'
@@ -50,6 +52,7 @@ export const ALL_PREDEFINED_AGENTS = [
   APU_AGENT,
   ASTRA_AGENT,
   JUNGI_AGENT,
+  INSIGHTS_AGENT,
   NOTION_AGENT,
   NORA_AGENT,
   // AMI_CALENDAR_AGENT  // REMOVED - consolidated into AMI_AGENT
