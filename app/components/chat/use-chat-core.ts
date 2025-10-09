@@ -1220,35 +1220,32 @@ export function useChatCore({
   }, [prompt])
 
   // Sync local messages state with initialMessages when it changes (e.g., switching chats)
-  // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
-  // Also, only sync if the chatId has changed to avoid conflicts during message streaming
+  // Avoid overwriting optimistic updates mid-submit; only hard-sync on chatId changes
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
-    
-    // CRITICAL: Always sync when chatId changes (even if initialMessages is empty)
-    // This ensures new chats start clean
-    // Only prevent sync if we're submitting AND chatId hasn't changed
-    if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
+    if (chatIdChanged) {
+      // When switching chats (or entering a newly created one), trust initialMessages
+      setMessages(initialMessages as ChatMessage[])
+    } else if (!isSubmitting && initialMessages.length > messages.length) {
+      // If we fetched more messages for the same chat (e.g., background refresh), merge
       setMessages(initialMessages as ChatMessage[])
     }
   }, [initialMessages, isSubmitting, chatId])
 
   // Reset messages when navigating from a chat to home (new chat)
-  if (
-    prevChatIdRef.current !== null &&
-    chatId === null &&
-    messages.length > 0
-  ) {
-    setMessages([])
-    setInput('')
-    setStatus('ready')
-    setError(null)
-    setPendingToolConfirmation(null)
-    seenConfirmationIdsRef.current.clear()
-    hasSentFirstMessageRef.current = false
+  if (prevChatIdRef.current !== chatId) {
+    // Route/Session changed; update ref and, if leaving chat, clear UI state
+    const leavingChat = prevChatIdRef.current && chatId === null
     prevChatIdRef.current = chatId
-  } else {
-    prevChatIdRef.current = chatId
+    if (leavingChat) {
+      setMessages([])
+      setInput('')
+      setStatus('ready')
+      setError(null)
+      setPendingToolConfirmation(null)
+      seenConfirmationIdsRef.current.clear()
+      hasSentFirstMessageRef.current = false
+    }
   }
 
   // Input is updated immediately; debounce should be applied to side-effects, not the input state itself.

@@ -11,10 +11,10 @@ export function ChatContainer() {
   const pathname = usePathname()
 
   if (multiModelEnabled) {
-    // Key by pathname to ensure a full remount when route changes
-    return <MultiChat key={pathname} />
+    // Preserve component instance across route changes to avoid losing optimistic UI state
+    return <MultiChat />
   }
 
-  // Key by pathname to ensure a full remount when route changes
-  return <Chat key={pathname} />
+  // Preserve component instance across route changes to avoid losing optimistic UI state
+  return <Chat />
 }

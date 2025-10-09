@@ -40,14 +40,9 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const { chatId } = useChatSession()
   const pathname = usePathname()
 
-  // Reset messages when pathname changes (navigation between routes)
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[MessagesProvider] Pathname changed to: ${pathname}`)
-    }
-    setMessages([])
-    setIsLoading(false)
-  }, [pathname])
+  // Note: We no longer clear messages on every pathname change.
+  // Chat state is driven by chatId; clearing on arbitrary route changes
+  // caused optimistic first messages to disappear during chat creation.
 
   useEffect(() => {
     if (chatId === null) {

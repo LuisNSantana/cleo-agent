@@ -120,6 +120,9 @@ import { delegationTools } from './delegation'
 // Financial tools
 import { financialModelingPrepTools } from './financial-modeling-prep'
 import { alphaVantageTools } from './alpha-vantage'
+// Ingredients comparison
+import { ingredientsTools } from './ingredients-compare'
+import { pdfTools } from './pdf-extract'
 
 // Notion (register each tool with explicit keys)
 import {
@@ -402,6 +405,8 @@ export const tools = {
 	...firecrawlExtendedTools,
 	...delegationTools,
 	...twitterTools,
+	...ingredientsTools,
+	...pdfTools,
 	
 	// Twitter Advanced
 	postTweetWithMedia: postTweetWithMediaTool,
