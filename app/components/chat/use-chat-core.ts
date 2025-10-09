@@ -1174,12 +1174,9 @@ export function useChatCore({
       } catch (error) {
         // Swallow error and keep UI responsive
       }
-    } else {
-      // Force reset UI state even if no controller exists
-      setStatus("ready")
-      setIsSubmitting(false)
     }
-  }, [])
+    // Don't force reset if there's no controller - let the natural flow handle it
+  }, [isSubmitting])
 
   // Regenerate function
   const regenerate = useCallback(async () => {
@@ -1224,25 +1221,17 @@ export function useChatCore({
 
   // Sync local messages state with initialMessages when it changes (e.g., switching chats)
   // But don't sync if we're in the middle of submitting to avoid overwriting optimistic updates
+  // Also, only sync if the chatId has changed to avoid conflicts during message streaming
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
     
-    // Don't sync if actively submitting - preserve optimistic updates
-    if (isSubmitting) {
-      return
-    }
-    
-    // 🔧 CRITICAL FIX: Don't sync if initialMessages is empty but we have local messages
-    // This prevents clearing optimistic messages before server responds
-    if (initialMessages.length === 0 && messages.length > 0) {
-      return
-    }
-    
-    // Sync messages when chatId changes or when server has more messages
-    if (chatIdChanged || initialMessages.length > messages.length) {
+    // CRITICAL: Always sync when chatId changes (even if initialMessages is empty)
+    // This ensures new chats start clean
+    // Only prevent sync if we're submitting AND chatId hasn't changed
+    if (!isSubmitting && (chatIdChanged || initialMessages.length > messages.length)) {
       setMessages(initialMessages as ChatMessage[])
     }
-  }, [initialMessages, isSubmitting, chatId, messages.length])
+  }, [initialMessages, isSubmitting, chatId])
 
   // Reset messages when navigating from a chat to home (new chat)
   if (
