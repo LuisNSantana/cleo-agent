@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import '@/lib/suppress-warnings'
 import { processFileContent } from '@/lib/file-processing'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'

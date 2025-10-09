@@ -1,3 +1,4 @@
+import '@/lib/suppress-warnings'
 import { tool } from 'ai'
 import { z } from 'zod'
 // Use the debugging-disabled fork installed in dependencies

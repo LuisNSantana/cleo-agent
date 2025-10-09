@@ -2,6 +2,8 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 // RAG prompt construction is now centralized in lib/chat/prompt
 import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
 import { getAllModels } from "@/lib/models"
+import { NextRequest, NextResponse } from 'next/server'
+import '@/lib/suppress-warnings'
 import { resolveModelFromList } from '@/lib/models/resolve'
 import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
 import { tools, ensureDelegationToolForAgent } from "@/lib/tools"

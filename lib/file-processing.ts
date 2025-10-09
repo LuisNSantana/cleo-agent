@@ -1,3 +1,4 @@
+import '@/lib/suppress-warnings'
 import pdf from "pdf-parse-debugging-disabled"
 import * as mammoth from "mammoth"
 
