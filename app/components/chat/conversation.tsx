@@ -2,7 +2,7 @@ import { ChatContainerContent, ChatContainerRoot } from "@/components/prompt-kit
 import { Loader } from "@/components/prompt-kit/loader"
 import { ScrollButton } from "@/components/prompt-kit/scroll-button"
 import { UIMessage as MessageType } from "ai"
-import { useRef, useMemo, Fragment } from "react"
+import { useRef, useMemo, Fragment, useEffect } from "react"
 import { Message } from "./message"
 import { PipelineTimeline, type PipelineStep } from './pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from './optimization-insights'
@@ -10,6 +10,7 @@ import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { PerformanceMetrics } from './performance-metrics'
 import { TypingIndicator } from "@/components/ui/typing-indicator"
+import { useStickToBottomContext } from "use-stick-to-bottom"
 
 type ConversationProps = {
   messages: MessageType[]
@@ -29,6 +30,8 @@ export function Conversation({
   userId,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
+  const { scrollToBottom, isAtBottom, state } = useStickToBottomContext()
+  const lastAutoscrollMessageRef = useRef<string | null>(null)
 
   // Extract pipeline steps PER MESSAGE instead of globally
   const messagePipelineSteps = useMemo(() => {
@@ -120,6 +123,41 @@ export function Conversation({
     return ""
   }
 
+  const latestMessage = messages[messages.length - 1]
+
+  useEffect(() => {
+    if (!latestMessage) return
+    const isAssistantDone = latestMessage.role === "assistant" && status !== "streaming"
+    if (!isAssistantDone) {
+      return
+    }
+
+    const nearBottom = state?.isNearBottom ?? isAtBottom
+    if (!nearBottom) {
+      return
+    }
+
+    const messageKey = `${latestMessage.id}:${(latestMessage as any)?.parts?.length ?? 0}`
+    if (lastAutoscrollMessageRef.current === messageKey) {
+      return
+    }
+
+    lastAutoscrollMessageRef.current = messageKey
+
+    const raf = requestAnimationFrame(() => {
+      scrollToBottom({
+        animation: {
+          damping: 0.75,
+          stiffness: 0.09,
+          mass: 1.1,
+        },
+        wait: 32,
+      })
+    })
+
+    return () => cancelAnimationFrame(raf)
+  }, [latestMessage, status, scrollToBottom, isAtBottom, state?.isNearBottom])
+
 
   if (!messages || messages.length === 0)
     return <div className="h-full w-full"></div>
@@ -137,6 +175,7 @@ export function Conversation({
             // IMPROVED: Add dynamic bottom padding with extra margin to prevent input overlay
             // Increased default from 88px to 120px + 16px safety margin
             paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 16px)`,
+            scrollPaddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 24px)`,
           }}
         >
           {messages?.map((message, index) => {
