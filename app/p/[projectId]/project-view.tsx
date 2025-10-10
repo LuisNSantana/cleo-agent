@@ -256,6 +256,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     chatId: null,
   })
 
+  // Override selected model with grok-4-fast-reasoning for project context (smartest multimodal model with reasoning)
+  const projectModel = 'grok-4-fast-reasoning'
+
   // Simplified ensureChatExists for authenticated project context
   const ensureChatExists = useCallback(
     async (userId: string) => {
@@ -269,7 +272,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         const newChat = await createNewChat(
           userId,
           localInput,
-          selectedModel,
+          projectModel, // Use grok-4-fast for project chats
           true, // Always authenticated in this context
           SYSTEM_PROMPT_DEFAULT,
           projectId
@@ -304,7 +307,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       currentChatId,
       createNewChat,
       localInput,
-      selectedModel,
+      projectModel,
       projectId,
     ]
   )
@@ -313,7 +316,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     isAuthenticated: true, // Always authenticated in project context
     chatId: null,
     messages,
-    selectedModel,
+    selectedModel: projectModel, // Use project model for operations
     systemPrompt: SYSTEM_PROMPT_DEFAULT,
     createNewChat,
     setHasDialogAuth: () => {}, // Not used in project context
