@@ -30,8 +30,6 @@ export function Conversation({
   userId,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
-  const { scrollToBottom, isAtBottom, state } = useStickToBottomContext()
-  const lastAutoscrollMessageRef = useRef<string | null>(null)
 
   // Extract pipeline steps PER MESSAGE instead of globally
   const messagePipelineSteps = useMemo(() => {
@@ -125,6 +123,70 @@ export function Conversation({
 
   const latestMessage = messages[messages.length - 1]
 
+  if (!messages || messages.length === 0)
+    return <div className="h-full w-full"></div>
+
+  return (
+    <div className="relative flex h-full w-full flex-col items-center overflow-hidden z-10">
+      <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 mx-auto flex w-full flex-col justify-center">
+        <div className="h-app-header bg-transparent flex w-full mask-b-from-4% mask-b-to-100% lg:hidden" />
+      </div>
+      <ChatContainerRoot className="relative w-full">
+        <ConversationContent
+          messages={messages}
+          status={status}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onReload={onReload}
+          userId={userId}
+          messagePipelineSteps={messagePipelineSteps}
+          currentMessageSteps={currentMessageSteps}
+          optimizationStatus={optimizationStatus}
+          metrics={metrics}
+          isActive={isActive}
+          extractTextFromMessage={extractTextFromMessage}
+          initialMessageCount={initialMessageCount}
+          latestMessage={latestMessage}
+        />
+      </ChatContainerRoot>
+    </div>
+  )
+}
+
+function ConversationContent({
+  messages,
+  status,
+  onDelete,
+  onEdit,
+  onReload,
+  userId,
+  messagePipelineSteps,
+  currentMessageSteps,
+  optimizationStatus,
+  metrics,
+  isActive,
+  extractTextFromMessage,
+  initialMessageCount,
+  latestMessage,
+}: {
+  messages: MessageType[]
+  status: "streaming" | "ready" | "submitted" | "error"
+  onDelete: (id: string) => void
+  onEdit: (id: string, newText: string) => void
+  onReload: () => void
+  userId?: string
+  messagePipelineSteps: Map<string, PipelineStep[]>
+  currentMessageSteps: PipelineStep[]
+  optimizationStatus: OptimizationStatus | null
+  metrics: any
+  isActive: boolean
+  extractTextFromMessage: (msg?: MessageType) => string
+  initialMessageCount: React.MutableRefObject<number>
+  latestMessage: MessageType
+}) {
+  const { scrollToBottom, isAtBottom, state } = useStickToBottomContext()
+  const lastAutoscrollMessageRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!latestMessage) return
     const isAssistantDone = latestMessage.role === "assistant" && status !== "streaming"
@@ -158,17 +220,8 @@ export function Conversation({
     return () => cancelAnimationFrame(raf)
   }, [latestMessage, status, scrollToBottom, isAtBottom, state?.isNearBottom])
 
-
-  if (!messages || messages.length === 0)
-    return <div className="h-full w-full"></div>
-
   return (
-    <div className="relative flex h-full w-full flex-col items-center overflow-hidden z-10">
-      <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 mx-auto flex w-full flex-col justify-center">
-        <div className="h-app-header bg-transparent flex w-full mask-b-from-4% mask-b-to-100% lg:hidden" />
-      </div>
-      <ChatContainerRoot className="relative w-full">
-        <ChatContainerContent
+    <ChatContainerContent
           className="custom-scrollbar flex w-full h-full flex-col items-center pt-16 md:pt-20"
           style={{
             scrollbarGutter: "stable both-edges",
@@ -327,7 +380,5 @@ export function Conversation({
             <ScrollButton className="absolute top-[-50px] right-[30px]" />
           </div>
         </ChatContainerContent>
-      </ChatContainerRoot>
-    </div>
   )
 }
