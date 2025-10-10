@@ -148,17 +148,24 @@ export function CleoPersonalitySettings() {
   return (
     <div className="space-y-8 overflow-x-hidden">
       <div>
-        <h3 className="mb-2 text-lg font-medium">Cleo personality</h3>
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-muted-foreground text-sm">
-            Personalize how Cleo communicates with you. Choose a base style and fine‑tune the details.
-          </p>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20">
+            <MaskHappyIcon className="size-6 text-pink-600 dark:text-pink-400" weight="duotone" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-semibold">Customize Cleo's Personality</h3>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Choose how Cleo communicates with you
+            </p>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-end">
           <div className="text-xs">
             {saveState === "saving" && (
               <span className="text-muted-foreground">Saving…</span>
             )}
             {saveState === "saved" && (
-              <span className="text-emerald-600 dark:text-emerald-400">Saved</span>
+              <span className="text-emerald-600 dark:text-emerald-400">✓ Saved</span>
             )}
           </div>
         </div>

@@ -15,6 +15,7 @@ import {
   ChartLineUpIcon,
   ArrowSquareOutIcon,
   UsersIcon,
+  MaskHappy as MaskHappyIcon,
 } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useCallback } from "react"
@@ -105,13 +106,21 @@ export function SettingsContent({
                   <PaintBrushIcon className="size-4" />
                   <span>Appearance</span>
                 </TabsTrigger>
+                
+                <TabsTrigger
+                  value="personality"
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <MaskHappyIcon className="size-4" />
+                  <span>Personality</span>
+                </TabsTrigger>
 
                 <TabsTrigger
                   value="models"
                   className="flex shrink-0 items-center gap-2"
                 >
                   <CubeIcon className="size-4" />
-                  <span>Models</span>
+                  <span>AI Models</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="connections"
@@ -173,14 +182,13 @@ export function SettingsContent({
               <LayoutSettings />
               <InteractionPreferences />
             </TabsContent>
-
-
+            
+            <TabsContent value="personality" className="space-y-6 px-6 overflow-y-auto">
+              <CleoPersonalitySettings />
+            </TabsContent>
 
             <TabsContent value="models" className="px-6 overflow-y-auto">
               <SimpleModelsInfo />
-              <div className="mt-8">
-                <CleoPersonalitySettings />
-              </div>
             </TabsContent>
 
             <TabsContent value="connections" className="space-y-6 px-6 overflow-y-auto">
@@ -269,7 +277,16 @@ export function SettingsContent({
                     <span>Appearance</span>
                   </div>
                 </TabsTrigger>
-
+                
+                <TabsTrigger
+                  value="personality"
+                  className="w-full justify-start rounded-md px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <MaskHappyIcon className="size-4" />
+                    <span>Personality</span>
+                  </div>
+                </TabsTrigger>
 
                 <TabsTrigger
                   value="models"
@@ -277,7 +294,7 @@ export function SettingsContent({
                 >
                   <div className="flex items-center gap-2">
                     <CubeIcon className="size-4" />
-                    <span>Models</span>
+                    <span>AI Models</span>
                   </div>
                 </TabsTrigger>
                 <TabsTrigger
@@ -350,12 +367,13 @@ export function SettingsContent({
                 <LayoutSettings />
                 <InteractionPreferences />
               </TabsContent>
-
-
+              
+              <TabsContent value="personality" className="mt-0 space-y-6 overflow-x-hidden">
+                <CleoPersonalitySettings />
+              </TabsContent>
 
               <TabsContent value="models" className="mt-0 space-y-6 overflow-x-hidden">
                 <SimpleModelsInfo />
-                <CleoPersonalitySettings />
               </TabsContent>
 
               <TabsContent value="connections" className="mt-0 space-y-6">

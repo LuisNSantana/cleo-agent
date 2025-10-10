@@ -43,6 +43,7 @@ import {
   ChartLine as DashboardIcon,
   Plugs as IntegrationsIcon,
   Folder as Folders,
+  MaskHappy as MaskHappyIcon,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
 import { SidebarVoiceButton } from "@/app/components/voice/sidebar-voice-button"
@@ -92,6 +93,14 @@ export function AppSidebar() {
     { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, iconWeight: "duotone" as const },
     { href: "/docs", label: "Docs", icon: DocsIcon, iconWeight: "duotone" as const },
   ]
+
+  // Personality navigation item (opens settings with personality tab)
+  const personalityAction = {
+    label: "Personality",
+    icon: MaskHappyIcon,
+    iconWeight: "duotone" as const,
+    action: () => handleOpenSettings("personality"),
+  }
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
@@ -152,6 +161,26 @@ export function AppSidebar() {
               })}
             </SidebarMenu>
           </SidebarGroup>
+          
+          {/* Personality quick access */}
+          <SidebarGroup className="mb-1">
+            <SidebarMenu className="space-y-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  tooltip="Customize Cleo's personality"
+                  onClick={() => {
+                    personalityAction.action()
+                  }}
+                >
+                  <div className="flex items-center gap-3 w-full">
+                    <personalityAction.icon className="size-[18px]" weight={personalityAction.iconWeight} />
+                    <span className="text-[13.5px]">{personalityAction.label}</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+          
           <SidebarSeparator className="my-5 bg-gradient-to-r from-transparent via-border/30 to-transparent" />
 
           <div className="mb-6 flex w-full flex-col items-start gap-1">

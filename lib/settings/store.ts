@@ -4,6 +4,7 @@ export type SettingsTab =
   | "general"
   | "dashboard"
   | "appearance"
+  | "personality"
   | "models"
   | "connections"
   | "files"
