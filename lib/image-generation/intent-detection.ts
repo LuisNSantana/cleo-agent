@@ -10,16 +10,22 @@ const IMAGE_GENERATION_KEYWORDS = [
   'crear imagen', 'generar imagen', 'imagen de', 'foto de', 'ilustración de',
   'dibujo de', 'diseño de', 'logo de', 'póster de', 'banner de',
   'visualiza', 'representa', 'muestra visualmente', 'haz un dibujo',
+  'hazme un logo', 'haz un logo', 'crea un logo', 'crea un póster', 'renderiza',
+  'píntame', 'pintame', 'ilústrame', 'concept art', 'arte conceptual',
+  'portada de', 'cover art', 'arte de', 'arte estilo',
   
   // English terms
   'generate an image', 'create an image', 'draw', 'design', 'make an image',
   'create image', 'generate image', 'image of', 'picture of', 'illustration of',
   'drawing of', 'design of', 'logo of', 'poster of', 'banner of',
   'visualize', 'represent', 'show visually', 'make a drawing',
+  'render', 'render me', 'concept art of', 'artwork of', 'cover art of',
+  'album cover', 'movie poster', 'digital art of',
   
   // Common phrases
   'quiero ver', 'muéstrame', 'cómo se ve', 'cómo sería', 'imagina',
   'i want to see', 'show me', 'what would look like', 'imagine',
+  'haz que se vea', 'enséñame cómo se vería', 'make it look like',
 ]
 
 const IMAGE_STYLE_KEYWORDS = [
@@ -27,6 +33,16 @@ const IMAGE_STYLE_KEYWORDS = [
   'minimalista', 'abstracto', 'fotorrealista', 'vintage', 'moderno',
   'realistic', 'watercolor', 'oil painting', 'minimalist', 'abstract',
   'photorealistic', 'modern', 'artistic', 'professional', 'creative'
+]
+
+const NEGATIVE_PATTERNS = [
+  /analiza (esta|la)?\s*(imagen|foto)/i,
+  /describe (esta|la)?\s*(imagen|foto)/i,
+  /qué ves en (esta|la)\s*(imagen|foto)/i,
+  /busca(r)?\s+(una\s+)?imagen(es)?/i,
+  /sube esta imagen/i,
+  /revisa esta imagen/i,
+  /analizar imagen adjunta/i,
 ]
 
 export interface ImageGenerationIntent {
@@ -44,6 +60,18 @@ export function detectImageGenerationIntent(message: string): ImageGenerationInt
   const lowerMessage = message.toLowerCase()
   const detectedKeywords: string[] = []
   let confidence = 0
+
+  for (const negative of NEGATIVE_PATTERNS) {
+    if (negative.test(message)) {
+      return {
+        shouldGenerate: false,
+        confidence: 0,
+        prompt: message,
+        detectedKeywords: [],
+        extractedPrompt: message.trim(),
+      }
+    }
+  }
 
   // Check for direct image generation keywords
   for (const keyword of IMAGE_GENERATION_KEYWORDS) {
@@ -73,12 +101,16 @@ export function detectImageGenerationIntent(message: string): ImageGenerationInt
     /create (an? )?image/i,
     /generate (an? )?image/i,
     /draw (an? )?/i,
-    /design (an? )?/i
+    /design (an? )?/i,
+    /render (an? )?/i,
+    /artwork (of|showing)/i,
+    /concept art (of|for)/i,
   ]
 
   for (const pattern of patterns) {
     if (pattern.test(message)) {
-      confidence += 0.4
+      confidence += 0.35
+      detectedKeywords.push(`pattern:${pattern.source}`)
       break
     }
   }
@@ -100,7 +132,7 @@ export function detectImageGenerationIntent(message: string): ImageGenerationInt
     extractedPrompt = message // Fallback to original message
   }
 
-  const shouldGenerate = confidence >= 0.3 && detectedKeywords.length > 0
+  const shouldGenerate = confidence >= 0.35 && detectedKeywords.length > 0
 
   return {
     shouldGenerate,

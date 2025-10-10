@@ -184,22 +184,6 @@ export function Chat() {
 
   const showOnboarding = !chatId && messages.length === 0
 
-  const handleGenerateImageRequest = useCallback((rawPrompt: string) => {
-    const trimmed = rawPrompt.trim()
-    if (!trimmed) return
-
-    const hasImageCue = /imagen|image|dibuja|draw|create/i.test(trimmed)
-    const formattedPrompt = hasImageCue
-      ? trimmed
-      : `🖼️ Genera una imagen de: ${trimmed}`
-
-    handleInputChange(formattedPrompt)
-
-    requestAnimationFrame(() => {
-      submit()
-    })
-  }, [handleInputChange, submit])
-
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
@@ -223,7 +207,6 @@ export function Chat() {
       placeholder,
       onClearPlaceholderAction: handleClearPlaceholder,
       onShowPlaceholderAction: handleShowPlaceholder,
-      onGenerateImageAction: handleGenerateImageRequest,
     }),
     [
       input,
@@ -247,7 +230,6 @@ export function Chat() {
       placeholder,
       handleClearPlaceholder,
       handleShowPlaceholder,
-      handleGenerateImageRequest,
     ]
   )
 

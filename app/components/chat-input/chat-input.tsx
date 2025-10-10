@@ -9,7 +9,7 @@ import {
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, CircleNotch, ImageSquare, Sparkle, Stop } from "@phosphor-icons/react"
+import { ArrowUpIcon, Stop } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -18,7 +18,6 @@ import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
 import { usePendingCanvasMessage } from "@/hooks/use-pending-canvas-message"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ChatInputProps = {
   value: string
@@ -42,7 +41,6 @@ type ChatInputProps = {
   onClearPlaceholderAction?: () => void
   onShowPlaceholderAction?: (placeholder: string) => void
   hideModelSelector?: boolean
-  onGenerateImageAction?: (prompt: string) => void
 }
 
 export function ChatInput({
@@ -66,7 +64,6 @@ export function ChatInput({
   onClearPlaceholderAction,
   onShowPlaceholderAction,
   hideModelSelector = false,
-  onGenerateImageAction,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -80,7 +77,6 @@ export function ChatInput({
   const selectModelConfig = getModelInfo(selectedModel)
   const hasSearchSupport = Boolean(selectModelConfig?.webSearch)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
-  const [imageMode, setImageMode] = useState(false)
 
   // Canvas message handling
   const { pendingMessage, consumePendingMessage, hasPendingMessage } = usePendingCanvasMessage()
@@ -155,15 +151,6 @@ export function ChatInput({
   }, [hasPendingMessage, pendingMessage?.timestamp, onValueChangeAction, onFileUploadAction, onSendAction, consumePendingMessage]) // Agregar dependencias necesarias
 
   const handleSend = useCallback(() => {
-    // Image generation mode
-    if (imageMode && onGenerateImageAction) {
-      if (!isSubmitting && !isOnlyWhitespace(value)) {
-        onGenerateImageAction(value)
-        setImageMode(false)
-      }
-      return
-    }
-    
     // Stop streaming - check this FIRST before other conditions
     if (status === 'streaming') {
       stopAction()
@@ -177,7 +164,7 @@ export function ChatInput({
     
     // Send the message
     onSendAction()
-  }, [status, stopAction, imageMode, onGenerateImageAction, isSubmitting, value, onSendAction])
+  }, [status, stopAction, isSubmitting, value, onSendAction])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -191,16 +178,11 @@ export function ChatInput({
           return
         }
 
-    e.preventDefault()
-    if (imageMode && onGenerateImageAction) {
-      onGenerateImageAction(value)
-      setImageMode(false)
-    } else {
-      onSendAction()
-    }
+        e.preventDefault()
+        onSendAction()
       }
     },
-  [isSubmitting, onSendAction, status, value, imageMode, onGenerateImageAction]
+  [isSubmitting, onSendAction, status, value]
   )
 
   const handlePaste = useCallback(
@@ -307,19 +289,9 @@ export function ChatInput({
             hasImages={files.some(isImageFile)} 
             onSuggestionAction={onSuggestionAction} 
           />
-
-          {imageMode && (
-            <div className="mx-3 mb-2 flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs text-purple-700 shadow-sm dark:border-purple-700 dark:bg-purple-900/30 dark:text-purple-200">
-              <Sparkle className="mt-0.5 size-4 flex-shrink-0" weight="fill" />
-              <div className="flex-1 leading-snug">
-                <span className="block text-sm font-semibold">Image Mode Active</span>
-                Describe the scene, style, or lighting and Cleo will generate it with FLUX Pro. Falls back to OpenAI if needed.
-              </div>
-            </div>
-          )}
           
           <PromptInputTextarea
-            placeholder={imageMode ? "Describe the image you want to generate (style, lighting, composition)..." : (placeholder || "Ask Cleo...")}
+            placeholder={placeholder || "Ask Cleo..."}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
@@ -346,37 +318,9 @@ export function ChatInput({
                   isAuthenticated={isUserAuthenticated}
                 />
               ) : null}
-              <TooltipProvider delayDuration={120}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant={imageMode ? 'secondary' : 'ghost'}
-                      className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 p-0 rounded-full hover:bg-muted/80 transition-all duration-200 touch-manipulation"
-                      type="button"
-                      aria-label="Toggle image generation mode"
-                      aria-pressed={imageMode}
-                      onClick={() => setImageMode((mode) => !mode)}
-                    >
-                      <ImageSquare className="size-[18px]" weight={imageMode ? "fill" : "duotone"} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    {imageMode
-                      ? "Image mode active - Click to disable"
-                      : "Generate image with AI"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              {imageMode && (
-                <div className="hidden md:flex items-center gap-1.5 rounded-full border border-purple-200/60 bg-purple-50/60 dark:bg-purple-900/20 px-2.5 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 backdrop-blur-sm">
-                  <Sparkle className="size-3.5" weight="fill" />
-                  <span>Image</span>
-                </div>
-              )}
             </div>
             <PromptInputAction
-              tooltip={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send"}
+              tooltip={status === "streaming" ? "Stop" : "Send"}
             >
               <Button
                 size="sm"
@@ -385,12 +329,10 @@ export function ChatInput({
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}
-                aria-label={status === "streaming" ? "Stop" : imageMode ? "Generate image" : "Send message"}
+                aria-label={status === "streaming" ? "Stop" : "Send message"}
               >
                 {status === 'streaming' ? (
                   <Stop className="size-[18px]" weight="fill" />
-                ) : imageMode ? (
-                  <Sparkle className="size-[18px]" weight="fill" />
                 ) : (
                   <ArrowUpIcon className="size-[18px]" weight="bold" />
                 )}
