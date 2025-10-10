@@ -281,8 +281,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         if (!newChat) return null
 
         setCurrentChatId(newChat.id)
-        // Redirect to the chat page as expected
-        window.history.pushState(null, "", `/c/${newChat.id}`)
+        // Stay in project view - don't redirect to /c/
+        // window.history.pushState(null, "", `/c/${newChat.id}`)
         return newChat.id
       } catch (err: unknown) {
         let errorMessage = "Something went wrong."
@@ -404,7 +404,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         body: {
           chatId: ensuredChatId,
           userId: uid,
-          model: selectedModel,
+          model: projectModel, // Use projectModel instead of selectedModel
           isAuthenticated: true,
           systemPrompt: SYSTEM_PROMPT_DEFAULT,
           enableSearch,
@@ -428,10 +428,15 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       if (messages.length > 0) {
         bumpChat(ensuredChatId)
       }
-    } catch {
-  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
+    } catch (error: any) {
+      console.error('Failed to send message in project:', error)
+      setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
       cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
-      toast({ title: "Failed to send message", status: "error" })
+      toast({ 
+        title: "Failed to send message", 
+        description: error?.message || "Please try again",
+        status: "error" 
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -446,7 +451,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     cleanupOptimisticAttachments,
     ensureChatExists,
     handleFileUploads,
-    selectedModel,
+    projectModel,
     handleSubmit,
     cacheAndAddMessage,
     messages.length,
@@ -590,25 +595,25 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-    value: localInput,
-  onSuggestionAction: () => {},
-  onValueChangeAction: handleInputChange,
-  onSendAction: submit,
+      value: localInput, // Changed from 'input' to 'value'
+      onValueChangeAction: handleInputChange,
+      onSendAction: submit,
       isSubmitting,
       files,
-  onFileUploadAction: handleFileUpload,
-  onFileRemoveAction: handleFileRemove,
+      onFileUploadAction: handleFileUpload,
+      onFileRemoveAction: handleFileRemove,
+      onSuggestionAction: (suggestion: string) => setLocalInput(suggestion), // Add suggestion handler
       hasSuggestions: false,
-  onSelectModelAction: handleModelChange,
-      selectedModel,
+      onSelectModelAction: handleModelChange,
+      selectedModel: projectModel, // Use projectModel instead of selectedModel
       isUserAuthenticated: isAuthenticated,
-  stopAction: stop,
+      stopAction: stop,
       status,
-  setEnableSearchAction: setEnableSearch,
+      setEnableSearchAction: setEnableSearch,
       enableSearch,
     }),
     [
-    localInput,
+      localInput,
       handleInputChange,
       submit,
       isSubmitting,
@@ -616,16 +621,14 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       handleFileUpload,
       handleFileRemove,
       handleModelChange,
-      selectedModel,
+      projectModel, // Use projectModel dependency
       isAuthenticated,
       stop,
       status,
-  setEnableSearch,
+      setEnableSearch,
       enableSearch,
     ]
-  )
-
-  // Always show onboarding when on project page, regardless of messages
+  )  // Always show onboarding when on project page, regardless of messages
   const showOnboarding = pathname === `/p/${projectId}`
 
   // Early return for critical loading/error states
