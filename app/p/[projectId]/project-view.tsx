@@ -240,8 +240,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const messages = (chatHelpers as any).messages as any[]
   // In project context we manage a local input to avoid relying on chatHelpers.setInput (which may be undefined)
   const [localInput, setLocalInput] = useState<string>("")
-  // AI SDK v5 uses 'append' method instead of 'handleSubmit'
-  const append = (chatHelpers as any).append as (message: any, options?: any) => Promise<any>
   const status = (chatHelpers as any).status as any
   const reload = (chatHelpers as any).reload as (options?: any) => void
   const stop = (chatHelpers as any).stop as () => void
@@ -389,24 +387,88 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         try { setInputMaybe("") } catch {}
       }
 
-      // Use append method from AI SDK v5 to send the message
-      await append(
-        {
-          role: 'user',
-          content: textToSend,
-          experimental_attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      // Add user message to UI immediately
+      const userMessage: MessageAISDK = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: textToSend,
+        parts: [{ type: 'text', text: textToSend }],
+        createdAt: new Date(),
+        experimental_attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      }
+      setMessages((prev: any[]) => [...prev, userMessage])
+
+      // Call chat API directly with streaming
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          body: {
-            chatId: ensuredChatId,
-            userId: uid,
-            model: projectModel,
-            isAuthenticated: true,
-            systemPrompt: SYSTEM_PROMPT_DEFAULT,
-            enableSearch,
-          },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+          chatId: ensuredChatId,
+          userId: uid,
+          model: projectModel,
+          isAuthenticated: true,
+          systemPrompt: SYSTEM_PROMPT_DEFAULT,
+          enableSearch,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let assistantMessage = ''
+      let assistantMessageId = `assistant-${Date.now()}`
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value)
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('0:')) {
+              try {
+                const jsonStr = line.substring(2)
+                const parsed = JSON.parse(jsonStr)
+                if (parsed && typeof parsed === 'string') {
+                  assistantMessage += parsed
+                  // Update message in UI
+                  setMessages((prev: any[]) => {
+                    const withoutLast = prev.filter((m: any) => m.id !== assistantMessageId)
+                    return [...withoutLast, {
+                      id: assistantMessageId,
+                      role: 'assistant',
+                      content: assistantMessage,
+                      createdAt: new Date(),
+                    }]
+                  })
+                }
+              } catch (e) {
+                // Ignore parse errors in streaming chunks
+              }
+            }
+          }
         }
-      )
+      }
+
+      // Cache final message
+      if (assistantMessage) {
+        cacheAndAddMessage({
+          id: assistantMessageId,
+          role: 'assistant',
+          content: assistantMessage,
+          parts: [{ type: 'text', text: assistantMessage }],
+          createdAt: new Date(),
+        })
+      }
 
       // Bump existing chats to top (non-blocking, after submit)
       if (messages.length > 0) {
@@ -431,10 +493,11 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     handleFileUploads,
     setLocalInput,
     setInputMaybe,
-    append,
+    setMessages,
+    messages,
     projectModel,
     enableSearch,
-    messages.length,
+    cacheAndAddMessage,
     bumpChat,
   ])
 
