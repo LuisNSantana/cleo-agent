@@ -294,7 +294,7 @@ function createAndRunExecution(
 	let executionPromise: Promise<any>
 	try {
 		// Lazy require to avoid client bundle impact
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		 
 		const { withRequestContext } = require('@/lib/server/request-context')
 		executionPromise = withRequestContext({ userId: exec.userId, requestId: exec.id }, () => core.executeAgent(target, ctx, { timeout: timeoutMs ?? undefined }))
 		logger.debug('🔐 [LEGACY DEBUG] Wrapped core.executeAgent with request context', { executionId: exec.id, userId: exec.userId })

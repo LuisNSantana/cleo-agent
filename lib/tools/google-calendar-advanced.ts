@@ -329,7 +329,7 @@ export const addConferenceDetailsTool = tool({
       // Get current event
       const event = await makeGoogleCalendarRequest(token, `calendars/primary/events/${eventId}`)
 
-      let updateData: any = { ...event }
+      const updateData: any = { ...event }
 
       if (conferenceType === 'GOOGLE_MEET') {
         // Create Google Meet conference

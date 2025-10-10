@@ -315,7 +315,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
 
     // Check for tool failures in the message history
     let hasToolFailures = false;
-    let failureReasons: string[] = [];
+    const failureReasons: string[] = [];
     
     const agentMessages = Array.isArray(execution.messages) ? coerceAgentMessages(execution.messages) : [];
     const toolCalls: JsonObject[] = [];

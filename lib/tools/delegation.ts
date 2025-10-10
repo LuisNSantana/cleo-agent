@@ -207,7 +207,7 @@ async function runDelegation(params: {
   
   while (Date.now() - startedAt < timeoutMs) {
     // Small delay
-    // eslint-disable-next-line no-await-in-loop
+     
     await new Promise(r => setTimeout(r, POLL_MS))
 
     try {

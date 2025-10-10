@@ -28,7 +28,7 @@ function TicTacToeGame({ game, onGameUpdate }: TicTacToeProps) {
     const isDraw = !winner && newGrid.every((row: any[]) => row.every((cell: any) => cell !== ''))
 
     // Get AI move if game continues and player just moved
-    let finalGrid = newGrid
+    const finalGrid = newGrid
     let nextPlayer = data.currentPlayer === 'X' ? 'O' : 'X'
     let isPlayerTurn = true
 

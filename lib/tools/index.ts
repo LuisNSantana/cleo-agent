@@ -529,7 +529,7 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				let finalResult: string | null = null
 				let status: string = 'running'
 				while (Date.now() - startedAt < TIMEOUT_MS) {
-					// eslint-disable-next-line no-await-in-loop
+					 
 					await new Promise(r => setTimeout(r, POLL_MS))
 					try {
 						const snapshot = execId ? orchestrator.getExecution?.(execId) : null

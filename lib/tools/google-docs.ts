@@ -446,7 +446,7 @@ export const updateGoogleDocTool = tool({
         return length
       }, 0) || 0
 
-      let requests: any[] = []
+      const requests: any[] = []
 
       if (mode === 'replace') {
         // Delete all content and insert new content

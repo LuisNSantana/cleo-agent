@@ -9,7 +9,7 @@ export function SingleChild({ children, label }: { children: React.ReactNode, la
   const count = React.Children.count(children)
   if (process.env.NODE_ENV !== 'production') {
     if (count !== 1) {
-      // eslint-disable-next-line no-console
+       
       console.warn(`[SingleChild] ${label || ''} expected exactly 1 child, received ${count}.`, children)
     }
   }

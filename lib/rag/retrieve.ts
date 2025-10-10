@@ -218,7 +218,7 @@ export function buildContextBlock(chunks: RetrievedChunk[], maxChars = 6000) {
   lines.push('')
   for (const c of chunks) {
     // User-friendly header in English
-    let header = `📄 Document (relevance: ${(c.rerank_score || c.hybrid_score || c.similarity || 0).toFixed(2)})`
+    const header = `📄 Document (relevance: ${(c.rerank_score || c.hybrid_score || c.similarity || 0).toFixed(2)})`
     
     lines.push(header)
     lines.push(c.content?.trim() || '')

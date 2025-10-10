@@ -329,7 +329,7 @@ export function useChatCore({
 
       // Intentionally silenced in production to avoid leaking internal details
       if (process.env.NODE_ENV !== 'production') {
-  // eslint-disable-next-line no-console
+   
   // ...existing code...
       }
 

@@ -397,7 +397,7 @@ export function generateDelegationRecommendation(
   // Score each agent based on how well they match the task
   const scores = capabilities.map(agent => {
     let score = 0
-    let reasoning: string[] = []
+    const reasoning: string[] = []
     
     // Check if task matches what they can handle
     agent.canHandle.forEach(capability => {

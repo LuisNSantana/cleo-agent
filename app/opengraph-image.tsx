@@ -36,7 +36,7 @@ export default async function Image() {
           }}
         >
           {/* Logo */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             src={new URL("/img/agents/logocleo4.png", appUrl).toString()}
             width={200}

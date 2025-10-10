@@ -429,9 +429,9 @@ export default function AgentsChatPage() {
           agentKey: threadKey, 
           limit: '1' 
         })
-  let res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
+  const res = await fetch(`/api/agents/threads?${params.toString()}`, { credentials: 'same-origin' })
         if (!res.ok) throw new Error('Failed to fetch threads')
-        let data = await res.json()
+        const data = await res.json()
         let thread = data?.threads?.[0]
         if (!thread?.id) {
           const modeTitle = forceSupervised 

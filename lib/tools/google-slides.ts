@@ -85,7 +85,7 @@ export const createGoogleSlidesPresentationTool = tool({
     if (!token) return { success:false, message:'Google Workspace not connected', presentation:null }
     try {
       const pres = await slidesRequest(token, 'presentations', { method:'POST', body: JSON.stringify({ title }) })
-      let firstSlideId: string | undefined = pres.slides?.[0]?.objectId
+      const firstSlideId: string | undefined = pres.slides?.[0]?.objectId
       // If initial text provided, insert a textbox via batchUpdate
       if (initialText && firstSlideId) {
         const elementId = 'intro_box_' + Date.now()

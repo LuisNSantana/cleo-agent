@@ -501,7 +501,7 @@ function SingleToolCard({
           {delegationAgentId ? (() => {
             const meta = getAgentMetadata(delegationAgentId)
             if (meta.avatar) {
-              // eslint-disable-next-line @next/next/no-img-element
+               
               return (
                 <img
                   src={meta.avatar}

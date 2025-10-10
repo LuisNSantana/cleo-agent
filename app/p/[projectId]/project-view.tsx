@@ -348,20 +348,12 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     // At this point user is guaranteed
     const uid = user.id as string
 
-    const optimisticId = `optimistic-${Date.now().toString()}`
     const textToSend = localInput
-    const optimisticAttachments =
-      files.length > 0 ? createOptimisticAttachments(files) : []
-    const optimisticMessage = {
-      id: optimisticId,
-      content: textToSend,
-      role: "user" as const,
-      createdAt: new Date(),
-      experimental_attachments:
-        optimisticAttachments.length > 0 ? optimisticAttachments : undefined,
+    
+    if (!textToSend.trim()) {
+      setIsSubmitting(false)
+      return
     }
-
-  setMessages((prev: any[]) => [...prev, optimisticMessage])
 
     const submittedFiles = [...files]
     setFiles([])
@@ -369,8 +361,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     try {
       const ensuredChatId = await ensureChatExists(uid)
       if (!ensuredChatId) {
-  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
-        cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
+        setIsSubmitting(false)
         return
       }
 
@@ -379,8 +370,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           title: `The message you submitted was too long, please submit something shorter. (Max ${MESSAGE_MAX_LENGTH} characters)`,
           status: "error",
         })
-  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
-        cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
+        setIsSubmitting(false)
         return
       }
 
@@ -388,17 +378,15 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       if (submittedFiles.length > 0) {
         attachments = await handleFileUploads(uid, ensuredChatId)
         if (attachments === null) {
-          setMessages((prev: any[]) => prev.filter((m: any) => m.id !== optimisticId))
-          cleanupOptimisticAttachments(
-            optimisticMessage.experimental_attachments
-          )
+          setIsSubmitting(false)
           return
         }
       }
 
-      // Ensure the chat hook has the input text when it relies on internal state
+      // Clear input before sending
+      setLocalInput("")
       if (typeof setInputMaybe === 'function') {
-        try { setInputMaybe(textToSend) } catch {}
+        try { setInputMaybe("") } catch {}
       }
 
       // Use append method from AI SDK v5 to send the message
@@ -406,7 +394,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         {
           role: 'user',
           content: textToSend,
-          experimental_attachments: attachments || undefined,
+          experimental_attachments: attachments && attachments.length > 0 ? attachments : undefined,
         },
         {
           body: {
@@ -419,15 +407,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           },
         }
       )
-      
-      // Clear inputs after submit has been dispatched
-      setLocalInput("")
-      if (typeof setInputMaybe === 'function') {
-        try { setInputMaybe("") } catch {}
-      }
-  setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
-      cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
-      cacheAndAddMessage(convertToMessageAISDK(optimisticMessage))
 
       // Bump existing chats to top (non-blocking, after submit)
       if (messages.length > 0) {
@@ -435,8 +414,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       }
     } catch (error: any) {
       console.error('Failed to send message in project:', error)
-      setMessages((prev: any[]) => prev.filter((msg: any) => msg.id !== optimisticId))
-      cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
       toast({ 
         title: "Failed to send message", 
         description: error?.message || "Please try again",
@@ -448,21 +425,17 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   }, [
     user,
     files,
-    createOptimisticAttachments,
     localInput,
-    setMessages,
-    setLocalInput,
     setFiles,
-    cleanupOptimisticAttachments,
     ensureChatExists,
     handleFileUploads,
-    projectModel,
+    setLocalInput,
+    setInputMaybe,
     append,
-    cacheAndAddMessage,
+    projectModel,
+    enableSearch,
     messages.length,
     bumpChat,
-    enableSearch,
-    setInputMaybe,
   ])
 
   // Header CTA: hidden file input change handler (auto-upload)

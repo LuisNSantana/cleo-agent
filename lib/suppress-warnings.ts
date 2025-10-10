@@ -4,7 +4,7 @@
 //  - Node DEP0005 Buffer() deprecation warnings
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __WARNINGS_PATCHED__: boolean | undefined
 }
 

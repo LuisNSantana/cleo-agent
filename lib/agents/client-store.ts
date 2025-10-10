@@ -161,7 +161,7 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
         // Map API to AgentConfig (preserving sub-agent hints)
   const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-        let agents: AgentConfig[] = list.map((agent: any) => ({
+        const agents: AgentConfig[] = list.map((agent: any) => ({
           id: agent.id,
           name: agent.name,
           description: agent.description,

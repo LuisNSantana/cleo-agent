@@ -439,7 +439,7 @@ export const serpTrendsSearchTool = tool({
 				data_type: input.data_type
 			}, key)
 			
-			let result: any = { query: input.q, data_type: input.data_type, engine: 'google_trends' }
+			const result: any = { query: input.q, data_type: input.data_type, engine: 'google_trends' }
 			
 			// Parse different types of trends data
 			if (input.data_type === 'TIMESERIES' && json.interest_over_time) {

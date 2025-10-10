@@ -798,7 +798,7 @@ export class AgentOrchestrator {
    * Prepare execution context with memory management
    */
   private async prepareExecutionContext(context: ExecutionContext): Promise<ExecutionContext> {
-    let processedContext = { ...context }
+    const processedContext = { ...context }
 
     if (this.memoryManager) {
       // Optimize message history if needed

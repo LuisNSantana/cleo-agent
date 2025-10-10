@@ -282,8 +282,8 @@ export async function getDashboardData(userId: string, rangeDays: number = 30): 
   }
 
   // Agent usage analytics (placeholder until migration runs)
-  let agentUsage: DashboardData['agentUsage'] = []
-  let uniqueAgents = 0
+  const agentUsage: DashboardData['agentUsage'] = []
+  const uniqueAgents = 0
 
   const finalTotals = {
     messages: totals.messages,

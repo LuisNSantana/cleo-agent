@@ -325,7 +325,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   } catch (e) {
     console.error('❌ [ENHANCED ADAPTER] Exception in orchestrator delegation', e)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const { emitExecutionEvent } = require('@/lib/agents/logging-events')
       emitExecutionEvent({
         trace_id: `fallback_${Date.now()}`,

@@ -20,7 +20,7 @@ let storage: ALS<RequestContext> | undefined
 if (isServer) {
   try {
     // Use eval to avoid static bundler resolution in client/edge builds
-    // eslint-disable-next-line no-eval
+     
     const nodeRequire = eval('require') as NodeRequire
     const { AsyncLocalStorage } = nodeRequire('async_hooks') as typeof import('async_hooks')
     storage = new AsyncLocalStorage<RequestContext>()

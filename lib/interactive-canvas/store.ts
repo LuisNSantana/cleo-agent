@@ -235,7 +235,7 @@ export const useInteractiveCanvasStore = create<InteractiveCanvasStore>()((set, 
     transformSelection: (deltaX, deltaY, scaleX, scaleY) => {
       const { canvasState, selectedElements } = get()
       
-      let newCanvasState = { ...canvasState }
+      const newCanvasState = { ...canvasState }
       
       // Transform shapes
       newCanvasState.shapes = canvasState.shapes.map(shape => {

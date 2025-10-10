@@ -917,7 +917,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
             {(() => {
               const currentId = editingAgent?.id
               const candidateIds = new Set(parentCandidates.map(p => p.id))
-              let uuidAgents = (parentCandidates.length > 0)
+              const uuidAgents = (parentCandidates.length > 0)
                 ? parentCandidates.filter(p => isUUID(p.id)).map(p => ({ id: p.id, name: p.name } as any))
                 : agents.filter(a => isUUID(a.id) && a.id !== currentId && !a.isSubAgent)
               const currentVal = isUUID(formData.parentAgentId) ? formData.parentAgentId : ''

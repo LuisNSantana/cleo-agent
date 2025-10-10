@@ -44,7 +44,7 @@ function safeStringify(obj: any): string {
 /** Emit a structured JSON log (prefijo para fácil grep). */
 function emit(log: object) {
   if (!debugEnabled()) return
-  // eslint-disable-next-line no-console
+   
   console.log(`TOOL_DIAG ${safeStringify(log)}`)
 }
 
