@@ -7,7 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { PanelLeftIcon } from "lucide-react"
+import { List } from "@phosphor-icons/react"
 
 type HeaderSidebarTriggerProps = React.HTMLAttributes<HTMLButtonElement>
 
@@ -51,7 +51,7 @@ export function HeaderSidebarTrigger({
           title={label}
           {...props}
         >
-          <PanelLeftIcon className="size-5" />
+          <List className="size-5" weight="bold" />
           <span className="sr-only">Toggle sidebar</span>
         </button>
       </TooltipTrigger>

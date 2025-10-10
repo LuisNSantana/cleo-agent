@@ -132,6 +132,10 @@ export function AppSidebar() {
                         prefetch
                         className="flex items-center w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
                         onClick={() => {
+                          // Reset messages when clicking Home
+                          if (href === "/") {
+                            resetMessages()
+                          }
                           if (isMobile) {
                             setOpenMobile(false)
                           }

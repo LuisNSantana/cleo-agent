@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button"
 import { APP_NAME } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
-import { Info, CheckSquare } from "@phosphor-icons/react"
+import { useMessages } from "@/lib/chat-store/messages/provider"
+import { Info, CheckSquare, ArrowsOut, Sidebar as SidebarIcon } from "@phosphor-icons/react"
 import Link from "next/link"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { NotificationBell } from "@/components/notifications/notification-bell"
-import { ArrowsInSimple as FullscreenIcon } from "@phosphor-icons/react"
-import { PanelLeftIcon } from "lucide-react"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
   const { user } = useUser()
+  const { resetMessages } = useMessages()
   const { preferences, setLayout } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
 
@@ -34,11 +34,12 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
             <div className="flex flex-1 items-center gap-2">
               <div className="flex items-center gap-2">
                 {canToggleSidebar && (
-                  <HeaderSidebarTrigger className="-ml-1 size-9 border border-border/40 bg-background/80 shadow-sm backdrop-blur-sm" />
+                  <HeaderSidebarTrigger className="size-9 border border-border/40 bg-background/80 shadow-sm backdrop-blur-sm" />
                 )}
                 <Link
                   href="/"
                   className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
+                  onClick={() => resetMessages()}
                 >
                   <CleoIcon size={56} src="/img/agents/logocleo4.png" className="" />
                   <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
@@ -98,7 +99,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                   setLayout(hasSidebar ? "fullscreen" : "sidebar")
                 }}
               >
-                {hasSidebar ? <FullscreenIcon className="size-4" /> : <PanelLeftIcon className="size-4" />}
+                {hasSidebar ? <ArrowsOut className="size-4" /> : <SidebarIcon className="size-4" />}
               </button>
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
