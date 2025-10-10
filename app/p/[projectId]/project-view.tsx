@@ -240,7 +240,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const messages = (chatHelpers as any).messages as any[]
   // In project context we manage a local input to avoid relying on chatHelpers.setInput (which may be undefined)
   const [localInput, setLocalInput] = useState<string>("")
-  const handleSubmit = (chatHelpers as any).handleSubmit as (e?: any, options?: any) => void
+  // AI SDK v5 uses 'append' method instead of 'handleSubmit'
+  const append = (chatHelpers as any).append as (message: any, options?: any) => Promise<any>
   const status = (chatHelpers as any).status as any
   const reload = (chatHelpers as any).reload as (options?: any) => void
   const stop = (chatHelpers as any).stop as () => void
@@ -400,21 +401,25 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         try { setInputMaybe(textToSend) } catch {}
       }
 
-      const options = {
-        body: {
-          chatId: ensuredChatId,
-          userId: uid,
-          model: projectModel, // Use projectModel instead of selectedModel
-          isAuthenticated: true,
-          systemPrompt: SYSTEM_PROMPT_DEFAULT,
-          enableSearch,
-          // Explicitly pass the text for the first message to avoid race conditions
-          text: textToSend,
+      // Use append method from AI SDK v5 to send the message
+      await append(
+        {
+          role: 'user',
+          content: textToSend,
+          experimental_attachments: attachments || undefined,
         },
-        experimental_attachments: attachments || undefined,
-      }
-
-      handleSubmit(undefined, options)
+        {
+          body: {
+            chatId: ensuredChatId,
+            userId: uid,
+            model: projectModel,
+            isAuthenticated: true,
+            systemPrompt: SYSTEM_PROMPT_DEFAULT,
+            enableSearch,
+          },
+        }
+      )
+      
       // Clear inputs after submit has been dispatched
       setLocalInput("")
       if (typeof setInputMaybe === 'function') {
@@ -452,11 +457,12 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     ensureChatExists,
     handleFileUploads,
     projectModel,
-    handleSubmit,
+    append,
     cacheAndAddMessage,
     messages.length,
     bumpChat,
     enableSearch,
+    setInputMaybe,
   ])
 
   // Header CTA: hidden file input change handler (auto-upload)
