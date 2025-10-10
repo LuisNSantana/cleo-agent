@@ -12,6 +12,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useChats } from "@/lib/chat-store/chats/provider"
+import { useMessages } from "@/lib/chat-store/messages/provider"
 import {
   ChatTeardropText,
   GithubLogo,
@@ -50,6 +51,7 @@ export function AppSidebar() {
   const isMobile = useBreakpoint(768)
   const { setOpenMobile } = useSidebar()
   const { chats, isLoading } = useChats()
+  const { resetMessages } = useMessages()
   const params = useParams<{ chatId: string }>()
   const currentChatId = params.chatId
   const pathname = usePathname()
@@ -154,6 +156,7 @@ export function AppSidebar() {
               className="hover:bg-muted/80 hover:text-foreground text-foreground group/new-chat relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5"
               prefetch
               onClick={() => {
+                resetMessages()
                 if (isMobile) {
                   setOpenMobile(false)
                 }

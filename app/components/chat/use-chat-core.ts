@@ -1224,14 +1224,29 @@ export function useChatCore({
   // Avoid overwriting optimistic updates mid-submit; only hard-sync on chatId changes
   useEffect(() => {
     const chatIdChanged = prevChatIdRef.current !== chatId
+
     if (chatIdChanged) {
-      // When switching chats (or entering a newly created one), trust initialMessages
+      if (!chatId) {
+        // Navigated away from a chat (e.g., New Chat); ensure local state resets
+        setMessages([])
+        return
+      }
+
+      // When switching to a different chat, sync with its stored messages
       setMessages(initialMessages as ChatMessage[])
-    } else if (!isSubmitting && initialMessages.length > messages.length) {
+      return
+    }
+
+    if (!chatId) {
+      // No active chat; avoid rehydrating stale messages from storage
+      return
+    }
+
+    if (!isSubmitting && initialMessages.length > messages.length) {
       // If we fetched more messages for the same chat (e.g., background refresh), merge
       setMessages(initialMessages as ChatMessage[])
     }
-  }, [initialMessages, isSubmitting, chatId])
+  }, [initialMessages, isSubmitting, chatId, messages.length])
 
   // Reset messages when navigating from a chat to home (new chat)
   if (prevChatIdRef.current !== chatId) {
