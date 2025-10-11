@@ -12,6 +12,7 @@ import { useMessages } from "@/lib/chat-store/messages/provider"
 import type { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { MESSAGE_MAX_LENGTH, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { Attachment } from "@/lib/file-handling"
+import { getProjectSystemPrompt } from "@/lib/prompts/project"
 // API_ROUTE_CHAT no longer used with useChat v5
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
@@ -19,7 +20,7 @@ import { useChat } from "@ai-sdk/react"
 import { ChatCircleIcon, PencilSimple, Check, X } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useMemo, useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, validateFile } from "@/lib/file-handling"
@@ -72,6 +73,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const { createNewChat, bumpChat } = useChats();
   const { cacheAndAddMessage } = useMessages();
   const pathname = usePathname();
+  const router = useRouter();
   
   const {
     files,
@@ -280,8 +282,10 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         if (!newChat) return null
 
         setCurrentChatId(newChat.id)
-        // Stay in project view - don't redirect to /c/
-        // window.history.pushState(null, "", `/c/${newChat.id}`)
+        
+        // Redirect to the new chat to show the conversation
+        router.push(`/c/${newChat.id}`)
+        
         return newChat.id
       } catch (err: unknown) {
         let errorMessage = "Something went wrong."
@@ -308,6 +312,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       localInput,
       projectModel,
       projectId,
+      router,
     ]
   )
 
@@ -410,8 +415,12 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           userId: uid,
           model: projectModel,
           isAuthenticated: true,
-          systemPrompt: SYSTEM_PROMPT_DEFAULT,
-          enableSearch,
+          systemPrompt: getProjectSystemPrompt(
+            project?.name || "Project",
+            project?.description || undefined
+          ),
+          projectId: projectId,
+          enableSearch: true, // Always enable search for project chats
         }),
       })
 
