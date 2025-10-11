@@ -1,9 +1,15 @@
 import { createChatInDb } from "./api"
+import { NON_AUTH_ALLOWED_MODELS, MODEL_DEFAULT_GUEST } from "@/lib/config"
+import { normalizeModelId } from "@/lib/openproviders/provider-map"
 
 export async function POST(request: Request) {
   try {
-    const { userId, title, model, isAuthenticated, projectId } =
-      await request.json()
+    const body = await request.json()
+    const userId = body.userId as string
+    const title = body.title as string | undefined
+    let model = body.model as string | undefined
+    const isAuthenticated = Boolean(body.isAuthenticated)
+    const projectId = body.projectId as string | undefined
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -11,10 +17,25 @@ export async function POST(request: Request) {
       })
     }
 
+    // Guest model guardrail: if not authenticated and requested model is not allowed,
+    // force the default guest model so creation never fails here.
+    if (!isAuthenticated) {
+      const requested = model || MODEL_DEFAULT_GUEST
+      const normalized = normalizeModelId(requested)
+      const allowedSet = new Set(
+        NON_AUTH_ALLOWED_MODELS.map((m) => normalizeModelId(m))
+      )
+      if (!allowedSet.has(normalized)) {
+        model = MODEL_DEFAULT_GUEST
+      } else {
+        model = requested
+      }
+    }
+
     const chat = await createChatInDb({
       userId,
       title,
-      model,
+      model: model!,
       isAuthenticated,
       projectId,
     })

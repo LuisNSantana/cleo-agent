@@ -262,6 +262,12 @@ export function normalizeModelId(model: string): string {
     case "grok-4-multimodal":
       // Legacy ID renamed to grok-4-fast-reasoning (same capabilities, prevents 404s)
       return "grok-4-fast-reasoning"
+    case "x-ai/grok-4-fast":
+      // Normalize provider-scoped X.AI path to canonical public id
+      return "grok-4-fast"
+    case "x-ai/grok-4-fast-reasoning":
+      // Normalize provider-scoped reasoning variant to canonical
+      return "grok-4-fast-reasoning"
     case "meta-llama/meta-llama-3.1-405b-instruct":
       // Corrected canonical OpenRouter path uses llama-3.1-405b-instruct
       return "meta-llama/llama-3.1-405b-instruct"
