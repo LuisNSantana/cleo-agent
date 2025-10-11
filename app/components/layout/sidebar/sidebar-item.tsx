@@ -3,10 +3,11 @@ import useClickOutside from "@/app/hooks/use-click-outside"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { Chat } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
-import { Check, X } from "@phosphor-icons/react"
+import { Check, X, FolderOpen } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SidebarItemMenu } from "./sidebar-item-menu"
+import { useQuery } from "@tanstack/react-query"
 
 type SidebarItemProps = {
   chat: Chat
@@ -22,6 +23,19 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const { updateTitle } = useChats()
   const isMobile = useBreakpoint(768)
   const containerRef = useRef<HTMLDivElement | null>(null)
+
+  // Fetch project info if this chat belongs to a project
+  const { data: projectInfo } = useQuery({
+    queryKey: ['chat-project-sidebar', chat.project_id],
+    queryFn: async () => {
+      if (!chat.project_id) return null
+      const response = await fetch(`/api/projects/${chat.project_id}`)
+      if (!response.ok) return null
+      return response.json()
+    },
+    enabled: !!chat.project_id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
 
   if (!isEditing && lastChatTitleRef.current !== chat.title) {
     lastChatTitleRef.current = chat.title
@@ -183,11 +197,22 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
             prefetch
             onClick={handleLinkClick}
           >
-            <div
-              className="text-sidebar-foreground relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-3 py-2.5 text-sm font-medium text-ellipsis whitespace-nowrap"
-              title={displayTitle}
-            >
-              {displayTitle}
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              {chat.project_id && projectInfo && !projectInfo._error && (
+                <div title={`Proyecto: ${projectInfo.name}`}>
+                  <FolderOpen 
+                    size={14} 
+                    weight="duotone" 
+                    className="text-purple-400 shrink-0"
+                  />
+                </div>
+              )}
+              <div
+                className="text-sidebar-foreground relative line-clamp-1 mask-r-from-80% mask-r-to-85% text-sm font-medium text-ellipsis whitespace-nowrap flex-1"
+                title={displayTitle}
+              >
+                {displayTitle}
+              </div>
             </div>
           </Link>
 

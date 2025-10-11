@@ -283,8 +283,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
 
         setCurrentChatId(newChat.id)
         
-        // Redirect to the new chat to show the conversation
-        router.push(`/c/${newChat.id}`)
+        // DON'T redirect here - let the submit handler redirect after the message is sent
+        // router.push(`/c/${newChat.id}`)
         
         return newChat.id
       } catch (err: unknown) {
@@ -483,6 +483,11 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       if (messages.length > 0) {
         bumpChat(ensuredChatId)
       }
+
+      // Redirect to the chat view after the message is complete
+      // This ensures the message is sent and the response is received before navigating
+      router.push(`/c/${ensuredChatId}`)
+      
     } catch (error: any) {
       console.error('Failed to send message in project:', error)
       toast({ 
@@ -508,6 +513,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     enableSearch,
     cacheAndAddMessage,
     bumpChat,
+    router,
+    project,
+    projectId,
   ])
 
   // Header CTA: hidden file input change handler (auto-upload)

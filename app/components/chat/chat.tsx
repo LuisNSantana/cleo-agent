@@ -23,6 +23,8 @@ import { useFileUpload } from "./use-file-upload"
 import ConfirmationPanel, { ConfirmationItem } from "@/components/chat/confirmation-panel"
 import { VoiceMode } from "@/app/components/voice/voice-mode"
 import { Phone } from "lucide-react"
+import { ProjectChatHeader } from "./project-chat-header"
+import { useQuery } from "@tanstack/react-query"
 
 const FeedbackWidget = dynamic(
   () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
@@ -70,6 +72,18 @@ export function Chat() {
   const { user } = useUser()
   const { preferences } = useUserPreferences()
   const { draftValue, clearDraft } = useChatDraft(chatId)
+
+  // Fetch project info if this chat belongs to a project
+  const { data: projectInfo } = useQuery({
+    queryKey: ['chat-project', currentChat?.project_id],
+    queryFn: async () => {
+      if (!currentChat?.project_id) return null
+      const response = await fetch(`/api/projects/${currentChat.project_id}`)
+      if (!response.ok) return null
+      return response.json()
+    },
+    enabled: !!currentChat?.project_id,
+  })
 
   // File upload functionality
   const {
@@ -323,6 +337,14 @@ export function Chat() {
       style={{ ['--chat-input-height' as any]: `${inputHeight}px` }}
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
+
+      {/* Project Chat Header - Show when chat belongs to a project */}
+      {currentChat?.project_id && projectInfo && !projectInfo._error && (
+        <ProjectChatHeader
+          projectId={currentChat.project_id}
+          projectName={projectInfo.name || "Project"}
+        />
+      )}
 
       <AnimatePresence initial={false} mode="popLayout">
         {showOnboarding ? (
