@@ -128,7 +128,25 @@ export function openproviders<T extends SupportedModel>(modelId: T, _settings?: 
       },
       baseURL: 'https://openrouter.ai/api/v1',
     })
-    return openrouterProvider.chat(normalized.replace('openrouter:', ''))
+
+    const aliasMap: Record<string, string> = {
+      'grok-4-fast': 'x-ai/grok-4-fast',
+    }
+
+    let slug = typeof modelId === 'string' ? modelId : normalized
+    if (slug.startsWith('openrouter:')) {
+      slug = slug.replace('openrouter:', '')
+    } else if (slug.startsWith('openrouter/')) {
+      slug = slug.replace('openrouter/', '')
+    } else {
+      slug = normalized
+    }
+
+    if (!slug.includes('/') && aliasMap[slug]) {
+      slug = aliasMap[slug]
+    }
+
+    return openrouterProvider.chat(slug)
   }
 
   throw new Error(`Unsupported model: ${modelId}`)

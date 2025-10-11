@@ -177,24 +177,27 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             const sessionUpdate: any = {
               type: 'session.update',
               session: {
-                // Keep configuration minimal and within documented fields to avoid server errors
-                // Modalities and voice selection
-                modalities: ['text', 'audio'],
-                voice: configRef.current.voice || 'alloy',
-                // Explicit audio formats to match our client encoder
-                input_audio_format: {
-                  type: 'pcm16',
-                  sample_rate_hz: 24000
-                },
-                output_audio_format: {
-                  type: 'pcm16',
-                  sample_rate_hz: 24000
-                },
-                // Enable server-side VAD and transcription
-                input_audio_transcription: { model: 'whisper-1' },
-                turn_detection: {
-                  type: 'server_vad',
-                  silence_duration_ms: 500
+                type: 'realtime',
+                model,
+                output_modalities: ['audio', 'text'],
+                audio: {
+                  input: {
+                    format: {
+                      type: 'audio/pcm',
+                      rate: 24000
+                    },
+                    turn_detection: {
+                      type: 'server_vad',
+                      silence_duration_ms: 500
+                    }
+                  },
+                  output: {
+                    format: {
+                      type: 'audio/pcm',
+                      rate: 24000
+                    },
+                    voice: configRef.current.voice || 'alloy'
+                  }
                 }
               }
             }
@@ -265,7 +268,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             }
           }
 
-          if (eventType === 'response.audio.delta' && data.delta) {
+          if ((eventType === 'response.audio.delta' || eventType === 'response.output_audio.delta') && data.delta) {
             setStatus('speaking')
             try {
               // Ensure playback context exists
@@ -299,15 +302,23 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             }
           }
 
-          if (eventType === 'response.audio.done') {
+          if (eventType === 'response.audio.done' || eventType === 'response.output_audio.done') {
             setStatus('listening')
           }
 
-          if (eventType === 'conversation.item.input_audio_transcription.completed') {
-            console.log('📝 User transcript:', data.transcript)
+          if (eventType === 'conversation.item.input_audio_transcription.completed' || eventType === 'response.output_audio_transcript.done') {
+            const transcript =
+              data.transcript ||
+              data.text ||
+              (typeof data.delta === 'string' ? data.delta : undefined) ||
+              data.output?.[0]?.content?.[0]?.text
+
+            if (transcript) {
+              console.log('📝 User transcript:', transcript)
+            }
             
             // Save transcript
-            if (chatIdRef.current && data.transcript) {
+            if (chatIdRef.current && transcript) {
               try {
                 await fetch('/api/voice/transcript', {
                   method: 'POST',
@@ -315,7 +326,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
                   body: JSON.stringify({
                     chatId: chatIdRef.current,
                     role: 'user',
-                    content: data.transcript,
+                    content: transcript,
                     sessionId: sessionIdRef.current
                   })
                 })

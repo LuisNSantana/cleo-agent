@@ -20,6 +20,9 @@ export function useVoiceElevenLabs() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const chatIdRef = useRef<string | null>(null)
+  const lastSpeechAtRef = useRef<number>(Date.now())
+  const isSpeakingRef = useRef<boolean>(false)
+  const hasPendingFinalRef = useRef<boolean>(false)
 
   // Monitor audio level
   const monitorAudioLevel = useCallback(() => {
@@ -162,18 +165,87 @@ export function useVoiceElevenLabs() {
           source.connect(processor)
           processor.connect(audioContext.destination)
 
+          const TARGET_SAMPLE_RATE = 16000
+          const SILENCE_THRESHOLD = 0.015
+          const SILENCE_DURATION_MS = 800
+
+          const downsample = (buffer: Float32Array, inputRate: number, targetRate: number) => {
+            if (inputRate === targetRate) {
+              return buffer.slice()
+            }
+            const ratio = inputRate / targetRate
+            const newLength = Math.max(1, Math.round(buffer.length / ratio))
+            const result = new Float32Array(newLength)
+            for (let i = 0; i < newLength; i++) {
+              const rawIndex = i * ratio
+              const index = Math.floor(rawIndex)
+              const nextIndex = Math.min(index + 1, buffer.length - 1)
+              const interpolation = rawIndex - index
+              const sample = buffer[index] + (buffer[nextIndex] - buffer[index]) * interpolation
+              result[i] = sample
+            }
+            return result
+          }
+
           processor.onaudioprocess = (e) => {
             if (ws.readyState !== WebSocket.OPEN || isMuted) return
+
             const inputData = e.inputBuffer.getChannelData(0)
+            const sampleRate = audioContext.sampleRate
+            const floatData = downsample(inputData, sampleRate, TARGET_SAMPLE_RATE)
+
+            // Measure RMS to drive lightweight VAD hints
+            let sumSquares = 0
+            for (let i = 0; i < floatData.length; i++) {
+              const sample = floatData[i]
+              sumSquares += sample * sample
+            }
+            const rms = Math.sqrt(sumSquares / floatData.length)
+
+            if (rms > SILENCE_THRESHOLD) {
+              lastSpeechAtRef.current = Date.now()
+              if (!isSpeakingRef.current) {
+                isSpeakingRef.current = true
+              }
+              if (hasPendingFinalRef.current) {
+                hasPendingFinalRef.current = false
+              }
+            }
+
             // Convert Float32 [-1,1] to PCM16
-            const pcm16 = new Int16Array(inputData.length)
-            for (let i = 0; i < inputData.length; i++) {
-              const s = Math.max(-1, Math.min(1, inputData[i]))
+            const pcm16 = new Int16Array(floatData.length)
+            for (let i = 0; i < floatData.length; i++) {
+              const s = Math.max(-1, Math.min(1, floatData[i]))
               pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
             }
+
             const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
-            // Align message shape with Agents WS: stream audio chunks continuously
-            ws.send(JSON.stringify({ type: 'audio', audio: base64, is_final: false }))
+            ws.send(
+              JSON.stringify({
+                type: 'audio',
+                audio: base64,
+                is_final: false,
+                sample_rate: TARGET_SAMPLE_RATE
+              })
+            )
+
+            // Emit a finalization hint if we've entered silence after speech
+            if (
+              isSpeakingRef.current &&
+              Date.now() - lastSpeechAtRef.current > SILENCE_DURATION_MS &&
+              !hasPendingFinalRef.current
+            ) {
+              hasPendingFinalRef.current = true
+              isSpeakingRef.current = false
+              ws.send(
+                JSON.stringify({
+                  type: 'audio',
+                  audio: '',
+                  is_final: true,
+                  sample_rate: TARGET_SAMPLE_RATE
+                })
+              )
+            }
           }
 
           // Store processor for cleanup
@@ -364,6 +436,9 @@ export function useVoiceElevenLabs() {
     analyserRef.current = null
     sessionIdRef.current = null
     startTimeRef.current = null
+    lastSpeechAtRef.current = Date.now()
+    isSpeakingRef.current = false
+    hasPendingFinalRef.current = false
 
     setStatus('idle')
     setAudioLevel(0)

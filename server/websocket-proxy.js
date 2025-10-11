@@ -38,8 +38,7 @@ wss.on('connection', (clientWs, req) => {
   const openaiUrl = `wss://api.openai.com/v1/realtime?model=${model}`
   const openaiWs = new WebSocket(openaiUrl, {
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'OpenAI-Beta': 'realtime=v1'
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
     }
   })
   
