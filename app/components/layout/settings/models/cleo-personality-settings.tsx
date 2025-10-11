@@ -23,12 +23,30 @@ import {
   ChatCircleDotsIcon,
   SparkleIcon,
   GraduationCapIcon,
+  InfoIcon,
+  RocketLaunchIcon,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { debounce } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
+
+const EXAMPLE_INSTRUCTIONS = `Example instructions you can use:
+
+🎯 Role & Context:
+"You're my technical advisor for a SaaS startup. Keep responses practical and focused on growth."
+
+📝 Communication Style:
+"Be concise and direct. Use bullet points for complex topics. Avoid unnecessary pleasantries."
+
+🚫 Boundaries:
+"Don't make assumptions about my technical knowledge. Always explain acronyms first."
+
+💡 Preferences:
+"When suggesting code, prefer TypeScript over JavaScript. For design, prioritize accessibility."
+
+Remember: The more specific you are, the better Cleo can adapt to your needs!`
 
 const personalityTypes = [
   {
@@ -147,6 +165,7 @@ export function CleoPersonalitySettings() {
 
   return (
     <div className="space-y-8 overflow-x-hidden">
+      {/* Enhanced Header with Better Value Prop */}
       <div>
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20">
@@ -155,10 +174,41 @@ export function CleoPersonalitySettings() {
           <div className="flex-1">
             <h3 className="text-xl font-semibold">Customize Cleo's Personality</h3>
             <p className="text-muted-foreground text-sm mt-0.5">
-              Choose how Cleo communicates with you
+              Make Cleo work exactly how you want—personalized responses, optimized performance
             </p>
           </div>
         </div>
+        
+        {/* Value Proposition Banner */}
+        <div className="mt-4 rounded-lg border border-blue-500/20 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <RocketLaunchIcon className="size-5 text-blue-500 shrink-0 mt-0.5" weight="duotone" />
+            <div className="space-y-2 flex-1">
+              <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                ✨ Unlock Cleo's Full Potential
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Personalize how Cleo responds to match your workflow. Choose a base personality, fine-tune behavior, 
+                and add <strong>custom instructions</strong> to optimize accuracy and relevance for your specific needs.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="secondary" className="gap-1">
+                  <SparkleIcon className="size-3" />
+                  Better accuracy
+                </Badge>
+                <Badge variant="secondary" className="gap-1">
+                  <GraduationCapIcon className="size-3" />
+                  Domain expertise
+                </Badge>
+                <Badge variant="secondary" className="gap-1">
+                  <GearIcon className="size-3" />
+                  Your preferences
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <div className="mt-2 flex items-center justify-end">
           <div className="text-xs">
             {saveState === "saving" && (
@@ -453,66 +503,220 @@ export function CleoPersonalitySettings() {
           </div>
         </div>
 
-        {/* Custom Style */}
-    <div className="space-y-2">
-          <label className="text-sm font-medium">Custom style instructions</label>
-          <Textarea
-            value={localSettings.customStyle}
-            onChange={(e) => {
-              const val = e.target.value.slice(0, 500)
-              setAndSave({ customStyle: val })
-            }}
-            placeholder="Optional: add specific guidance about tone, vocabulary, or boundaries."
-      className="min-h-24"
-          />
-          <div className="text-right text-xs text-muted-foreground">
-            {localSettings.customStyle.length}/500
+        {/* Enhanced Custom Instructions Section */}
+        <div className="space-y-4 rounded-xl border-2 border-dashed border-purple-500/30 bg-gradient-to-br from-purple-500/5 via-transparent to-pink-500/5 p-5">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 shrink-0">
+              <SparkleIcon className="size-5 text-purple-600 dark:text-purple-400" weight="duotone" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-semibold">Custom Instructions (Advanced)</label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon className="size-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Add specific rules, context, or preferences that apply to ALL your conversations with Cleo. 
+                        This helps optimize performance and accuracy for your unique needs.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                💡 <strong>Pro tip:</strong> Define your role, preferences, and boundaries to get responses 
+                tailored exactly to your needs. Be specific for best results!
+              </p>
+
+              {/* Expandable Examples */}
+              <details className="group">
+                <summary className="cursor-pointer text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline list-none flex items-center gap-1">
+                  <span>📚 View examples & best practices</span>
+                  <span className="text-[10px] opacity-60">(click to expand)</span>
+                </summary>
+                <div className="mt-3 rounded-lg bg-muted/50 p-3 space-y-3 text-xs border border-border/50">
+                  <div>
+                    <p className="font-medium mb-1.5 text-blue-600 dark:text-blue-400">💼 For Work:</p>
+                    <code className="block bg-background/60 p-2 rounded text-[11px] border">
+                      I'm a product manager at a fintech startup. Keep responses practical and actionable. 
+                      When discussing features, always consider user privacy and compliance. Prefer frameworks 
+                      like Jobs-to-be-Done over generic advice.
+                    </code>
+                  </div>
+
+                  <div>
+                    <p className="font-medium mb-1.5 text-green-600 dark:text-green-400">👨‍💻 For Developers:</p>
+                    <code className="block bg-background/60 p-2 rounded text-[11px] border">
+                      I'm a TypeScript developer focused on React and Next.js. Always show TypeScript examples, 
+                      not JavaScript. Prioritize modern patterns (hooks, server components) and explain trade-offs. 
+                      Don't assume I know every library—introduce new tools with context.
+                    </code>
+                  </div>
+
+                  <div>
+                    <p className="font-medium mb-1.5 text-orange-600 dark:text-orange-400">🎨 For Creators:</p>
+                    <code className="block bg-background/60 p-2 rounded text-[11px] border">
+                      I'm a content creator focused on tech education. Help me simplify complex topics for 
+                      beginners. Use analogies and real-world examples. When suggesting content ideas, consider 
+                      SEO and engagement potential.
+                    </code>
+                  </div>
+
+                  <div>
+                    <p className="font-medium mb-1.5 text-purple-600 dark:text-purple-400">🎓 For Students:</p>
+                    <code className="block bg-background/60 p-2 rounded text-[11px] border">
+                      I'm studying computer science. Explain concepts step-by-step, don't just give answers. 
+                      When solving problems, show your reasoning process. Use Socratic questioning to help me 
+                      learn rather than just memorize.
+                    </code>
+                  </div>
+
+                  <div className="pt-2 border-t border-border/30">
+                    <p className="font-medium mb-2">✨ Best Practices:</p>
+                    <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                      <li>Define your role/context first</li>
+                      <li>Specify output preferences (format, length, style)</li>
+                      <li>Set clear boundaries (what NOT to do)</li>
+                      <li>Mention tools/frameworks you prefer</li>
+                      <li>Update as your needs evolve</li>
+                    </ul>
+                  </div>
+                </div>
+              </details>
+
+              <Textarea
+                value={localSettings.customStyle}
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 1000)
+                  setAndSave({ customStyle: val })
+                }}
+                placeholder="Example: I'm a startup founder focused on AI products. Keep responses concise and actionable. When discussing technical topics, balance depth with accessibility. Prioritize modern best practices and scalable solutions. Don't make assumptions—ask clarifying questions when needed."
+                className="min-h-32 text-sm font-mono resize-y"
+              />
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {localSettings.customStyle.length === 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      ⚠️ Empty instructions = generic responses. Add context for better results!
+                    </span>
+                  ) : localSettings.customStyle.length < 50 ? (
+                    <span className="text-blue-600 dark:text-blue-400">
+                      💡 Add more details to improve accuracy
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      ✓ Great! Cleo will use this context for all conversations
+                    </span>
+                  )}
+                </span>
+                <span className="text-muted-foreground">
+                  {localSettings.customStyle.length}/1000
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Preview Section */}
-      <div className="rounded-lg border p-4">
-        <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
-          <LightbulbIcon className="size-4" />
-          Style preview
-        </h4>
-        <div className="rounded-md bg-muted/30 p-3 text-sm">
-          <p className="mb-2 font-medium">Example response:</p>
-          <div className="italic">
-            {(() => {
-              const base = personalityTypes.find((p) => p.id === localSettings.personalityType)?.example || ""
-              // Simple preview adaptation: remove emojis if disabled
-              return localSettings.useEmojis ? base : base.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
-            })()}
+      {/* Enhanced Preview Section */}
+      <div className="rounded-xl border-2 bg-gradient-to-br from-background to-muted/20 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="flex items-center gap-2 text-sm font-semibold">
+            <LightbulbIcon className="size-5 text-yellow-500" weight="duotone" />
+            Live Style Preview
+          </h4>
+          <Badge variant="secondary" className="gap-1.5">
+            <div className="size-1.5 rounded-full bg-green-500 animate-pulse" />
+            Active
+          </Badge>
+        </div>
+
+        <div className="space-y-3">
+          {/* Example Response */}
+          <div className="rounded-lg bg-background border p-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Example Response
+            </p>
+            <div className="text-sm leading-relaxed">
+              {(() => {
+                const base = personalityTypes.find((p) => p.id === localSettings.personalityType)?.example || ""
+                return localSettings.useEmojis ? base : base.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+              })()}
+            </div>
+            {localSettings.customStyle && (
+              <div className="pt-2 border-t border-border/50">
+                <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">
+                  + Custom Context Applied:
+                </p>
+                <p className="text-xs text-muted-foreground italic line-clamp-2">
+                  "{localSettings.customStyle.slice(0, 120)}{localSettings.customStyle.length > 120 ? '...' : ''}"
+                </p>
+              </div>
+            )}
           </div>
-          <div className="mt-3 flex gap-2 text-xs">
-            <Badge variant="outline">
-              Creativity: {localSettings.creativityLevel}%
+
+          {/* Settings Summary */}
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline" className="text-[11px]">
+              <SparkleIcon className="size-3 mr-1" />
+              Creativity {localSettings.creativityLevel}%
             </Badge>
-            <Badge variant="outline">
-              Formality: {localSettings.formalityLevel}%
+            <Badge variant="outline" className="text-[11px]">
+              <GearIcon className="size-3 mr-1" />
+              Formality {localSettings.formalityLevel}%
             </Badge>
-            <Badge variant="outline">
-              Enthusiasm: {localSettings.enthusiasmLevel}%
+            <Badge variant="outline" className="text-[11px]">
+              <SmileyIcon className="size-3 mr-1" />
+              Enthusiasm {localSettings.enthusiasmLevel}%
             </Badge>
-            <Badge variant="outline">
-              Helpfulness: {localSettings.helpfulnessLevel}%
+            <Badge variant="outline" className="text-[11px]">
+              <LightbulbIcon className="size-3 mr-1" />
+              Helpfulness {localSettings.helpfulnessLevel}%
             </Badge>
-            <Badge variant="outline">Emojis: {localSettings.useEmojis ? "Yes" : "No"}</Badge>
-            <Badge variant="outline">Proactive: {localSettings.proactiveMode ? "Yes" : "No"}</Badge>
+            <Badge variant="outline" className="text-[11px]">
+              {localSettings.useEmojis ? "✨ Emojis" : "No Emojis"}
+            </Badge>
+            <Badge variant="outline" className="text-[11px]">
+              {localSettings.proactiveMode ? "🎯 Proactive" : "Reactive"}
+            </Badge>
+            {localSettings.customStyle && (
+              <Badge variant="outline" className="text-[11px] bg-purple-500/10 border-purple-500/30">
+                <SparkleIcon className="size-3 mr-1" />
+                Custom Instructions Active
+              </Badge>
+            )}
           </div>
-          <div className="mt-3 flex justify-end gap-2">
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between pt-2 border-t">
+            <p className="text-xs text-muted-foreground">
+              {localSettings.customStyle 
+                ? "✓ Your custom instructions will apply to all conversations"
+                : "Add custom instructions above for personalized responses"
+              }
+            </p>
             <Button
               size="sm"
               variant="ghost"
+              className="gap-2"
               onClick={() => {
                 const prompt = generatePersonalizedPrompt("preview-model", localSettings)
                 navigator.clipboard.writeText(prompt)
-                toast({ title: "Prompt copied to clipboard" })
+                toast({ 
+                  title: "System prompt copied!", 
+                  description: "Paste this to see exactly what Cleo receives",
+                  status: "success" 
+                })
               }}
             >
-              Copy prompt
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              View Full Prompt
             </Button>
           </div>
         </div>
