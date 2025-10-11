@@ -1,4 +1,5 @@
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
+import { normalizeModelId } from "@/lib/openproviders/provider-map"
 import { ModelConfig } from "./types"
 import { grokModels } from "./data/grok"
 import { openaiModels } from "./data/openai.clean"
@@ -54,11 +55,12 @@ export async function getAllModels(): Promise<ModelConfig[]> {
 export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
   const models = await getAllModels()
 
+  const freeSet = new Set([
+    ...FREE_MODELS_IDS.map(normalizeModelId),
+    ...NON_AUTH_ALLOWED_MODELS.map(normalizeModelId),
+  ])
   const freeModels = models
-    .filter((model) => {
-      const isInFreeList = FREE_MODELS_IDS.includes(model.id)
-      return isInFreeList
-    })
+    .filter((model) => freeSet.has(normalizeModelId(model.id)))
     .map((model) => ({
       ...model,
       accessible: true,
@@ -82,7 +84,7 @@ export async function getModelsForNonAuthUsers(): Promise<ModelConfig[]> {
   const models = await getAllModels()
   
   return models
-    .filter((model) => NON_AUTH_ALLOWED_MODELS.includes(model.id))
+    .filter((model) => new Set(NON_AUTH_ALLOWED_MODELS.map(normalizeModelId)).has(normalizeModelId(model.id)))
     .map((model) => ({
       ...model,
       accessible: true,

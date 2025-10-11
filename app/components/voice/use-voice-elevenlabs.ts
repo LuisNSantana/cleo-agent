@@ -114,7 +114,7 @@ export function useVoiceElevenLabs() {
       sessionIdRef.current = sessionId
 
       // Get ElevenLabs signed URL
-      const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_1301k707t7ybf60bby0zc3q49eqt'
+  const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_1301k707t7ybf60bby0zc3q49eqt'
       console.log('🎯 Using ElevenLabs Agent ID:', agentId)
       
       const signedUrlResponse = await fetch('/api/voice/elevenlabs/signed-url', {
@@ -143,43 +143,46 @@ export function useVoiceElevenLabs() {
         startTimeRef.current = Date.now()
         monitorAudioLevel()
 
-        // Start sending audio
-        // Check supported MIME types
-        let mimeType = 'audio/webm;codecs=opus'
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm'
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'audio/ogg;codecs=opus'
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-              console.warn('⚠️ No optimal audio codec found, using default')
-              mimeType = ''
-            }
-          }
-        }
-        
-        const mediaRecorder = new MediaRecorder(stream, 
-          mimeType ? { mimeType } : {}
-        )
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN && !isMuted) {
-            // Convert to base64 and send
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              const base64 = (reader.result as string).split(',')[1]
-              ws.send(JSON.stringify({
-                type: 'audio_input',
-                audio: base64
-              }))
-            }
-            reader.readAsDataURL(event.data)
-          }
+        // Initialize connection (per Agents WS spec)
+        try {
+          ws.send(JSON.stringify({
+            type: 'initializeConnection',
+            agent_id: agentId,
+            conversation_config: { enable_vad: true, language: 'auto' }
+          }))
+        } catch (initErr) {
+          console.error('Failed to initialize ElevenLabs connection:', initErr)
         }
 
-        mediaRecorder.start(100) // Send chunks every 100ms
-        
-        // Store recorder reference for cleanup
-        ;(wsRef as any).mediaRecorder = mediaRecorder
+        // Send raw PCM16 audio using a ScriptProcessor to match ElevenLabs expectations
+        try {
+          const audioContext = audioContextRef.current!
+          const source = audioContext.createMediaStreamSource(stream)
+          const processor = audioContext.createScriptProcessor(2048, 1, 1) // ~128ms at 16kHz
+          source.connect(processor)
+          processor.connect(audioContext.destination)
+
+          processor.onaudioprocess = (e) => {
+            if (ws.readyState !== WebSocket.OPEN || isMuted) return
+            const inputData = e.inputBuffer.getChannelData(0)
+            // Convert Float32 [-1,1] to PCM16
+            const pcm16 = new Int16Array(inputData.length)
+            for (let i = 0; i < inputData.length; i++) {
+              const s = Math.max(-1, Math.min(1, inputData[i]))
+              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+            }
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
+            // Align message shape with Agents WS: stream audio chunks continuously
+            ws.send(JSON.stringify({ type: 'audio', audio: base64, is_final: false }))
+          }
+
+          // Store processor for cleanup
+          ;(wsRef as any).processor = processor
+        } catch (procErr) {
+          console.error('Failed to initialize PCM16 processor:', procErr)
+          setError(new Error('Audio processing initialization failed'))
+          setStatus('error')
+        }
       }
 
       ws.onmessage = async (event: MessageEvent) => {
@@ -331,14 +334,19 @@ export function useVoiceElevenLabs() {
     }
 
     // Stop media recorder if exists
-    if ((wsRef as any).mediaRecorder) {
+    // Stop processor if exists
+    if ((wsRef as any).processor) {
       try {
-        (wsRef as any).mediaRecorder.stop()
+        (wsRef as any).processor.disconnect()
       } catch {}
-      (wsRef as any).mediaRecorder = null
+      (wsRef as any).processor = null
     }
 
     if (wsRef.current) {
+      try {
+        // Mark stream closure
+        wsRef.current.send(JSON.stringify({ type: 'closeConnection' }))
+      } catch {}
       wsRef.current.close()
       wsRef.current = null
     }

@@ -177,15 +177,23 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             const sessionUpdate: any = {
               type: 'session.update',
               session: {
+                // Keep configuration minimal and within documented fields to avoid server errors
+                // Modalities and voice selection
                 modalities: ['text', 'audio'],
                 voice: configRef.current.voice || 'alloy',
-                input_audio_transcription: {
-                  model: 'whisper-1'
+                // Explicit audio formats to match our client encoder
+                input_audio_format: {
+                  type: 'pcm16',
+                  sample_rate_hz: 24000
                 },
+                output_audio_format: {
+                  type: 'pcm16',
+                  sample_rate_hz: 24000
+                },
+                // Enable server-side VAD and transcription
+                input_audio_transcription: { model: 'whisper-1' },
                 turn_detection: {
                   type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
                   silence_duration_ms: 500
                 }
               }
@@ -248,24 +256,44 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
+            try {
+              // Commit buffered audio and trigger a response when VAD ends
+              ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+              ws.send(JSON.stringify({ type: 'response.create' }))
+            } catch (commitErr) {
+              console.error('Failed to commit audio or create response:', commitErr)
+            }
           }
 
           if (eventType === 'response.audio.delta' && data.delta) {
             setStatus('speaking')
-            
-            // Decode and play audio (simplified - same as working version)
             try {
-              const audioData = atob(data.delta)
-              const pcm16 = new Int16Array(audioData.length / 2)
-              for (let i = 0; i < pcm16.length; i++) {
-                pcm16[i] = (audioData.charCodeAt(i * 2) | (audioData.charCodeAt(i * 2 + 1) << 8))
+              // Ensure playback context exists
+              if (!playbackContextRef.current) {
+                playbackContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 })
               }
-              
-              // Play audio using simple Audio element
-              const audioBlob = new Blob([pcm16], { type: 'audio/pcm' })
-              const audioUrl = URL.createObjectURL(audioBlob)
-              const audio = new Audio(audioUrl)
-              audio.play().catch(console.error)
+              const ctx = playbackContextRef.current
+
+              // Base64 decode to PCM16
+              const b64 = data.delta as string
+              const bin = atob(b64)
+              const bytes = new Uint8Array(bin.length)
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+              const pcm16 = new Int16Array(bytes.buffer)
+
+              // Convert PCM16 to Float32 in [-1, 1]
+              const float32 = new Float32Array(pcm16.length)
+              for (let i = 0; i < pcm16.length; i++) {
+                float32[i] = Math.max(-1, Math.min(1, pcm16[i] / 0x8000))
+              }
+
+              // Create and play AudioBuffer
+              const buffer = ctx.createBuffer(1, float32.length, 24000)
+              buffer.getChannelData(0).set(float32)
+              const source = ctx.createBufferSource()
+              source.buffer = buffer
+              source.connect(ctx.destination)
+              source.start()
             } catch (audioError) {
               console.error('Error playing audio:', audioError)
             }

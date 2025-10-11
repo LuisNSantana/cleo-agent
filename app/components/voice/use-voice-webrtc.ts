@@ -229,7 +229,10 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
               // Sin esto, OpenAI NO transcribe la voz del usuario
               input_audio_transcription: {
                 model: 'whisper-1'
-              }
+              },
+              // Set explicit audio formats, matching our mono PCM16 stream
+              input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
+              output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 }
             }
           }
           if (instructions && instructions.length > 0) {
@@ -329,6 +332,13 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           if (event.type === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
+            try {
+              // Commit any buffered audio and ask the model to respond
+              dataChannelRef.current?.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+              dataChannelRef.current?.send(JSON.stringify({ type: 'response.create' }))
+            } catch (commitErr) {
+              console.error('Failed to commit audio or create response:', commitErr)
+            }
           }
 
           if (event.type === 'session.updated') {

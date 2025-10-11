@@ -3,11 +3,18 @@ import {
   AUTH_DAILY_MESSAGE_LIMIT,
   DAILY_LIMIT_PRO_MODELS,
   FREE_MODELS_IDS,
+  NON_AUTH_ALLOWED_MODELS,
   NON_AUTH_DAILY_MESSAGE_LIMIT,
 } from "@/lib/config"
+import { normalizeModelId } from '@/lib/openproviders/provider-map'
 import { SupabaseClient } from "@supabase/supabase-js"
 
-const isFreeModel = (modelId: string) => FREE_MODELS_IDS.includes(modelId)
+const isFreeModel = (modelId: string) => {
+  const normalized = normalizeModelId(modelId)
+  // Build a normalized set including non-auth allowed list (guests) and free list (auth)
+  const candidates = [...new Set([...FREE_MODELS_IDS, ...NON_AUTH_ALLOWED_MODELS])]
+  return candidates.some((id) => normalizeModelId(id) === normalized)
+}
 const isProModel = (modelId: string) => !isFreeModel(modelId)
 
 /**
