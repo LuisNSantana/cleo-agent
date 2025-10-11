@@ -98,8 +98,6 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 export async function GET() {
-	console.log('🔗 LangChain Multi-Model Chat - Health Check')
-
 	try {
 		const pipeline = new MultiModelPipeline()
 		const hasGroqKey = !!process.env.GROQ_API_KEY
@@ -136,16 +134,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-	console.log('🚀 LangChain Multi-Model Chat - Processing Request')
-
 	try {
 		const body = await req.json()
-		console.log('📨 Request body:', {
-			message: typeof body.message === 'string' ? `${body.message.substring(0, 100)}...` : undefined,
-			type: body.type,
-			hasMetadata: !!body.metadata,
-			userId: body.metadata?.userId,
-		})
 
 		const parsed = LangChainRequestSchema.safeParse(body)
 		if (!parsed.success) {
@@ -166,7 +156,6 @@ export async function POST(req: NextRequest) {
 		let supabase: any = null
 		let realUserId: string | null = metadata.userId || null
 		if (metadata.userId && metadata.isAuthenticated) {
-			console.log('👤 Validating user:', metadata.userId)
 			try {
 				supabase = await validateAndTrackUsage({
 					userId: metadata.userId,
@@ -180,15 +169,10 @@ export async function POST(req: NextRequest) {
 						const { data: userData, error: userError } = await supabase.auth.getUser()
 						if (!userError && userData?.user) {
 							realUserId = userData.user.id
-							console.log('🔍 Using real Supabase user ID for LangChain:', realUserId)
 						}
 					} catch {}
 				}
 			} catch (authError) {
-				console.warn(
-					'⚠️ Authentication validation failed for internal call, proceeding without auth:',
-					authError,
-				)
 				// For internal calls from /api/chat, we can proceed without strict auth validation
 				// The original endpoint already validated the user
 			}
@@ -197,11 +181,6 @@ export async function POST(req: NextRequest) {
 		// Build final system prompt (personalization + RAG context) similar to main chat endpoint
 		let finalSystemPrompt: string | undefined
 		try {
-			console.log('🔍 Building final system prompt with:', {
-				originalModel: metadata.originalModel,
-				systemPrompt: metadata.systemPrompt ? 'present' : 'not present',
-				systemPromptLength: metadata.systemPrompt?.length || 0,
-			})
 			finalSystemPrompt = (
 				await buildFinalSystemPrompt({
 					baseSystemPrompt: metadata.systemPrompt,
@@ -215,11 +194,8 @@ export async function POST(req: NextRequest) {
 					debugRag: metadata.debugRag,
 				})
 			).finalSystemPrompt
-			if (finalSystemPrompt) {
-				console.log('[LangChain] Final system prompt prepared. length:', finalSystemPrompt.length)
-			}
 		} catch (e) {
-			console.warn('[LangChain] Failed to build final system prompt, using defaults')
+			// Use defaults if prompt building fails
 		}
 
 		// Process with LangChain pipeline (normalized below)
@@ -287,7 +263,6 @@ export async function POST(req: NextRequest) {
 		// Use intelligent delegation analyzer for automatic agent detection
 		let intelligentDelegation: { agentId: string; toolName: string; confidence: number } | null = null
 		try {
-			console.log('🧠 [MULTI-MODEL] Analyzing for delegation:', normalizedContent?.substring(0, 100))
 			const analysis = analyzeDelegationIntent(normalizedContent || '')
 			if (analysis && analysis.confidence > 0.4) { // Lower threshold for multi-model endpoint
 				intelligentDelegation = {
@@ -295,10 +270,9 @@ export async function POST(req: NextRequest) {
 					toolName: analysis.toolName,
 					confidence: analysis.confidence
 				}
-				console.log('🎯 [MULTI-MODEL] Auto-detected delegation:', intelligentDelegation)
 			}
 		} catch (error) {
-			console.warn('⚠️ [MULTI-MODEL] Delegation analysis failed:', error)
+			// Delegation analysis failed, continue without it
 		}
 
 		const likelyToolIntent = (
@@ -324,22 +298,9 @@ export async function POST(req: NextRequest) {
 		// Add intelligent delegation tool if detected
 		if (intelligentDelegation && !allowedToolsAuto.includes(intelligentDelegation.toolName)) {
 			allowedToolsAuto.push(intelligentDelegation.toolName)
-			console.log('🤖 [MULTI-MODEL] Added intelligent delegation tool:', intelligentDelegation.toolName)
 		}
 
 		const enableToolsAuto = metadata.enableTools ?? (likelyToolIntent || allowedToolsAuto.length > 0)
-		if (enableToolsAuto) {
-			console.log('🧰 Tools enabled (auto):', { 
-				mentionsAmi, mentionsPeter, mentionsEmma, mentionsToby, mentionsApu, 
-				mentionsNotion, mentionsWorkspace, mentionsDelegate, 
-				allowedToolsAuto,
-				intelligentDelegation: intelligentDelegation ? {
-					agent: intelligentDelegation.agentId,
-					tool: intelligentDelegation.toolName,
-					confidence: Math.round(intelligentDelegation.confidence * 100) + '%'
-				} : null
-			})
-		}
 
 		// Attach per-request context so tools can read userId/model
 		let reqId: string
@@ -432,14 +393,9 @@ export async function POST(req: NextRequest) {
 										inputTokens: pipelineResult.tokens?.input,
 										outputTokens: pipelineResult.tokens?.output,
 								})
-
-				console.log('✅ Messages logged to database successfully')
 			} catch (dbError) {
-				console.warn('⚠️ Failed to log messages to database:', dbError)
 				// Don't fail the entire request if logging fails
 			}
-		} else {
-			console.log('ℹ️ Skipping database logging - no supabase client or missing metadata')
 		}
 
 		// Return streaming response compatible with frontend SSE parser

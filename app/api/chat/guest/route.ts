@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { getCleoPrompt } from "@/lib/prompts"
+import { MODEL_DEFAULT_GUEST } from "@/lib/config"
 
 export const runtime = 'nodejs'
 
@@ -51,18 +52,9 @@ export async function POST(req: NextRequest) {
       return new Response('Error: No message provided', { status: 400 })
     }
 
-    // FORZAR DEEPSEEK PARA TODOS LOS CASOS EN GUEST MODE - SOLUCIÓN URGENTE
-    const guestModel = 'deepseek/deepseek-chat-v3.1:free'
-    const guestModelId = 'openrouter:deepseek/deepseek-chat-v3.1:free'
-    
-    console.log('🔥 GUEST MODE DEBUG:', {
-      userMessage: userMessage.substring(0, 50) + '...',
-      conversationLength: conversationHistory.length,
-      selectedModel: guestModel,
-      selectedModelId: guestModelId,
-      hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
-      timestamp: new Date().toISOString()
-    })
+    // Usar el modelo configurado por defecto para guests (grok-4-fast vía OpenRouter)
+    const guestModel = 'x-ai/grok-4-fast'
+    const guestModelId = 'openrouter:x-ai/grok-4-fast'
     
     const systemPrompt = getCleoPrompt(guestModelId, 'guest')
 
