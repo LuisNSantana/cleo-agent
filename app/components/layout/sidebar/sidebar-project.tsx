@@ -7,6 +7,7 @@ import { DialogCreateProject } from "./dialog-create-project"
 import { SidebarProjectItem } from "./sidebar-project-item"
 import { SidebarGroup } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { useI18n } from "@/lib/i18n"
 
 type Project = {
   id: string
@@ -20,6 +21,7 @@ type Project = {
 
 export function SidebarProject() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { t } = useI18n()
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["projects"],
@@ -40,7 +42,7 @@ export function SidebarProject() {
       <div className="flex items-center justify-between px-3 pb-2">
         <div className="flex items-center gap-2">
           <FoldersIcon size={18} weight="duotone" className="text-foreground/70" />
-          <span className="text-sm font-medium text-foreground">Proyectos</span>
+          <span className="text-sm font-medium text-foreground">{t.sidebar.projects}</span>
         </div>
         <Button
           type="button"
@@ -50,21 +52,21 @@ export function SidebarProject() {
           onClick={() => setIsDialogOpen(true)}
         >
           <FolderPlusIcon size={16} />
-          Nuevo
+          {t.sidebar.newProject}
         </Button>
       </div>
 
       {/* Project list without accordion wrapper */}
       <div className="space-y-0.5 px-1">
         {isLoading ? (
-          <div className="text-muted-foreground px-3 py-2 text-xs">Cargando proyectos…</div>
+          <div className="text-muted-foreground px-3 py-2 text-xs">Loading projects…</div>
         ) : projects.length > 0 ? (
           projects.map((project) => (
             <SidebarProjectItem key={project.id} project={project} />
           ))
         ) : (
           <div className="text-muted-foreground/70 mx-2 rounded-lg border border-dashed border-border/40 bg-background/30 px-3 py-3 text-center text-xs">
-            No tienes proyectos aún
+            No projects yet
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { fetchClient } from "@/lib/fetch"
+import { useI18n } from "@/lib/i18n"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -52,6 +53,8 @@ export function DialogCreateProject({
   const [selectedColor, setSelectedColor] = useState('#6b7280')
   const queryClient = useQueryClient()
   const router = useRouter()
+  const { t } = useI18n()
+  
   const createProjectMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }): Promise<CreateProjectData> => {
       const response = await fetchClient("/api/projects", {
@@ -89,21 +92,21 @@ export function DialogCreateProject({
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+            <DialogTitle>{t.projects.createNew}</DialogTitle>
             <DialogDescription>
-              Elige un nombre y color para tu nuevo proyecto.
+              {t.projects.createDescription}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <Input
-              placeholder="Nombre del proyecto"
+              placeholder={t.projects.namePlaceholder}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               autoFocus
             />
             
             <div className="space-y-3">
-              <label className="text-sm font-medium">Color de la carpeta:</label>
+              <label className="text-sm font-medium">{t.projects.folderColor}</label>
               <div className="grid grid-cols-6 gap-2">
                 {PRESET_COLORS.map((color) => (
                   <button

@@ -5,10 +5,18 @@ type TimeGroup = {
   chats: Chats[]
 }
 
+type TimeLabels = {
+  today: string
+  last7Days: string
+  last30Days: string
+  thisYear: string
+}
+
 // Group chats by time periods
 export function groupChatsByDate(
   chats: Chats[],
-  searchQuery: string
+  searchQuery: string,
+  labels?: TimeLabels
 ): TimeGroup[] | null {
   if (searchQuery) return null // Don't group when searching
 
@@ -57,20 +65,27 @@ export function groupChatsByDate(
 
   const result: TimeGroup[] = []
 
+  const timeLabels = labels || {
+    today: "Today",
+    last7Days: "Last 7 days",
+    last30Days: "Last 30 days",
+    thisYear: "This year"
+  }
+
   if (todayChats.length > 0) {
-    result.push({ name: "Today", chats: todayChats })
+    result.push({ name: timeLabels.today, chats: todayChats })
   }
 
   if (last7DaysChats.length > 0) {
-    result.push({ name: "Last 7 days", chats: last7DaysChats })
+    result.push({ name: timeLabels.last7Days, chats: last7DaysChats })
   }
 
   if (last30DaysChats.length > 0) {
-    result.push({ name: "Last 30 days", chats: last30DaysChats })
+    result.push({ name: timeLabels.last30Days, chats: last30DaysChats })
   }
 
   if (thisYearChats.length > 0) {
-    result.push({ name: "This year", chats: thisYearChats })
+    result.push({ name: timeLabels.thisYear, chats: thisYearChats })
   }
 
   Object.entries(olderChats)

@@ -47,6 +47,7 @@ import {
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
 import { SidebarVoiceButton } from "@/app/components/voice/sidebar-voice-button"
+import { useI18n } from "@/lib/i18n"
 
 export function AppSidebar() {
   const isMobile = useBreakpoint(768)
@@ -57,11 +58,17 @@ export function AppSidebar() {
   const currentChatId = params.chatId
   const pathname = usePathname()
   const openSettings = useSettingsStore((state) => state.openSettings)
+  const { t } = useI18n()
 
   const groupedChats = useMemo(() => {
-    const result = groupChatsByDate(chats, "")
+    const result = groupChatsByDate(chats, "", {
+      today: t.time.today,
+      last7Days: t.time.last7Days,
+      last30Days: t.time.last30Days,
+      thisYear: t.time.thisYear,
+    })
     return result
-  }, [chats])
+  }, [chats, t.time])
   const hasChats = chats.length > 0
 
   const handleOpenSettings = useCallback(
@@ -77,30 +84,30 @@ export function AppSidebar() {
   const quickActions = useMemo(() => [
     {
       id: "settings-files",
-      label: "Files",
+      label: t.sidebar.files,
       description: "Upload, organize, and share documents with your agents.",
       icon: Folders,
       action: () => handleOpenSettings("files"),
     },
-  ], [handleOpenSettings])
+  ], [handleOpenSettings, t.sidebar.files])
 
   // OPTIMIZED: Grok-style navigation - cleaner without excessive badges
-  const primaryNav = [
-    { href: "/", label: "Home", icon: HouseIcon, iconWeight: "duotone" as const },
-    { href: "/agents/manage", label: "Agents", icon: AgentsIcon, iconWeight: "duotone" as const },
-    { href: "/agents/tasks", label: "Tasks", icon: TasksIcon, iconWeight: "duotone" as const },
-    { href: "/integrations", label: "Integrations", icon: IntegrationsIcon, iconWeight: "duotone" as const },
-    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, iconWeight: "duotone" as const },
-    { href: "/docs", label: "Docs", icon: DocsIcon, iconWeight: "duotone" as const },
-  ]
+  const primaryNav = useMemo(() => [
+    { href: "/", label: t.sidebar.home, icon: HouseIcon, iconWeight: "duotone" as const },
+    { href: "/agents/manage", label: t.sidebar.agents, icon: AgentsIcon, iconWeight: "duotone" as const },
+    { href: "/agents/tasks", label: t.sidebar.tasks, icon: TasksIcon, iconWeight: "duotone" as const },
+    { href: "/integrations", label: t.sidebar.integrations, icon: IntegrationsIcon, iconWeight: "duotone" as const },
+    { href: "/dashboard", label: t.sidebar.dashboard, icon: DashboardIcon, iconWeight: "duotone" as const },
+    { href: "/docs", label: t.sidebar.docs, icon: DocsIcon, iconWeight: "duotone" as const },
+  ], [t.sidebar])
 
   // Personality navigation item (opens settings with personality tab)
-  const personalityAction = {
-    label: "Personality",
+  const personalityAction = useMemo(() => ({
+    label: t.sidebar.personality,
     icon: MaskHappyIcon,
     iconWeight: "duotone" as const,
     action: () => handleOpenSettings("personality"),
-  }
+  }), [handleOpenSettings, t.sidebar.personality])
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
@@ -197,7 +204,7 @@ export function AppSidebar() {
             >
               <div className="flex items-center gap-3">
                 <NotePencilIcon size={18} weight="duotone" />
-                <span className="font-medium">New Chat</span>
+                <span className="font-medium">{t.sidebar.newChat}</span>
               </div>
               <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/new-chat:opacity-100">
                 ⌘⇧U
@@ -209,7 +216,7 @@ export function AppSidebar() {
               icon={<MagnifyingGlass size={18} weight="duotone" className="mr-3" />}
               label={
                 <div className="flex w-full items-center gap-3">
-                  <span className="font-medium">Search</span>
+                  <span className="font-medium">{t.sidebar.search}</span>
                   <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/search:opacity-100">
                     ⌘+K
                   </div>
