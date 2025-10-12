@@ -203,9 +203,9 @@ IMPORTANT CONTEXT NOTES
 Overall goal: maintain a fluid, helpful conversation. Use your tools to provide real value, and narrate your actions to ${userFirstName} as you assist.`
 
     // Define tools available for voice mode
+    // NOTE: OpenAI Realtime API expects tools WITHOUT 'type: function' wrapper
     const voiceTools = [
       {
-        type: 'function',
         name: 'search_web',
         description: 'Search the internet for current information, news, prices, or any topic. Returns relevant results and a summary.',
         parameters: {
@@ -220,7 +220,6 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
         }
       },
       {
-        type: 'function',
         name: 'check_email',
         description: 'Check recent emails and summarize important messages from Gmail inbox.',
         parameters: {
@@ -240,7 +239,6 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
         }
       },
       {
-        type: 'function',
         name: 'create_calendar_event',
         description: 'Create a new event in Google Calendar with specified date and time.',
         parameters: {
@@ -273,7 +271,6 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
         }
       },
       {
-        type: 'function',
         name: 'send_email',
         description: 'Send an email via Gmail to specified recipient.',
         parameters: {
@@ -301,7 +298,6 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
         }
       },
       {
-        type: 'function',
         name: 'create_task',
         description: 'Create a new task or reminder in the task management system.',
         parameters: {

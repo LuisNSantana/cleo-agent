@@ -94,6 +94,15 @@ wss.on('connection', (clientWs, req) => {
   // Forward messages from client to OpenAI
   clientWs.on('message', (data) => {
     if (openaiWs.readyState === WebSocket.OPEN) {
+      // Log session.update payloads for debugging
+      try {
+        const message = JSON.parse(data.toString())
+        if (message.type === 'session.update') {
+          console.log('📡 Forwarding session.update to OpenAI:', JSON.stringify(message, null, 2))
+        }
+      } catch (e) {
+        // Not JSON or error parsing, skip logging
+      }
       openaiWs.send(data)
     }
   })
