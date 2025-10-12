@@ -94,27 +94,29 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       console.log('🔧 Config received from /api/voice/config')
       console.log('🛠️ Tools in config:', config.tools?.map((t: any) => ({ name: t.name, hasTypeField: 'type' in t })))
       
-      const sessionUpdatePayload = (() => {
-        const session: Record<string, unknown> = {
-          modalities: ['text', 'audio'],
-          voice: config?.voice || 'alloy',
-          input_audio_format: 'pcm16',
-          output_audio_format: 'pcm16',
-          input_audio_transcription: { model: 'whisper-1' },
-          tools: Array.isArray(config?.tools) ? config.tools : []
-        }
+      // Stage session.update in 3 small updates to avoid server_error due to size/schema
+      const trimmedInstructions = typeof config?.instructions === 'string'
+        ? String(config.instructions).slice(0, 1500)
+        : undefined
 
-        if (typeof config?.instructions === 'string' && config.instructions.trim().length > 0) {
-          session.instructions = config.instructions
-        }
+      const baseSession = {
+        voice: config?.voice || 'alloy',
+        input_audio_format: 'pcm16',
+        output_audio_format: 'pcm16'
+      }
 
-        return {
-          type: 'session.update',
-          session
-        }
-      })()
-      
-      console.log('📦 Built session.update payload with', (sessionUpdatePayload.session.tools as any[] || []).length, 'tools')
+      const updates: any[] = [
+        { type: 'session.update', session: { ...baseSession } },
+        { type: 'session.update', session: { ...baseSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}) } },
+        { type: 'session.update', session: { ...baseSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}), tools: Array.isArray(config?.tools) ? config.tools : [] } }
+      ]
+
+      let updateStage = 0
+      console.log('📦 Prepared staged session.update payloads:', {
+        stages: updates.length,
+        hasInstructions: !!trimmedInstructions,
+        toolsCount: (Array.isArray(config?.tools) ? config.tools.length : 0)
+      })
 
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -231,12 +233,12 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'session.created' && !sessionReady) {
             console.log('✅ session.created - awaiting configuration setup')
 
-            if (sessionUpdatePayload) {
+            if (updates.length > 0) {
               try {
                 awaitingSessionUpdate = true
-                console.log('📡 Sending session.update with contextual instructions and tools')
-                console.log('📋 FULL session.update payload:', JSON.stringify(sessionUpdatePayload, null, 2))
-                ws.send(JSON.stringify(sessionUpdatePayload))
+                console.log(`📡 Sending staged session.update [stage ${updateStage + 1}/${updates.length}]`)
+                console.log('📋 Payload:', JSON.stringify(updates[updateStage], null, 2))
+                ws.send(JSON.stringify(updates[updateStage]))
               } catch (updateError) {
                 console.error('Failed to send session.update:', updateError)
                 awaitingSessionUpdate = false
@@ -252,7 +254,23 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             console.log('✅ session.updated')
             awaitingSessionUpdate = false
             sessionUpdateRetryRef.current = 0
-            finalizeSessionReady()
+            // Start audio as soon as the first update is accepted
+            if (!sessionReady) {
+              finalizeSessionReady()
+            }
+            // If there are more staged updates, send next
+            if (updateStage < updates.length - 1) {
+              updateStage += 1
+              try {
+                awaitingSessionUpdate = true
+                console.log(`📡 Sending staged session.update [stage ${updateStage + 1}/${updates.length}]`)
+                console.log('📋 Payload:', JSON.stringify(updates[updateStage], null, 2))
+                ws.send(JSON.stringify(updates[updateStage]))
+              } catch (updateError) {
+                console.error('Failed to send next staged session.update:', updateError)
+                awaitingSessionUpdate = false
+              }
+            }
             return
           }
           
@@ -269,7 +287,6 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
               console.warn(`⚠️ session.update failed (attempt ${attempt + 1}). Applying fallback...`)
 
               const minimalSession: Record<string, unknown> = {
-                modalities: ['text', 'audio'],
                 voice: (config?.voice || 'alloy'),
                 input_audio_format: 'pcm16',
                 output_audio_format: 'pcm16'
@@ -288,10 +305,10 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
                 if (attempt === 1) {
                   // Retry 2: Minimal + trimmed instructions
-                  const trimmedInstructions = typeof config?.instructions === 'string'
+                  const trimmed = typeof config?.instructions === 'string'
                     ? config.instructions.slice(0, 1500)
                     : undefined
-                  const withInstr = { type: 'session.update', session: { ...minimalSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}) } }
+                  const withInstr = { type: 'session.update', session: { ...minimalSession, ...(trimmed ? { instructions: trimmed } : {}) } }
                   console.log('🧪 Retrying session.update with TRIMMED INSTRUCTIONS only (still no tools)')
                   console.log('📋 TRIMMED payload:', JSON.stringify(withInstr, null, 2))
                   sessionUpdateRetryRef.current += 1
