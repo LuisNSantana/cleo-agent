@@ -38,6 +38,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
   const sessionIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const sessionUpdateRetryRef = useRef<number>(0)
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -234,6 +235,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
               try {
                 awaitingSessionUpdate = true
                 console.log('📡 Sending session.update with contextual instructions and tools')
+                console.log('📋 FULL session.update payload:', JSON.stringify(sessionUpdatePayload, null, 2))
                 ws.send(JSON.stringify(sessionUpdatePayload))
               } catch (updateError) {
                 console.error('Failed to send session.update:', updateError)
@@ -249,6 +251,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'session.updated') {
             console.log('✅ session.updated')
             awaitingSessionUpdate = false
+            sessionUpdateRetryRef.current = 0
             finalizeSessionReady()
             return
           }
@@ -259,15 +262,55 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             if (data.error) {
               console.error('OpenAI error payload:', JSON.stringify(data.error, null, 2))
             }
-            
-            // Check if it's a server error (500)
+
+            // If session.update failed, try progressive fallbacks before giving up
+            if (awaitingSessionUpdate && !sessionReady) {
+              const attempt = sessionUpdateRetryRef.current
+              console.warn(`⚠️ session.update failed (attempt ${attempt + 1}). Applying fallback...`)
+
+              const minimalSession: Record<string, unknown> = {
+                modalities: ['text', 'audio'],
+                voice: (config?.voice || 'alloy'),
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16'
+              }
+
+              try {
+                if (attempt === 0) {
+                  // Retry 1: Minimal session (no tools, no instructions)
+                  const minimalPayload = { type: 'session.update', session: minimalSession }
+                  console.log('🧪 Retrying session.update with MINIMAL payload (no tools/instructions)')
+                  console.log('📋 MINIMAL payload:', JSON.stringify(minimalPayload, null, 2))
+                  sessionUpdateRetryRef.current += 1
+                  ws.send(JSON.stringify(minimalPayload))
+                  return
+                }
+
+                if (attempt === 1) {
+                  // Retry 2: Minimal + trimmed instructions
+                  const trimmedInstructions = typeof config?.instructions === 'string'
+                    ? config.instructions.slice(0, 1500)
+                    : undefined
+                  const withInstr = { type: 'session.update', session: { ...minimalSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}) } }
+                  console.log('🧪 Retrying session.update with TRIMMED INSTRUCTIONS only (still no tools)')
+                  console.log('📋 TRIMMED payload:', JSON.stringify(withInstr, null, 2))
+                  sessionUpdateRetryRef.current += 1
+                  ws.send(JSON.stringify(withInstr))
+                  return
+                }
+              } catch (retryErr) {
+                console.error('❌ Fallback retry failed to send:', retryErr)
+              }
+
+            }
+
+            // Out of fallbacks or not in session.update phase: surface the error
             if (data.error?.type === 'server_error') {
               console.warn('⚠️ OpenAI server error - this is on their side')
               setError(new Error('OpenAI is experiencing issues. The service may be temporarily unavailable.'))
             } else {
               setError(new Error(errorMessage))
             }
-            
             setStatus('error')
             return
           }

@@ -114,6 +114,15 @@ wss.on('connection', (clientWs, req) => {
   
   // Forward messages from OpenAI to client
   openaiWs.on('message', (data) => {
+    try {
+      const text = typeof data === 'string' ? data : data.toString()
+      const msg = JSON.parse(text)
+      if (msg?.type === 'error') {
+        console.error('🚨 OpenAI ERROR message received via WS:', JSON.stringify(msg, null, 2))
+      }
+    } catch (_) {
+      // ignore non-JSON or parse failures
+    }
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(data)
     }
