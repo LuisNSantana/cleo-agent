@@ -9,6 +9,54 @@
 
 const WebSocket = require('ws')
 const http = require('http')
+const fs = require('fs')
+const path = require('path')
+
+function loadEnvFiles() {
+  const cwd = process.cwd()
+  const envFiles = ['.env.local', '.env']
+
+  for (const file of envFiles) {
+    const filePath = path.join(cwd, file)
+    if (!fs.existsSync(filePath)) {
+      continue
+    }
+
+    const contents = fs.readFileSync(filePath, 'utf8')
+    parseEnv(contents)
+  }
+}
+
+function parseEnv(contents) {
+  const lines = contents.split(/\r?\n/)
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) {
+      continue
+    }
+
+    const eqIndex = line.indexOf('=')
+    if (eqIndex === -1) {
+      continue
+    }
+
+    const key = line.slice(0, eqIndex).trim()
+    if (!key || process.env[key] !== undefined) {
+      continue
+    }
+
+    let value = line.slice(eqIndex + 1).trim()
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1)
+    } else if (value.startsWith('\'') && value.endsWith('\'')) {
+      value = value.slice(1, -1)
+    }
+
+    process.env[key] = value
+  }
+}
+
+loadEnvFiles()
 
 const PORT = process.env.WS_PROXY_PORT || 8080
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
@@ -38,7 +86,8 @@ wss.on('connection', (clientWs, req) => {
   const openaiUrl = `wss://api.openai.com/v1/realtime?model=${model}`
   const openaiWs = new WebSocket(openaiUrl, {
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'OpenAI-Beta': 'realtime=v1',
     }
   })
   

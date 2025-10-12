@@ -174,37 +174,30 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'session.created' && !sessionReady) {
             console.log('✅ session.created - Sending streamlined configuration...')
 
+            const voice = configRef.current.voice || 'alloy'
             const sessionUpdate: any = {
               type: 'session.update',
               session: {
-                type: 'realtime',
-                model,
-                output_modalities: ['audio', 'text'],
-                audio: {
-                  input: {
-                    format: {
-                      type: 'audio/pcm',
-                      rate: 24000
-                    },
-                    turn_detection: {
-                      type: 'server_vad',
-                      silence_duration_ms: 500
-                    }
-                  },
-                  output: {
-                    format: {
-                      type: 'audio/pcm',
-                      rate: 24000
-                    },
-                    voice: configRef.current.voice || 'alloy'
-                  }
-                }
-              }
+                modalities: ['text', 'audio'],
+                voice,
+                turn_detection: {
+                  type: 'server_vad',
+                  silence_duration_ms: 500,
+                },
+                input_audio_format: {
+                  format: 'pcm16',
+                  sample_rate: 24000,
+                },
+                output_audio_format: {
+                  format: 'pcm16',
+                  sample_rate: 24000,
+                },
+              },
             }
 
             if (configRef.current.instructions && typeof configRef.current.instructions === 'string') {
               const MAX_INSTRUCTION_LENGTH = 4000
-              sessionUpdate.session.instructions =
+              ;(sessionUpdate.session as Record<string, unknown>).instructions =
                 configRef.current.instructions.length > MAX_INSTRUCTION_LENGTH
                   ? configRef.current.instructions.slice(0, MAX_INSTRUCTION_LENGTH)
                   : configRef.current.instructions
