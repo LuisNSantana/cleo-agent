@@ -90,6 +90,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       }
 
       const config = await configResponse.json()
+      console.log('🔧 Config received from /api/voice/config')
+      console.log('🛠️ Tools in config:', config.tools?.map((t: any) => ({ name: t.name, hasTypeField: 'type' in t })))
+      
       const sessionUpdatePayload = (() => {
         const session: Record<string, unknown> = {
           modalities: ['text', 'audio'],
@@ -109,6 +112,8 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           session
         }
       })()
+      
+      console.log('📦 Built session.update payload with', (sessionUpdatePayload.session.tools as any[] || []).length, 'tools')
 
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({

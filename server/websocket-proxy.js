@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * WebSocket Proxy Server for OpenAI Realtime API
+ * WebSocket Proxy Server for OpenAI Realtime API (v1.0.1)
  * 
  * This proxy allows browser clients to connect to OpenAI Realtime API
  * by adding the required Authorization header that browsers cannot set.
+ * 
+ * Features:
+ * - Automatic retry on connection failures
+ * - Detailed logging for debugging
+ * - Support for Railway PORT environment variable
  */
 
 const WebSocket = require('ws')
