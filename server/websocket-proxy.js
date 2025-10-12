@@ -58,7 +58,7 @@ function parseEnv(contents) {
 
 loadEnvFiles()
 
-const PORT = process.env.WS_PROXY_PORT || 8080
+const PORT = process.env.PORT || process.env.WS_PROXY_PORT || 8080
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 if (!OPENAI_API_KEY) {
