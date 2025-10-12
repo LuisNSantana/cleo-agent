@@ -36,11 +36,8 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const sessionIdRef = useRef<string | null>(null)
-  const chatIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const animationFrameRef = useRef<number | null>(null)
-  const audioElementRef = useRef<HTMLAudioElement | null>(null)
-  const playbackContextRef = useRef<AudioContext | null>(null)
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -78,8 +75,6 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
     try {
       setStatus('connecting')
       setError(null)
-      chatIdRef.current = chatId || null
-
       console.log('🚂 Starting Railway WebSocket voice session...')
 
       // Fetch voice configuration
@@ -112,7 +107,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       const audioContext = new AudioContext({ sampleRate: 24000 })
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
-      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+  const processor = audioContext.createScriptProcessor(2048, 1, 1)
       
       analyser.fftSize = 256
       source.connect(analyser)
@@ -148,7 +143,30 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       wsRef.current = ws
 
       let sessionReady = false
-      const configRef = { current: config }
+        const startAudioProcessor = () => {
+          if (!processorRef.current) return
+
+          processorRef.current.onaudioprocess = (e) => {
+            if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
+              const inputData = e.inputBuffer.getChannelData(0)
+
+              const pcm16 = new Int16Array(inputData.length)
+              for (let i = 0; i < inputData.length; i++) {
+                const s = Math.max(-1, Math.min(1, inputData[i]))
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+              }
+
+              const base64 = btoa(
+                String.fromCharCode(...new Uint8Array(pcm16.buffer))
+              )
+
+              ws.send(JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: base64
+              }))
+            }
+          }
+        }
 
       ws.onopen = () => {
         console.log('✅ Railway WebSocket connected, waiting for session.created...')
@@ -172,50 +190,14 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Sending streamlined configuration...')
-
-            const voice = configRef.current.voice || 'alloy'
-            const sessionUpdate: any = {
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                voice,
-                turn_detection: {
-                  type: 'server_vad',
-                  silence_duration_ms: 500,
-                },
-                input_audio_format: {
-                  format: 'pcm16',
-                  sample_rate: 24000,
-                },
-                output_audio_format: {
-                  format: 'pcm16',
-                  sample_rate: 24000,
-                },
-              },
-            }
-
-            if (configRef.current.instructions && typeof configRef.current.instructions === 'string') {
-              const MAX_INSTRUCTION_LENGTH = 4000
-              ;(sessionUpdate.session as Record<string, unknown>).instructions =
-                configRef.current.instructions.length > MAX_INSTRUCTION_LENGTH
-                  ? configRef.current.instructions.slice(0, MAX_INSTRUCTION_LENGTH)
-                  : configRef.current.instructions
-            }
-
-            try {
-              ws.send(JSON.stringify(sessionUpdate))
-              console.log('📤 Sent streamlined session.update (voice + VAD + instructions)')
-            } catch (sendError) {
-              console.error('Failed to send session.update:', sendError)
-            }
+            console.log('✅ session.created - Using default OpenAI session configuration')
 
             sessionReady = true
             setStatus('listening')
             startTimeRef.current = Date.now()
             monitorAudioLevel()
-            
-            // Start sending audio
+
+            // Start sending audio immediately with default config
             startAudioProcessor()
             return
           }
@@ -252,44 +234,21 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
-            try {
-              // Commit buffered audio and trigger a response when VAD ends
-              ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
-              ws.send(JSON.stringify({ type: 'response.create' }))
-            } catch (commitErr) {
-              console.error('Failed to commit audio or create response:', commitErr)
-            }
           }
 
           if ((eventType === 'response.audio.delta' || eventType === 'response.output_audio.delta') && data.delta) {
             setStatus('speaking')
             try {
-              // Ensure playback context exists
-              if (!playbackContextRef.current) {
-                playbackContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 })
-              }
-              const ctx = playbackContextRef.current
-
-              // Base64 decode to PCM16
-              const b64 = data.delta as string
-              const bin = atob(b64)
-              const bytes = new Uint8Array(bin.length)
-              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-              const pcm16 = new Int16Array(bytes.buffer)
-
-              // Convert PCM16 to Float32 in [-1, 1]
-              const float32 = new Float32Array(pcm16.length)
+              const audioData = atob(data.delta)
+              const pcm16 = new Int16Array(audioData.length / 2)
               for (let i = 0; i < pcm16.length; i++) {
-                float32[i] = Math.max(-1, Math.min(1, pcm16[i] / 0x8000))
+                pcm16[i] = (audioData.charCodeAt(i * 2) | (audioData.charCodeAt(i * 2 + 1) << 8))
               }
 
-              // Create and play AudioBuffer
-              const buffer = ctx.createBuffer(1, float32.length, 24000)
-              buffer.getChannelData(0).set(float32)
-              const source = ctx.createBufferSource()
-              source.buffer = buffer
-              source.connect(ctx.destination)
-              source.start()
+              const audioBlob = new Blob([pcm16], { type: 'audio/pcm' })
+              const audioUrl = URL.createObjectURL(audioBlob)
+              const audio = new Audio(audioUrl)
+              audio.play().catch(console.error)
             } catch (audioError) {
               console.error('Error playing audio:', audioError)
             }
@@ -299,34 +258,8 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             setStatus('listening')
           }
 
-          if (eventType === 'conversation.item.input_audio_transcription.completed' || eventType === 'response.output_audio_transcript.done') {
-            const transcript =
-              data.transcript ||
-              data.text ||
-              (typeof data.delta === 'string' ? data.delta : undefined) ||
-              data.output?.[0]?.content?.[0]?.text
-
-            if (transcript) {
-              console.log('📝 User transcript:', transcript)
-            }
-            
-            // Save transcript
-            if (chatIdRef.current && transcript) {
-              try {
-                await fetch('/api/voice/transcript', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chatId: chatIdRef.current,
-                    role: 'user',
-                    content: transcript,
-                    sessionId: sessionIdRef.current
-                  })
-                })
-              } catch (err) {
-                console.error('Failed to save transcript:', err)
-              }
-            }
+          if (eventType === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
+            console.log('📝 User transcript:', data.transcript)
           }
 
         } catch (err) {
@@ -347,41 +280,13 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
         }
       }
 
-      // Audio processor function
-      const startAudioProcessor = () => {
-        if (!processorRef.current) return
-
-        processorRef.current.onaudioprocess = (e) => {
-          if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
-            const inputData = e.inputBuffer.getChannelData(0)
-            
-            // Convert Float32 to Int16 PCM
-            const pcm16 = new Int16Array(inputData.length)
-            for (let i = 0; i < inputData.length; i++) {
-              const s = Math.max(-1, Math.min(1, inputData[i]))
-              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
-            }
-            
-            // Convert to base64
-            const base64 = btoa(
-              String.fromCharCode(...new Uint8Array(pcm16.buffer))
-            )
-            
-            ws.send(JSON.stringify({
-              type: 'input_audio_buffer.append',
-              audio: base64
-            }))
-          }
-        }
-      }
-
     } catch (err) {
       console.error('Railway voice session error:', err)
       setError(err as Error)
       setStatus('error')
       cleanup()
     }
-  }, [monitorAudioLevel, isMuted, status])
+  }, [monitorAudioLevel, status])
 
   const endSession = useCallback(async () => {
     try {
@@ -444,13 +349,7 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       audioContextRef.current = null
     }
     
-    if (playbackContextRef.current) {
-      playbackContextRef.current.close()
-      playbackContextRef.current = null
-    }
-
     analyserRef.current = null
-    audioElementRef.current = null
     sessionIdRef.current = null
     startTimeRef.current = null
 
