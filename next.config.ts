@@ -18,13 +18,6 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     // Speed up import resolution for large UI/icon libs
     optimizePackageImports: ["@phosphor-icons/react", "lucide-react"],
   },
-  // Configure API routes for larger request bodies (Grok-4-Fast 2M token support)
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb', // Allow up to 50MB for multiple PDF uploads
-    },
-    responseLimit: false,
-  },
   // Allow ngrok origins in development
   ...(!isProd && {
     allowedOrigins: [
