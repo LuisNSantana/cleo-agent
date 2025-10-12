@@ -90,6 +90,25 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       }
 
       const config = await configResponse.json()
+      const sessionUpdatePayload = (() => {
+        const session: Record<string, unknown> = {
+          modalities: ['text', 'audio'],
+          voice: config?.voice || 'alloy',
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: { model: 'whisper-1' },
+          tools: Array.isArray(config?.tools) ? config.tools : []
+        }
+
+        if (typeof config?.instructions === 'string' && config.instructions.trim().length > 0) {
+          session.instructions = config.instructions
+        }
+
+        return {
+          type: 'session.update',
+          session
+        }
+      })()
 
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -143,30 +162,44 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
       wsRef.current = ws
 
       let sessionReady = false
-        const startAudioProcessor = () => {
-          if (!processorRef.current) return
+      let awaitingSessionUpdate = false
 
-          processorRef.current.onaudioprocess = (e) => {
-            if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
-              const inputData = e.inputBuffer.getChannelData(0)
+      const finalizeSessionReady = () => {
+        if (sessionReady) {
+          return
+        }
 
-              const pcm16 = new Int16Array(inputData.length)
-              for (let i = 0; i < inputData.length; i++) {
-                const s = Math.max(-1, Math.min(1, inputData[i]))
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
-              }
+        sessionReady = true
+        setStatus('listening')
+        startTimeRef.current = Date.now()
+        monitorAudioLevel()
+        startAudioProcessor()
+      }
 
-              const base64 = btoa(
-                String.fromCharCode(...new Uint8Array(pcm16.buffer))
-              )
+      const startAudioProcessor = () => {
+        if (!processorRef.current) return
 
-              ws.send(JSON.stringify({
-                type: 'input_audio_buffer.append',
-                audio: base64
-              }))
+        processorRef.current.onaudioprocess = (e) => {
+          if (ws.readyState === WebSocket.OPEN && !isMuted && sessionReady) {
+            const inputData = e.inputBuffer.getChannelData(0)
+
+            const pcm16 = new Int16Array(inputData.length)
+            for (let i = 0; i < inputData.length; i++) {
+              const s = Math.max(-1, Math.min(1, inputData[i]))
+              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
             }
+
+            const base64 = btoa(
+              String.fromCharCode(...new Uint8Array(pcm16.buffer))
+            )
+
+            ws.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: base64
+            }))
           }
         }
+      }
 
       ws.onopen = () => {
         console.log('✅ Railway WebSocket connected, waiting for session.created...')
@@ -190,21 +223,29 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - Using default OpenAI session configuration')
+            console.log('✅ session.created - awaiting configuration setup')
 
-            sessionReady = true
-            setStatus('listening')
-            startTimeRef.current = Date.now()
-            monitorAudioLevel()
-
-            // Start sending audio immediately with default config
-            startAudioProcessor()
+            if (sessionUpdatePayload) {
+              try {
+                awaitingSessionUpdate = true
+                console.log('📡 Sending session.update with contextual instructions and tools')
+                ws.send(JSON.stringify(sessionUpdatePayload))
+              } catch (updateError) {
+                console.error('Failed to send session.update:', updateError)
+                awaitingSessionUpdate = false
+                finalizeSessionReady()
+              }
+            } else {
+              finalizeSessionReady()
+            }
             return
           }
 
-          // Handle other event types
           if (eventType === 'session.updated') {
             console.log('✅ session.updated')
+            awaitingSessionUpdate = false
+            finalizeSessionReady()
+            return
           }
           
           if (eventType === 'error') {
