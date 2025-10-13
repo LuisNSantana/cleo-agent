@@ -193,6 +193,15 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
       } catch (e) {
         console.log("[Analytics] updateModelUsage error:", (e as any)?.message)
       }
+
+      // Record daily usage for premium models (e.g., GPT-5)
+      try {
+        const { dailyLimits } = await import("@/lib/daily-limits")
+        await dailyLimits.recordUsage(realUserId!, model)
+        console.log(`[DAILY LIMIT] Recorded usage for user ${realUserId}, model ${model}`)
+      } catch (e) {
+        console.warn("[DAILY LIMIT] Failed to record usage:", (e as any)?.message)
+      }
     } catch (err) {
       console.error("Failed finishing stream handling:", err)
     }

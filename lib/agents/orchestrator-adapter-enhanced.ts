@@ -253,6 +253,11 @@ function createAndRunExecutionWithContext(
 ): AgentExecution {
   // Import request context utilities
   const { withRequestContext } = require('@/lib/server/request-context')
+  // Persist a global fallback for userId in case async boundaries lose context
+  try {
+    const g = globalThis as any
+    g.__cleoLastUserId = userId
+  } catch {}
   
   // Run execution within the specified user context
   return withRequestContext({
@@ -306,26 +311,81 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
       }
     }
 
-    if (legacy && typeof legacy.startAgentExecutionWithHistory === 'function') {
-      console.log('🔍 [ENHANCED ADAPTER] startAgentExecutionWithHistory OK', { priorLen: prior?.length || 0, agentId })
-      const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
+    if (legacy) {
+      // Prefer UI variant to propagate user/thread context to legacy orchestrator
+      const currentUserId = (() => {
+        try { return getCurrentUserId() } catch { return undefined }
+      })()
+      // Compute effective user id with global fallback to survive async boundaries
+      const gAny = globalThis as any
+      const effectiveUserId = currentUserId || gAny.__cleoLastUserId
+      if (effectiveUserId && (!gAny.__cleoLastUserId || gAny.__cleoLastUserId !== effectiveUserId)) {
+        try { gAny.__cleoLastUserId = effectiveUserId } catch {}
+      }
 
-      if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
+      if (typeof legacy.startAgentExecutionForUI === 'function') {
         try {
-          exec.steps.push({
-            id: `step_${Date.now()}_bootstrap`,
-            timestamp: new Date(),
-            agent: exec.agentId,
-            action: 'routing',
-            content: `Execution bootstrap (enhanced unified) for ${exec.agentId}`,
-            progress: 0,
-            metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId }
-          })
-        } catch (e) {
-          console.warn('⚠️ [ENHANCED ADAPTER] Failed to add bootstrap step', e)
+          const { withRequestContext } = require('@/lib/server/request-context')
+          console.log('🔍 [ENHANCED ADAPTER] startAgentExecutionForUI OK', { priorLen: prior?.length || 0, agentId, userId: effectiveUserId })
+          return withRequestContext({
+            userId: effectiveUserId,
+            model: agentId || 'cleo-supervisor',
+            requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          }, () => legacy.startAgentExecutionForUI(input, agentId, 'default', effectiveUserId, prior || [])) as AgentExecution
+        } catch (ctxErr) {
+          console.warn('⚠️ [ENHANCED ADAPTER] Failed to wrap startAgentExecutionForUI with context, attempting direct call', ctxErr)
+          return legacy.startAgentExecutionForUI(input, agentId, 'default', effectiveUserId, prior || []) as AgentExecution
         }
       }
-      return exec
+
+      // Fallback: use WithHistory if ForUI is not available
+      if (typeof legacy.startAgentExecutionWithHistory === 'function') {
+        console.log('🔍 [ENHANCED ADAPTER] startAgentExecutionWithHistory OK (fallback path)', { priorLen: prior?.length || 0, agentId, userId: effectiveUserId })
+        // Ensure a request context for tools even in fallback path
+        try {
+          const { withRequestContext } = require('@/lib/server/request-context')
+          const exec = withRequestContext({
+            userId: effectiveUserId,
+            model: agentId || 'cleo-supervisor',
+            requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          }, () => legacy.startAgentExecutionWithHistory(input, agentId, prior || [])) as AgentExecution
+          if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
+            try {
+              exec.steps.push({
+                id: `step_${Date.now()}_bootstrap`,
+                timestamp: new Date(),
+                agent: exec.agentId,
+                action: 'routing',
+                content: `Execution bootstrap (enhanced unified) for ${exec.agentId}`,
+                progress: 0,
+                metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId || effectiveUserId }
+              })
+            } catch (e) {
+              console.warn('⚠️ [ENHANCED ADAPTER] Failed to add bootstrap step', e)
+            }
+          }
+          return exec
+        } catch (wrapErr) {
+          console.warn('⚠️ [ENHANCED ADAPTER] Failed to wrap WithHistory with context, calling directly', wrapErr)
+          const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
+          if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
+            try {
+              exec.steps.push({
+                id: `step_${Date.now()}_bootstrap`,
+                timestamp: new Date(),
+                agent: exec.agentId,
+                action: 'routing',
+                content: `Execution bootstrap (enhanced unified) for ${exec.agentId}`,
+                progress: 0,
+                metadata: { unified_entrypoint: true, adapter: 'enhanced', context_user_id: exec.userId || effectiveUserId }
+              })
+            } catch (e) {
+              console.warn('⚠️ [ENHANCED ADAPTER] Failed to add bootstrap step (direct)', e)
+            }
+          }
+          return exec
+        }
+      }
     }
     console.error('❌ [ENHANCED ADAPTER] Legacy orchestrator missing startAgentExecutionWithHistory after retries')
   } catch (e) {

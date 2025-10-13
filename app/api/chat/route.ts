@@ -560,6 +560,24 @@ export async function POST(req: Request) {
       throw new Error(`Model ${modelConfig.id} has no API SDK configured`)
     }
 
+    // Check daily limits for premium models (e.g., GPT-5)
+    if (isAuthenticated && userId && modelConfig.dailyLimit) {
+      const limitCheck = await dailyLimits.canUseModel(userId, normalizedModel, modelConfig)
+      
+      if (!limitCheck.canUse) {
+        const errorMsg = `Has alcanzado el límite diario de ${limitCheck.limit} mensajes para el modelo ${modelConfig.name}. Intenta mañana o usa el modelo "Faster".`
+        console.warn(`[DAILY LIMIT] User ${userId} exceeded limit for ${normalizedModel}`)
+        
+        return createErrorResponse({
+          code: 'DAILY_LIMIT_REACHED',
+          message: errorMsg,
+          statusCode: 429
+        })
+      }
+      
+      console.log(`[DAILY LIMIT] User ${userId} can use ${normalizedModel}: ${limitCheck.remaining}/${limitCheck.limit} remaining`)
+    }
+
   // --- Delegation Intent Heuristics (Optimized) ---
     // FAST PATH: Only evaluate if message suggests delegation keywords
     // This avoids expensive scoring for simple conversational queries

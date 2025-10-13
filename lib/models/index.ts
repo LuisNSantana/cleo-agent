@@ -28,9 +28,9 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Final list: Single public model (grok-4-fast)
+// Final list: Faster (grok-4-fast) y Smarter (gpt-5)
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-fast'])
+  ...pickById(grokModels, ['grok-4-fast', 'gpt-5'])
 ]
 
 // Post-processing rules to prevent confusing duplicates in selector.
