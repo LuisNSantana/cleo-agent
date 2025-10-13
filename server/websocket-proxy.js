@@ -119,6 +119,9 @@ wss.on('connection', (clientWs, req) => {
       const msg = JSON.parse(text)
       if (msg?.type === 'error') {
         console.error('🚨 OpenAI ERROR message received via WS:', JSON.stringify(msg, null, 2))
+        if (msg?.error) {
+          console.error('🔎 OpenAI error.details:', msg.error)
+        }
       }
     } catch (_) {
       // ignore non-JSON or parse failures

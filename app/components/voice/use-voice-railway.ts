@@ -99,23 +99,31 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
         ? String(config.instructions).slice(0, 1500)
         : undefined
 
+      // Stage 1: keep it minimal to avoid server_error from complex fields
       const baseSession = {
-        modalities: ['text', 'audio'],
         voice: config?.voice || 'alloy',
-        input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-        output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-        // Enable server-side VAD and transcription from the start (matches WebRTC behavior)
-        turn_detection: {
-          type: 'server_vad',
-          silence_duration_ms: 500
-        },
-        input_audio_transcription: { model: 'whisper-1' }
+        input_audio_format: 'pcm16',
+        output_audio_format: 'pcm16'
       }
 
       const updates: any[] = [
+        // Stage 1: minimal
         { type: 'session.update', session: { ...baseSession } },
-        { type: 'session.update', session: { ...baseSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}) } },
-        { type: 'session.update', session: { ...baseSession, ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}), tools: Array.isArray(config?.tools) ? config.tools : [] } }
+        // Stage 2: add transcription + VAD + instructions
+        { type: 'session.update', session: {
+          ...baseSession,
+          input_audio_transcription: { model: 'whisper-1' },
+          turn_detection: { type: 'server_vad', silence_duration_ms: 500 },
+          ...(trimmedInstructions ? { instructions: trimmedInstructions } : {})
+        } },
+        // Stage 3: add tools
+        { type: 'session.update', session: {
+          ...baseSession,
+          input_audio_transcription: { model: 'whisper-1' },
+          turn_detection: { type: 'server_vad', silence_duration_ms: 500 },
+          ...(trimmedInstructions ? { instructions: trimmedInstructions } : {}),
+          tools: Array.isArray(config?.tools) ? config.tools : []
+        } }
       ]
 
       let updateStage = 0
@@ -296,10 +304,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
               console.warn(`⚠️ session.update failed (attempt ${attempt + 1}). Applying fallback...`)
 
               const minimalSession: Record<string, unknown> = {
-                modalities: ['text', 'audio'],
                 voice: (config?.voice || 'alloy'),
-                input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-                output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 }
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16'
               }
 
               try {
@@ -310,10 +317,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
                   const toolsPayload = {
                     type: 'session.update',
                     session: {
-                      modalities: ['text', 'audio'],
                       voice: (config?.voice || 'alloy'),
-                      input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-                      output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
+                      input_audio_format: 'pcm16',
+                      output_audio_format: 'pcm16',
                       ...(typeof config?.instructions === 'string' ? { instructions: String(config.instructions).slice(0, 1500) } : {}),
                       tools: toolsWithType
                     }
