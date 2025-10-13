@@ -89,6 +89,36 @@ const execRegistry = g.__cleoExecRegistry as AgentExecution[]
 const listeners = g.__cleoAdapterListeners as Array<(event: any) => void>
 const coreOrchestrator = g.__cleoCoreOrchestrator as EnhancedCoreOrchestrator
 
+// Track whether we've successfully subscribed to legacy events
+if (!(g as any).__enhancedAdapterLegacySubscribed) {
+  (g as any).__enhancedAdapterLegacySubscribed = false
+}
+
+function ensureLegacySubscription() {
+  const gAny = globalThis as any
+  if (gAny.__enhancedAdapterLegacySubscribed) return
+  try {
+    const legacy = gAny.__cleoOrchestrator
+    if (legacy && typeof legacy.onEvent === 'function') {
+      legacy.onEvent((event: any) => {
+        if (event.type === 'execution_completed' && event.data?.executionId) {
+          const execId = event.data.executionId
+          let exec = execRegistry.find(e => e.id === execId)
+          if (exec) {
+            exec.status = 'completed'
+            exec.endTime = new Date()
+            console.log('🔍 [ENHANCED ADAPTER] Synced completion from legacy (late):', execId)
+          }
+        }
+      })
+      gAny.__enhancedAdapterLegacySubscribed = true
+      console.log('🔍 [ENHANCED ADAPTER] Subscribed to legacy orchestrator events (late)')
+    }
+  } catch (err) {
+    console.warn('⚠️ [ENHANCED ADAPTER] ensureLegacySubscription failed:', err)
+  }
+}
+
 export function getAgentOrchestrator() {
   const orchestrator = {
     __id: 'enhanced-core-adapter',
@@ -374,6 +404,8 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
   try {
     console.log('🔍 [ENHANCED ADAPTER] Delegation entrypoint invoked')
     let legacy = attemptLegacy()
+    // Attempt to subscribe after lazy init
+    ensureLegacySubscription()
 
     // Background non-blocking quick retries (upgrade path) if method missing
     if (!legacy || typeof legacy.startAgentExecutionWithHistory !== 'function') {
@@ -383,6 +415,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
           if (late && typeof late.startAgentExecutionWithHistory === 'function' && !legacy) {
             console.log('🔍 [ENHANCED ADAPTER] Late legacy orchestrator availability detected (upgrade will not retro-run current exec)')
             legacy = late
+            ensureLegacySubscription()
           }
         }, 50 * (i + 1))
       }

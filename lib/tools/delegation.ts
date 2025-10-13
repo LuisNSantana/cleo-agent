@@ -151,10 +151,25 @@ async function runDelegation(params: {
   })
 
   // Start execution (UI variant propagates user/thread when present)
-  const exec = orchestrator.startAgentExecutionForUI?.(input, agentId, undefined, userId, [], true)
-    || orchestrator.startAgentExecution?.(input, agentId)
+  // NOTE: startAgentExecutionForUI in the enhanced adapter is async; ensure we await to get the exec object (id/status)
+  const exec = orchestrator.startAgentExecutionForUI
+    ? await orchestrator.startAgentExecutionForUI(input, agentId, undefined, userId, [], true)
+    : (orchestrator.startAgentExecution ? await orchestrator.startAgentExecution(input, agentId) : undefined)
 
-  const execId: string | undefined = exec?.id
+  // Try to capture execution id; if missing, attempt a quick recovery from active executions
+  let execId: string | undefined = exec?.id
+  if (!execId) {
+    try {
+      const candidates: any[] = (orchestrator.getActiveExecutions?.() || orchestrator.getAllExecutions?.() || []) as any[]
+      const match = candidates
+        .filter((e) => e?.agentId === agentId && (!e?.userId || !userId || e?.userId === userId))
+        .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime())[0]
+      if (match?.id) {
+        execId = match.id
+        console.log('🔍 [DELEGATION DEBUG] Recovered execId from active executions:', { execId })
+      }
+    } catch {}
+  }
   
   // DEBUG: Log delegation execution details
   console.log('🔍 [DELEGATION DEBUG] Started execution:', {
@@ -217,6 +232,7 @@ async function runDelegation(params: {
   
   // CRITICAL FIX: Listen for completion events to detect when delegated agent finishes
   let eventListenerAdded = false
+  let detachListener: (() => void) | null = null
   const completionPromise = new Promise<string | null>((resolve) => {
     try {
       const legacy = (globalThis as any).__cleoOrchestrator
@@ -236,6 +252,9 @@ async function runDelegation(params: {
         }
         legacy.onEvent(handler)
         eventListenerAdded = true
+        detachListener = () => {
+          try { legacy.offEvent?.(handler) } catch {}
+        }
         console.log('🔍 [DELEGATION DEBUG] Added completion event listener for:', execId)
       } else {
         resolve(null) // Fallback to polling only
@@ -383,6 +402,9 @@ async function runDelegation(params: {
       // Continue polling despite transient errors
     }
   }
+
+  // Cleanup event listener if we attached one
+  try { if (eventListenerAdded && detachListener) { (detachListener as () => void)() } } catch {}
 
   if (!finalResult) {
     const elapsed = Date.now() - startedAt
