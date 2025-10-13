@@ -53,6 +53,60 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   const animationFrameRef = useRef<number | null>(null)
   const hasActiveResponseRef = useRef<boolean>(false)
   const enableBargeInRef = useRef<boolean>(false)
+
+  // Helper: Optimize Opus parameters in SDP for low-latency audio
+  const mungeOpusSdp = (sdp: string): string => {
+    try {
+      // Find Opus payload type
+      const rtpmapRegex = /a=rtpmap:(\d+) opus\/(48000)(?:\/(\d+))?/i
+      const rtpmapMatch = sdp.match(rtpmapRegex)
+      if (!rtpmapMatch) return sdp
+      const payloadType = rtpmapMatch[1]
+
+      // Ensure ptime=10
+      if (/^a=ptime:/m.test(sdp)) {
+        sdp = sdp.replace(/^a=ptime:\d+/m, 'a=ptime:10')
+      } else {
+        // Insert ptime near the audio media section
+        sdp = sdp.replace(/(m=audio .+\r?\n)/, `$1a=ptime:10\r\n`)
+      }
+
+      // Build desired fmtp params
+      const desired = [
+        'minptime=10',       // minimum packetization time
+        'useinbandfec=1',    // enable FEC for better quality on loss
+        'stereo=0',          // mono for latency
+        'maxaveragebitrate=32000', // ~32kbps for snappy TTS
+        'cbr=1',             // constant bitrate
+        'sprop-maxcapturerate=48000',
+        'sprop-stereo=0',
+      ]
+      const fmtpRegex = new RegExp(`a=fmtp:${payloadType} (.+)`, 'i')
+      if (fmtpRegex.test(sdp)) {
+        sdp = sdp.replace(fmtpRegex, (_m: string, params: string) => {
+          const existing = params.split(';').map((p: string) => p.trim()).filter(Boolean)
+          const merged = new Map<string, string>()
+          for (const p of existing) {
+            const [k, v] = (p as string).split('=')
+            if (k) merged.set(k, v ?? '')
+          }
+          for (const p of desired) {
+            const [k, v] = p.split('=')
+            if (k) merged.set(k, v ?? '')
+          }
+          const mergedParams = Array.from(merged.entries()).map(([k, v]) => `${k}=${v}`).join(';')
+          return `a=fmtp:${payloadType} ${mergedParams}`
+        })
+      } else {
+        // Insert a new fmtp line after rtpmap
+        sdp = sdp.replace(rtpmapRegex, (m) => `${m}\r\n` + `a=fmtp:${payloadType} ${desired.join(';')}`)
+      }
+
+      return sdp
+    } catch {
+      return sdp
+    }
+  }
   
   // Reconnection management
   const reconnectAttemptsRef = useRef<number>(0)
@@ -305,6 +359,8 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         setStatus('listening')
         startTimeRef.current = Date.now()
         monitorAudioLevel()
+        // Enable barge-in by default for more natural conversations
+        enableBargeInRef.current = true
         
         // 1. First, send session.update with instructions, VAD config, and transcription
         try {
@@ -312,10 +368,12 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
             type: 'session.update',
             session: {
               // Enable server-side VAD turn detection and tune pause before responding
-              // 500–700ms yields natural pauses; use 500ms for quicker detection
+              // Aim for snappier turn-taking: shorter silence and a slightly lower threshold
               turn_detection: {
                 type: 'server_vad',
-                silence_duration_ms: 500
+                silence_duration_ms: 300,
+                threshold: 0.4,
+                prefix_padding_ms: 200
               },
               // CRÍTICO: Habilitar transcripción de audio del usuario
               // Sin esto, OpenAI NO transcribe la voz del usuario
@@ -631,10 +689,19 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         throw new Error('Failed to get local description with ICE candidates')
       }
 
+      // Low-latency Opus tweaks: munge SDP before sending to backend
+      const mungedSdp = mungeOpusSdp(finalOffer.sdp)
+      // Update local description to keep it in sync with the SDP we send
+      try {
+        await pc.setLocalDescription({ type: 'offer', sdp: mungedSdp })
+      } catch (e) {
+        console.warn('Failed to set munged SDP as local description; proceeding to signal it anyway.', e)
+      }
+
       console.log('📤 Sending SDP offer to backend...')
-      console.log('📤 SDP length:', finalOffer.sdp.length)
-      console.log('📤 SDP preview:', finalOffer.sdp.substring(0, 100))
-      console.log('📤 ICE candidates in SDP:', (finalOffer.sdp.match(/a=candidate/g) || []).length)
+      console.log('📤 SDP length:', mungedSdp.length)
+      console.log('📤 SDP preview:', mungedSdp.substring(0, 100))
+      console.log('📤 ICE candidates in SDP:', (mungedSdp.match(/a=candidate/g) || []).length)
 
       // Send offer (with gathered ICE candidates) to our backend which will forward to OpenAI
       const sdpResponse = await fetch('/api/voice/webrtc/session', {
@@ -643,7 +710,7 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          sdp: finalOffer.sdp,
+          sdp: mungedSdp,
           session: {
             model: config?.model,
             voice: config?.voice,
