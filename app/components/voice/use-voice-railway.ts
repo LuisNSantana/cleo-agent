@@ -250,46 +250,16 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           
           // Wait for session.created FIRST
           if (eventType === 'session.created' && !sessionReady) {
-            console.log('✅ session.created - awaiting configuration setup')
-
-            if (updates.length > 0) {
-              try {
-                awaitingSessionUpdate = true
-                console.log(`📡 Sending staged session.update [stage ${updateStage + 1}/${updates.length}]`)
-                console.log('📋 Payload:', JSON.stringify(updates[updateStage], null, 2))
-                ws.send(JSON.stringify(updates[updateStage]))
-              } catch (updateError) {
-                console.error('Failed to send session.update:', updateError)
-                awaitingSessionUpdate = false
-                finalizeSessionReady()
-              }
-            } else {
-              finalizeSessionReady()
-            }
+            console.log('✅ session.created - skipping session.update due to consistent server_error')
+            console.log('🎯 Using default session configuration and starting audio immediately')
+            
+            // Skip session.update entirely and start with default session
+            finalizeSessionReady()
             return
           }
 
           if (eventType === 'session.updated') {
-            console.log('✅ session.updated')
-            awaitingSessionUpdate = false
-            sessionUpdateRetryRef.current = 0
-            // Start audio as soon as the first update is accepted
-            if (!sessionReady) {
-              finalizeSessionReady()
-            }
-            // If there are more staged updates, send next
-            if (updateStage < updates.length - 1) {
-              updateStage += 1
-              try {
-                awaitingSessionUpdate = true
-                console.log(`📡 Sending staged session.update [stage ${updateStage + 1}/${updates.length}]`)
-                console.log('📋 Payload:', JSON.stringify(updates[updateStage], null, 2))
-                ws.send(JSON.stringify(updates[updateStage]))
-              } catch (updateError) {
-                console.error('Failed to send next staged session.update:', updateError)
-                awaitingSessionUpdate = false
-              }
-            }
+            console.log('✅ session.updated (unexpected - we skipped session.update)')
             return
           }
           
@@ -385,8 +355,14 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
             setStatus('listening')
             try {
               ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
-              ws.send(JSON.stringify({ type: 'response.create' }))
-              console.log('🧠 Committed audio buffer and requested response')
+              ws.send(JSON.stringify({ 
+                type: 'response.create',
+                response: {
+                  modalities: ['text', 'audio'],
+                  instructions: trimmedInstructions || "You are Cleo, a helpful AI assistant. Respond naturally and conversationally."
+                }
+              }))
+              console.log('🧠 Committed audio buffer and requested response with inline instructions')
             } catch (commitErr) {
               console.error('Failed to commit audio or create response:', commitErr)
             }

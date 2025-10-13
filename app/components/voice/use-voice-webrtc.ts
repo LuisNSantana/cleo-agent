@@ -230,9 +230,9 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
               input_audio_transcription: {
                 model: 'whisper-1'
               },
-              // Set explicit audio formats, matching our mono PCM16 stream
-              input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-              output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 }
+              // Set explicit audio formats as strings (OpenAI expects 'pcm16', not objects)
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16'
             }
           }
           if (instructions && instructions.length > 0) {
