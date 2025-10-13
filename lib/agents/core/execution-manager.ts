@@ -88,16 +88,19 @@ export class ExecutionManager {
       // Compile graph and execute within request context so tools can read userId
       const compiledGraph = graph.compile()
       
-      // CRITICAL: Add timeout at graph execution level to prevent indefinite hangs
-      // This prevents the graph from hanging if LLM API is slow or tools get stuck
-      // For scheduled tasks with delegations, use longer timeout to allow sub-agent execution
+      // CRITICAL: Use timeout from options if provided, otherwise 300s default  
+      // This allows legacy orchestrator to control timeout properly
       const configuredTimeout = options.timeout ?? 300000; // 5 minutes default when undefined
       const hasTimeout = Number.isFinite(configuredTimeout) && configuredTimeout > 0;
       const GRAPH_EXECUTION_TIMEOUT = hasTimeout ? configuredTimeout : null;
 
       logger.debug(
         `🚀 [EXECUTION] Starting graph execution for ${agentConfig.id} with timeout ${GRAPH_EXECUTION_TIMEOUT ?? 'disabled'}ms`,
-        { isScheduledTask: context.metadata?.isScheduledTask }
+        { 
+          isScheduledTask: context.metadata?.isScheduledTask,
+          timeoutSource: options.timeout ? 'options' : 'default',
+          optionsTimeout: options.timeout
+        }
       );
       
       const graphPromise = withRequestContext(
@@ -107,8 +110,10 @@ export class ExecutionManager {
         }
       );
 
-      const result = GRAPH_EXECUTION_TIMEOUT
-        ? await Promise.race([
+      let result;
+      if (GRAPH_EXECUTION_TIMEOUT) {
+        try {
+          result = await Promise.race([
             graphPromise,
             new Promise<never>((_, reject) =>
               setTimeout(() => {
@@ -116,8 +121,14 @@ export class ExecutionManager {
                 reject(new Error(`Graph execution timeout after ${GRAPH_EXECUTION_TIMEOUT}ms`));
               }, GRAPH_EXECUTION_TIMEOUT)
             ),
-          ])
-        : await graphPromise;
+          ]);
+        } catch (timeoutError) {
+          logger.error(`🚨 [EXECUTION] Graph timeout caught for ${agentConfig.id}:`, timeoutError);
+          throw timeoutError;
+        }
+      } else {
+        result = await graphPromise;
+      }
 
       // Extract final response
       const finalMessages = result.messages || []

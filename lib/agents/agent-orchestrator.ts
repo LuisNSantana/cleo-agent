@@ -305,6 +305,7 @@ function createAndRunExecution(
 		// Lazy require to avoid client bundle impact
 		 
 		const { withRequestContext } = require('@/lib/server/request-context')
+		logger.debug(`🚀 [LEGACY DEBUG] Starting core execution for agent ${target.id} with timeout ${timeoutMs}ms`)
 		executionPromise = withRequestContext({ userId: exec.userId, requestId: exec.id }, () => core.executeAgent(target, ctx, { timeout: timeoutMs ?? undefined }))
 		logger.debug('🔐 [LEGACY DEBUG] Wrapped core.executeAgent with request context', { executionId: exec.id, userId: exec.userId })
 	} catch (ctxWrapErr) {
@@ -316,10 +317,15 @@ function createAndRunExecution(
 		? Promise.race([
 			executionPromise,
 			new Promise((_, reject) => {
-				setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`)), timeoutMs)
+				setTimeout(() => {
+					logger.error(`🚨 [LEGACY TIMEOUT] Execution timeout after ${timeoutMs/1000} seconds for agent ${target.id}`)
+					reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`))
+				}, timeoutMs)
 			})
 		])
 		: executionPromise
+	
+	logger.debug(`🔍 [LEGACY DEBUG] Set up promise race with timeout ${timeoutMs}ms for agent ${target.id}`)
 	
 	promiseToAwait.then(res => {
 		logger.info('🔍 [LEGACY DEBUG] Execution completed, processing result:', {
@@ -449,6 +455,14 @@ function createAndRunExecution(
 			logger.error('🔍 [DEBUG] Error notifying listeners:', listenerError)
 		}
 	}).catch(err => {
+		logger.error('🚨 [LEGACY DEBUG] Execution error caught:', {
+			executionId: exec.id,
+			agentId: target.id,
+			error: err instanceof Error ? err.message : String(err),
+			isTimeout: err.message?.includes('timeout'),
+			stack: err instanceof Error ? err.stack : undefined
+		})
+		
 		// For timeout errors, try to capture any partial results
 		if (err.message.includes('timeout')) {
 			// Check if we have any tool calls captured during execution

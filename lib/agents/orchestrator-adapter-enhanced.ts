@@ -278,6 +278,31 @@ export function getAgentOrchestrator() {
     }
   }
 
+  // CRITICAL: Subscribe to legacy orchestrator execution events to stay in sync
+  // This is essential for marking executions as completed when legacy orchestrator finishes
+  try {
+    const legacy = (globalThis as any).__cleoOrchestrator
+    if (legacy && typeof legacy.onEvent === 'function') {
+      legacy.onEvent((event: any) => {
+        if (event.type === 'execution_completed' && event.data?.executionId) {
+          // Sync completion to enhanced adapter registry
+          const execId = event.data.executionId
+          let exec = execRegistry.find(e => e.id === execId)
+          if (exec) {
+            exec.status = 'completed'
+            exec.endTime = new Date()
+            console.log('🔍 [ENHANCED ADAPTER] Synced completion from legacy:', execId)
+          }
+        }
+      })
+      console.log('🔍 [ENHANCED ADAPTER] Successfully subscribed to legacy orchestrator events')
+    } else {
+      console.warn('⚠️ [ENHANCED ADAPTER] Legacy orchestrator not available for event subscription')
+    }
+  } catch (err) {
+    console.warn('⚠️ [ENHANCED ADAPTER] Failed to subscribe to legacy events:', err)
+  }
+
   return orchestrator
 }
 
