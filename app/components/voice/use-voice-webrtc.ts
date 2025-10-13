@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-type VoiceStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error'
+type VoiceStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error' | 'reconnecting'
+
+// Error classification for handling strategy
+type ErrorSeverity = 'transient' | 'recoverable' | 'fatal'
+
+interface VoiceError extends Error {
+  severity: ErrorSeverity
+  code?: string
+  retryable: boolean
+}
 
 interface UseVoiceWebRTCReturn {
   startSession: (chatId?: string) => Promise<void>
@@ -15,6 +24,14 @@ interface UseVoiceWebRTCReturn {
   audioLevel: number
   duration: number
   cost: number
+}
+
+// Connection quality metrics
+interface ConnectionMetrics {
+  latency: number
+  packetsLost: number
+  jitter: number
+  timestamp: number
 }
 
 export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
@@ -36,6 +53,45 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   const animationFrameRef = useRef<number | null>(null)
   const hasActiveResponseRef = useRef<boolean>(false)
   const enableBargeInRef = useRef<boolean>(false)
+  
+  // Reconnection management
+  const reconnectAttemptsRef = useRef<number>(0)
+  const maxReconnectAttempts = 3
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const sessionConfigRef = useRef<any>(null)
+  
+  // Connection quality monitoring
+  const metricsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastMetricsRef = useRef<ConnectionMetrics | null>(null)
+
+  // Classify error severity for handling strategy
+  const classifyError = (error: any): VoiceError => {
+    const voiceError = error as VoiceError
+    
+    // OpenAI-specific errors
+    if (error.error?.type === 'invalid_request_error') {
+      voiceError.severity = 'fatal'
+      voiceError.retryable = false
+      voiceError.code = error.error.code
+    } else if (error.error?.type === 'server_error') {
+      voiceError.severity = 'recoverable'
+      voiceError.retryable = true
+    } else if (error.message?.includes('rate limit')) {
+      voiceError.severity = 'recoverable'
+      voiceError.retryable = true
+    } else if (error.message?.includes('Data channel') || error.message?.includes('ICE')) {
+      voiceError.severity = 'recoverable'
+      voiceError.retryable = true
+    } else if (error.message?.includes('permission') || error.message?.includes('NotAllowed')) {
+      voiceError.severity = 'fatal'
+      voiceError.retryable = false
+    } else {
+      voiceError.severity = 'recoverable'
+      voiceError.retryable = true
+    }
+    
+    return voiceError
+  }
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -126,15 +182,19 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       const { sessionId: voiceSessionId } = await sessionResponse.json()
       sessionIdRef.current = voiceSessionId
 
-      // Create WebRTC peer connection with STUN servers for NAT traversal
-      // IMPORTANT: Without STUN servers, WebRTC may fail on networks with NAT/firewalls
-      // These are FREE public STUN servers (no account needed):
-      // - Google's public STUN server
-      // - Twilio's public STUN server (free, no account required)
+      // Create WebRTC peer connection with multiple STUN servers for redundancy
+      // PRODUCTION BEST PRACTICE: Multiple STUN servers ensure connectivity across different network conditions
+      // - Google STUN: Primary, highly reliable
+      // - Twilio STUN: Backup for redundancy
+      // TODO: Add TURN server for restrictive corporate networks (requires credentials)
       const pc = new RTCPeerConnection({
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ],
+        // Optimize for low-latency audio
+        iceCandidatePoolSize: 10
       })
       peerConnectionRef.current = pc
 
@@ -147,13 +207,35 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
         }
       }
 
-      // Monitor connection state changes
+      // Monitor connection state changes with auto-recovery
       pc.onconnectionstatechange = () => {
         console.log('🔗 Connection state:', pc.connectionState)
+        
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          console.warn('⚠️ Connection failed/disconnected, attempting recovery...')
+          handleConnectionFailure()
+        } else if (pc.connectionState === 'connected') {
+          console.log('✅ Connection established successfully')
+          reconnectAttemptsRef.current = 0 // Reset reconnect counter on success
+        }
       }
 
       pc.oniceconnectionstatechange = () => {
         console.log('🧊 ICE connection state:', pc.iceConnectionState)
+        
+        if (pc.iceConnectionState === 'failed') {
+          console.warn('⚠️ ICE connection failed, initiating ICE restart...')
+          restartICE()
+        } else if (pc.iceConnectionState === 'disconnected') {
+          console.warn('⚠️ ICE disconnected, monitoring for recovery...')
+          // Give it 5 seconds to recover before attempting restart
+          setTimeout(() => {
+            if (pc.iceConnectionState === 'disconnected') {
+              console.warn('⚠️ ICE still disconnected after 5s, restarting...')
+              restartICE()
+            }
+          }, 5000)
+        }
       }
 
       // Set up audio element for remote audio playback
@@ -304,10 +386,28 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           const event = JSON.parse(e.data)
           console.log('Event:', event.type)
 
+          // PRODUCTION: Enhanced error handling with classification
           if (event.type === 'error') {
             console.error('❌ OpenAI Error:', event)
-            setError(new Error(event.error?.message || 'OpenAI error'))
-            setStatus('error')
+            const classifiedError = classifyError(event)
+            
+            console.error('📊 Error Details:', {
+              type: event.error?.type,
+              code: event.error?.code,
+              message: event.error?.message,
+              param: event.error?.param,
+              severity: classifiedError.severity,
+              retryable: classifiedError.retryable
+            })
+
+            // Only set error state for fatal errors
+            if (classifiedError.severity === 'fatal') {
+              setError(classifiedError)
+              setStatus('error')
+            } else if (classifiedError.severity === 'recoverable') {
+              console.warn('⚠️ Recoverable error, continuing session...')
+              // Log but don't interrupt the session
+            }
             return
           }
 
@@ -343,6 +443,8 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
           if (event.type === 'session.updated') {
             console.log('✅ session.updated acknowledged by OpenAI')
+            // Start monitoring connection quality after session is ready
+            startConnectionMonitoring()
           }
 
           if (event.type === 'response.audio.delta') {
@@ -583,11 +685,136 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
 
     } catch (err) {
       console.error('Voice session error:', err)
-      setError(err as Error)
-      setStatus('error')
-      cleanup()
+      const classifiedError = classifyError(err)
+      setError(classifiedError)
+      
+      // Attempt reconnection for recoverable errors
+      if (classifiedError.retryable && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        console.log(`🔄 Attempting reconnection (${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`)
+        setStatus('reconnecting')
+        reconnectAttemptsRef.current++
+        
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, reconnectAttemptsRef.current) * 1000
+        reconnectTimeoutRef.current = setTimeout(() => {
+          startSession(chatIdRef.current || undefined)
+        }, delay)
+      } else {
+        setStatus('error')
+        cleanup()
+      }
     }
   }, [monitorAudioLevel])
+
+  // Handle connection failures with auto-recovery
+  const handleConnectionFailure = useCallback(() => {
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached, giving up')
+      setStatus('error')
+      setError(new Error('Connection failed after multiple attempts'))
+      cleanup()
+      return
+    }
+
+    console.log(`🔄 Connection failed, attempting recovery (${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`)
+    setStatus('reconnecting')
+    reconnectAttemptsRef.current++
+
+    // Exponential backoff
+    const delay = Math.pow(2, reconnectAttemptsRef.current) * 1000
+    reconnectTimeoutRef.current = setTimeout(() => {
+      startSession(chatIdRef.current || undefined)
+    }, delay)
+  }, [])
+
+  // ICE restart for connection recovery
+  const restartICE = useCallback(async () => {
+    const pc = peerConnectionRef.current
+    if (!pc) return
+
+    try {
+      console.log('🔄 Initiating ICE restart...')
+      const offer = await pc.createOffer({ iceRestart: true })
+      await pc.setLocalDescription(offer)
+
+      // Send new offer through signaling (implementation depends on your signaling mechanism)
+      // For now, we'll just log it
+      console.log('📤 ICE restart offer created, signaling required for full restart')
+      // TODO: Implement full ICE restart with signaling when needed
+    } catch (err) {
+      console.error('❌ ICE restart failed:', err)
+      handleConnectionFailure()
+    }
+  }, [handleConnectionFailure])
+
+  // Monitor connection quality metrics
+  const startConnectionMonitoring = useCallback(() => {
+    if (metricsIntervalRef.current) return // Already monitoring
+
+    console.log('📊 Starting connection quality monitoring...')
+    
+    metricsIntervalRef.current = setInterval(async () => {
+      const pc = peerConnectionRef.current
+      if (!pc) return
+
+      try {
+        const stats = await pc.getStats()
+        let packetsLost = 0
+        let jitter = 0
+        let rtt = 0
+
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            packetsLost = report.packetsLost || 0
+            jitter = report.jitter || 0
+          }
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            rtt = report.currentRoundTripTime || 0
+          }
+        })
+
+        const metrics: ConnectionMetrics = {
+          latency: rtt * 1000, // Convert to ms
+          packetsLost,
+          jitter: jitter * 1000, // Convert to ms
+          timestamp: Date.now()
+        }
+
+        lastMetricsRef.current = metrics
+
+        // Log warnings for poor connection quality
+        if (metrics.latency > 300) {
+          console.warn(`⚠️ High latency detected: ${metrics.latency.toFixed(0)}ms`)
+        }
+        if (metrics.packetsLost > 100) {
+          console.warn(`⚠️ Packet loss detected: ${metrics.packetsLost} packets`)
+        }
+        if (metrics.jitter > 50) {
+          console.warn(`⚠️ High jitter detected: ${metrics.jitter.toFixed(0)}ms`)
+        }
+
+        // Log periodic health check (every 30 seconds)
+        if (metrics.timestamp % 30000 < 5000) {
+          console.log('💚 Connection health:', {
+            latency: `${metrics.latency.toFixed(0)}ms`,
+            packetsLost: metrics.packetsLost,
+            jitter: `${metrics.jitter.toFixed(2)}ms`
+          })
+        }
+      } catch (err) {
+        console.error('Failed to get connection stats:', err)
+      }
+    }, 5000) // Check every 5 seconds
+  }, [])
+
+  // Stop connection monitoring
+  const stopConnectionMonitoring = useCallback(() => {
+    if (metricsIntervalRef.current) {
+      clearInterval(metricsIntervalRef.current)
+      metricsIntervalRef.current = null
+      console.log('📊 Stopped connection quality monitoring')
+    }
+  }, [])
 
   const endSession = useCallback(async () => {
     try {
@@ -621,26 +848,52 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   }, [])
 
   const cleanup = useCallback(() => {
+    console.log('🧹 Cleaning up voice session...')
+    
+    // Stop all monitoring
+    stopConnectionMonitoring()
+    
     // Stop animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+
+    // Clear reconnection timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
     }
 
     // Close data channel
     if (dataChannelRef.current) {
-      dataChannelRef.current.close()
+      try {
+        dataChannelRef.current.close()
+      } catch (err) {
+        console.warn('Error closing data channel:', err)
+      }
       dataChannelRef.current = null
     }
 
     // Close peer connection
     if (peerConnectionRef.current) {
-      peerConnectionRef.current.close()
+      try {
+        peerConnectionRef.current.close()
+      } catch (err) {
+        console.warn('Error closing peer connection:', err)
+      }
       peerConnectionRef.current = null
     }
 
     // Stop media tracks
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop()
+        } catch (err) {
+          console.warn('Error stopping media track:', err)
+        }
+      })
       mediaStreamRef.current = null
     }
 
@@ -650,14 +903,19 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
       audioElementRef.current = null
     }
 
+    // Clear refs
     analyserRef.current = null
     sessionIdRef.current = null
     startTimeRef.current = null
+    sessionConfigRef.current = null
+    lastMetricsRef.current = null
 
     setStatus('idle')
     setAudioLevel(0)
     setDuration(0)
-  }, [])
+    
+    console.log('✅ Cleanup complete')
+  }, [stopConnectionMonitoring])
 
   const toggleMute = useCallback(() => {
     if (mediaStreamRef.current) {
