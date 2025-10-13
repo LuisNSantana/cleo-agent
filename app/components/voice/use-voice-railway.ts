@@ -103,7 +103,13 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
         modalities: ['text', 'audio'],
         voice: config?.voice || 'alloy',
         input_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
-        output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 }
+        output_audio_format: { type: 'pcm16', sample_rate_hz: 24000 },
+        // Enable server-side VAD and transcription from the start (matches WebRTC behavior)
+        turn_detection: {
+          type: 'server_vad',
+          silence_duration_ms: 500
+        },
+        input_audio_transcription: { model: 'whisper-1' }
       }
 
       const updates: any[] = [
@@ -371,6 +377,13 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
           if (eventType === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
+            try {
+              ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+              ws.send(JSON.stringify({ type: 'response.create' }))
+              console.log('🧠 Committed audio buffer and requested response')
+            } catch (commitErr) {
+              console.error('Failed to commit audio or create response:', commitErr)
+            }
           }
 
           if ((eventType === 'response.audio.delta' || eventType === 'response.output_audio.delta') && data.delta) {
