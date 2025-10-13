@@ -90,7 +90,7 @@ const listeners = g.__cleoAdapterListeners as Array<(event: any) => void>
 const coreOrchestrator = g.__cleoCoreOrchestrator as EnhancedCoreOrchestrator
 
 export function getAgentOrchestrator() {
-  return {
+  const orchestrator = {
     __id: 'enhanced-core-adapter',
     // Execution methods - delegate to legacy for complex delegation logic
     executeAgent(input: string, agentId?: string) {
@@ -219,8 +219,87 @@ export function getAgentOrchestrator() {
     },
     cleanup() {
       listeners.splice(0, listeners.length)
+    },
+    handleExecutionCompletion(execution: any) {
+      console.log('🔍 [ENHANCED ADAPTER] Received execution completion from core:', execution.id)
+      
+      // Find the execution in our registry and mark it completed
+      let exec = execRegistry.find((e: any) => e.id === execution.id)
+      
+      if (!exec) {
+        console.log('🔍 [ENHANCED ADAPTER] Execution not found in registry, creating new entry:', execution.id)
+        // Create a new execution entry for delegated executions that weren't tracked
+        const newExec: AgentExecution = {
+          id: execution.id,
+          agentId: execution.agentId || 'unknown',
+          threadId: execution.threadId || 'unknown',
+          userId: execution.userId || 'unknown', 
+          status: 'completed' as const,
+          startTime: execution.startTime || new Date(),
+          endTime: execution.endTime || new Date(),
+          messages: execution.messages || [],
+          steps: execution.steps || [],
+          metrics: execution.metrics || { totalTokens: 0, inputTokens: 0, outputTokens: 0, executionTime: 0, executionTimeMs: 0, tokensUsed: 0, toolCallsCount: 0, handoffsCount: 0, errorCount: 0, retryCount: 0, cost: 0 }
+        }
+        execRegistry.push(newExec)
+        exec = newExec
+      } else {
+        exec.status = 'completed'
+        exec.endTime = execution.endTime || new Date()
+      }
+      
+      // Ensure final message is included
+      if (execution.messages && execution.messages.length > 0) {
+        const lastMessage = execution.messages[execution.messages.length - 1]
+        if (lastMessage.type === 'ai' && lastMessage.content && exec) {
+          // Check if we already have this message
+          const existingMessage = exec.messages.find((m: any) => m.id === lastMessage.id)
+          if (!existingMessage) {
+            exec.messages.push(lastMessage)
+            console.log('🔍 [ENHANCED ADAPTER] Added final AI message to execution')
+          }
+        }
+      }
+      
+      // Notify listeners of completion
+      if (exec) {
+        try {
+          listeners.forEach(fn => fn({ 
+            type: 'execution_completed', 
+            agentId: exec!.agentId, 
+            timestamp: new Date(), 
+            data: { executionId: exec!.id } 
+          }))
+          console.log('🔍 [ENHANCED ADAPTER] Listeners notified of completion for:', exec.id)
+        } catch (error) {
+          console.error('🔍 [ENHANCED ADAPTER] Error notifying listeners:', error)
+        }
+      }
     }
   }
+
+  // Subscribe to legacy orchestrator execution events to stay in sync
+  try {
+    const legacy = (globalThis as any).__cleoOrchestrator
+    if (legacy && typeof legacy.onEvent === 'function') {
+      legacy.onEvent((event: any) => {
+        if (event.type === 'execution_completed' && event.data?.executionId) {
+          // Sync completion to enhanced adapter registry
+          const execId = event.data.executionId
+          let exec = execRegistry.find(e => e.id === execId)
+          if (exec) {
+            exec.status = 'completed'
+            exec.endTime = new Date()
+            console.log('🔍 [ENHANCED ADAPTER] Synced completion from legacy:', execId)
+          }
+        }
+      })
+    }
+  } catch (err) {
+    console.warn('⚠️ [ENHANCED ADAPTER] Failed to subscribe to legacy events:', err)
+  }
+
+  return orchestrator
 }
 
 // Convenience wrapper
