@@ -278,27 +278,6 @@ export function getAgentOrchestrator() {
     }
   }
 
-  // Subscribe to legacy orchestrator execution events to stay in sync
-  try {
-    const legacy = (globalThis as any).__cleoOrchestrator
-    if (legacy && typeof legacy.onEvent === 'function') {
-      legacy.onEvent((event: any) => {
-        if (event.type === 'execution_completed' && event.data?.executionId) {
-          // Sync completion to enhanced adapter registry
-          const execId = event.data.executionId
-          let exec = execRegistry.find(e => e.id === execId)
-          if (exec) {
-            exec.status = 'completed'
-            exec.endTime = new Date()
-            console.log('🔍 [ENHANCED ADAPTER] Synced completion from legacy:', execId)
-          }
-        }
-      })
-    }
-  } catch (err) {
-    console.warn('⚠️ [ENHANCED ADAPTER] Failed to subscribe to legacy events:', err)
-  }
-
   return orchestrator
 }
 
@@ -422,6 +401,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
             model: agentId || 'cleo-supervisor',
             requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           }, () => legacy.startAgentExecutionWithHistory(input, agentId, prior || [])) as AgentExecution
+          
           if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
             try {
               exec.steps.push({
@@ -441,6 +421,7 @@ function createAndRunExecution(input: string, agentId: string | undefined, prior
         } catch (wrapErr) {
           console.warn('⚠️ [ENHANCED ADAPTER] Failed to wrap WithHistory with context, calling directly', wrapErr)
           const exec = legacy.startAgentExecutionWithHistory(input, agentId, prior || []) as AgentExecution
+          
           if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {
             try {
               exec.steps.push({
