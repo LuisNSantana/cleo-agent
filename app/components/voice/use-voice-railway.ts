@@ -169,7 +169,9 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
 
       // Connect to Railway WebSocket proxy
       const proxyUrl = process.env.NEXT_PUBLIC_WS_PROXY_URL || 'ws://localhost:8080'
-      const model = config?.model || 'gpt-4o-mini-realtime-preview-2024-12-17'
+      const model = (config?.model && typeof config.model === 'string' && config.model.length > 0)
+        ? config.model
+        : 'gpt-4o-realtime-preview-2024-12-17'
       const wsUrl = `${proxyUrl}?model=${encodeURIComponent(model)}`
       
       console.log('🔗 Connecting to Railway proxy:', wsUrl)

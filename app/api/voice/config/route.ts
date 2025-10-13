@@ -326,7 +326,8 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
     // Return configuration for voice session with tools
     return NextResponse.json({
       apiKey,
-      model: 'gpt-4o-mini-realtime-preview-2024-12-17',
+      // Prefer the non-mini realtime model which is more widely supported/stable
+      model: 'gpt-4o-realtime-preview-2024-12-17',
       voice: 'alloy',
       instructions,
       tools: voiceTools
