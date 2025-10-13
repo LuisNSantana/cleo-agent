@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { detectLanguage } from '@/lib/language-detection'
 import { trackToolUsage } from '@/lib/analytics'
 import { getCurrentUserId, getCurrentRequestId } from '@/lib/server/request-context'
+import { redisEnabled, hashKey as redisHashKey, redisGetJSON, redisSetJSON } from '@/lib/cache/redis-client'
 
 // Enhanced types for Brave Search response (added summarizer and goggles support)
 interface BraveSearchResult {
@@ -268,6 +269,20 @@ export const webSearchTool = tool({
         return { ...cached.data, note: (cached.data.note || '') + (language === 'es' ? ' (caché)' : ' (cache)') }
       }
 
+      // L2 (Redis) cache lookup
+      let l2Key = ''
+      if (redisEnabled()) {
+        try {
+          l2Key = `websearch:v1:${redisHashKey(['q', normalized, 'c', count, 'lang', language, 'sum', !!use_summarizer, 'fresh', freshness || '-', 'gog', goggles_id || '-', 'src', primary])}`
+          const l2 = await redisGetJSON<z.infer<typeof webSearchOutputSchema>>(l2Key)
+          if (l2 && l2.success && Array.isArray(l2.results)) {
+            console.log('[WebSearch] L2 (Redis) cache hit')
+            searchCache.set(key, { data: l2 as any, expiry: now + cacheDuration })
+            return { ...l2, note: (l2.note || '') + (language === 'es' ? ' (redis)' : ' (redis)') }
+          }
+        } catch {}
+      }
+
       let results: any[] = []
       let ai_summary = ''
       let suggested_query = ''
@@ -437,6 +452,10 @@ export const webSearchTool = tool({
         source
       }
       searchCache.set(key, { data: payload as any, expiry: now + cacheDuration })
+      // Populate L2 cache (best-effort)
+      if (l2Key) {
+        try { await redisSetJSON(l2Key, payload, Math.ceil(cacheDuration / 1000)) } catch {}
+      }
       console.log(`[WebSearch] Success: ${deduped.length} results from ${source} (clusters: ${clusters.length}, AI summary: ${!!ai_summary})`)
       // Track tool usage success
       if (userId) {
