@@ -244,9 +244,12 @@ async function runDelegation(params: {
               targetExecutionId: execId,
               agentId: event.agentId
             })
-            // Get final result from the completed execution
-            const snapshot = orchestrator.getExecution?.(execId)
-            const result = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+            // Get final result from the completed execution (may need a brief drain window)
+            let result = ''
+            try {
+              const snapshot = orchestrator.getExecution?.(execId)
+              result = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+            } catch {}
             resolve(result)
           }
         }
@@ -277,8 +280,20 @@ async function runDelegation(params: {
     
     // If we got a completion event, use that result
     if (eventResult !== null) {
-      finalResult = eventResult
+      // We got a completion event; sometimes messages aren't synced yet. Try a quick drain loop to fetch final text.
       status = 'completed'
+      let resolvedText = eventResult || ''
+      if ((!resolvedText || resolvedText.length === 0) && execId) {
+        for (let i = 0; i < 5; i++) {
+          await new Promise(r => setTimeout(r, 120))
+          try {
+            const snap = orchestrator.getExecution?.(execId)
+            const candidate = String(snap?.result || snap?.messages?.slice(-1)?.[0]?.content || '')
+            if (candidate) { resolvedText = candidate; break }
+          } catch {}
+        }
+      }
+      finalResult = resolvedText
       console.log('🔍 [DELEGATION DEBUG] Completion detected via event:', {
         execId,
         resultLength: finalResult?.length,
@@ -406,7 +421,7 @@ async function runDelegation(params: {
   // Cleanup event listener if we attached one
   try { if (eventListenerAdded && detachListener) { (detachListener as () => void)() } } catch {}
 
-  if (!finalResult) {
+  if (status !== 'completed') {
     const elapsed = Date.now() - startedAt
     finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
     logger.warn('⏱️ [DELEGATION_TIMEOUT]', { executionId: execId, target_agent: agentId, context_user_id: userId, elapsedMs: elapsed })
