@@ -67,22 +67,32 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
   // Classify error severity for handling strategy
   const classifyError = (error: any): VoiceError => {
     const voiceError = error as VoiceError
+    const errorMessage = error?.message || error?.error?.message || ''
     
     // OpenAI-specific errors
     if (error.error?.type === 'invalid_request_error') {
-      voiceError.severity = 'fatal'
-      voiceError.retryable = false
-      voiceError.code = error.error.code
+      // These are recoverable, not fatal - don't interrupt the session
+      if (error.error?.code === 'input_audio_buffer_commit_empty' ||
+          error.error?.code === 'conversation_already_has_active_response') {
+        voiceError.severity = 'recoverable'
+        voiceError.retryable = false // Don't retry, just continue
+        voiceError.code = error.error.code
+      } else {
+        // Other invalid_request_errors are likely configuration issues
+        voiceError.severity = 'fatal'
+        voiceError.retryable = false
+        voiceError.code = error.error.code
+      }
     } else if (error.error?.type === 'server_error') {
       voiceError.severity = 'recoverable'
       voiceError.retryable = true
-    } else if (error.message?.includes('rate limit')) {
+    } else if (errorMessage.includes('rate limit')) {
       voiceError.severity = 'recoverable'
       voiceError.retryable = true
-    } else if (error.message?.includes('Data channel') || error.message?.includes('ICE')) {
+    } else if (errorMessage.includes('Data channel') || errorMessage.includes('ICE')) {
       voiceError.severity = 'recoverable'
       voiceError.retryable = true
-    } else if (error.message?.includes('permission') || error.message?.includes('NotAllowed')) {
+    } else if (errorMessage.includes('permission') || errorMessage.includes('NotAllowed')) {
       voiceError.severity = 'fatal'
       voiceError.retryable = false
     } else {
@@ -432,13 +442,11 @@ export function useVoiceWebRTC(): UseVoiceWebRTCReturn {
           if (event.type === 'input_audio_buffer.speech_stopped') {
             console.log('🎤 User stopped speaking')
             setStatus('listening')
-            try {
-              // Commit any buffered audio and ask the model to respond
-              dataChannelRef.current?.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
-              dataChannelRef.current?.send(JSON.stringify({ type: 'response.create' }))
-            } catch (commitErr) {
-              console.error('Failed to commit audio or create response:', commitErr)
-            }
+            // IMPORTANT: With server_vad enabled, OpenAI automatically commits the buffer
+            // and creates a response. We should NOT manually commit/create here as it
+            // causes "input_audio_buffer_commit_empty" and "conversation_already_has_active_response" errors.
+            // The VAD handles this automatically when silence is detected.
+            console.log('ℹ️ Server VAD will handle commit and response creation automatically')
           }
 
           if (event.type === 'session.updated') {
