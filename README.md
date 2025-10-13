@@ -219,6 +219,30 @@ NEXT_PUBLIC_APP_URL=https://your-tunnel.ngrok-free.app
 - [🔧 Local Model Setup](./docs/cleo-local-model-guide.md)
    - Execute `supabase_schema.sql` for basic tables
    - Execute `supabase_schema_add_documents.sql` for document management
+
+### 🔁 Hybrid Cache (L1 in-memory + L2 Redis)
+
+To make retrieval faster and consistent across instances, Cleo supports an optional Redis-backed L2 cache in addition to the default in-memory cache.
+
+Enable it by setting in `.env.local`:
+
+```
+ENABLE_REDIS_CACHE=true
+
+# Option A: Upstash (serverless-friendly)
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+
+# Option B: Standard Redis (e.g., Redis Cloud)
+# Use a TLS URL when available (rediss://...)
+REDIS_URL=rediss://default:<password>@<host>:<port>
+```
+
+Notes:
+- Upstash is recommended for Vercel/Serverless. Standard Redis works on long-lived servers or Docker.
+- Current usage: RAG retrieval results in `lib/rag/retrieve.ts`.
+- Safe-by-default: if Redis is not configured or disabled, Cleo falls back to L1 only.
+
 ## 🤝 Contributing
 
 1. Fork the repository

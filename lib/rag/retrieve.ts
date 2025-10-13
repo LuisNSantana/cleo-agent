@@ -5,6 +5,7 @@ import { detectLanguage, type SupportedLanguage } from '@/lib/language-detection
 import { translateQuery } from './translate'
 import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { createHash } from 'crypto'
+import { redisEnabled, hashKey as redisHashKey, redisGetJSON, redisSetJSON } from '@/lib/cache/redis-client'
 
 export interface RetrieveOptions {
   userId: string
@@ -82,10 +83,38 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     `tw:${textWeight}`,
     `mc:${opts.maxContextChars ?? 'default'}`
   ].join('|'))
+  // L1 check (in-memory)
   const cached = cache.get(cacheKey)
   if (cached && cached.expiry > Date.now()) {
     console.log(`[RAG] Cache hit for query (ttl left: ${Math.round((cached.expiry - Date.now())/1000)}s)`)
     return cached.data
+  }
+
+  // L2 check (Redis)
+  let l2Key = ''
+  if (redisEnabled()) {
+    try {
+      l2Key = `rag:v1:${redisHashKey([
+        'u', normalizedUserId,
+        'q', query,
+        'd', documentId || '-',
+        'p', projectId || '-',
+        'k', opts.topK ?? 'auto',
+        'hy', useHybrid,
+        'rr', useReranking,
+        'min', minSimilarity,
+        'vw', vectorWeight,
+        'tw', textWeight,
+        'mc', opts.maxContextChars ?? 'default',
+      ])}`
+      const l2 = await redisGetJSON<RetrievedChunk[]>(l2Key)
+      if (Array.isArray(l2) && l2.length > 0) {
+        // Populate L1 for faster subsequent hits in this instance
+        cache.set(cacheKey, { data: l2, expiry: Date.now() + CACHE_DEFAULT_TTL })
+        console.log('[RAG] L2 (Redis) cache hit')
+        return l2
+      }
+    } catch {}
   }
   
   // Adaptive sizing: derive topK and chunkLimit from query size and budget
@@ -200,8 +229,9 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     try {
       if (timeLeft() < 400) {
         console.log('[RERANK] Skipped due to low remaining budget.')
-        const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
-        cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
+  cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  if (l2Key) { try { await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000)) } catch {} }
         return sliced
       }
       const documents = results.map(chunk => chunk.content)
@@ -212,8 +242,9 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       )
       if (!rerankResults) {
         console.log('[RERANK] Timeout; returning hybrid results without reranking.')
-        const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
-        cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
+  cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  if (l2Key) { try { await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000)) } catch {} }
         return sliced
       }
       
@@ -230,8 +261,9 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       })
 
       console.log(`[RERANK] Reranked ${results.length} → ${rerankedChunks.length} chunks (top score: ${rerankedChunks[0]?.rerank_score?.toFixed(3)})`)
-      const sliced = rerankedChunks.slice(0, Math.min(dynamicTopK, chunkLimit))
-      cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  const sliced = rerankedChunks.slice(0, Math.min(dynamicTopK, chunkLimit))
+  cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  if (l2Key) { try { await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000)) } catch {} }
       return sliced
     } catch (error: any) {
       console.error('[RERANK] Reranking failed, using hybrid results:', error.message)
@@ -239,6 +271,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   }
   const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
   cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  if (l2Key) { try { await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000)) } catch {} }
   return sliced
 }
 
