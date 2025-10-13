@@ -48,6 +48,11 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     'tweet','twitter','x.com','post','publicar','social media','contenido social','analytics social',
     'schedule post','programar publicación'
   ],
+  'iris-insights': [
+    { k: 'insight', w: 2 }, { k: 'insights', w: 2 }, 'resumen ejecutivo','hallazgos','recomendaciones','riesgos','tendencias',
+    'pdf','documento','doc','google doc','evidencia','referencias','sintetiza','analiza','analisis','análisis',
+    'informe','reporte','executive summary','mapa de evidencias','fuentes','citas'
+  ],
 }
 
 // Optional penalties or boosts based on message length or structure

@@ -290,9 +290,10 @@ export async function POST(req: Request) {
   let normalizedModel = normalizeModelId(model)
   console.log('[ChatAPI] Incoming model:', originalModel, 'normalized:', normalizedModel, 'isAuthenticated:', isAuthenticated)
 
-  // Auto-enable RAG for personalized responses - always try to retrieve user context
-  const autoRagEnabled = true
-  const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
+  // Smart RAG: prefer speed. Only enable retrieval when explicitly requested or intent signals it
+  // We will compute an effective flag later once we have the last user message
+  const autoRagEnabled = false
+  let retrievalRequested = enableSearch || !!documentId || autoRagEnabled
 
     if (!messages || !chatId || !userId) {
       return new Response(
@@ -559,9 +560,13 @@ export async function POST(req: Request) {
       throw new Error(`Model ${modelConfig.id} has no API SDK configured`)
     }
 
-    // --- Delegation Intent Heuristics (Lote 1) ---
-    // Evaluate user last message intent BEFORE prompt assembly so we can inject a system hint if strong.
+  // --- Delegation Intent Heuristics (Optimized) ---
+    // FAST PATH: Only evaluate if message suggests delegation keywords
+    // This avoids expensive scoring for simple conversational queries
     let delegationIntent: ReturnType<typeof scoreDelegationIntent> | null = null
+  const quickDelegationCheck = /\b(delega|delegate|ask|pregunta|call|llama|usa|use|pídele|with|encárgalo|handoff|sub[- ]?agent|agente)\b/i
+  let quickDelegationFlag = false
+    
     try {
       const lastUser = [...messages].reverse().find(m => m.role === 'user')
       let lastUserPlain = ''
@@ -579,8 +584,25 @@ export async function POST(req: Request) {
             .join('\n')
         }
       }
-      if (lastUserPlain.trim()) {
-        delegationIntent = scoreDelegationIntent(lastUserPlain, { debug: debugDelegation })
+      
+      // OPTIMIZATION: Only run expensive heuristics if delegation keywords present
+      quickDelegationFlag = !!(lastUserPlain.trim() && quickDelegationCheck.test(lastUserPlain))
+      if (quickDelegationFlag) {
+        // Get available agents for scoring optimization
+        const { agentLoader } = await import('@/lib/agents/agent-loader')
+        const availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+        const availableAgentIds = availableAgents
+          .filter(a => a.role !== 'supervisor')
+          .map(a => a.id)
+        
+        delegationIntent = scoreDelegationIntent(lastUserPlain, { 
+          debug: debugDelegation,
+          availableAgents: availableAgentIds 
+        })
+        
+        if (delegationIntent?.score && delegationIntent.score > 0) {
+          console.log('[DelegationIntent] Detected:', delegationIntent.target, 'score:', delegationIntent.score)
+        }
       }
     } catch (e) {
       console.warn('[DelegationIntent] heuristic failed', e)
@@ -616,6 +638,9 @@ export async function POST(req: Request) {
     } catch (e) {
       console.log('[ChatAPI] Personality parse failed')
     }
+
+  // Decide effective search flag based on quick intent and explicit request
+  const effectiveEnableSearch = Boolean(enableSearch || documentId || (quickDelegationFlag && process.env.DEFAULT_SEARCH_ON_DELEGATION === 'true'))
 
   // Convert multimodal messages to correct format for the model
     convertedMessages = await convertUserMultimodalMessages(
@@ -658,7 +683,7 @@ export async function POST(req: Request) {
       // reserved for future per-image diagnostics
     }
 
-    // Resolve an API key for the selected provider. For unauthenticated users,
+  // Resolve an API key for the selected provider. For unauthenticated users,
     // fall back to environment keys so models like OpenRouter work in demos.
     {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
@@ -689,7 +714,7 @@ export async function POST(req: Request) {
         messages,
         supabase,
         realUserId,
-        enableSearch,
+    enableSearch: effectiveEnableSearch,
         documentId,
         projectId,
         debugRag,
@@ -747,8 +772,8 @@ export async function POST(req: Request) {
       providerOptions = {
         xai: {
           searchParameters: {
-            mode: enableSearch ? 'auto' : 'off',
-            returnCitations: enableSearch ? true : false,
+            mode: effectiveEnableSearch ? 'auto' : 'off',
+            returnCitations: effectiveEnableSearch ? true : false,
           },
         },
       }
@@ -763,18 +788,25 @@ export async function POST(req: Request) {
       } catch {}
     }
 
-    // Ensure all delegation tools are present (non-forcing) so model can choose.
-    try {
-      const agents = await getAllAgentsUnified()
-      for (const a of agents) {
-        if (a.role !== 'supervisor') {
-          ensureDelegationToolForAgent(a.id, a.name)
+    // Ensure all delegation tools are present only when delegation is likely
+    // This reduces cold start time for simple Q&A
+    if (quickDelegationFlag) {
+      try {
+        const { agentLoader } = await import('@/lib/agents/agent-loader')
+        const agents = await agentLoader.loadAgents({ userId: realUserId })
+        
+        for (const a of agents) {
+          if (a.role !== 'supervisor') {
+            ensureDelegationToolForAgent(a.id, a.name)
+          }
         }
+        // After ensuring, refresh registry reference (tools is mutated inside helper)
+    toolsForRun = tools as typeof tools
+        
+        console.log(`[ChatAPI] Loaded ${agents.length} agents with delegation tools`)
+      } catch (e) {
+        console.warn('[ChatAPI] Failed to ensure delegation tools', e)
       }
-      // After ensuring, refresh registry reference (tools is mutated inside helper)
-  toolsForRun = tools as typeof tools
-    } catch (e) {
-      console.warn('[ChatAPI] Failed to ensure delegation tools', e)
     }
 
     // Provider-specific tool name normalization
@@ -789,9 +821,12 @@ export async function POST(req: Request) {
 
     // Optional delegation-only toolset for general chat
     // When CHAT_DELEGATION_ONLY=true, expose only delegate_to_* tools (+ minimal helpers)
+    // OPTIMIZED: Use cached agents, and only if delegation is relevant
     try {
-      if (process.env.CHAT_DELEGATION_ONLY === 'true') {
-        const agents = await getAllAgentsUnified()
+      if (process.env.CHAT_DELEGATION_ONLY === 'true' && quickDelegationFlag) {
+        const { agentLoader } = await import('@/lib/agents/agent-loader')
+        const agents = await agentLoader.loadAgents({ userId: realUserId })
+        
         // Ensure delegation tools exist for all specialist agents
         const delegateToolNames: string[] = []
         for (const a of agents) {

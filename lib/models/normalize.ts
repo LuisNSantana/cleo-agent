@@ -9,10 +9,10 @@ const LEGACY_TO_FREE = new Set<string>([
   'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-5-sonnet-latest', 'claude-3-7-sonnet-20250219',
   'mistral-medium-2508', 'mistral-large-latest-fallback', 'openrouter:deepseek/deepseek-chat-v3.1:free',
   'openrouter:openai/gpt-oss-120b', 'gpt-oss-120b', 'openrouter:openrouter/sonoma-sky-alpha', 'openrouter:z-ai/glm-4.5',
-  'grok-3', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'
+  'grok-3', 'grok-4-fast-non-reasoning'
 ])
 
-const VALID_MODELS = new Set(['grok-4-fast', 'grok-4-fast-reasoning', 'gpt-5-mini-2025-08-07'])
+const VALID_MODELS = new Set(['grok-4-fast', 'grok-4-fast-reasoning'])
 
 const SMARTER_ALIASES = new Set([
   'smarter', 'smarter-tier', 'gpt-5-mini', 'gpt-5-mini-2025-08-07', 'gpt5-mini'
@@ -22,7 +22,7 @@ export function normalizeModelId(id: string | undefined | null): string {
   if (!id) return 'grok-4-fast'
   // Map old public multimodal id to new reasoning id
   if (id === 'grok-4-multimodal') return 'grok-4-fast-reasoning'
-  if (SMARTER_ALIASES.has(id)) return 'gpt-5-mini-2025-08-07'
+  if (SMARTER_ALIASES.has(id)) return 'grok-4-fast-reasoning'
   if (VALID_MODELS.has(id)) return id
   if (LEGACY_TO_FREE.has(id)) return 'grok-4-fast'
   return 'grok-4-fast'
