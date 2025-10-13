@@ -293,6 +293,27 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
               }
 
               try {
+                // Special-case: if we failed while sending the tools stage, retry once adding type: 'function' to each tool
+                if (typeof updateStage === 'number' && updateStage >= 2 && attempt === 0) {
+                  const tools = Array.isArray(config?.tools) ? config.tools : []
+                  const toolsWithType = tools.map((t: any) => ({ type: 'function', ...t }))
+                  const toolsPayload = {
+                    type: 'session.update',
+                    session: {
+                      voice: (config?.voice || 'alloy'),
+                      input_audio_format: 'pcm16',
+                      output_audio_format: 'pcm16',
+                      ...(typeof config?.instructions === 'string' ? { instructions: String(config.instructions).slice(0, 1500) } : {}),
+                      tools: toolsWithType
+                    }
+                  }
+                  console.log('🧪 Retrying tools stage with type:function wrapper on tools')
+                  console.log('📋 TOOLS-with-type payload:', JSON.stringify(toolsPayload, null, 2))
+                  sessionUpdateRetryRef.current += 1
+                  ws.send(JSON.stringify(toolsPayload))
+                  return
+                }
+
                 if (attempt === 0) {
                   // Retry 1: Minimal session (no tools, no instructions)
                   const minimalPayload = { type: 'session.update', session: minimalSession }
@@ -319,6 +340,13 @@ export function useVoiceRailway(): UseVoiceRailwayReturn {
                 console.error('❌ Fallback retry failed to send:', retryErr)
               }
 
+            }
+
+            // If we're already active and a later staged update failed, keep the session alive
+            if (sessionReady && awaitingSessionUpdate) {
+              console.warn('⚠️ Non-fatal: staged session.update failed after session was ready. Continuing without further staging.')
+              awaitingSessionUpdate = false
+              return
             }
 
             // Out of fallbacks or not in session.update phase: surface the error
