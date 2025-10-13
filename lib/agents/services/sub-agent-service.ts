@@ -71,15 +71,33 @@ export class SubAgentService {
   }
 
   /**
-   * Get all sub-agents for a parent agent
+   * Get all sub-agents for a parent agent (includes predefined + DB)
    */
   static async getSubAgents(parentAgentId: string, userId?: string): Promise<SubAgent[]> {
-    // 1) DB sub-agents (via RPC) — only if parentAgentId is a UUID to avoid 22P02 errors
+    // 1) Predefined sub-agents (from code)
+    const predefined = ALL_PREDEFINED_AGENTS
+      .filter(a => a.isSubAgent && a.parentAgentId === parentAgentId)
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        description: a.description || '',
+        parentAgentId: a.parentAgentId!,
+        isSubAgent: true,
+        delegationToolName: `delegate_to_${a.id.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        subAgentConfig: {},
+        systemPrompt: a.prompt,
+        model: a.model,
+        temperature: a.temperature ?? 0.7,
+        maxTokens: a.maxTokens ?? 4096,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        createdBy: 'system'
+      }))
+
+    // 2) DB sub-agents (via RPC) — only if parentAgentId is a UUID to avoid 22P02 errors
     let dbList: any[] = []
     const isUuid = this.isValidUUID(parentAgentId)
-    if (!isUuid) {
-      // Skipping RPC get_sub_agents for non-UUID parentAgentId
-    } else {
+    if (isUuid) {
       try {
         const { data, error } = await supabase.rpc('get_sub_agents', {
           parent_id: parentAgentId
@@ -96,32 +114,20 @@ export class SubAgentService {
 
     const dbSubAgents = dbList.map(this.mapDatabaseAgentToSubAgent)
 
-    // 2) Predefined sub-agents
-    const predefined = ALL_PREDEFINED_AGENTS
-      .filter(a => a.isSubAgent && a.parentAgentId === parentAgentId)
-      .map(a => ({
-        id: a.id,
-        name: a.name,
-        description: a.description || '',
-        parentAgentId: a.parentAgentId!,
-        isSubAgent: true,
-        delegationToolName: undefined as any,
-        subAgentConfig: {},
-        systemPrompt: a.prompt,
-        model: a.model,
-        temperature: a.temperature ?? 0.7,
-        maxTokens: a.maxTokens ?? 4096,
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        createdBy: 'local'
-      }))
-
-    // 3) Merge preferring DB over predefined by ID
+    // 3) Merge: DB overrides predefined by ID
     const byId = new Map<string, SubAgent>()
     for (const sa of predefined) byId.set(sa.id, sa)
     for (const sa of dbSubAgents) byId.set(sa.id, sa)
 
-    return Array.from(byId.values())
+    const result = Array.from(byId.values())
+    
+    // Log for debugging
+    if (result.length > 0) {
+      console.log(`[SubAgentService] Found ${result.length} sub-agents for parent ${parentAgentId}:`, 
+        result.map(s => s.name).join(', '))
+    }
+
+    return result
   }
 
   /**

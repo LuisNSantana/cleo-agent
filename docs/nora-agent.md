@@ -1,11 +1,11 @@
 # Nora — Agente de Community Management
 
-Resumen de la implementación, herramientas, sub-agentes y flujo de trabajo para el agente "Nora" (Community Manager).
+Resumen de la implementación, herramientas y flujo de trabajo para el agente "Nora" (Community Manager).
 
 ## Visión general
-Nora es un agente especializado en gestión de comunidades y redes sociales. Su objetivo es coordinar la creación de contenido, programar y publicar en X/Twitter, monitorear tendencias y métricas, y delegar tareas a sub-agentes cuando convenga.
+Nora es un agente especializado en gestión de comunidades y redes sociales. Su objetivo es coordinar la creación de contenido, programar y publicar en X/Twitter, monitorear tendencias y métricas.
 
-Enfoque: centralizar la estrategia social en un agente que orquesta creación (+Luna), análisis (+Zara) y publicación (+Viktor). Nora usa credenciales por usuario para operar APIs reales de terceros de forma segura.
+**Enfoque:** Nora maneja todo el ciclo de social media end-to-end: estrategia → contenido → publicación → análisis. Usa credenciales por usuario para operar APIs reales de terceros de forma segura.
 
 ## Componentes principales
 - Agente: `NORA_AGENT` (definido en `lib/agents/predefined/nora.ts`)
@@ -17,55 +17,61 @@ Enfoque: centralizar la estrategia social en un agente que orquesta creación (+
 ## Tools disponibles
 Detalle breve de cada tool y su propósito.
 
-- postTweet
+- **postTweet**
   - Publica un tweet usando las credenciales del usuario.
   - Input: { text, media?, reply_to?, scheduled_at? }
   - Output: { success, tweet_id, url } o error con código/mensaje.
 
-- generateTweet
+- **generateTweet**
   - Genera textos optimizados para X/Twitter según brief y tono.
   - Input: { prompt, length, tone }
   - Output: texto sugerido(s).
 
-- hashtagResearch
+- **hashtagResearch**
   - Busca y sugiere hashtags relevantes por tema o público objetivo.
   - Input: { topic, locale?, time_range? }
   - Output: lista de hashtags con volumen/score (cuando esté disponible).
 
-- twitterTrendsAnalysis
+- **twitterTrendsAnalysis**
   - Consulta tendencias (global/por región) y las interpreta para sugerir acciones.
   - Input: { woeid? | geo?, period? }
   - Output: tendencias y recomendaciones.
 
-- twitterAnalytics
+- **twitterAnalytics**
   - Recupera métricas (engagement, impresiones, CTR) para cuentas configuradas.
   - Input: { account_id, range }
   - Output: métricas agregadas, top posts.
 
-- Serp-related tools
+- **Serp-related tools**
   - `serpGeneralSearch`, `serpNewsSearch`, `serpTrendsSearch`, `serpTrendingNow`, `webSearch` — usados para investigación y descubrimiento de contenido.
 
-- getCurrentDateTime
+- **Google Workspace tools**
+  - Google Docs para crear reportes y calendarios de contenido
+  - Google Sheets para dashboards de analytics y tracking de KPIs
+
+- **getCurrentDateTime**
   - Utilidad para planificar horarios óptimos de publicación.
 
-- delegate_to_luna / delegate_to_zara / delegate_to_viktor
-  - Delegación a sub-agentes especializados (ver abajo).
-
-- complete_task
+- **complete_task**
   - Marca tareas como completadas y comunica resultado al orquestador.
 
-## Sub-agentes y responsabilidades
-- Luna — Content Creator
-  - Generación de borradores, variantes de copy, ideas creativas y calendarios de contenido.
-  - Interfaz con `generateTweet` y herramientas de búsqueda para briefing.
+## Arquitectura y Especialización
 
-- Zara — Analytics & Trends
-  - Analiza datos, detecta patrones, sugiere hashtags y horarios; ejecuta `twitterTrendsAnalysis` y `twitterAnalytics`.
+**Nora es un agente completo** que maneja todas las facetas de community management:
 
-- Viktor — Publishing & Scheduler
-  - Encargado de programar y publicar (usa `postTweet`), manejo de colas y control de errores en la publicación.
+### Capacidades Core:
+1. **Estrategia de Contenido** - Define pilares editoriales y calendarios
+2. **Creación de Contenido** - Escribe tweets, hilos y copy optimizado
+3. **Publicación y Scheduling** - Programa y publica contenido
+4. **Analytics y Optimización** - Analiza métricas y ajusta estrategia
+5. **Community Engagement** - Interactúa con la audiencia
+6. **Trend Monitoring** - Monitorea y reacciona a tendencias
 
-Delegación: Nora decide cuándo mantener la acción y cuándo delegar. Cada sub-agente devuelve una respuesta estructurada que Nora incorpora en su plan.
+### Herramientas Especializadas:
+- **Twitter/X:** postTweet, generateTweet, postTweetWithMedia, createTwitterThread
+- **Research:** webSearch, serpAPI tools para trends y competencia
+- **Analytics:** Google Sheets con fórmulas, gráficos y conditional formatting
+- **Reporting:** Google Docs con formato profesional
 
 ## Gestión de credenciales
 - Modelo: una fila por conexión en `user_service_connections` (tabla común del sistema).
@@ -73,31 +79,37 @@ Delegación: Nora decide cuándo mantener la acción y cuándo delegar. Cada sub
 - CRUD Server: `app/api/twitter/credentials/route.ts` — crea, lista, elimina conexiones.
 - Test endpoint: `app/api/twitter/test/route.ts` — valida credenciales con la API de Twitter antes de guardarlas.
 - Seguridad: las claves se encriptan en la base de datos (misma estrategia usada para Notion/SerpAPI).
-- UI: `components/serpapi/serpapi-credentials-manager` y el equivalente `components/twitter/twitter-credentials-manager.tsx` permiten agregar, testear y eliminar credenciales desde la sección de agentes.
+- UI: `components/twitter/twitter-credentials-manager.tsx` permite agregar, testear y eliminar credenciales desde la sección de agentes.
 
 ## Flujo de trabajo (ejemplo: publicar una campaña)
 1. Usuario configura credenciales en el panel de agentes (`/app/agents/manage`).
-2. Nora recibe un objetivo: "Lanzar hilo promocional sobre X".
-3. Nora consulta a Zara para investigar tendencias y hashtags.
-4. Nora solicita a Luna 3 variantes de hilo (tono A/B/C) usando `generateTweet` y resultados de búsqueda.
-5. Nora valida internamente la mejor variante y entrega a Viktor para programar la publicación con `postTweet` (o publicar inmediatamente).
-6. Después de publicar, Zara recopila métricas con `twitterAnalytics` y Nora resume el rendimiento y sugiere optimizaciones.
+2. Nora recibe un objetivo: "Lanzar campaña promocional sobre producto X".
+3. Nora investiga tendencias relevantes usando serpAPI tools.
+4. Nora genera contenido optimizado: tweets, threads, y variantes usando generateTweet.
+5. Nora programa la publicación con postTweet o publica inmediatamente.
+6. Nora crea dashboard en Google Sheets para tracking de métricas.
+7. Después de publicar, Nora recopila métricas y genera reporte con recomendaciones.
 
 ## Contratos mínimos (inputs/outputs)
-- Inputs:
+- **Inputs:**
   - Credenciales del usuario (almacenadas por `user_id`)
   - Objetivo/brief (texto estructurado) para generación
   - Contexto (audiencia, canal, restricciones legales)
-- Outputs:
+- **Outputs:**
   - Publicaciones (tweet ids / urls)
   - Recomendaciones (hashtags, horarios)
   - Reportes de métricas
-- Modo fallo:
+  - Calendarios de contenido
+  - Dashboards de analytics
+- **Modo fallo:**
   - Si faltan credenciales: la tool falla con mensaje y Nora solicita al usuario conectar credenciales.
   - Rate limit / API errors: retries exponenciales con backoff y fallback a acciones manuales (notificar al usuario).
 
 ## Casos borde y consideraciones
-- Múltiples cuentas: el usuario puede tener varias conexiones; Nora escogerá la conexión etiquetada/activa.
+- **Múltiples cuentas:** el usuario puede tener varias conexiones; Nora escogerá la conexión etiquetada/activa.
+- **Rate limits:** Implementación de backoff exponencial y queueing de publicaciones.
+- **Validación de contenido:** Nora verifica longitud, menciones, y compliance antes de publicar.
+- **Analytics históricos:** Mantiene tracking en Google Sheets para análisis longitudinal.
 - Permisos insuficientes: si la app no tiene permisos de escritura, el sistema reporta el error y sugiere regenerar tokens.
 - Contenido sensible: Nora incluye reglas de moderación. Los prompts pueden bloquear contenido no permitido.
 - Fallos en la API: registrar incidentes y exponer una razón legible al usuario.

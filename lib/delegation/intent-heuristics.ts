@@ -14,6 +14,7 @@ export interface DelegationIntentResult {
 
 // Keyword dictionary per agent (lowercase). Weight defaults to 1 unless specified.
 // Keep lists compact; we can enrich later.
+// This list is dynamically enriched at runtime with user-created agents
 const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> = {
   'ami-creative': [
     'agenda','agendar','calendario','calendar','schedule','scheduling','meeting','reunión','recordatorio','reminder',
@@ -28,7 +29,6 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'apu-support': [
     'investiga','research','buscar','trend','tendencia','web','news','noticias','análisis','comparar','fuentes'
   ],
-
   'emma-ecommerce': [
     'shopify','ecommerce','tienda','producto','inventario','ventas','carrito','sku','catalogo','checkout'
   ],
@@ -44,16 +44,9 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     'enviar correo','compose email','draft email','responder correo','firma','inbox zero'
   ],
   'nora-community': [
-    'comunidad','community','engagement','social strategy','campaña','followers','audiencia','redes sociales'
-  ],
-  'luna-content-creator': [
-    'escribe tweet','copy','contenido creativo','post viral','hashtags','hilo','thread'
-  ],
-  'zara-analytics-specialist': [
-    'analytics','métricas','stats','estadísticas','kpi','performance social','engagement rate'
-  ],
-  'viktor-publishing-specialist': [
-    'programar publicación','schedule post','publicar','calendarizar contenido','publish now'
+    'comunidad','community','engagement','social strategy','campaña','followers','audiencia','redes sociales',
+    'tweet','twitter','x.com','post','publicar','social media','contenido social','analytics social',
+    'schedule post','programar publicación'
   ],
 }
 
@@ -71,13 +64,53 @@ function normalizeScore(count: number, totalKeywords: number): number {
   return Math.min(1, ratio)
 }
 
-export function scoreDelegationIntent(userMessage: string, opts?: { debug?: boolean }): DelegationIntentResult {
+/**
+ * Enrich keywords dynamically with user-created agents
+ * This is called at runtime to include custom agents in intent detection
+ */
+export function enrichKeywordsWithAgents(agents: Array<{ id: string; name: string; tags?: string[]; description?: string }>): void {
+  for (const agent of agents) {
+    // Skip if already defined or if it's the supervisor
+    if (AGENT_KEYWORDS[agent.id] || agent.id === 'cleo-supervisor') continue
+    
+    // Generate keywords from agent name, tags, and description
+    const keywords: string[] = []
+    
+    // Add name variations (lowercase)
+    keywords.push(agent.name.toLowerCase())
+    
+    // Add tags if available
+    if (agent.tags && agent.tags.length > 0) {
+      keywords.push(...agent.tags.map(t => t.toLowerCase()))
+    }
+    
+    // Extract key terms from description (words longer than 4 chars)
+    if (agent.description) {
+      const descWords = agent.description.toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length > 4 && /^[a-z]+$/.test(w))
+        .slice(0, 5) // Max 5 terms from description
+      keywords.push(...descWords)
+    }
+    
+    AGENT_KEYWORDS[agent.id] = keywords
+  }
+}
+
+export function scoreDelegationIntent(userMessage: string, opts?: { debug?: boolean; availableAgents?: string[] }): DelegationIntentResult {
   const text = userMessage.toLowerCase()
   const scores: Record<string, number> = {}
   const reasons: string[] = []
 
-  for (const agentId of Object.keys(AGENT_KEYWORDS)) {
+  // Filter to only score available agents (performance optimization)
+  const agentsToScore = opts?.availableAgents 
+    ? Object.keys(AGENT_KEYWORDS).filter(id => opts.availableAgents!.includes(id))
+    : Object.keys(AGENT_KEYWORDS)
+
+  for (const agentId of agentsToScore) {
     const keywords = AGENT_KEYWORDS[agentId]
+    if (!keywords || keywords.length === 0) continue
+    
     let hitCount = 0
     for (const entry of keywords) {
       const k = typeof entry === 'string' ? entry : entry.k
