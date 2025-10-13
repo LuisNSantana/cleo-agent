@@ -750,7 +750,7 @@ export async function POST(req: Request) {
     ;(globalThis as any).__requestId = reqId
 
   // Configure tools and provider options per model
-    // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
+  // For xAI (grok-3-mini), drop the generic webSearch tool; prefer native Live Search when user enables it
   toolsForRun = tools as typeof tools
   // Detect explicit document intent in the last user message
   const lastUserContent = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
@@ -776,6 +776,20 @@ export async function POST(req: Request) {
             returnCitations: effectiveEnableSearch ? true : false,
           },
         },
+      }
+    }
+
+    // Reasoning toggle for Grok 4 Fast via OpenRouter (provider-level option simulated here)
+    if (normalizedModel === 'grok-4-fast') {
+      providerOptions = {
+        ...(providerOptions || {}),
+        xai: {
+          ...(providerOptions?.xai || {}),
+          // For simple chats (greetings), keep minimal reasoning; otherwise default to medium
+          reasoning: {
+            effort: quickDelegationFlag ? 'medium' : 'minimal'
+          },
+        }
       }
     }
 

@@ -5,11 +5,10 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Cleo simplified public models (added 2025-09-27)
   // These are the only two user-selectable chat models now.
   // grok-4-fast is routed internally to openrouter:x-ai/grok-4-fast
-  // grok-4-fast-reasoning is the new multimodal primary (was grok-4-multimodal)
+  // Reasoning is a runtime toggle; there is no separate id
   "grok-4-fast": "openrouter",
-  "grok-4-fast-reasoning": "xai",
   // Backward compatibility alias
-  "grok-4-multimodal": "xai",
+  "grok-4-multimodal": "openrouter", // normalize to grok-4-fast alias upstream
   // OpenRouter models
   "openrouter:z-ai/glm-4.5": "openrouter",
   "z-ai/glm-4.5": "openrouter",
@@ -167,7 +166,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // XAI
   "grok-4": "xai",
   // (dedup) entries moved to top section; keeping non-reasoning variant only
-  "grok-4-fast-non-reasoning": "xai",  // Grok 4 Fast Non-Reasoning
+  // Removed explicit non-reasoning variant; handled via options
   "grok-3": "xai",
   "grok-3-latest": "xai",
   "grok-3-fast": "xai",

@@ -11,6 +11,42 @@ import { makeDelegationDecision, analyzeTaskComplexity } from '@/lib/agents/comp
 import type { AgentConfig } from '@/lib/agents/types'
 import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
 
+// Lightweight in-memory cache for personalization (5 min TTL)
+const USER_PROFILE_TTL_MS = 5 * 60 * 1000
+const userProfileCache = new Map<string, { expires: number; block: string }>()
+
+async function getUserProfileBlock(supabase: any, userId: string | null): Promise<string> {
+  try {
+    if (!supabase || !userId) return ''
+    const cached = userProfileCache.get(userId)
+    const now = Date.now()
+    if (cached && cached.expires > now) return cached.block
+
+    const { data, error } = await (supabase as any)
+      .from('users')
+      .select('display_name, favorite_features, favorite_models')
+      .eq('id', userId)
+      .single()
+    if (error) return ''
+
+    const name = (data?.display_name || '').toString().trim()
+    const favFeatures: string[] = Array.isArray(data?.favorite_features) ? data.favorite_features.slice(0, 5) : []
+    const favModels: string[] = Array.isArray(data?.favorite_models) ? data.favorite_models.slice(0, 5) : []
+
+    const lines: string[] = []
+    lines.push('USER PROFILE (compact)')
+    if (name) lines.push(`- Name: ${name}`)
+    if (favFeatures.length) lines.push(`- Favorite features: ${favFeatures.join(', ')}`)
+    if (favModels.length) lines.push(`- Favorite models: ${favModels.join(', ')}`)
+    const block = lines.length > 1 ? lines.join('\n') : ''
+
+    userProfileCache.set(userId, { expires: now + USER_PROFILE_TTL_MS, block })
+    return block
+  } catch {
+    return ''
+  }
+}
+
 // Build a dynamic internal hint to steer delegation without exposing it to the user
 async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective) {
   const base = `\n\nOPTIMIZED AGENT SYSTEM ACTIVE:
@@ -271,7 +307,9 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
         if ((isGreeting || isVeryShort) && hasNoTaskVerbs) {
           retrievalRequested = false
         }
-        if (!realUserId || !realUserId.trim()) {
+        if (!retrievalRequested) {
+          // Skip retrieval entirely for trivial/greeting messages
+        } else if (!realUserId || !realUserId.trim()) {
           console.warn('[RAG] Skipping retrieval because realUserId is missing in buildFinalSystemPrompt.')
         } else {
           const normalizedUserId = realUserId.trim()
@@ -505,6 +543,9 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
 
   const personaPrompt = generatePersonalizedPrompt(model, personalitySettings, { compact: true })
 
+  // Build compact user profile block (cached, fast DB hit)
+  const userProfileBlock = await getUserProfileBlock(supabase, realUserId)
+
   const CONTEXT_AND_DOC_RULES = `CONTEXT USAGE\n- If CONTEXT is provided, use it directly; don't claim missing info.\n\nDOCUMENTS\n- If the user wants to work on / edit / collaborate on a document found in the CONTEXT, offer opening it in the Canvas Editor (e.g., "¿Quieres que abra [nombre del documento] en el editor colaborativo?")`
 
   const personalizationInstruction = `IMPORTANT: ALWAYS use information from the CONTEXT to respond. This includes:
@@ -546,8 +587,8 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 - Agent visibility: Each agent can see their own tools, tags, and specializations when making delegation decisions.`
   
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
 
   if (
     (typeof selectedBasePrompt === 'string' && selectedBasePrompt.includes('{{user_lang}}')) ||

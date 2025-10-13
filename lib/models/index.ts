@@ -6,8 +6,7 @@ import { grokModels } from "./data/grok"
 /**
  * Simplified unified model list
  * We expose only two clear options in the UI:
- * - Faster (🚀): grok-4-fast → quick and cost-effective text
- * - Smarter (🧠): grok-4-fast-reasoning → reasoning + vision/files
+ * - Grok 4 Fast (🚀): single model via OpenRouter. Reasoning is a runtime toggle, not a separate id.
  *
  * Old tiers and legacy models (Claude, GPT‑5, Mistral, Gemini, etc.) are hidden
  * to avoid duplication and noise. Historical ids are normalized upstream.
@@ -29,9 +28,9 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Final list: Faster (grok-4-fast), Smarter (grok-4-fast-reasoning)
+// Final list: Single public model (grok-4-fast)
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-fast', 'grok-4-fast-reasoning'])
+  ...pickById(grokModels, ['grok-4-fast'])
 ]
 
 // Post-processing rules to prevent confusing duplicates in selector.
