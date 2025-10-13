@@ -243,8 +243,9 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     }
   }
 
-  const autoRagEnabled = true
-  const retrievalRequested = enableSearch || !!documentId || autoRagEnabled
+  // Prefer speed by default; only enable RAG when explicitly requested
+  let autoRagEnabled = false
+  let retrievalRequested = enableSearch || !!documentId || !!projectId || autoRagEnabled
   let ragSystemAddon = ''
 
   if (retrievalRequested) {
@@ -262,6 +263,14 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
       }
 
       if (userPlain.trim()) {
+        // Greeting/trivial fast-path: skip retrieval to save time for simple chats
+        const low = userPlain.trim().toLowerCase()
+        const isGreeting = /^(hola|\bhey\b|\bhi\b|hello|buen[oa]s\s+(d[ií]as|tardes|noches)|how are you|como estas|cómo estás|que tal|qué tal)\b/.test(low)
+        const isVeryShort = low.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean).length <= 6
+        const hasNoTaskVerbs = !/(crear|create|build|make|generar|generate|analizar|analyze|buscar|search|investigar|research|enviar|send|programa|code|document|sheet|pdf|notion|calendar|email|gmail|drive)/i.test(low)
+        if ((isGreeting || isVeryShort) && hasNoTaskVerbs) {
+          retrievalRequested = false
+        }
         if (!realUserId || !realUserId.trim()) {
           console.warn('[RAG] Skipping retrieval because realUserId is missing in buildFinalSystemPrompt.')
         } else {
@@ -278,7 +287,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           } catch {}
 
           // Dynamic sizing: faster models get smaller budgets for speed
-          const fastModel = model === 'grok-3-mini'
+          const fastModel = model === 'grok-3-mini' || model === 'grok-4-fast'
           const topK = fastModel ? 4 : 6
           let retrieved = await retrieveRelevant({
             userId: normalizedUserId,
@@ -394,8 +403,15 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
       }
 
       if (userPlain.trim()) {
-        const early = detectEarlyIntent(userPlain)
-        if (early) {
+        const low = userPlain.trim().toLowerCase()
+        const isGreeting = /^(hola|\bhey\b|\bhi\b|hello|buen[oa]s\s+(d[ií]as|tardes|noches)|how are you|como estas|cómo estás|que tal|qué tal)\b/.test(low)
+        const isVeryShort = low.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean).length <= 6
+        const hasNoTaskVerbs = !/(crear|create|build|make|generar|generate|analizar|analyze|buscar|search|investigar|research|enviar|send|programa|code|document|sheet|pdf|notion|calendar|email|gmail|drive)/i.test(low)
+        const skipEarly = (isGreeting || isVeryShort) && hasNoTaskVerbs
+
+        if (!skipEarly) {
+          const early = detectEarlyIntent(userPlain)
+          if (early) {
           routerHint = early
           if (realUserId) {
             ;(async () => {
@@ -414,6 +430,9 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
             })()
           }
           throw new Error('__EARLY_ROUTER_HINT_FOUND__')
+        }
+        } else {
+          console.log('🧭 [Prompt] Early intent skipped (greeting/simple).')
         }
 
         if (supabase && realUserId) {
