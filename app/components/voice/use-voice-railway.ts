@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-type VoiceStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error'
+type VoiceStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error' | 'reconnecting'
 
 interface UseVoiceRailwayReturn {
   startSession: (chatId?: string) => Promise<void>

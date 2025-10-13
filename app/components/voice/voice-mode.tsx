@@ -14,10 +14,11 @@ function AudioVisualizer({
   status 
 }: { 
   audioLevel: number
-  status: 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error'
+  status: 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error' | 'reconnecting'
 }) {
   const isActive = status === 'listening' || status === 'speaking' || status === 'active'
   const isSpeaking = status === 'speaking'
+  const isReconnecting = status === 'reconnecting'
 
   const bars = Array.from({ length: 40 }, (_, i) => {
     const baseHeight = 0.2 + (Math.sin(i * 0.5) * 0.3)
@@ -37,12 +38,14 @@ function AudioVisualizer({
               ? "bg-gradient-to-t from-blue-500 to-purple-500"
               : status === 'listening'
               ? "bg-gradient-to-t from-emerald-500 to-green-400"
+              : isReconnecting
+              ? "bg-gradient-to-t from-amber-500 to-orange-400"
               : "bg-gradient-to-t from-zinc-700 to-zinc-600"
           )}
           initial={{ scaleY: 0.2 }}
           animate={{
             scaleY: height,
-            opacity: isActive ? 1 : 0.3
+            opacity: isActive || isReconnecting ? 1 : 0.3
           }}
           transition={{
             duration: 0.15,
@@ -133,6 +136,8 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
     switch (status) {
       case 'connecting':
         return 'Conectando...'
+      case 'reconnecting':
+        return 'Reconectando...'
       case 'active':
       case 'listening':
         return 'Escuchando...'

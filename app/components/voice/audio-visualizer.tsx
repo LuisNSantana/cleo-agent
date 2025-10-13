@@ -5,12 +5,13 @@ import { cn } from '@/lib/utils'
 
 interface AudioVisualizerProps {
   audioLevel: number
-  status: 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error'
+  status: 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'error' | 'reconnecting'
 }
 
 export function AudioVisualizer({ audioLevel, status }: AudioVisualizerProps) {
   const isActive = status === 'listening' || status === 'speaking' || status === 'active'
   const isSpeaking = status === 'speaking'
+  const isReconnecting = status === 'reconnecting'
 
   // Generate bars
   const bars = Array.from({ length: 40 }, (_, i) => {
@@ -31,12 +32,14 @@ export function AudioVisualizer({ audioLevel, status }: AudioVisualizerProps) {
               ? "bg-gradient-to-t from-blue-500 to-purple-500"
               : status === 'listening'
               ? "bg-gradient-to-t from-emerald-500 to-green-400"
+              : isReconnecting
+              ? "bg-gradient-to-t from-amber-500 to-orange-400"
               : "bg-gradient-to-t from-zinc-700 to-zinc-600"
           )}
           initial={{ scaleY: 0.2 }}
           animate={{
             scaleY: height,
-            opacity: isActive ? 1 : 0.3
+            opacity: isActive || isReconnecting ? 1 : 0.3
           }}
           transition={{
             duration: 0.15,
