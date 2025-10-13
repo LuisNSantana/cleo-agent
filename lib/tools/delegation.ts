@@ -155,6 +155,16 @@ async function runDelegation(params: {
     || orchestrator.startAgentExecution?.(input, agentId)
 
   const execId: string | undefined = exec?.id
+  
+  // DEBUG: Log delegation execution details
+  console.log('🔍 [DELEGATION DEBUG] Started execution:', {
+    targetAgentId: agentId,
+    execId,
+    executionStatus: exec?.status,
+    userId,
+    inputPreview: input.slice(0, 100)
+  })
+  
   const startedAt = Date.now()
   const { getRuntimeConfig } = await import('../agents/runtime-config')
   const runtime = getRuntimeConfig()
@@ -205,14 +215,72 @@ async function runDelegation(params: {
   let lastProgress = 0
   let extendedMs = 0
   
+  // CRITICAL FIX: Listen for completion events to detect when delegated agent finishes
+  let eventListenerAdded = false
+  const completionPromise = new Promise<string | null>((resolve) => {
+    try {
+      const legacy = (globalThis as any).__cleoOrchestrator
+      if (legacy && typeof legacy.onEvent === 'function' && execId) {
+        const handler = (event: any) => {
+          if (event.type === 'execution_completed' && event.data?.executionId === execId) {
+            console.log('🔍 [DELEGATION DEBUG] Received completion event:', {
+              eventExecutionId: event.data?.executionId,
+              targetExecutionId: execId,
+              agentId: event.agentId
+            })
+            // Get final result from the completed execution
+            const snapshot = orchestrator.getExecution?.(execId)
+            const result = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+            resolve(result)
+          }
+        }
+        legacy.onEvent(handler)
+        eventListenerAdded = true
+        console.log('🔍 [DELEGATION DEBUG] Added completion event listener for:', execId)
+      } else {
+        resolve(null) // Fallback to polling only
+      }
+    } catch (err) {
+      console.warn('🔍 [DELEGATION DEBUG] Failed to add completion listener:', err)
+      resolve(null) // Fallback to polling only
+    }
+  })
+  
   while (Date.now() - startedAt < timeoutMs) {
-    // Small delay
-     
-    await new Promise(r => setTimeout(r, POLL_MS))
+    // Small delay OR wait for completion event
+    const pollPromise = new Promise(r => setTimeout(r, POLL_MS))
+    
+    // Race between polling delay and completion event
+    const eventResult = await Promise.race([
+      pollPromise.then(() => null),
+      completionPromise
+    ])
+    
+    // If we got a completion event, use that result
+    if (eventResult !== null) {
+      finalResult = eventResult
+      status = 'completed'
+      console.log('🔍 [DELEGATION DEBUG] Completion detected via event:', {
+        execId,
+        resultLength: finalResult?.length,
+        agentId
+      })
+      break
+    }
 
     try {
       const snapshot = execId ? orchestrator.getExecution?.(execId) : null
       status = snapshot?.status || status
+      
+      // DEBUG: Log detailed execution status during delegation polling
+      console.log('🔍 [DELEGATION DEBUG] Polling execution:', {
+        execId,
+        snapshotStatus: snapshot?.status,
+        snapshotResult: snapshot?.result ? 'present' : 'missing',
+        snapshotMessages: snapshot?.messages?.length || 0,
+        currentStatus: status,
+        elapsed: Date.now() - startedAt
+      })
       
       // Emit progress events when status changes
       if (status !== lastStatus) {
