@@ -4,6 +4,7 @@ import { defaultReranker } from './reranking'
 import { detectLanguage, type SupportedLanguage } from '@/lib/language-detection'
 import { translateQuery } from './translate'
 import { getRuntimeConfig } from '@/lib/agents/runtime-config'
+import { createHash } from 'crypto'
 
 export interface RetrieveOptions {
   userId: string
@@ -18,6 +19,9 @@ export interface RetrieveOptions {
   textWeight?: number
   // Optional prompt budgeting inputs
   maxContextChars?: number // approximate max characters to allocate for context
+  // Deadline and caching
+  timeoutMs?: number // hard deadline for the entire retrieval (including reranking)
+  cacheTtlMs?: number // optional cache TTL override
 }
 
 export interface RetrievedChunk {
@@ -52,6 +56,37 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     console.warn('[RAG] retrieveRelevant called without a valid userId. Skipping search to avoid RPC errors.')
     return []
   }
+
+  const start = Date.now()
+  const deadline = typeof opts.timeoutMs === 'number' && opts.timeoutMs > 0
+    ? start + opts.timeoutMs
+    : Number.POSITIVE_INFINITY
+  const timeLeft = () => Math.max(0, deadline - Date.now())
+
+  // Simple in-memory TTL cache shared per server runtime
+  type CacheEntry = { data: RetrievedChunk[]; expiry: number }
+  const globalAny = globalThis as any
+  const CACHE_DEFAULT_TTL = typeof opts.cacheTtlMs === 'number' && opts.cacheTtlMs > 0 ? opts.cacheTtlMs : 2 * 60 * 1000 // 2 minutes
+  const cache: Map<string, CacheEntry> = globalAny.__ragRetrievalCache || (globalAny.__ragRetrievalCache = new Map())
+  const hash = (s: string) => createHash('sha256').update(s).digest('hex')
+  const cacheKey = hash([
+    `u:${normalizedUserId}`,
+    `q:${query}`,
+    documentId ? `d:${documentId}` : 'd:-',
+    projectId ? `p:${projectId}` : 'p:-',
+    `k:${opts.topK ?? 'auto'}`,
+    `hy:${useHybrid}`,
+    `rr:${useReranking}`,
+    `min:${minSimilarity}`,
+    `vw:${vectorWeight}`,
+    `tw:${textWeight}`,
+    `mc:${opts.maxContextChars ?? 'default'}`
+  ].join('|'))
+  const cached = cache.get(cacheKey)
+  if (cached && cached.expiry > Date.now()) {
+    console.log(`[RAG] Cache hit for query (ttl left: ${Math.round((cached.expiry - Date.now())/1000)}s)`)
+    return cached.data
+  }
   
   // Adaptive sizing: derive topK and chunkLimit from query size and budget
   const approxQueryTokens = Math.ceil(query.length / 4)
@@ -75,10 +110,21 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   // Multilingual support: expand query if user/doc language likely differs
   const detected: SupportedLanguage = detectLanguage(query)
   const altTarget: SupportedLanguage = detected === 'es' ? 'en' : 'es'
-  const translated = await translateQuery(query, altTarget)
+  let translated = ''
+  if (timeLeft() > 250) {
+    try {
+      translated = await translateQuery(query, altTarget)
+    } catch (e) {
+      console.warn('[RAG] translateQuery failed or skipped:', (e as any)?.message)
+    }
+  }
   const uniqueQueries = Array.from(new Set([query, translated].map(q => q.trim()).filter(Boolean)))
-  const [embedding] = await defaultEmbeddingProvider.embed([query])
-  if (!embedding) return []
+  if (timeLeft() <= 0) {
+    console.warn('[RAG] Deadline reached before embedding. Skipping retrieval.')
+    return []
+  }
+  const queryEmbeddings = await defaultEmbeddingProvider.embed(uniqueQueries)
+  if (!queryEmbeddings?.length) return []
 
   let results: RetrievedChunk[] = []
 
@@ -86,9 +132,16 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     // Use hybrid search (vector + full-text)
     const perQueryMatch = useReranking ? dynamicTopK * 2 : dynamicTopK
     const hybridResults: RetrievedChunk[] = []
-    for (const q of uniqueQueries) {
-      const [qEmbedding] = await defaultEmbeddingProvider.embed([q])
-      const { data, error } = await (supabase as any).rpc('hybrid_search_document_chunks', {
+  for (let i = 0; i < uniqueQueries.length; i++) {
+      if (timeLeft() <= 0) {
+        console.warn('[RAG] Deadline reached during hybrid search loop; returning partial results.')
+        break
+      }
+      const q = uniqueQueries[i]
+      const qEmbedding = queryEmbeddings[i]
+      const callBudget = Math.max(150, timeLeft() - 100) // leave a tiny buffer
+      if (callBudget <= 0) break
+      const rpcPromise = (supabase as any).rpc('hybrid_search_document_chunks', {
         p_user_id: normalizedUserId,
         p_query_embedding: qEmbedding,
         p_query_text: q,
@@ -99,7 +152,12 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
         p_vector_weight: vectorWeight,
         p_text_weight: textWeight,
       })
-  
+      const res = await withTimeout(rpcPromise as Promise<{ data: any; error: any }>, callBudget)
+      if (!res) {
+        console.warn('[RAG] hybrid_search timeout; skipping this query piece')
+        continue
+      }
+      const { data, error } = res
       if (error) {
         console.error('hybrid_search_document_chunks error', error)
         continue
@@ -140,12 +198,24 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   // Apply cross-encoder reranking if enabled
   if (useReranking && results.length > 1) {
     try {
+      if (timeLeft() < 400) {
+        console.log('[RERANK] Skipped due to low remaining budget.')
+        const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
+        cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+        return sliced
+      }
       const documents = results.map(chunk => chunk.content)
       // Use the original query for reranking to keep intent, but this already contains multilingual candidates
-      const rerankResults = await defaultReranker.rerank(query, documents, { 
-        topK: dynamicTopK, 
-        minScore: runtime.ragMinRerankScore
-      })
+      const rerankResults = await withTimeout(
+        defaultReranker.rerank(query, documents, { topK: dynamicTopK, minScore: runtime.ragMinRerankScore }),
+        timeLeft() - 50
+      )
+      if (!rerankResults) {
+        console.log('[RERANK] Timeout; returning hybrid results without reranking.')
+        const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
+        cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+        return sliced
+      }
       
       // Map reranked results back to chunks
       const rerankedChunks = rerankResults
@@ -160,13 +230,16 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       })
 
       console.log(`[RERANK] Reranked ${results.length} → ${rerankedChunks.length} chunks (top score: ${rerankedChunks[0]?.rerank_score?.toFixed(3)})`)
-      return rerankedChunks
+      const sliced = rerankedChunks.slice(0, Math.min(dynamicTopK, chunkLimit))
+      cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+      return sliced
     } catch (error: any) {
       console.error('[RERANK] Reranking failed, using hybrid results:', error.message)
     }
   }
-
-  return results.slice(0, Math.min(dynamicTopK, chunkLimit))
+  const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
+  cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
+  return sliced
 }
 
 // Fallback function for vector-only search
@@ -183,16 +256,26 @@ async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk
   const embedding = (await defaultEmbeddingProvider.embed([query]))[0]
   if (!embedding) return []
   
-  const { data, error } = await (supabase as any).rpc('match_document_chunks', {
+  const vectorRpc = (supabase as any).rpc('match_document_chunks', {
     p_user_id: normalizedUserId,
     p_query_embedding: embedding,
     p_match_count: topK,
     p_document_id: documentId || null,
     p_project_id: projectId || null,
     p_min_similarity: minSimilarity,
-  })
+  }) as Promise<{ data: any; error: any }>
+  const vectorRes = await withTimeout(vectorRpc, Math.max(150, (opts.timeoutMs ?? 5000) - 100))
+  if (!vectorRes) {
+    console.warn('[RAG] match_document_chunks timeout; returning empty results')
+    return []
+  }
+  const { data, error } = vectorRes
   
   if (error) {
+    if ((error as any).message === 'timeout') {
+      console.warn('[RAG] match_document_chunks timeout; returning empty results')
+      return []
+    }
     console.error('match_document_chunks error', error)
     if (error.code === 'PGRST202') {
       console.warn('[RAG] RPC missing. Ensure you ran supabase_schema_rag.sql in your project. Returning empty context.')
@@ -229,4 +312,15 @@ export function buildContextBlock(chunks: RetrievedChunk[], maxChars = 6000) {
   }
   lines.push('=== END OF CONTEXT ===')
   return lines.join('\n')
+}
+
+// Utility: race a promise against a timeout; returns null on timeout
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  if (!isFinite(ms) || ms <= 0) return promise.then(v => v).catch(e => { throw e })
+  return new Promise<T | null>((resolve, reject) => {
+    const t = setTimeout(() => resolve(null), ms)
+    promise
+      .then((v) => { clearTimeout(t); resolve(v) })
+      .catch((e) => { clearTimeout(t); reject(e) })
+  })
 }

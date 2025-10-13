@@ -127,6 +127,7 @@ export const listCalendarEventsTool = tool({
   execute: async ({ maxResults = 50, timeMin, timeMax, timeZone = 'Europe/Madrid', calendarId = 'primary', filterKeyword, singleEvents = true }) => {
     const userId = getCurrentUserId()
     const model = getCurrentModel() || ''
+    const uuidLike = typeof userId === 'string' && /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(userId)
     
     // Force 'primary' calendar to avoid permission issues
     const safeCalendarId = 'primary'
@@ -139,7 +140,7 @@ export const listCalendarEventsTool = tool({
     
     try {
       const started = Date.now()
-      if (!userId) return { success: false, message: 'Auth required', events: [], total: 0 }
+      if (!userId || !uuidLike) return { success: false, message: 'Inicia sesión para usar tu Calendario de Google', events: [], total: 0 }
 
       const accessToken = await getGoogleCalendarAccessToken(userId)
       if (!accessToken) return { success: false, message: 'Connect Google Calendar in Settings', events: [], total: 0 }
@@ -234,8 +235,8 @@ export const listCalendarEventsTool = tool({
     } catch (error) {
       console.error('[GCal List Error]:', error)
       const msg = error instanceof Error ? error.message : String(error)
-      const userId = getCurrentUserId()
-      if (userId) await trackToolUsage(userId, 'googleCalendar.listEvents', { ok: false, execMs: 0, errorType: 'list_error' })
+      const uid = getCurrentUserId()
+      if (uid) await trackToolUsage(uid, 'googleCalendar.listEvents', { ok: false, execMs: 0, errorType: 'list_error' })
       return { success: false, message: `Failed: ${msg}`, events: [], total_count: 0 }
     }
   },
@@ -300,10 +301,11 @@ export const createCalendarEventTool = tool({
       { summary: refinedSummary, originalSummary: summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
       async () => {
         const userId = getCurrentUserId()
+        const uuidLike = typeof userId === 'string' && /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(userId)
         
         try {
           const started = Date.now()
-          if (!userId) return { success: false, message: 'Auth required' }
+          if (!userId || !uuidLike) return { success: false, message: 'Inicia sesión para crear eventos en tu Calendario de Google' }
 
           const accessToken = await getGoogleCalendarAccessToken(userId)
           if (!accessToken) return { success: false, message: 'Connect Google Calendar' }

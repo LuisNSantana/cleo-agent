@@ -175,8 +175,9 @@ export class AgentDiscoveryService {
         .neq('name', 'Cleo') // Exclude Cleo
       
       if (userId) {
-        // Get user's agents and publicly shared agents
-        query = query.or(`user_id.eq.${userId},is_public.eq.true`)
+        // Filter strictly by the authenticated user's agents.
+        // Note: 'is_public' column does not exist in our schema; predefined/shared agents are handled elsewhere.
+        query = query.eq('user_id', userId)
       }
       
       const { data: agents, error } = await query
