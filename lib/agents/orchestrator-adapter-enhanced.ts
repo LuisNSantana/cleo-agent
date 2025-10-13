@@ -265,12 +265,6 @@ function createAndRunExecutionWithContext(
     model: agentId || 'agent:unknown',
     requestId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }, () => {
-    // Call legacy orchestrator's startAgentExecutionForUI which accepts userId
-    const legacy = (globalThis as any).__cleoOrchestrator
-    if (legacy && typeof legacy.startAgentExecutionForUI === 'function') {
-      return legacy.startAgentExecutionForUI(input, agentId, 'default', userId, prior)
-    }
-    // Fallback to basic execution if legacy not available
     return createAndRunExecution(input, agentId, prior)
   })
 }

@@ -67,18 +67,39 @@ function warnOnce(kind: 'userId' | 'model' | 'requestId') {
 
 export function getCurrentUserId(): string | undefined {
   const context = (storage as ALS<RequestContext>).getStore()
-  if (!context?.userId) warnOnce('userId')
-  return context?.userId
+  let uid = context?.userId
+  if (!uid) {
+    warnOnce('userId')
+    try {
+      const g: any = globalThis as any
+      uid = g.__currentUserId || g.__cleoLastUserId || uid
+    } catch {}
+  }
+  return uid
 }
 
 export function getCurrentModel(): string | undefined {
   const context = (storage as ALS<RequestContext>).getStore()
-  if (!context?.model) warnOnce('model')
-  return context?.model
+  let model = context?.model
+  if (!model) {
+    warnOnce('model')
+    try {
+      const g: any = globalThis as any
+      model = g.__currentModel || model
+    } catch {}
+  }
+  return model
 }
 
 export function getCurrentRequestId(): string | undefined {
   const context = (storage as ALS<RequestContext>).getStore()
-  if (!context?.requestId) warnOnce('requestId')
-  return context?.requestId
+  let rid = context?.requestId
+  if (!rid) {
+    warnOnce('requestId')
+    try {
+      const g: any = globalThis as any
+      rid = g.__requestId || rid
+    } catch {}
+  }
+  return rid
 }

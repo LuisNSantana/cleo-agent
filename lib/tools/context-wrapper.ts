@@ -47,12 +47,25 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
         existing = serverContext.getRequestContext?.()
         withRequestContext = serverContext.withRequestContext
       } catch {}
-      
+      // Promote existing context to globals for nested async boundaries
+      try {
+        const g: any = globalThis as any
+        if (existing?.userId) g.__currentUserId = existing.userId
+        if (existing?.model) g.__currentModel = existing.model
+        if (existing?.requestId) g.__requestId = existing.requestId
+      } catch {}
+
       const snapshot = buildContextSnapshot(existing)
       const hasFullContext = Boolean(snapshot?.userId) && Boolean(snapshot?.model)
 
       if (hasFullContext || !withRequestContext) {
-        // If we have full context or can't use withRequestContext, just execute directly
+        // If we have full context or can't use withRequestContext, ensure globals then execute directly
+        try {
+          const g: any = globalThis as any
+          if (snapshot.userId) g.__currentUserId = snapshot.userId
+          if (snapshot.model) g.__currentModel = snapshot.model
+          if (snapshot.requestId) g.__requestId = snapshot.requestId
+        } catch {}
         return originalExecute(...args)
       }
 
@@ -61,7 +74,15 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
         console.warn(`⚠️ [ContextGuard] Tool '${toolName}' executed with missing request context fields. Applying safeguarded context.`)
       }
 
-      return withRequestContext(snapshot, () => originalExecute(...args))
+      return withRequestContext(snapshot, () => {
+        try {
+          const g: any = globalThis as any
+          if (snapshot.userId) g.__currentUserId = snapshot.userId
+          if (snapshot.model) g.__currentModel = snapshot.model
+          if (snapshot.requestId) g.__requestId = snapshot.requestId
+        } catch {}
+        return originalExecute(...args)
+      })
     } catch (error) {
       console.error(`Error in wrapped tool execution for ${toolName}:`, error)
       // Fallback to direct execution on error

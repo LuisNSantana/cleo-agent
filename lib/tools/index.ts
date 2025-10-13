@@ -476,11 +476,19 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 			execute: async ({ task, context, priority, requirements }) => {
 				const orchestrator = getAgentOrchestrator() as any
 				// Dynamic import to avoid build issues
-				let userId = '00000000-0000-0000-0000-000000000000'
+				let userId: string | undefined
 				try {
 					const { getCurrentUserId } = await import('@/lib/server/request-context')
-					userId = getCurrentUserId?.() || userId
+					userId = getCurrentUserId?.()
 				} catch {}
+				// Fallback via enhanced adapter global flags
+				if (!userId) {
+					const g: any = globalThis as any
+					userId = g?.__currentUserId || g?.__cleoLastUserId
+				}
+				if (!userId) {
+					console.warn('[DELEGATION] Missing userId in tool context; delegation may be limited')
+				}
 				
 				const input = [
 					`Tarea: ${task}`,

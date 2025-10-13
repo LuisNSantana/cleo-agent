@@ -136,11 +136,20 @@ function createAndRunExecution(
 	const core = getCore()
 	const executionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 
+	// Derive effective user id with fallbacks to survive missing ALS contexts
+	let effectiveUserId = userId || getCurrentUserId()
+	if (!effectiveUserId) {
+		try {
+			const g: any = globalThis as any
+			effectiveUserId = g.__currentUserId || g.__cleoLastUserId || effectiveUserId
+		} catch {}
+	}
+
 	const exec: AgentExecution = {
 		id: executionId,
 		agentId: agentId || 'cleo-supervisor',
 			threadId: threadId || 'default',
-			userId: userId || getCurrentUserId() || '00000000-0000-0000-0000-000000000000',
+			userId: effectiveUserId || '00000000-0000-0000-0000-000000000000',
 		status: 'running',
 		startTime: new Date(),
 		messages: [],
