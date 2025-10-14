@@ -441,17 +441,25 @@ export function useChatCore({
       if (state.hiddenDuration > 5000 && wasStreamingRef.current) {
         console.warn('⚠️ Stream may have been interrupted by screen lock/background')
         
-        // Show notification to user
-        toast({
-          title: 'Connection may have been interrupted',
-          description: 'Your screen was locked during streaming. If the response is incomplete, try resending.',
-          status: 'warning'
-        })
+        // Check if the last assistant message is incomplete (no finish marker)
+        const lastMsg = messages[messages.length - 1]
+        const isIncomplete = lastMsg?.role === 'assistant' && 
+                            !lastMsg.content.includes('[DONE]') &&
+                            lastMsg.content.length > 0 &&
+                            lastMsg.content.length < 100 // Likely truncated
+        
+        if (isIncomplete) {
+          toast({
+            title: 'Response may be incomplete',
+            description: 'The connection was interrupted. The server may still be processing. Wait a moment or try resending.',
+            status: 'warning',
+          })
+        }
         
         // Reset streaming flag
         wasStreamingRef.current = false
       }
-    }, []),
+    }, [messages]),
     minHiddenDuration: 1000 // Only care about hides longer than 1 second
   })
 
@@ -567,6 +575,8 @@ export function useChatCore({
       messages: messagesToSend.map(convertToMessageAISDK),
     }),
     signal: abortControllerRef.current.signal,
+    // ✅ Keep connection alive even when tab is backgrounded
+    keepalive: true,
   })
 
   // Sending chat request
