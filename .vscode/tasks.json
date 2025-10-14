@@ -1,0 +1,42 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "test:jest:targeted",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"jest",
+				"-c",
+				"jest.config.js",
+				"tests/model-resolver.test.ts",
+				"tests/confirmation-resume-endpoint.test.ts",
+				"--runInBand",
+				"--detectOpenHandles"
+			],
+			"problemMatcher": [
+				"$tsc",
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test:jest:targeted-2",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"jest",
+				"-c",
+				"jest.config.js",
+				"tests/model-resolver.test.ts",
+				"tests/confirmation-resume-endpoint.test.ts",
+				"--runInBand"
+			],
+			"problemMatcher": [
+				"$tsc",
+				"$eslint-stylish"
+			],
+			"group": "build"
+		}
+	]
+}

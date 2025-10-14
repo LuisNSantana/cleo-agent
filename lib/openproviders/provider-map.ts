@@ -7,6 +7,8 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // grok-4-fast is routed internally to openrouter:x-ai/grok-4-fast
   // Reasoning is a runtime toggle; there is no separate id
   "grok-4-fast": "openrouter",
+  // Accept alias used in tests and legacy references; route via OpenRouter as well
+  "grok-4-fast-reasoning": "openrouter",
   // Backward compatibility alias
   "grok-4-multimodal": "openrouter", // normalize to grok-4-fast alias upstream
   // OpenRouter models

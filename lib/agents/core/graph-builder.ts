@@ -1025,16 +1025,17 @@ export class GraphBuilder {
               content: msg.content
             }))
             
-            const { withRequestContext } = await import('@/lib/server/request-context')
+            const { withRequestContext, getCurrentUserId } = await import('@/lib/server/request-context')
             // Ensure ALS context is present for tools and caches used during prompt build (RAG/webSearch)
+            const effectiveUserId = state.userId || getCurrentUserId() || (globalThis as any)?.__currentUserId || ''
             const promptResult = await withRequestContext({
-              userId: state.userId,
+              userId: effectiveUserId,
               model: agentConfig.model,
               requestId: state.executionId || `exec_${Date.now()}`
             }, async () => {
               // Also set global fallbacks, in case some tool reads global vars
               try {
-                ;(globalThis as any).__currentUserId = state.userId
+                ;(globalThis as any).__currentUserId = effectiveUserId
                 ;(globalThis as any).__currentModel = agentConfig.model
               } catch {}
               const res = await buildFinalSystemPrompt({
@@ -1042,13 +1043,13 @@ export class GraphBuilder {
                 model: agentConfig.model,
                 messages: messagesForPrompt,
                 supabase: await createClient(),
-                realUserId: state.userId,
+                realUserId: effectiveUserId,
                 enableSearch: true,
                 debugRag: false
               })
               return res
             })
-            logger.debug('🧠 [Cleo] Prompt built with user context', { hasUserId: !!state.userId, execId: state.executionId })
+            logger.debug('🧠 [Cleo] Prompt built with user context', { hasUserId: !!effectiveUserId, execId: state.executionId })
             
             systemMessage = new SystemMessage(promptResult?.finalSystemPrompt ?? agentConfig.prompt)
             logger.debug('🧠 [Cleo Legacy] Using dynamic system prompt with routing hints and RAG')

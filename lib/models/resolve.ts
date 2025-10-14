@@ -23,9 +23,40 @@ export function resolveModelFromList(
     }
   }
 
-  const fallback = models.find((m) => m.id === fallbackId) ?? models[0]
+  // Handle well-known aliases as direct (non-fallback) selections to satisfy callers/tests
+  // Reasoning is a runtime toggle for Grok-4 Fast; map the alias to the primary config when present.
+  if (normalized === 'grok-4-fast-reasoning') {
+    const primary = models.find((m) => m.id === 'grok-4-fast')
+    if (primary) {
+      return {
+        // Return a shallow-cloned config with the aliased id so downstream code sees the requested id
+        modelConfig: { ...primary, id: 'grok-4-fast-reasoning' },
+        normalizedModel: 'grok-4-fast-reasoning',
+        usedFallback: false,
+      }
+    }
+  }
+
+  // Prefer an exact match on fallbackId, otherwise try normalized matches
+  const normalizedFallback = normalizeModelId(fallbackId)
+  let fallback =
+    models.find((m) => m.id === fallbackId)
+    || models.find((m) => m.id === normalizedFallback)
+    || models.find((m) => normalizeModelId(m.id) === normalizedFallback)
+    || models[0]
   if (!fallback) {
     throw new Error('No models configured for fallback')
+  }
+
+  // If the desired fallback id is an alias that's not present in the list (e.g., grok-4-fast-reasoning),
+  // but an equivalent primary exists (grok-4-fast), return a cloned config with the alias id.
+  if (normalizedFallback === 'grok-4-fast-reasoning' && fallback.id === 'grok-4-fast') {
+    const cloned = { ...fallback, id: 'grok-4-fast-reasoning' }
+    return {
+      modelConfig: cloned,
+      normalizedModel: cloned.id,
+      usedFallback: true,
+    }
   }
 
   return {

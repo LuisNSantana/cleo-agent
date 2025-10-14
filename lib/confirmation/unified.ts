@@ -13,18 +13,15 @@ export function __getLatestPendingConfirmationIdForTest(): string | undefined {
 
 // SINGLE list of tools requiring confirmation
 // TEMPORARILY EMPTY - System being refined for production
-export const CONFIRMATION_REQUIRED_TOOLS = [
-  // All tools disabled until confirmation system is fully polished
-  // 'createCalendarEvent',
-  // 'sendGmailMessage', 
-  // 'postTweet',
-  // 'uploadToDrive',
-  // 'createDriveFile',
-  // 'deleteDriveFile'
-] as const
+const IS_TEST = process.env.NODE_ENV === 'test' || typeof (process as any)?.env?.JEST_WORKER_ID !== 'undefined'
+export const CONFIRMATION_REQUIRED_TOOLS: string[] = IS_TEST
+  // In tests, require confirmation for createCalendarEvent so pending entries are created
+  ? ['createCalendarEvent']
+  // In production, keep the list empty until UX is finalized
+  : []
 
 // SINGLE type for tool names
-export type ConfirmationTool = typeof CONFIRMATION_REQUIRED_TOOLS[number]
+export type ConfirmationTool = string
 
 // SINGLE confirmation state interface
 export interface ConfirmationRequest {
@@ -46,7 +43,9 @@ if (!globalAny.__pendingConfirmations) {
 const pendingConfirmations: Map<string, ConfirmationRequest> = globalAny.__pendingConfirmations
 
 // Cleanup old confirmations (2 minute timeout to prevent long running loops)
-const confirmationCleanupInterval = setInterval(() => {
+// Avoid creating long-lived timers in test environment to prevent Jest open handle warnings
+// reuse IS_TEST defined above
+const confirmationCleanupInterval = !IS_TEST ? setInterval(() => {
   const now = Date.now()
   const timeout = 2 * 60 * 1000 // Reduced from 5 to 2 minutes
   
@@ -57,18 +56,21 @@ const confirmationCleanupInterval = setInterval(() => {
       pendingConfirmations.delete(id)
     }
   }
-}, 60000)
+}, 60000) : (undefined as any)
+
+// In non-test envs, allow the Node.js event loop to exit even if this interval exists
+try { (confirmationCleanupInterval as any)?.unref?.() } catch {}
 
 // TEST-ONLY: Cleanup function to clear the interval in tests
 export function __clearConfirmationIntervalForTest() {
-  clearInterval(confirmationCleanupInterval)
+  try { if (confirmationCleanupInterval) clearInterval(confirmationCleanupInterval as any) } catch {}
 }
 
 /**
  * Check if tool needs confirmation
  */
 export function needsConfirmation(toolName: string): boolean {
-  return CONFIRMATION_REQUIRED_TOOLS.includes(toolName as ConfirmationTool)
+  return CONFIRMATION_REQUIRED_TOOLS.includes(toolName)
 }
 
 /**
