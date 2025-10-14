@@ -62,7 +62,10 @@ function warnOnce(kind: 'userId' | 'model' | 'requestId') {
   const g = globalThis as any
   if (g[key]) return
   g[key] = true
-  console.warn(`🚨 [SECURITY] getCurrent${kind[0].toUpperCase()}${kind.slice(1)} called without proper request context`)
+  // Only warn in development to avoid noise in production logs
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`🚨 [SECURITY] getCurrent${kind[0].toUpperCase()}${kind.slice(1)} called without proper request context`)
+  }
 }
 
 export function getCurrentUserId(): string | undefined {

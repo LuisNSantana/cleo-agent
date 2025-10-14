@@ -107,14 +107,18 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
         'tw', textWeight,
         'mc', opts.maxContextChars ?? 'default',
       ])}`
+      console.log(`[RAG] 🔑 L2 key generated (userId: ${normalizedUserId})`)
       const l2 = await redisGetJSON<RetrievedChunk[]>(l2Key)
       if (Array.isArray(l2) && l2.length > 0) {
         // Populate L1 for faster subsequent hits in this instance
         cache.set(cacheKey, { data: l2, expiry: Date.now() + CACHE_DEFAULT_TTL })
-        console.log('[RAG] L2 (Redis) cache hit')
+        console.log('[RAG] ✅ L2 (Redis) cache hit')
         return l2
       }
-    } catch {}
+      console.log('[RAG] ❌ L2 cache miss, proceeding to DB query')
+    } catch (e) {
+      console.warn('[RAG] ⚠️  L2 cache lookup error:', e instanceof Error ? e.message : String(e))
+    }
   }
   
   // Adaptive sizing: derive topK and chunkLimit from query size and budget
@@ -271,7 +275,15 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   }
   const sliced = results.slice(0, Math.min(dynamicTopK, chunkLimit))
   cache.set(cacheKey, { data: sliced, expiry: Date.now() + CACHE_DEFAULT_TTL })
-  if (l2Key) { try { await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000)) } catch {} }
+  if (l2Key) { 
+    try { 
+      console.log('[RAG] 💾 Populating L2 (Redis) cache (final)...')
+      await redisSetJSON(l2Key, sliced, Math.ceil(CACHE_DEFAULT_TTL/1000))
+      console.log('[RAG] ✅ L2 cache populated successfully')
+    } catch (e) {
+      console.warn('[RAG] ⚠️  L2 cache population failed:', e instanceof Error ? e.message : String(e))
+    }
+  }
   return sliced
 }
 

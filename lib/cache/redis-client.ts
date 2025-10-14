@@ -135,17 +135,25 @@ export function redisEnabled(): boolean {
 }
 
 export async function getRedis(): Promise<RedisLike | null> {
-  if (!redisEnabled()) return null
-  if (singleton.client) return singleton.client
+  if (!redisEnabled()) {
+    console.log('[Redis] ❌ Disabled (ENABLE_REDIS_CACHE !== true or no credentials)')
+    return null
+  }
+  if (singleton.client) {
+    console.log(`[Redis] ✅ Reusing existing client (mode: ${singleton.mode})`)
+    return singleton.client
+  }
 
   const hasUpstash = !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN
   if (hasUpstash) {
+    console.log('[Redis] 🔧 Initializing Upstash client...')
     // Lazy import to avoid bundling when unused
     const { Redis } = await import('@upstash/redis')
     const upstash = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL!,
       token: process.env.UPSTASH_REDIS_REST_TOKEN!,
     })
+    console.log('[Redis] ✅ Upstash client initialized successfully')
     const client: RedisLike = {
       async get(key: string) {
         const res = await upstash.get(key)
@@ -170,6 +178,7 @@ export async function getRedis(): Promise<RedisLike | null> {
 
   const hasRedisUrl = !!process.env.REDIS_URL
   if (hasRedisUrl) {
+    console.log('[Redis] 🔧 Initializing node-redis client...')
     const { createClient } = await import('redis')
     const nodeClient = createClient({ url: process.env.REDIS_URL })
     // Avoid unhandled rejections in serverless logs
@@ -180,6 +189,7 @@ export async function getRedis(): Promise<RedisLike | null> {
     if (!nodeClient.isOpen) {
       await nodeClient.connect()
     }
+    console.log('[Redis] ✅ node-redis client initialized successfully')
     const client: RedisLike = {
       async get(key: string) {
         return (await nodeClient.get(key)) as string | null
@@ -208,12 +218,21 @@ export function hashKey(parts: Array<string | number | boolean | null | undefine
 export async function redisGetJSON<T>(key: string): Promise<T | null> {
   try {
     const r = await getRedis()
-    if (!r) return null
+    if (!r) {
+      console.log('[Redis] ⚠️  redisGetJSON called but Redis is disabled')
+      return null
+    }
+    console.log(`[Redis] 🔍 GET attempt for key: ${key.substring(0, 50)}...`)
     const raw = await r.get(key)
-    if (!raw) return null
+    if (!raw) {
+      console.log('[Redis] ❌ Cache MISS')
+      return null
+    }
+    console.log('[Redis] ✅ Cache HIT')
     return JSON.parse(raw) as T
-  } catch {
+  } catch (error) {
     // Fail silently to not impact request latency
+    console.warn('[Redis] ⚠️  redisGetJSON error:', error instanceof Error ? error.message : String(error))
     return null
   }
 }
@@ -221,10 +240,16 @@ export async function redisGetJSON<T>(key: string): Promise<T | null> {
 export async function redisSetJSON(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
   try {
     const r = await getRedis()
-    if (!r) return
+    if (!r) {
+      console.log('[Redis] ⚠️  redisSetJSON called but Redis is disabled')
+      return
+    }
+    console.log(`[Redis] 💾 SET attempt for key: ${key.substring(0, 50)}... (TTL: ${ttlSeconds || 'none'}s)`)
     const payload = JSON.stringify(value)
     await r.set(key, payload, ttlSeconds ? { ex: ttlSeconds } : undefined)
-  } catch {
+    console.log('[Redis] ✅ Cache SET successful')
+  } catch (error) {
     // Ignore errors (best-effort cache)
+    console.warn('[Redis] ⚠️  redisSetJSON error:', error instanceof Error ? error.message : String(error))
   }
 }

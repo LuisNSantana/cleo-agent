@@ -273,10 +273,13 @@ export const webSearchTool = tool({
       let l2Key = ''
       if (redisEnabled()) {
         try {
-          l2Key = `websearch:v1:${redisHashKey(['q', normalized, 'c', count, 'lang', language, 'sum', !!use_summarizer, 'fresh', freshness || '-', 'gog', goggles_id || '-', 'src', primary])}`
+          // Include userId in key for per-user caching, but make it optional to avoid blocking when context is missing
+          const safeUserId = userId || 'anon'
+          l2Key = `websearch:v1:${redisHashKey(['uid', safeUserId, 'q', normalized, 'c', count, 'lang', language, 'sum', !!use_summarizer, 'fresh', freshness || '-', 'gog', goggles_id || '-', 'src', primary])}`
+          console.log(`[WebSearch] 🔑 L2 key generated (userId: ${safeUserId})`)
           const l2 = await redisGetJSON<z.infer<typeof webSearchOutputSchema>>(l2Key)
           if (l2 && l2.success && Array.isArray(l2.results)) {
-            console.log('[WebSearch] L2 (Redis) cache hit')
+            console.log('[WebSearch] ✅ L2 (Redis) cache hit')
             searchCache.set(key, { data: l2 as any, expiry: now + cacheDuration })
             return { ...l2, note: (l2.note || '') + (language === 'es' ? ' (redis)' : ' (redis)') }
           }
@@ -454,7 +457,13 @@ export const webSearchTool = tool({
       searchCache.set(key, { data: payload as any, expiry: now + cacheDuration })
       // Populate L2 cache (best-effort)
       if (l2Key) {
-        try { await redisSetJSON(l2Key, payload, Math.ceil(cacheDuration / 1000)) } catch {}
+        try { 
+          console.log('[WebSearch] 💾 Populating L2 (Redis) cache...')
+          await redisSetJSON(l2Key, payload, Math.ceil(cacheDuration / 1000))
+          console.log('[WebSearch] ✅ L2 cache populated successfully')
+        } catch (e) {
+          console.warn('[WebSearch] ⚠️  L2 cache population failed:', e instanceof Error ? e.message : String(e))
+        }
       }
       console.log(`[WebSearch] Success: ${deduped.length} results from ${source} (clusters: ${clusters.length}, AI summary: ${!!ai_summary})`)
       // Track tool usage success
