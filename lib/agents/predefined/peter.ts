@@ -62,9 +62,13 @@ export const PETER_AGENT: AgentConfig = {
     'getEconomicIndicators',
     // Market and crypto research
     'webSearch',
-  'firecrawl_crawl',
-  'firecrawl_extract',
-  'firecrawl_sitemap_summarize',
+    // Firecrawl - Document & web analysis
+    'firecrawl_analyze_pdf',     // NEW: Analyze financial PDFs (reports, statements)
+    'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping
+    'firecrawl_search',           // NEW: Web search with extraction
+    'firecrawl_crawl',
+    'firecrawl_extract',
+    'firecrawl_sitemap_summarize',
     'cryptoPrices',
     // Mathematical calculations
     'calculator',

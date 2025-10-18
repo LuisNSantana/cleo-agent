@@ -31,8 +31,12 @@ export const INSIGHTS_AGENT: AgentConfig = {
     'webSearch',
     'perplexity_research',
     'extract_text_from_pdf',
-    'firecrawl_extract',
-    'firecrawl_scrape',
+    // Firecrawl - Enhanced document & web analysis
+    'firecrawl_analyze_pdf',     // NEW: Advanced PDF analysis with structured extraction
+    'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping with actions
+    'firecrawl_search',           // NEW: Web search with content extraction
+    'firecrawl_extract',          // Single page extraction
+    'firecrawl_crawl',            // Multi-page crawling
     // Short-term memory
     'memoryAddNote',
     // Task completion signal
@@ -47,7 +51,7 @@ TYPICAL INPUTS
 - User objectives (if provided)
 
 APPROACH
-1) Prioritize attachments/files before the web. Use: extract_text_from_pdf, readGoogleDoc, openDocument. For deeper web research use perplexity_research (cite sources) and firecrawl_extract/scrape.
+1) Prioritize attachments/files before the web. Use: extract_text_from_pdf or firecrawl_analyze_pdf (for PDFs with structured extraction), readGoogleDoc, openDocument. For deeper web research use perplexity_research (cite sources) and firecrawl_search (web search + scraping) or firecrawl_scrape_advanced (dynamic sites).
 2) Identify patterns and relationships; separate FACTS from INFERENCES; maintain traceability (short citation/footnote at the end of each finding when applicable).
 3) Prioritization: lead with critical/urgent items, then important, then other. Indicate confidence level (0–100%) when appropriate.
 4) Executive clarity: communicate plainly and in order. Use tables for risks; if KPIs/charts are requested, leverage Google Sheets (appendGoogleSheet, createGoogleSheetChart, applyConditionalFormatting).

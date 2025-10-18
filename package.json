@@ -31,7 +31,8 @@
     "dev:helper": "node scripts/dev-helper.js",
     "voice:proxy": "node server/websocket-proxy.js",
     "dev:voice": "npm-run-all --parallel dev voice:proxy",
-    "diagnose:redis": "node scripts/diagnose-redis.js"
+    "diagnose:redis": "node scripts/diagnose-redis.js",
+    "test:redis-cache-hit": "node scripts/test-redis-cache-hit.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.1",

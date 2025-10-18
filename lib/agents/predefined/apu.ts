@@ -46,6 +46,12 @@ export const APU_AGENT: AgentConfig = {
     'serpGeneralSearch',
     'serpNewsSearch',
     'serpScholarSearch',
+    // Firecrawl - Document analysis & web research
+    'firecrawl_analyze_pdf',    // NEW: Analyze PDFs (docs, manuals, reports)
+    'firecrawl_scrape_advanced', // NEW: Advanced scraping for dynamic sites
+    'firecrawl_search',          // NEW: Web search with content extraction
+    'firecrawl_extract',         // Single page extraction
+    'firecrawl_crawl',           // Multi-page crawling
     // Analysis & Calculations
     'calculator',
     // Utilities

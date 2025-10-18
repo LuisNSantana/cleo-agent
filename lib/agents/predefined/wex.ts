@@ -22,7 +22,14 @@ export const WEX_AGENT: AgentConfig = {
     ]
     // Only include Firecrawl tools if API key present
     if (process.env.FIRECRAWL_API_KEY) {
-      base.splice(1, 0, 'firecrawl_crawl', 'firecrawl_extract', 'firecrawl_sitemap_summarize')
+      base.splice(1, 0, 
+        'firecrawl_analyze_pdf',      // NEW: PDF analysis with structured extraction
+        'firecrawl_scrape_advanced',   // NEW: Advanced scraping with browser actions
+        'firecrawl_search',            // NEW: Web search with content extraction
+        'firecrawl_crawl', 
+        'firecrawl_extract', 
+        'firecrawl_sitemap_summarize'
+      )
     }
     return base
   })(),
@@ -45,6 +52,9 @@ WORKFLOW (Phased Execution):
 1) Clarify ONLY if intent is ambiguous or missing a critical scope dimension (ONE question). Otherwise proceed.
 2) Recon (Perplexity): landscape scan → entities, themes, positioning angles, emerging shifts.
 3) Targeted Expansion:
+  - firecrawl_analyze_pdf: analyze PDF reports, whitepapers, research papers with structured extraction (earnings reports, product specs, case studies).
+  - firecrawl_search: web search with automatic content extraction (faster than perplexity for specific queries).
+  - firecrawl_scrape_advanced: dynamic sites requiring browser actions (click, scroll, wait for content).
   - firecrawl_crawl: multi-page structured harvesting (limit to meaningful clusters; avoid broad unfocused site sprawl).
   - firecrawl_extract: pinpoint single high-value assets (pricing, feature pages, case studies, docs, investor relations, product changelogs).
   - firecrawl_sitemap_summarize: rapid structural mapping when exploring unfamiliar domains.

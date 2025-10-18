@@ -20,9 +20,10 @@ export const JUNGI_AGENT: AgentConfig = {
     'openDocument',
     'createDocument',
     'extract_text_from_pdf',
-    // Crawl/extraer texto de páginas (PDF online)
-    'firecrawl_extract',
-    'firecrawl_scrape',
+    // Firecrawl - Enhanced document analysis
+    'firecrawl_analyze_pdf',     // NEW: Advanced PDF analysis with structured extraction
+    'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping
+    'firecrawl_extract',          // Single page extraction
     'webSearch',
     // Comparación principal
     'compare_ingredients',
