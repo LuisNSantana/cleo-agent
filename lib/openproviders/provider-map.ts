@@ -1,14 +1,18 @@
 import type { Provider, SupportedModel } from "./types"
 
+// Decide the default provider for Grok-4-Fast at load time.
+// Default remains OpenRouter unless explicitly enabled via env to avoid breaking tests.
+const GROK_DEFAULT_PROVIDER: Provider =
+  process.env.XAI_DIRECT_FOR_GROK === 'true' ? 'xai' : 'openrouter'
+
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Cleo simplified public models (added 2025-09-27)
   // These are the only two user-selectable chat models now.
-  // grok-4-fast is routed internally to openrouter:x-ai/grok-4-fast
-  // Reasoning is a runtime toggle; there is no separate id
-  "grok-4-fast": "openrouter",
-  // Accept alias used in tests and legacy references; route via OpenRouter as well
-  "grok-4-fast-reasoning": "openrouter",
+  // grok-4-fast default provider (toggleable via env)
+  // Reasoning es un toggle en runtime; mantenemos alias de convenience
+  "grok-4-fast": GROK_DEFAULT_PROVIDER,
+  "grok-4-fast-reasoning": GROK_DEFAULT_PROVIDER,
   // Backward compatibility alias
   "grok-4-multimodal": "openrouter", // normalize to grok-4-fast alias upstream
   // OpenRouter models

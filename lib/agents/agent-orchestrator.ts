@@ -56,6 +56,29 @@ function getCore(): CoreOrchestrator {
 				const event = new CustomEvent('delegation-progress', { detail: data })
 				window.dispatchEvent(event)
 			}
+			// Also reflect delegation steps into legacy exec registry so polling gets consistent steps
+			try {
+				const execId = data?.sourceExecutionId
+				if (!execId) return
+				const exec = execRegistry.find(e => e.id === execId)
+				if (!exec) return
+				if (!Array.isArray(exec.steps)) exec.steps = []
+				exec.steps.push({
+					id: `delegation_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+					timestamp: new Date(),
+					agent: data?.targetAgent || exec.agentId,
+					action: 'delegating',
+					content: data?.message || `${data?.targetAgent} working on task`,
+					progress: typeof data?.progress === 'number' ? data.progress : 0,
+					metadata: {
+						sourceAgent: data?.sourceAgent,
+						delegatedTo: data?.targetAgent,
+						task: data?.task,
+						status: data?.status,
+						stage: data?.stage
+					}
+				} as any)
+			} catch {}
 		})
 		
 		// Listen for delegation requested events
@@ -72,6 +95,27 @@ function getCore(): CoreOrchestrator {
 				const event = new CustomEvent('agent-delegation', { detail: { ...data, type: 'completed' } })
 				window.dispatchEvent(event)
 			}
+			// Append a completion step for visibility in legacy registry
+			try {
+				const execId = data?.sourceExecutionId
+				if (!execId) return
+				const exec = execRegistry.find(e => e.id === execId)
+				if (!exec) return
+				if (!Array.isArray(exec.steps)) exec.steps = []
+				exec.steps.push({
+					id: `delegation_completed_${Date.now()}`,
+					timestamp: new Date(),
+					agent: data?.targetAgent || exec.agentId,
+					action: 'delegating',
+					content: `${data?.targetAgent} completed the task`,
+					progress: 100,
+					metadata: {
+						status: 'completed',
+						stage: 'finalizing',
+						result: data?.result
+					}
+				} as any)
+			} catch {}
 		})
 	}
 	return coreInstance
@@ -313,20 +357,11 @@ function createAndRunExecution(
 		executionPromise = core.executeAgent(target, ctx, { timeout: timeoutMs ?? undefined })
 	}
 
-	const promiseToAwait = timeoutMs
-		? Promise.race([
-			executionPromise,
-			new Promise((_, reject) => {
-				setTimeout(() => {
-					logger.error(`🚨 [LEGACY TIMEOUT] Execution timeout after ${timeoutMs/1000} seconds for agent ${target.id}`)
-					reject(new Error(`Execution timeout after ${timeoutMs/1000} seconds`))
-				}, timeoutMs)
-			})
-		])
-		: executionPromise
-	
-	logger.debug(`🔍 [LEGACY DEBUG] Set up promise race with timeout ${timeoutMs}ms for agent ${target.id}`)
-	
+	// Rely on core ExecutionManager timeout; do not add another Promise.race here to avoid double timeouts
+	const promiseToAwait = executionPromise
+
+	logger.debug(`🔍 [LEGACY DEBUG] Awaiting core execution (timeout handled by core) for agent ${target.id}`)
+
 	promiseToAwait.then(res => {
 		logger.info('🔍 [LEGACY DEBUG] Execution completed, processing result:', {
 			executionId: exec.id,
@@ -463,7 +498,7 @@ function createAndRunExecution(
 			stack: err instanceof Error ? err.stack : undefined
 		})
 		
-		// For timeout errors, try to capture any partial results
+		// For timeout errors, try to capture any partial results (soft-timeout behavior)
 		if (err.message.includes('timeout')) {
 			// Check if we have any tool calls captured during execution
 			if (toolCallsUsed.length > 0) {
@@ -570,6 +605,7 @@ export function getAgentOrchestrator() {
 		
 		// EXPOSE CORE ORCHESTRATOR for adapter access
 		core: core,
+
 
 		executeAgent(input: string, agentId?: string) {
 			return createAndRunExecution(input, agentId, [])

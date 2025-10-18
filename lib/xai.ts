@@ -25,6 +25,8 @@ export function getXAIModel(modelId: string, apiKeyOverride?: string) {
       ? "grok-4-latest"
       : modelId === "grok-3-mini"
       ? "grok-3-mini"
+      : modelId === "grok-4-fast"
+      ? "grok-4-fast-reasoning"
       : modelId === "grok-4-fast-reasoning"
       ? "grok-4-fast-reasoning"
       : modelId === "grok-4-fast-non-reasoning"

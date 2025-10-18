@@ -362,6 +362,26 @@ export async function POST(req: Request) {
 
   // 🎨 IMAGE GENERATION DETECTION
   const isImageModel = isImageGenerationModel(originalModel)
+
+    // Expose last PDF attachment URL globally for tool parameter normalization (avoids giant base64)
+    try {
+      const anyUser = userMessage as any
+      const atts = Array.isArray(anyUser?.experimental_attachments) ? anyUser.experimental_attachments : undefined
+      const pdfAtt = atts?.find((a: any) => typeof a?.url === 'string' && (a?.contentType?.includes('pdf') || a?.url?.startsWith('http')))
+      if (pdfAtt && typeof pdfAtt.url === 'string') {
+        ;(globalThis as any).__lastAttachmentUrl = pdfAtt.url
+        console.log('[ChatAPI] Attachment-present hint added for Iris preference')
+      } else {
+        // Also scan multimodal parts for data URLs
+        if (Array.isArray((anyUser as any)?.parts)) {
+          const partPdf = (anyUser as any).parts.find((p: any) => p?.type === 'file' && (p?.mediaType?.includes('pdf') || (typeof p?.url === 'string' && p.url.startsWith('http'))))
+          if (partPdf?.url) {
+            ;(globalThis as any).__lastAttachmentUrl = partPdf.url
+            console.log('[ChatAPI] Attachment-present hint added for Iris preference')
+          }
+        }
+      }
+    } catch {}
     
     if (userMessageText && isImageModel) {
       console.log('🎨 [IMAGE GENERATION] Image generation model detected, generating image for:', userMessageText)

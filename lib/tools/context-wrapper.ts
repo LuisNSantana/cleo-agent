@@ -66,6 +66,23 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
           if (snapshot.model) g.__currentModel = snapshot.model
           if (snapshot.requestId) g.__requestId = snapshot.requestId
         } catch {}
+        // Pre-exec parameter normalization for certain tools
+        try {
+          if (toolName === 'extract_text_from_pdf' && args && args[0]) {
+            const params = args[0]
+            const g: any = globalThis as any
+            const lastUrl: string | undefined = g?.__lastAttachmentUrl
+            const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
+            const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+            if (!provided && lastUrl) {
+              params.url = lastUrl
+              delete params.pdfDataUrl
+            } else if (looksTruncated && lastUrl) {
+              params.url = lastUrl
+              delete params.pdfDataUrl
+            }
+          }
+        } catch {}
         return originalExecute(...args)
       }
 
@@ -80,6 +97,23 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
           if (snapshot.userId) g.__currentUserId = snapshot.userId
           if (snapshot.model) g.__currentModel = snapshot.model
           if (snapshot.requestId) g.__requestId = snapshot.requestId
+        } catch {}
+        // Pre-exec parameter normalization under withRequestContext
+        try {
+          if (toolName === 'extract_text_from_pdf' && args && args[0]) {
+            const params = args[0]
+            const g: any = globalThis as any
+            const lastUrl: string | undefined = g?.__lastAttachmentUrl
+            const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
+            const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+            if (!provided && lastUrl) {
+              params.url = lastUrl
+              delete params.pdfDataUrl
+            } else if (looksTruncated && lastUrl) {
+              params.url = lastUrl
+              delete params.pdfDataUrl
+            }
+          }
         } catch {}
         return originalExecute(...args)
       })

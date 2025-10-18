@@ -175,29 +175,72 @@ export function getAgentOrchestrator() {
         globalOrchestratorExists: !!(globalThis as any).__cleoOrchestrator
       })
       
-      // Try legacy orchestrator first (where delegation executions are stored)
+      // Helper to shallow-merge executions from legacy + core to surface delegation steps/messages consistently
+      const mergeExecutions = (legacyExec: any | null, coreExec: any | null): any | null => {
+        if (!legacyExec && !coreExec) return null
+        if (legacyExec && !coreExec) return legacyExec
+        if (!legacyExec && coreExec) return coreExec
+        // Both exist: prefer completed status/endTime from core; merge steps/messages de-duped by id
+        const merged: any = { ...legacyExec }
+        if (coreExec?.status === 'completed' && merged.status !== 'completed') {
+          merged.status = 'completed'
+          merged.endTime = coreExec.endTime || new Date()
+        }
+        // Merge messages
+        try {
+          const lMsgs = Array.isArray(legacyExec.messages) ? legacyExec.messages : []
+          const cMsgs = Array.isArray(coreExec.messages) ? coreExec.messages : []
+          const byId = new Map<string, any>()
+          ;[...lMsgs, ...cMsgs].forEach((m: any, idx: number) => {
+            const id = String(m?.id ?? `m_${idx}`)
+            if (!byId.has(id)) byId.set(id, m)
+          })
+          merged.messages = Array.from(byId.values())
+        } catch {}
+        // Merge steps (surface 'delegating' steps from core)
+        try {
+          const lSteps = Array.isArray(legacyExec.steps) ? legacyExec.steps : []
+          const cSteps = Array.isArray(coreExec.steps) ? coreExec.steps : []
+          const byId = new Map<string, any>()
+          ;[...lSteps, ...cSteps].forEach((s: any, idx: number) => {
+            const id = String(s?.id ?? `s_${idx}`)
+            if (!byId.has(id)) byId.set(id, s)
+          })
+          merged.steps = Array.from(byId.values()).sort((a: any, b: any) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime())
+        } catch {}
+        return merged
+      }
+
+      // Try legacy orchestrator first (where many executions are stored)
       try {
         const legacyOrch = (globalThis as any).__cleoOrchestrator
         if (legacyOrch && typeof legacyOrch.getExecution === 'function') {
           const e = legacyOrch.getExecution(executionId)
-          
+          // Also query core status for merge
+          let coreExec: any = null
+          try {
+            coreExec = legacyOrch?.core?.getExecutionStatus?.(executionId) || null
+          } catch {}
+
           console.log('🔍 [ENHANCED ADAPTER] Legacy result:', {
             executionId,
             legacyExecutionExists: !!e,
             hasSteps: !!(e && e.steps && e.steps.length > 0),
             legacyStatus: e?.status,
-            hasMessages: !!(e && e.messages && e.messages.length > 0)
+            hasMessages: !!(e && e.messages && e.messages.length > 0),
+            coreExecExists: !!coreExec,
+            coreStatus: coreExec?.status
           })
           
-          if (e) {
-            return e as AgentExecution
+          if (e || coreExec) {
+            return mergeExecutions(e as AgentExecution, coreExec as AgentExecution) as AgentExecution
           }
         }
       } catch (err) {
         console.error('Error getting execution from legacy:', err)
       }
       
-      // Fallback to adapter registry
+      // Fallback to adapter registry (no merge available)
       return execRegistry.find(e => e.id === executionId) || null
     },
     getAllExecutions(): AgentExecution[] {
