@@ -97,9 +97,10 @@ async function callFirecrawl(path: string, body: any) {
  * Perfect for analyzing research papers, reports, contracts, etc.
  */
 export const firecrawlAnalyzePdfTool = tool({
-  description: 'Analyze PDF documents from URLs and extract structured information. Supports both public PDFs and web pages containing PDFs. Can extract specific data using AI with custom prompts or schemas. Perfect for research papers, reports, contracts, invoices, and documentation.',
+  description: 'Analyze PDF documents from URLs or the latest attached file and extract structured information. Supports both public PDFs and web pages containing PDFs. Can extract specific data using AI with custom prompts or schemas. Perfect for research papers, reports, contracts, invoices, and documentation.',
   inputSchema: z.object({
-    url: z.string().url().describe('URL of the PDF document or webpage containing PDF'),
+    // Accept non-URL strings (filenames or relative paths) and normalize in execute
+    url: z.string().min(1).describe('URL of the PDF, a relative path, or an attachment filename (will be resolved)'),
     extractionPrompt: z.string().optional().describe('Natural language prompt describing what to extract (e.g., "Extract author, title, key findings, and methodology")'),
     extractionSchema: z.record(z.any()).optional().describe('JSON schema for structured extraction. Example: {"type": "object", "properties": {"title": {"type": "string"}, "authors": {"type": "array"}}}'),
     includeScreenshot: z.boolean().optional().default(false).describe('Include a screenshot of the first page'),
@@ -110,10 +111,41 @@ export const firecrawlAnalyzePdfTool = tool({
   const userId = getCurrentUserId()
     
     try {
+      // Normalize URL: allow filenames/relative paths by preferring last attachment URL
+      function normalizePdfUrl(input: unknown) {
+        if (typeof input !== 'string' || input.trim().length === 0) return null
+        const val = input.trim()
+        if (/^https?:\/\//i.test(val)) return val
+        try {
+          const g = globalThis
+          const lastUrl = (g && (g as any).__lastAttachmentUrl) as string | undefined
+          if (lastUrl && /^https?:\/\//i.test(lastUrl)) {
+            return lastUrl
+          }
+        } catch {}
+        // Try to resolve against app base if provided and looks like a root-relative path
+        try {
+          const base = (process.env.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL.trim()) || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : '')
+          if (base && val.startsWith('/')) {
+            return new URL(val, base).toString()
+          }
+        } catch {}
+        return null
+      }
+
+      const resolvedUrl = normalizePdfUrl(url)
+      if (!resolvedUrl) {
+        return {
+          success: false,
+          error: 'Invalid or unresolved PDF URL. Provide a full URL or attach the PDF to the message.',
+          url
+        }
+      }
+
       // Track usage
       if (userId) {
         await trackToolUsage(userId, 'firecrawl_analyze_pdf', { 
-          params: { url, hasPrompt: !!extractionPrompt, hasSchema: !!extractionSchema }
+          params: { url: resolvedUrl, hasPrompt: !!extractionPrompt, hasSchema: !!extractionSchema }
         })
       }
 
@@ -137,7 +169,7 @@ export const firecrawlAnalyzePdfTool = tool({
       const parsers: any[] = maxPages ? [{ type: 'pdf', maxPages }] : ['pdf']
 
       const result: FirecrawlScrapeResult = await callFirecrawl('/v2/scrape', {
-        url,
+        url: resolvedUrl,
         formats,
         parsers,
         onlyMainContent: true,
@@ -148,13 +180,13 @@ export const firecrawlAnalyzePdfTool = tool({
         return {
           success: false,
           error: result.error || 'Failed to analyze PDF',
-          url
+          url: resolvedUrl
         }
       }
 
       const response: any = {
         success: true,
-        url,
+        url: resolvedUrl,
         markdown: result.data.markdown,
         metadata: result.data.metadata || {},
         extractedData: result.data.json || null,

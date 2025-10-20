@@ -68,18 +68,27 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
         } catch {}
         // Pre-exec parameter normalization for certain tools
         try {
-          if (toolName === 'extract_text_from_pdf' && args && args[0]) {
+          const g: any = globalThis as any
+          const lastUrl: string | undefined = g?.__lastAttachmentUrl
+          if (args && args[0]) {
             const params = args[0]
-            const g: any = globalThis as any
-            const lastUrl: string | undefined = g?.__lastAttachmentUrl
-            const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
-            const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
-            if (!provided && lastUrl) {
-              params.url = lastUrl
-              delete params.pdfDataUrl
-            } else if (looksTruncated && lastUrl) {
-              params.url = lastUrl
-              delete params.pdfDataUrl
+            if (toolName === 'extract_text_from_pdf') {
+              const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
+              const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+              if (!provided && lastUrl) {
+                params.url = lastUrl
+                delete params.pdfDataUrl
+              } else if (looksTruncated && lastUrl) {
+                params.url = lastUrl
+                delete params.pdfDataUrl
+              }
+            }
+            if (toolName === 'firecrawl_analyze_pdf') {
+              const provided = (params.url as string | undefined)
+              const looksLikeUrl = typeof provided === 'string' && /^https?:\/\//i.test(provided)
+              if (!looksLikeUrl && lastUrl) {
+                params.url = lastUrl
+              }
             }
           }
         } catch {}
@@ -100,18 +109,27 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
         } catch {}
         // Pre-exec parameter normalization under withRequestContext
         try {
-          if (toolName === 'extract_text_from_pdf' && args && args[0]) {
+          const g: any = globalThis as any
+          const lastUrl: string | undefined = g?.__lastAttachmentUrl
+          if (args && args[0]) {
             const params = args[0]
-            const g: any = globalThis as any
-            const lastUrl: string | undefined = g?.__lastAttachmentUrl
-            const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
-            const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
-            if (!provided && lastUrl) {
-              params.url = lastUrl
-              delete params.pdfDataUrl
-            } else if (looksTruncated && lastUrl) {
-              params.url = lastUrl
-              delete params.pdfDataUrl
+            if (toolName === 'extract_text_from_pdf') {
+              const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
+              const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+              if (!provided && lastUrl) {
+                params.url = lastUrl
+                delete params.pdfDataUrl
+              } else if (looksTruncated && lastUrl) {
+                params.url = lastUrl
+                delete params.pdfDataUrl
+              }
+            }
+            if (toolName === 'firecrawl_analyze_pdf') {
+              const provided = (params.url as string | undefined)
+              const looksLikeUrl = typeof provided === 'string' && /^https?:\/\//i.test(provided)
+              if (!looksLikeUrl && lastUrl) {
+                params.url = lastUrl
+              }
             }
           }
         } catch {}
