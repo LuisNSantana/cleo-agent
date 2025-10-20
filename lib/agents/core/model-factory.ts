@@ -81,13 +81,31 @@ class AISdkChatModel extends BaseChatModel {
 
     try {
       const safeMax = clampMaxOutputTokens(this.modelName, options?.maxTokens ?? this.maxTokens)
-      const result = await generateText({
+      
+      // FIXED: Add 60s timeout to model calls to prevent hanging indefinitely
+      // Previous: No timeout caused tasks to hang when xAI/Grok API was slow or down
+      // 60s is sufficient for:
+      // - Initial reasoning/analysis
+      // - Tool planning and selection
+      // - Response generation
+      // If a single model call takes >60s, it's likely hung or the API is down
+      const MODEL_CALL_TIMEOUT_MS = 60_000 // 1 minute
+      
+      const modelCallPromise = generateText({
         model: this.model,
         messages: convertedMessages,
         temperature: this.temperature,
         maxTokens: safeMax,
         ...options
       })
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Model call timeout: ${this.modelName} exceeded ${MODEL_CALL_TIMEOUT_MS/1000}s`))
+        }, MODEL_CALL_TIMEOUT_MS)
+      })
+      
+      const result = await Promise.race([modelCallPromise, timeoutPromise]) as any
 
       return {
         generations: [{
@@ -238,13 +256,62 @@ export class ModelFactory {
 
     // xAI models (Grok) - including grok-3-mini-fallback -> grok-3-mini
     if (cleanModelName.startsWith('grok-') || cleanModelName.includes('xai/')) {
-      const xai = createXai({
-        apiKey: process.env.XAI_API_KEY
-      })
+      // CRITICAL FIX: grok-4-fast-reasoning is NOT a real xAI model
+      // xAI only has grok-4-fast (reasoning is a runtime parameter, not a model variant)
+      // Map grok-4-fast-reasoning → grok-4-fast to prevent API hanging
+      let actualModelName = cleanModelName
+      if (cleanModelName === 'grok-4-fast-reasoning' || cleanModelName === 'xai/grok-4-fast-reasoning') {
+        actualModelName = 'grok-4-fast'
+        logger.warn(`[ModelFactory] Mapping ${cleanModelName} → grok-4-fast (reasoning is not a separate model)`)
+      }
       
-      const model = xai(cleanModelName.replace('xai/', ''))
-  logger.info(`[ModelFactory] Instantiating xAI/AISDK model`, { cleanModelName })
-  return new AISdkChatModel(model, cleanModelName, temperature, safeMax)
+      // FIXED: Check if XAI_API_KEY is configured before attempting xAI
+      // If not configured, fall back to OpenRouter proxy (more reliable)
+      const hasXaiKey = process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0
+      
+      if (!hasXaiKey) {
+        logger.warn(`[ModelFactory] XAI_API_KEY not configured, falling back to OpenRouter for ${actualModelName}`)
+        // Use OpenRouter as fallback (x-ai/grok-4-fast is available there)
+        const openrouterModel = actualModelName.replace('grok-', 'x-ai/grok-').replace('xai/', 'x-ai/')
+        
+        return new ChatOpenAI({
+          apiKey: process.env.OPENROUTER_API_KEY,
+          modelName: openrouterModel,
+          temperature,
+          maxTokens: safeMax,
+          streaming,
+          cache: ModelFactory.llmCache,
+          configuration: {
+            baseURL: 'https://openrouter.ai/api/v1',
+          } as any,
+        })
+      }
+      
+      try {
+        const xai = createXai({
+          apiKey: process.env.XAI_API_KEY
+        })
+        
+        const model = xai(actualModelName.replace('xai/', ''))
+        logger.info(`[ModelFactory] Instantiating xAI/AISDK model`, { requestedModel: cleanModelName, actualModel: actualModelName })
+        return new AISdkChatModel(model, actualModelName, temperature, safeMax)
+      } catch (xaiError) {
+        logger.error(`[ModelFactory] xAI model failed, falling back to OpenRouter`, { cleanModelName, error: xaiError })
+        // Fallback to OpenRouter on xAI failure
+        const openrouterModel = actualModelName.replace('grok-', 'x-ai/grok-').replace('xai/', 'x-ai/')
+        
+        return new ChatOpenAI({
+          apiKey: process.env.OPENROUTER_API_KEY,
+          modelName: openrouterModel,
+          temperature,
+          maxTokens: safeMax,
+          streaming,
+          cache: ModelFactory.llmCache,
+          configuration: {
+            baseURL: 'https://openrouter.ai/api/v1',
+          } as any,
+        })
+      }
     }
 
     // OpenAI models (including GPT-5)

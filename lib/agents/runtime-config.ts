@@ -35,8 +35,15 @@ function numFromEnv(name: string, fallback: number): number {
 }
 
 export function getRuntimeConfig(): RuntimeConfig {
-  const defaultSpecialistLimit = 600_000
-  const defaultSupervisorLimit = 600_000
+  // FIXED: Reduced from 600s to 120s (2 min) to prevent hanging tasks
+  // Previous: 600s caused network timeout errors when models failed to respond
+  // 2 minutes is sufficient for:
+  // - Complex tool chains (3-5 tools)
+  // - Google Workspace operations (Drive, Gmail, Calendar)
+  // - External API calls with reasonable latency
+  // Still allows extensions via delegationExtendOnProgressMs when progress detected
+  const defaultSpecialistLimit = 120_000 // 2 minutes (was 10 min)
+  const defaultSupervisorLimit = 180_000 // 3 minutes for orchestration (was 10 min)
 
   let specialistLimit = intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', defaultSpecialistLimit)
   if (specialistLimit < 0) {

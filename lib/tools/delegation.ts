@@ -423,11 +423,44 @@ async function runDelegation(params: {
 
   if (status !== 'completed') {
     const elapsed = Date.now() - startedAt
-    finalResult = `Delegation timed out after ${elapsed} ms. Partial results may be available in the agent center.`
-    logger.warn('⏱️ [DELEGATION_TIMEOUT]', { executionId: execId, target_agent: agentId, context_user_id: userId, elapsedMs: elapsed })
+    const elapsedSec = Math.floor(elapsed / 1000)
+    
+    // IMPROVED: Better timeout messaging with specific diagnostics
+    let timeoutReason = 'unknown'
+    let userMessage = `Delegation timed out after ${elapsedSec}s.`
+    
+    try {
+      const snapshot = execId ? orchestrator.getExecution?.(execId) : null
+      const hasMessages = snapshot?.messages && snapshot.messages.length > 0
+      const lastMessage = hasMessages ? snapshot.messages.slice(-1)[0] : null
+      
+      if (!hasMessages) {
+        timeoutReason = 'no_response_from_model'
+        userMessage = `The ${getAgentDisplayName(agentId)} agent did not respond within ${elapsedSec}s. This usually indicates the AI model (${snapshot?.agentId || agentId}) is overloaded or unavailable. Please try again, or use a different approach.`
+      } else if (lastMessage && lastMessage.constructor?.name === 'ToolMessage') {
+        timeoutReason = 'tool_execution_timeout'
+        const toolName = (lastMessage as any)?.name || 'unknown tool'
+        userMessage = `The ${getAgentDisplayName(agentId)} agent timed out while executing "${toolName}" after ${elapsedSec}s. The tool may be slow or unresponsive.`
+      } else {
+        timeoutReason = 'general_timeout'
+        userMessage = `The ${getAgentDisplayName(agentId)} agent exceeded the ${elapsedSec}s limit while processing your request.`
+      }
+    } catch (diagErr) {
+      logger.warn('Failed to diagnose timeout reason:', diagErr)
+    }
+    
+    finalResult = userMessage
+    logger.warn('⏱️ [DELEGATION_TIMEOUT]', { 
+      executionId: execId, 
+      target_agent: agentId, 
+      context_user_id: userId, 
+      elapsedMs: elapsed,
+      timeoutReason,
+      diagnosticMessage: userMessage
+    })
     
     // PHASE 2: Record timeout as failure in circuit breaker
-    circuitBreaker.recordFailure(agentId, 'timeout')
+    circuitBreaker.recordFailure(agentId, `timeout:${timeoutReason}`)
     
     ActionLifecycle.timeout(actionId)
     lastActionEvent = actionSnapshotStore.get(actionId)?.events.slice(-1)[0]

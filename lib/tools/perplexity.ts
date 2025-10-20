@@ -52,6 +52,13 @@ export const perplexityResearchTool = tool({
 
     const prompt = focus ? `${query}\n\nFocus: ${focus}\nProvide sources.` : `${query}\nProvide sources.`
     try {
+      // FIXED: Add 45s timeout to prevent hanging on Perplexity API slowness
+      // Deep research can take 20-30s, allow buffer but prevent indefinite hangs
+      const PERPLEXITY_TIMEOUT_MS = 45_000 // 45 seconds
+      
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_TIMEOUT_MS)
+      
       const resp = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
@@ -65,8 +72,12 @@ export const perplexityResearchTool = tool({
             { role: 'user', content: prompt }
           ],
           temperature: 0.2
-        })
+        }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
+      
       if (!resp.ok) {
         return { success: false, summary: `Perplexity API error ${resp.status}`, sources: [], followups: [], model, raw: '' }
       }
@@ -85,7 +96,11 @@ export const perplexityResearchTool = tool({
       }
       return { success: true, summary: content.slice(0, 4000), sources, followups, model: data.model || model, raw: content }
     } catch (e: any) {
-      return { success: false, summary: 'Perplexity request failed', sources: [], followups: [], model, raw: String(e) }
+      const isTimeout = e?.name === 'AbortError'
+      const errorMsg = isTimeout 
+        ? 'Perplexity request timed out after 45s (deep research takes time, try again or use sonar model)'
+        : 'Perplexity request failed'
+      return { success: false, summary: errorMsg, sources: [], followups: [], model, raw: String(e) }
     }
   }
 })
