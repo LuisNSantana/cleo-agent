@@ -110,31 +110,53 @@ export const firecrawlAnalyzePdfTool = tool({
     const userId = getCurrentUserId()
     
     try {
-      // Normalize URL: if not http(s), try to resolve from last attachment
+      // Normalize URL: accept http(s) URLs, data URLs, or resolve from last attachment
       let resolvedUrl = url
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      
+      // Case 1: Already a valid HTTP(S) URL
+      if (/^https?:\/\//i.test(url)) {
+        resolvedUrl = url
+      }
+      // Case 2: Data URL (base64 inline) - Firecrawl doesn't support these directly, extract and return helpful error
+      else if (url.startsWith('data:')) {
+        return {
+          success: false,
+          error: 'Firecrawl cannot process inline base64 data URLs. The PDF must be uploaded and accessible via a public URL.',
+          hint: 'The PDF attachment should have been uploaded to storage. If you see this error, the file upload may have failed. Try re-attaching the file.',
+          url: url.slice(0, 100) + '...'
+        }
+      }
+      // Case 3: Filename or relative path - resolve from last attachment
+      else {
         const g = globalThis as any
         const lastAttachment = g?.__lastAttachmentUrl
+        
         if (lastAttachment && typeof lastAttachment === 'string' && /^https?:\/\//i.test(lastAttachment)) {
           resolvedUrl = lastAttachment
-          console.log('[firecrawl_analyze_pdf] Normalized filename to attachment URL:', resolvedUrl)
+          console.log(`[firecrawl_analyze_pdf] Resolved filename "${url}" to attachment URL: ${resolvedUrl}`)
         } else {
-          // Try to resolve against app base if provided and looks like a root-relative path
+          // Try to resolve root-relative paths against app base
           if (url.startsWith('/')) {
             const base = process.env.NEXT_PUBLIC_APP_URL || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : '')
             if (base) {
               try {
                 resolvedUrl = new URL(url, base).toString()
+                console.log(`[firecrawl_analyze_pdf] Resolved path "${url}" to: ${resolvedUrl}`)
               } catch {}
             }
           }
           
-          // If still not a valid URL, return error
+          // Final validation
           if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) {
             return {
               success: false,
-              error: `Invalid or unresolved PDF URL: "${url}". Please provide a full URL (http/https) or attach the PDF file.`,
-              hint: 'If you attached a PDF, make sure it was uploaded successfully and try again.',
+              error: `Cannot resolve PDF location from: "${url}"`,
+              hint: 'Please either: 1) Attach the PDF file using the attachment button, or 2) Provide a direct URL to a publicly accessible PDF (e.g., https://example.com/document.pdf)',
+              suggestions: [
+                'If you just attached a file, wait for the upload to complete before sending',
+                'Make sure the file is a PDF (not an image or other document type)',
+                'Try pasting a direct link to an online PDF instead'
+              ],
               url
             }
           }
