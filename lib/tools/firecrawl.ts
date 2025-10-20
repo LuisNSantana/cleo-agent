@@ -97,48 +97,47 @@ async function callFirecrawl(path: string, body: any) {
  * Perfect for analyzing research papers, reports, contracts, etc.
  */
 export const firecrawlAnalyzePdfTool = tool({
-  description: 'Analyze PDF documents from URLs or the latest attached file and extract structured information. Supports both public PDFs and web pages containing PDFs. Can extract specific data using AI with custom prompts or schemas. Perfect for research papers, reports, contracts, invoices, and documentation.',
+  description: 'Analyze PDF documents from URLs or attached files and extract structured information. Supports both public PDFs and web pages containing PDFs. Can extract specific data using AI with custom prompts or schemas. Perfect for research papers, reports, contracts, invoices, and documentation. If user attached a PDF, you can pass just the filename.',
   inputSchema: z.object({
-    // Accept non-URL strings (filenames or relative paths) and normalize in execute
-    url: z.string().min(1).describe('URL of the PDF, a relative path, or an attachment filename (will be resolved)'),
+    url: z.string().min(1).describe('URL of the PDF or just the filename if user attached a file (e.g., "document.pdf" or "https://example.com/file.pdf")'),
     extractionPrompt: z.string().optional().describe('Natural language prompt describing what to extract (e.g., "Extract author, title, key findings, and methodology")'),
     extractionSchema: z.record(z.any()).optional().describe('JSON schema for structured extraction. Example: {"type": "object", "properties": {"title": {"type": "string"}, "authors": {"type": "array"}}}'),
     includeScreenshot: z.boolean().optional().default(false).describe('Include a screenshot of the first page'),
     maxPages: z.number().optional().describe('Maximum number of pages to parse (cloud only, 1-10000)')
   }),
   execute: async (params) => {
-  const { url, extractionPrompt, extractionSchema, includeScreenshot = false, maxPages } = params
-  const userId = getCurrentUserId()
+    const { url, extractionPrompt, extractionSchema, includeScreenshot = false, maxPages } = params
+    const userId = getCurrentUserId()
     
     try {
-      // Normalize URL: allow filenames/relative paths by preferring last attachment URL
-      function normalizePdfUrl(input: unknown) {
-        if (typeof input !== 'string' || input.trim().length === 0) return null
-        const val = input.trim()
-        if (/^https?:\/\//i.test(val)) return val
-        try {
-          const g = globalThis
-          const lastUrl = (g && (g as any).__lastAttachmentUrl) as string | undefined
-          if (lastUrl && /^https?:\/\//i.test(lastUrl)) {
-            return lastUrl
+      // Normalize URL: if not http(s), try to resolve from last attachment
+      let resolvedUrl = url
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        const g = globalThis as any
+        const lastAttachment = g?.__lastAttachmentUrl
+        if (lastAttachment && typeof lastAttachment === 'string' && /^https?:\/\//i.test(lastAttachment)) {
+          resolvedUrl = lastAttachment
+          console.log('[firecrawl_analyze_pdf] Normalized filename to attachment URL:', resolvedUrl)
+        } else {
+          // Try to resolve against app base if provided and looks like a root-relative path
+          if (url.startsWith('/')) {
+            const base = process.env.NEXT_PUBLIC_APP_URL || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : '')
+            if (base) {
+              try {
+                resolvedUrl = new URL(url, base).toString()
+              } catch {}
+            }
           }
-        } catch {}
-        // Try to resolve against app base if provided and looks like a root-relative path
-        try {
-          const base = (process.env.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL.trim()) || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : '')
-          if (base && val.startsWith('/')) {
-            return new URL(val, base).toString()
+          
+          // If still not a valid URL, return error
+          if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) {
+            return {
+              success: false,
+              error: `Invalid or unresolved PDF URL: "${url}". Please provide a full URL (http/https) or attach the PDF file.`,
+              hint: 'If you attached a PDF, make sure it was uploaded successfully and try again.',
+              url
+            }
           }
-        } catch {}
-        return null
-      }
-
-      const resolvedUrl = normalizePdfUrl(url)
-      if (!resolvedUrl) {
-        return {
-          success: false,
-          error: 'Invalid or unresolved PDF URL. Provide a full URL or attach the PDF to the message.',
-          url
         }
       }
 
