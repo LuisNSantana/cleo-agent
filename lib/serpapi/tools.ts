@@ -82,13 +82,12 @@ export const serpGeneralSearchTool = tool({
 		if (!input.q || !String(input.q).trim()) {
 			return { error: 'Missing query. Provide q (or query) with your search text.' }
 		}
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured (user or env).' }
-		const cacheKey = `general:${JSON.stringify(input)}:${userId || 'anon'}`
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		const cacheKey = `general:${JSON.stringify(input)}`
 		const cached = getCache(cacheKey)
 		if (cached) return { ...cached, cached: true }
-		checkLimit(userId || 'anon')
+		checkLimit('global')
 		try {
 			const json = await serpFetch({ engine: 'google', q: input.q, num: input.num, safe: input.safe, location: input.location, hl: input.hl, gl: input.gl }, key)
 			const organic = normalizeOrganic(json.organic_results)
@@ -112,12 +111,11 @@ export const serpNewsSearchTool = tool({
 		if (!input.q || !String(input.q).trim()) {
 			return { error: 'Missing query. Provide q (or query) with your news search text.' }
 		}
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured.' }
-		const cacheKey = `news:${JSON.stringify(input)}:${userId || 'anon'}`
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		const cacheKey = `news:${JSON.stringify(input)}`
 		const cached = getCache(cacheKey); if (cached) return { ...cached, cached: true }
-		checkLimit(userId || 'anon')
+		checkLimit('global')
 		try {
 			const json = await serpFetch({ engine: 'google_news', q: input.q, hl: input.hl, gl: input.gl, num: input.num, tbs: input.tbs }, key)
 			const articles = (json.articles || []).slice(0, input.num).map((a: any) => ({
@@ -139,12 +137,11 @@ export const serpScholarSearchTool = tool({
 	description: 'SerpAPI Google Scholar search (academic). If engine quota restricted, returns fallback notice.',
 	inputSchema: z.object({ ...baseSearchInput, num: baseSearchInput.num.default(8) }),
 	execute: async (input) => {
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured.' }
-		const cacheKey = `scholar:${JSON.stringify(input)}:${userId || 'anon'}`
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		const cacheKey = `scholar:${JSON.stringify(input)}`
 		const cached = getCache(cacheKey); if (cached) return { ...cached, cached: true }
-		checkLimit(userId || 'anon')
+		checkLimit('global')
 		try {
 			const json = await serpFetch({ engine: 'google_scholar', q: input.q, num: input.num, hl: input.hl }, key)
 			if (json?.error) throw new Error(json.error)
@@ -170,12 +167,11 @@ export const serpAutocompleteTool = tool({
 	description: 'SerpAPI Google autocomplete suggestions for a partial query.',
 	inputSchema: z.object({ prefix: z.string().min(1).max(100).describe('Partial query prefix'), hl: z.string().optional() }),
 	execute: async ({ prefix, hl }) => {
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured.' }
-		const cacheKey = `ac:${prefix}:${hl || 'na'}:${userId || 'anon'}`
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		const cacheKey = `ac:${prefix}:${hl || 'na'}`
 		const cached = getCache(cacheKey); if (cached) return { ...cached, cached: true }
-		checkLimit(userId || 'anon')
+		checkLimit('global')
 		try {
 			const json = await serpFetch({ engine: 'google_autocomplete', q: prefix, hl }, key)
 			const suggestions = (json.suggestions || []).map((s: any) => s.value || s)
@@ -191,12 +187,11 @@ export const serpLocationSearchTool = tool({
 	description: 'SerpAPI Google Maps local results (places).',
 	inputSchema: z.object({ q: z.string().min(1), ll: z.string().optional().describe('Latitude,Longitude or data key'), type: z.string().optional(), num: z.number().min(1).max(10).default(5) }),
 	execute: async (input) => {
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured.' }
-		const cacheKey = `loc:${JSON.stringify(input)}:${userId || 'anon'}`
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		const cacheKey = `loc:${JSON.stringify(input)}`
 		const cached = getCache(cacheKey); if (cached) return { ...cached, cached: true }
-		checkLimit(userId || 'anon')
+		checkLimit('global')
 		try {
 			const json = await serpFetch({ engine: 'google_maps', q: input.q, ll: input.ll, type: input.type, num: input.num }, key)
 			const local_results = (json.local_results || []).slice(0, input.num).map((r: any) => ({
@@ -227,10 +222,9 @@ export const serpRawTool = tool({
 		gl: z.string().optional()
 	}),
 	execute: async ({ engine, q, params = {}, num, hl, gl }) => {
-		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
-		if (!key) return { error: 'No SerpAPI key configured.' }
-		checkLimit(userId || 'anon', 4)
+		const key = await resolveSerpapiKey()
+		if (!key) return { error: 'No SerpAPI key configured (env).' }
+		checkLimit('global', 4)
 		try {
 			const merged: Record<string, any> = { engine, q, num, hl, gl, ...params }
 			const json = await serpFetch(merged, key)
@@ -259,7 +253,7 @@ export const stockQuoteTool = tool({
 	}),
 	execute: async ({ symbol, hl, gl }) => {
 		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
+		const key = await resolveSerpapiKey()
 		if (!key) return { error: 'No SerpAPI key configured.' }
 		checkLimit(userId || 'anon')
 		try {
@@ -294,7 +288,7 @@ export const marketNewsTool = tool({
 	}),
 		execute: async ({ symbol, tbs, hl, gl, num }) => {
 		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
+		const key = await resolveSerpapiKey()
 		if (!key) return { error: 'No SerpAPI key configured.' }
 		checkLimit(userId || 'anon')
 		try {
@@ -342,7 +336,7 @@ export const stockChartAndVolatilityTool = tool({
 	}),
 	execute: async ({ symbol, period, timeframe, hl, gl }) => {
 		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
+		const key = await resolveSerpapiKey()
 		if (!key) return { success: false, error: 'No SerpAPI key configured.' }
 		checkLimit(userId || 'anon')
 		try {
@@ -420,7 +414,7 @@ export const serpTrendsSearchTool = tool({
 	}),
 	execute: async (input) => {
 		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
+		const key = await resolveSerpapiKey()
 		if (!key) return { error: 'No SerpAPI key configured.' }
 		
 		const cacheKey = `trends:${JSON.stringify(input)}:${userId || 'anon'}`
@@ -475,7 +469,7 @@ export const serpTrendingNowTool = tool({
 	}),
 	execute: async (input) => {
 		const userId = getCurrentUserId()
-		const key = await resolveSerpapiKey(userId)
+		const key = await resolveSerpapiKey()
 		if (!key) return { error: 'No SerpAPI key configured.' }
 		
 		const cacheKey = `trending_now:${JSON.stringify(input)}:${userId || 'anon'}`

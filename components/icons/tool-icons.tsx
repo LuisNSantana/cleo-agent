@@ -22,9 +22,28 @@ export const toolIconMap = {
   calculator: CalculatorIcon,
   cryptoPrice: CurrencyCircleDollarIcon,
   randomFact: LightbulbIcon,
-  webSearch: MagnifyingGlassIcon,
+  webSearch: TavilyIcon,
+  // SerpAPI tools (con y sin sufijo "Tool")
+  serpGeneralSearchTool: GoogleIcon,
+  serpGeneralSearch: GoogleIcon,
+  serpNewsSearchTool: GoogleIcon,
+  serpNewsSearch: GoogleIcon,
+  serpScholarSearchTool: GoogleIcon,
+  serpScholarSearch: GoogleIcon,
+  serpAutocompleteTool: GoogleIcon,
+  serpAutocomplete: GoogleIcon,
+  serpLocationSearchTool: GoogleIcon,
+  serpLocationSearch: GoogleIcon,
+  serpRawTool: GoogleIcon,
+  serpRaw: GoogleIcon,
+  serpTrendsSearchTool: GoogleIcon,
+  serpTrendsSearch: GoogleIcon,
+  serpTrendingNowTool: GoogleIcon,
+  serpTrendingNow: GoogleIcon,
+  // Google Calendar
   listCalendarEvents: GoogleCalendarIcon,
   createCalendarEvent: GoogleCalendarIcon,
+  // Google Drive
   listDriveFiles: GoogleDriveIcon,
   searchDriveFiles: GoogleDriveIcon,
   getDriveFileDetails: GoogleDriveIcon,
@@ -140,6 +159,34 @@ export function XTwitterIcon({ className }: { className?: string }) {
     <Image 
       src="/icons/x_twitter.png" 
       alt="X (Twitter)"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom Google icon component for SerpAPI tools
+export function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/google.png" 
+      alt="Google"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom Tavily icon component for web search
+export function TavilyIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/tavily-color.png" 
+      alt="Tavily Search"
       className={className}
       width={16}
       height={16}

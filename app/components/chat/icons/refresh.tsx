@@ -1,2 +1,2 @@
-import { Refresh } from "@phosphor-icons/react";
-export default Refresh;
+import { ArrowClockwise } from "@phosphor-icons/react";
+export default ArrowClockwise;

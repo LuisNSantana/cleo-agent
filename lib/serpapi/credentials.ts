@@ -87,28 +87,7 @@ export async function deleteSerpapiKey(userId: string, id: string) {
 /**
  * Returns decrypted active key or null if none found.
  */
-export async function getActiveSerpapiKey(userId: string): Promise<string | null> {
-	try {
-		const supabase = await createClient(); if (!supabase) return null
-			const { data, error } = await supabase
-				.from('user_service_connections')
-				.select('access_token,connected,account_info')
-				.eq('user_id', userId)
-				.eq('service_id', SERVICE_ID)
-				.eq('connected', true)
-				.order('created_at', { ascending: false })
-				.limit(1)
-				.maybeSingle()
-			if (error || !data?.access_token) return null
-		// encrypted:authTag:iv pattern (see other modules). We pass full payload and last segment as iv.
-		const parts = data.access_token.split(':')
-		if (parts.length < 3) return null
-		const iv = parts[parts.length - 1]
-		return decryptKey(data.access_token, iv)
-	} catch {
-		return null
-	}
-}
+// getActiveSerpapiKey eliminado: ahora solo se usa la clave global
 
 /** Quick key validation: minimal query with num=1 */
 export async function testSerpapiKey(apiKey: string) {
@@ -127,13 +106,9 @@ export async function testSerpapiKey(apiKey: string) {
 }
 
 /**
- * Helper to resolve effective key: user active key > env fallback
+ * Helper to resolve effective key: solo usa la clave global
  */
-export async function resolveSerpapiKey(userId?: string) {
-	if (userId) {
-		const k = await getActiveSerpapiKey(userId)
-		if (k) return k
-	}
-	return process.env.SERPAPI_API_KEY || ''
+export async function resolveSerpapiKey() {
+	return process.env.SERPAPI_API_KEY || process.env.SERP_API_KEY || ''
 }
 
