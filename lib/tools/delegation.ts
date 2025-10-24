@@ -555,10 +555,18 @@ export const delegateToNotionTool = tool({
 });
 
 export const delegateToNoraTool = tool({
-  description: 'Delegate community management, social media strategy, and comprehensive social platform coordination tasks to Nora specialist. Use for social media campaigns, community engagement strategies, Twitter/X management, cross-platform content coordination, brand social presence, and social media crisis management.',
+  description: 'Delegate medical information & triage requests to Nora (non-diagnostic). Use for evidence-informed guidance, risk flags, structured summaries with sources; not for emergencies or prescriptions.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'nora-medical', task, context, priority, requirements, userId })
+  }
+});
+
+export const delegateToJennTool = tool({
+  description: 'Delegate community management, social media strategy, and Twitter/X operations to Jenn. Use for content calendars, thread drafts, publishing, analytics reporting, and social engagement workflows.',
   inputSchema: delegationSchema,
   execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'nora-community', task, context, priority, requirements })
+    return runDelegation({ agentId: 'jenn-community', task, context, priority, requirements })
   }
 });
 
@@ -573,5 +581,6 @@ export const delegationTools = {
   delegate_to_astra: delegateToAstraTool,
   delegate_to_notion_agent: delegateToNotionTool,
   delegate_to_nora: delegateToNoraTool,
+  delegate_to_jenn: delegateToJennTool,
 
 };

@@ -42,10 +42,10 @@ const AGENT_DELEGATION_RULES = {
     description: "customer support, technical troubleshooting, issue resolution, documentation, service workflows, ticket management, help desk operations",
     role: "Customer Success & Technical Support Specialist: Expert in troubleshooting, customer service, documentation, and support workflow optimization."
   },
-  Nora: {
+  Jenn: {
     keywords: ["social media", "redes sociales", "community", "comunidad", "twitter", "content", "contenido", "post", "publicar", "engagement", "audience", "audiencia", "trends", "tendencias", "hashtags", "viral", "social", "community management", "analytics", "métricas", "scheduling", "programación", "content creation", "creación de contenido", "copywriting", "social strategy", "brand voice", "influencer", "ugc", "social listening", "crisis management"],
     description: "complete community management, social media strategy, content creation, analytics, scheduling, audience engagement, brand monitoring, crisis management, influencer collaboration",
-    role: "Complete Community Manager: Full-spectrum social media management including content creation, analytics, scheduling, moderation, audience engagement, and strategic planning."
+    role: "Complete Community Manager (Jenn): Full-spectrum social media management including content creation, analytics, scheduling, moderation, audience engagement, and strategic planning."
   },
   Wex: {
     keywords: [
@@ -54,12 +54,12 @@ const AGENT_DELEGATION_RULES = {
     description: "market & competitor intelligence, SEO/keyword & SERP analysis, positioning, pricing deltas, prospect/ICP signal discovery, opportunity & white space mapping, INSIGHT SYNTHESIS (SWOT, Five Forces, Opportunity Matrix, ICE/RICE)",
     role: "Intelligence & Insights Specialist: Multi-phase sourcing + structured synthesis turning fragmented research into actionable insights (insights accionables), frameworks, ranked opportunities, risks, and executive summaries."
   },
-  Jungi: {
+  Nora: {
     keywords: [
-      'ingredientes','etiqueta','label','comparar','comparación','lista de ingredientes','ocr','pdf','envase','alérgenos','alergenos','aditivos','e-codes','e330','composición'
+      'medical','health','symptom','triage','guideline','CDC','WHO','NIH','NICE','contraindication','pregnancy','lactation','allergy','drug interaction','vaccine','screening','prevention','risk factor','lifestyle','patient education','side effect','dosage info'
     ],
-    description: 'comparación de listas de ingredientes: oficial vs extraída (PDF/imagen/OCR), detección de faltantes/nuevos, cambios de orden, sinónimos/aditivos y banderas críticas por alérgenos',
-    role: 'Ingredient Comparator: QA de etiquetas y control de calidad alimentario'
+    description: 'medical information & triage support (non-diagnostic), evidence-informed summaries with sources and risk flags',
+    role: 'Medical Information & Triage Assistant (Nora): Educational support only; not a substitute for professional care.'
   },
   Iris: {
     keywords: [
@@ -159,7 +159,7 @@ Examples of routing logic:
 - Market intelligence/competitor analysis → Wex (firecrawl, webSearch, perplexity)
 - Research/documentation → Apu (customer support, troubleshooting)
 - E-commerce/Shopify → Emma (store management, analytics)
- - Ingredient list comparison from PDF/label → Jungi (OCR-tolerant ingredient diff with allergen flags)
+ - Medical information/triage (non-diagnostic) → Nora (evidence-based sources with risk flags)
  - Insight synthesis ("Caso" analysis, executive summary) → Iris (evidence gathering + structured insights)
 </decision_tree>
 
@@ -200,14 +200,57 @@ Examples of routing logic:
 </examples>
 </delegation_orchestration>`;
 
+// Scale effort and budget to query complexity to avoid over/under-spending tokens
+const EFFORT_SCALING_GUIDELINES = `EFFORT SCALING & BUDGETS:
+- Simple fact lookup or small edit → 1 model call, max 3 tool calls, no sub-agents.
+- Targeted task with one domain (e.g., 1–2 documents, 1 API) → up to 2 iterations, ≤6 tool calls, 0–1 sub-agent.
+- Comparative/analytic task across several sources → 2–4 iterations, ≤12 tool calls, 1–3 sub-agents.
+- Broad research or multi-facet synthesis → 3–6 iterations, ≤20 tool calls, 3–6 sub-agents with clear division of labor.
+- Always stop early if marginal gain < 10% new signal.
+Include an internal effort budget before starting and adhere to it.`;
+
+// Parallelization guidance inspired by Anthropic multi-agent research patterns
+const PARALLELIZATION_GUIDELINES = `PARALLELIZATION HEURISTICS:
+- Prefer parallel "reading" tasks; avoid parallel "writing" to the same artifact.
+- When breadth is needed, spawn multiple focused sub-agents in parallel; keep writing/synthesis in a single agent.
+- Use separate context windows for sub-agents; the lead agent synthesizes.
+- Do not spawn more than 5 sub-agents without clear justification.`;
+
+// Ensure delegated tasks are crisply specified for subagents
+const SUBAGENT_TASK_SPEC = `SUBAGENT TASK SPEC (for each delegation):
+- Objective: one clear goal with scope boundaries.
+- Output: required format (bullets/table/doc/sheet) and success criteria.
+- Tools: which tools to use/avoid and why.
+- Effort: max tool calls / time budget.
+- Handoffs: what to return to orchestrator (artifacts + 3–5 bullet summary).`;
+
+// Source quality and search strategy for research-like tasks
+const SOURCE_QUALITY_HEURISTICS = `SOURCE QUALITY & SEARCH STRATEGY:
+- Start broad → then narrow; prefer short queries first, refine based on results.
+- Prefer primary sources (filings, docs, datasets) over SEO content farms.
+- Deduplicate sources; resolve contradictions explicitly and note likely causes.
+- Cite concisely with numbered references next to claims when relevant.`;
+
+// Checkpointing and resume behavior to improve reliability
+const CHECKPOINTING_AND_RESUME = `CHECKPOINTING & RESILIENCE:
+- After major steps, create a compact internal checkpoint: plan, progress, artifacts.
+- If a tool fails, adapt: switch tool, adjust parameters, or skip with rationale—do not loop blindly.
+- If context nears limits, summarize completed work and proceed with compressed memory.`;
+
+// Clear stop conditions to prevent runaway loops
+const STOP_CONDITIONS_AND_BUDGET = `STOP CONDITIONS:
+- Stop when success criteria are met OR additional work yields <10% new signal.
+- Respect iteration/tool-call budgets unless user explicitly extends scope.
+- For destructive actions, require explicit confirmation before proceeding.`;
+
 // Strict delegation heuristics including Toby/Notion ambiguity handling
 const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
  - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
  - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
- - For social media via Nora: complete community management including content creation, analytics, scheduling, and engagement. Nora handles all social media tasks directly with integrated tools.
- - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Nora as the likely specialist (e.g., "¿Quieres que Nora gestione X/Y/Z?").
+ - For social media via Jenn: complete community management including content creation, analytics, scheduling, and engagement. Jenn handles all social media tasks directly with integrated tools.
+ - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Jenn as the likely specialist (e.g., "¿Quieres que Jenn gestione X/Y/Z?").
  - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
- - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Nora; "reporte de métricas" → Nora).
+ - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Jenn; "reporte de métricas" → Jenn).
  - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
  - Always include minimal context in handoff: goal, constraints, success criteria.`;
 
@@ -217,9 +260,9 @@ const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Email triage → Ami; email compose/send → delegate_to_astra
 - Financial analysis/Business planning → Peter
  - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
- - Social content creation/copywriting/analytics/metrics/reporting → Nora handles directly with integrated tools
+  - Social content creation/copywriting/analytics/metrics/reporting → Jenn handles directly with integrated tools
  - Evidence gathering (PDF/URL/Doc) → Iris synthesizes insights (Resumen Ejecutivo, Hallazgos, Tendencias, Riesgos, Recomendaciones, Próximos Pasos, Referencias)
- - Ingredient list comparison (oficial vs extraída OCR) → Jungi genera reporte estructurado con coincidencias, faltantes/nuevos, orden, sinónimos/aditivos, y banderas de alérgenos
+  - Medical information & triage (no diagnóstico) → Nora devuelve resumen basado en evidencia con fuentes y banderas de riesgo
  - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
 Notes:
 - When Notion credentials exist, do NOT ask the user to connect. Proceed to Notion Agent and return the real URL.
@@ -243,7 +286,7 @@ ORCHESTRATION INTELLIGENCE:
 - Chain specialists with clean handoffs.`;
 // Inject explicit Wex routing guidance
 const SPECIALISTS_AWARENESS_ENHANCED = SPECIALISTS_AWARENESS + `\n- For strategic market / competitor / SEO / prospect intelligence (pricing comparisons, TAM sizing, SERP & keyword analysis, positioning matrices, opportunity/white space discovery, actionable insight synthesis / "insights accionables", executive summaries, frameworks like SWOT/Five Forces/Opportunity Matrix/ICE-RICE) → delegate to Wex early if high-signal context is present.`
-  + `\n- For ingredient label QA and OCR-based comparisons (faltantes, nuevos, orden, sinónimos/aditivos, alérgenos) → delegate to Jungi.`
+  + `\n- For medical information and triage (non-diagnostic, evidence-informed with sources and risk flags) → delegate to Nora.`
   + `\n- For evidence-based insight synthesis (Resumen ejecutivo, Hallazgos, Tendencias, Riesgos con severidad/probabilidad/confianza, Recomendaciones, Próximos pasos, Referencias) → delegate to Iris.`
 
 const JOURNALISM_COMMUNITY_MANAGER_SPECIALIZATION = `SPECIALIZATION: JOURNALISM & COMMUNITY
@@ -281,14 +324,14 @@ const OUTPUT_REMINDERS = `OUTPUT FORMAT:
 - Sources: Compact list (e.g., "Sources: [Domain/Link]").
 - Validate: Empathetic? Actionable? Natural?`;
 
-// Reporting and visuals guidance for financial analysis (Peter) and social analytics (Nora)
+// Reporting and visuals guidance for financial analysis (Peter) and social analytics (Jenn)
 const REPORTING_AND_VISUALS = `REPORTING & VISUALS:
 FINANCIAL ANALYSIS (Peter):
 - Prefer charts for volatility/trend: include PNG/image or a link (if generated). If charts are unavailable, provide a compact table (Date, Close, Return %, Volatility) and explain how to interpret.
 - Clarify missing details once: tickers, period (e.g., 1m/3m/1y), timeframe (daily/weekly), benchmark (e.g., SPY).
 - Output: brief executive summary + visual(s)/table + 2–3 insights + next steps.
 
-SOCIAL REPORTING (Nora):
+SOCIAL REPORTING (Jenn):
 - Concise template:
   1) Executive Summary (3–5 bullets)
   2) Core KPIs (reach, impressions, engagement rate, CTR, growth)
@@ -364,18 +407,24 @@ TASKS & DELEGATION
 ${DELEGATION_AND_SPEED}
 ${STRICT_DELEGATION_HEURISTICS}
 ${SPECIALISTS_AWARENESS_ENHANCED}
+${EFFORT_SCALING_GUIDELINES}
+${PARALLELIZATION_GUIDELINES}
+${SUBAGENT_TASK_SPEC}
 
 TOOLS & VALIDATION
 ${TOOLS_INTEGRATION}
 ${ORCHESTRATION_CHAINS}
 ${NOTION_OUTPUT_VALIDATION}
 ${REPORTING_AND_VISUALS}
+${SOURCE_QUALITY_HEURISTICS}
 
 CONSTRAINTS & SAFETY
 ${ENGAGEMENT_AND_COMPLETENESS}
 ${ANTI_HALLUCINATION}
 ${ANTI_HALLUCINATION_STRICT_RAG}
 ${QA_AND_LOGGING_POLICY}
+${CHECKPOINTING_AND_RESUME}
+${STOP_CONDITIONS_AND_BUDGET}
 
 ${llamaSection}
 ${specializationModule}

@@ -28,7 +28,8 @@ const LEGACY_DELEGATION_TOOLS = [
   'delegate_to_emma', // E-commerce/Shopify
   'delegate_to_apu', // Financial/market research
   'delegate_to_wex', // Web automation
-  'delegate_to_nora', // Social media/Twitter
+  'delegate_to_nora', // Medical information & triage (non-diagnostic)
+  'delegate_to_jenn', // Social media/Twitter
 ]
 
 export const CLEO_AGENT: AgentConfig = {

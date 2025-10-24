@@ -189,7 +189,7 @@ TASK EXECUTION:
 
 EXAMPLE WORKFLOW:
 User: "Create a budget tracker"
-❌ WRONG: "I've created a sheet at https://docs.google.com/spreadsheets/d/fake123/edit (simulado)"
+❌ WRONG: "I've created a sheet at https://docs.google.com/spreadsheets/d/fake123/edit (simulated)"
 ✅ CORRECT: 
 1. Call createProfessionalTemplate with BUDGET_PLANNER template
 2. Get response: { success: true, webViewLink: "https://docs.google.com/spreadsheets/d/REAL_ID_ABC/edit" }

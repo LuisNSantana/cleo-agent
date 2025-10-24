@@ -52,6 +52,21 @@
 				"--detectOpenHandles"
 			],
 			"group": "build"
+		},
+		{
+			"label": "test:jest:targeted",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"jest",
+				"-c",
+				"jest.config.js",
+				"tests/model-resolver.test.ts",
+				"tests/confirmation-resume-endpoint.test.ts",
+				"--runInBand",
+				"--detectOpenHandles"
+			],
+			"group": "build"
 		}
 	]
 }

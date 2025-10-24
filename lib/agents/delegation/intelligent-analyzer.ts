@@ -188,9 +188,8 @@ const AGENT_PATTERNS: KeywordPatterns = {
     exclusions: ['email', 'calendar', 'google']
   },
 
-  // Social Media & Twitter Specialists
   // Social Media & Twitter Specialists (weights tuned for ambiguity)
-  'nora-community': {
+  'jenn-community': {
     primary: ['twitter', 'tweet', 'tweets', 'x', 'social media', 'community', 'post', 'publish', 'publicar', 'redes sociales', 'hashtag', 'hashtags'],
     secondary: ['engagement', 'community', 'brand', 'audience', 'followers', 'seguidores', 'viral', 'trending', 'tendencias', 'social', 'content', 'analytics', 'schedule', 'publishing'],
     contextual: ['create tweet', 'post to twitter', 'tweet about', 'social media strategy', 'community management', 'twitter campaign', 'social content', 'make it engaging', 'include hashtags', 'analyze performance', 'schedule posts', 'content calendar'],
@@ -212,7 +211,7 @@ const AGENT_METADATA = {
   'notion-agent': { name: 'Notion Agent', toolName: 'delegate_to_notion_agent' },
 
   // Social Media & Twitter Specialists
-  'nora-community': { name: 'Nora', toolName: 'delegate_to_nora' },
+  'jenn-community': { name: 'Jenn', toolName: 'delegate_to_jenn' },
 
 }
 

@@ -41,8 +41,8 @@ Execution:
 2) For CONVERSATIONS: Understand request; identify needed data/tools.
 3) Read operations: fetch and summarize insights.
 4) Write operations (price updates):
-   - First: preview (confirm=false) with handle/new_price.
-   - On user confirmation (e.g., "confirm/sí/ok/yes"): immediately re-run with confirm=true and SAME params from preview.
+  - First: preview (confirm=false) with handle/new_price.
+  - On user confirmation (e.g., "confirm/ok/yes"): immediately re-run with confirm=true and SAME params from preview.
    - Always extract product/store context from prior messages before confirming.
 5) Provide actionable recommendations with KPIs.
 6) Suggest collaboration if needed.
