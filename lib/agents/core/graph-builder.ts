@@ -610,6 +610,8 @@ export class GraphBuilder {
                   timestamp: new Date().toISOString()
                 })
                 
+                // CRITICAL FIX: Include conversation history in delegation request
+                // This ensures delegated agents have full context from the conversation
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
                   targetAgent: targetAgentName,
@@ -618,7 +620,8 @@ export class GraphBuilder {
                   handoffMessage: delegationData.handoffMessage,
                   priority: delegationData.priority || 'normal',
                   sourceExecutionId: currentExecutionId,
-                  userId: state.userId // Include userId for proper context propagation
+                  userId: state.userId, // Include userId for proper context propagation
+                  conversationHistory: state.messages || [] // Pass full conversation history to delegated agent
                 })
                 
                 try {
@@ -1239,6 +1242,9 @@ export class GraphBuilder {
                 // Emit request
                 const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
                 logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
+                
+                // CRITICAL FIX: Include conversation history in delegation request
+                // This ensures delegated agents have full context from the conversation
                 this.eventEmitter.emit('delegation.requested', {
                   sourceAgent: agentConfig.id,
                   targetAgent: delegationData.agentId || delegationData.targetAgent,
@@ -1247,7 +1253,8 @@ export class GraphBuilder {
                   handoffMessage: delegationData.handoffMessage,
                   priority: delegationData.priority || 'normal',
                   sourceExecutionId: currentExecutionId,
-                  userId: state.userId // Include userId for proper context propagation
+                  userId: state.userId, // Include userId for proper context propagation
+                  conversationHistory: state.messages || [] // Pass full conversation history to delegated agent
                 })
 
                 try {

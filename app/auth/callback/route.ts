@@ -2,22 +2,33 @@ import { MODEL_DEFAULT } from "@/lib/config"
 import { isSupabaseEnabled } from "@/lib/supabase/config"
 import { createClient } from "@/lib/supabase/server"
 import { createGuestServerClient } from "@/lib/supabase/server-guest"
+import { getAppBaseUrl } from "@/lib/utils/app-url"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
   const next = searchParams.get("next") ?? "/"
 
+  // Get dynamic base URL for redirects
+  const baseUrl = getAppBaseUrl()
+
+  console.log('🔐 [AUTH CALLBACK] Processing OAuth callback:', {
+    hasCode: !!code,
+    next,
+    baseUrl,
+    nodeEnv: process.env.NODE_ENV
+  })
+
   if (!isSupabaseEnabled) {
     return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent("Supabase is not enabled in this deployment.")}`
+      `${baseUrl}/auth/error?message=${encodeURIComponent("Supabase is not enabled in this deployment.")}`
     )
   }
 
   if (!code) {
     return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent("Missing authentication code")}`
+      `${baseUrl}/auth/error?message=${encodeURIComponent("Missing authentication code")}`
     )
   }
 
@@ -26,20 +37,20 @@ export async function GET(request: Request) {
 
   if (!supabase || !supabaseAdmin) {
     return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent("Supabase is not enabled in this deployment.")}`
+      `${baseUrl}/auth/error?message=${encodeURIComponent("Supabase is not enabled in this deployment.")}`
     )
   }
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    console.error("Auth error:", error)
+    console.error("❌ [AUTH CALLBACK] Exchange code error:", error)
     return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent(error.message)}`
+      `${baseUrl}/auth/error?message=${encodeURIComponent(error.message)}`
     )
   }
 
-  console.log('🔍 [AUTH DEBUG] Exchange code result:', {
+  console.log('✅ [AUTH CALLBACK] Exchange code successful:', {
     hasData: !!data,
     hasUser: !!data?.user,
     userId: data?.user?.id,
@@ -49,7 +60,7 @@ export async function GET(request: Request) {
   const user = data?.user
   if (!user || !user.id || !user.email) {
     return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent("Missing user info")}`
+      `${baseUrl}/auth/error?message=${encodeURIComponent("Missing user info")}`
     )
   }
 
@@ -66,15 +77,18 @@ export async function GET(request: Request) {
 
     // Only log error if it's not a duplicate key error (23505)
     if (insertError && insertError.code !== "23505") {
-      console.error("Error inserting user:", insertError)
+      console.error("❌ [AUTH CALLBACK] Error inserting user:", insertError)
+    } else {
+      console.log('✅ [AUTH CALLBACK] User record ensured in database')
     }
   } catch (err) {
-    console.error("Unexpected user insert error:", err)
+    console.error("❌ [AUTH CALLBACK] Unexpected user insert error:", err)
   }
 
-  const host = request.headers.get("host")
-  const protocol = host?.includes("localhost") ? "http" : "https"
-  const redirectUrl = `${protocol}://${host}${next}`
+  // Build redirect URL using the same base URL (no protocol/host detection needed)
+  const redirectUrl = `${baseUrl}${next}`
+  
+  console.log('🔐 [AUTH CALLBACK] Redirecting to:', redirectUrl)
 
   return NextResponse.redirect(redirectUrl)
 }

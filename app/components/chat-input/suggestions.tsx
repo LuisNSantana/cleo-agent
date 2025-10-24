@@ -2,9 +2,9 @@
 
 import { PromptSuggestion } from "@/components/prompt-kit/prompt-suggestion"
 import { TRANSITION_SUGGESTIONS } from "@/lib/motion"
+import { SUGGESTIONS_CONFIG } from "@/lib/config/suggestions"
 import { AnimatePresence, motion } from "framer-motion"
 import React, { memo, useCallback, useMemo, useState } from "react"
-import { SUGGESTIONS as SUGGESTIONS_CONFIG } from "../../../lib/config"
 
 type SuggestionsProps = {
   onValueChangeAction: (value: string) => void
@@ -37,26 +37,20 @@ export const Suggestions = memo(function Suggestions({
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
       setActiveCategory(null)
-      // Mostrar placeholder visual sin insertar texto en el textarea todavía
-      if (onShowPlaceholder) {
-        onShowPlaceholder(suggestion)
-      }
-      // No llamar onSuggestionAction aquí para evitar que se interprete como acción inmediata
-      // No limpiar el value todavía; sólo se limpia cuando el usuario empieza a escribir o envía
+      // Al hacer click, enviar la suggestion directamente (como en Zola)
+      onSuggestionAction(suggestion)
+      onValueChangeAction("")
     },
-    [onShowPlaceholder]
+    [onSuggestionAction, onValueChangeAction]
   )
 
   const handleCategoryClick = useCallback(
     (suggestion: { label: string; prompt: string }) => {
       setActiveCategory(suggestion.label)
-      // En modo categoría, mostramos el prompt como placeholder ligero y no como value real
-      if (onShowPlaceholder) {
-        onShowPlaceholder(suggestion.prompt)
-      }
-      onValueChangeAction("")
+      // Al seleccionar categoría, solo mostrar el prompt como placeholder
+      onValueChangeAction(suggestion.prompt)
     },
-    [onShowPlaceholder, onValueChangeAction]
+    [onValueChangeAction]
   )
 
   const suggestionsGrid = useMemo(

@@ -192,7 +192,7 @@ export function ModelSelector({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger asChild>
             <PopoverTrigger asChild>
               <Button
                 size="sm"
@@ -298,7 +298,7 @@ export function ModelSelector({
             }
           }}
         >
-          <TooltipTrigger>
+          <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent className="max-w-[240px] text-xs leading-snug">

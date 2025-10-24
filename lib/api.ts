@@ -104,23 +104,20 @@ export async function updateChatModel(chatId: string, model: string) {
  */
 export async function signInWithGoogle(supabase: SupabaseClient) {
   try {
-    const isDev = process.env.NODE_ENV === "development"
+    // Use centralized URL utility for consistent behavior across environments
+    const { getAuthCallbackUrl } = await import('./utils/app-url')
+    const callbackUrl = getAuthCallbackUrl()
 
-    // Get base URL dynamically, prioritizing NEXT_PUBLIC_APP_URL for ngrok/external access
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-      ? process.env.NEXT_PUBLIC_APP_URL
-      : isDev
-        ? "http://localhost:3000"
-        : typeof window !== "undefined"
-          ? window.location.origin
-          : process.env.NEXT_PUBLIC_VERCEL_URL
-            ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-            : APP_DOMAIN
+    console.log('🔐 [AUTH] Starting Google OAuth sign-in:', {
+      callbackUrl,
+      nodeEnv: process.env.NODE_ENV,
+      hasAppUrl: !!process.env.NEXT_PUBLIC_APP_URL
+    })
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${baseUrl}/auth/callback`,
+        redirectTo: callbackUrl,
         scopes: "openid email profile",
         queryParams: {
           access_type: "offline",
@@ -130,9 +127,11 @@ export async function signInWithGoogle(supabase: SupabaseClient) {
     })
 
     if (error) {
+      console.error('❌ [AUTH] Google OAuth error:', error)
       throw error
     }
 
+    console.log('✅ [AUTH] OAuth URL generated successfully')
     // Return the provider URL
     return data
   } catch (err) {

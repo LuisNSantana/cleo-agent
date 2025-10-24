@@ -81,6 +81,7 @@ export function ChatInput({
   // Canvas message handling
   const { pendingMessage, consumePendingMessage, hasPendingMessage } = usePendingCanvasMessage()
   const processedMessageRef = useRef<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isProcessingCanvas, setIsProcessingCanvas] = useState(false)
 
   // Procesar automáticamente mensajes pendientes del canvas (for instant send)
@@ -246,11 +247,12 @@ export function ChatInput({
           value={deferredValue}
         />
       )}
-    {/* Transparent container on mobile to avoid tinted background around the input */}
-    <div className="order-2 md:order-1 sticky bottom-0 z-40 border-t border-transparent bg-transparent px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)] supports-[backdrop-filter]:bg-transparent">
+      <div
+        className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1"
+        onClick={() => textareaRef.current?.focus()}
+      >
         <PromptInput
-      /* Frosted-glass input: lighter and blurrier on mobile; keep original on md+ */
-      className="input-glow relative z-10 p-0 pt-1 shadow-lg backdrop-blur-lg bg-white/70 dark:bg-zinc-900/50 ring-1 ring-white/30 dark:ring-white/10 md:bg-popover md:backdrop-blur-xl md:ring-0 md:shadow-xs"
+          className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
           maxHeight={200}
           value={value}
           onValueChange={handleValueChange}
@@ -291,13 +293,14 @@ export function ChatInput({
           />
           
           <PromptInputTextarea
+            ref={textareaRef}
             placeholder={placeholder || "Ask Cleo..."}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
-            className="min-h-[44px] pt-3 pl-4 pr-4 text-[15px] leading-[1.4] placeholder:text-muted-foreground/60"
+            className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
           />
-          <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
+          <PromptInputActions className="mt-3 w-full justify-between p-2">
             <div className="flex gap-2 items-center">
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}

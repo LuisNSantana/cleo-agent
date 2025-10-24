@@ -1207,26 +1207,48 @@ export class AgentOrchestrator {
         await this.subAgentManager.setUser(preferredUserId || sourceUserId || contextUserId || NIL_UUID)
       } catch {}
 
+      // CRITICAL FIX: Include full conversation history in delegation context
+      // Get conversation history from delegationData (passed from graph-builder)
+      // or fallback to empty array if not provided
+      const conversationHistory = delegationData.conversationHistory || []
+      
+      // Build delegation message history:
+      // 1. Include full conversation history (so delegated agent knows what was discussed)
+      // 2. Add delegation system message
+      // 3. Add the specific delegated task
+      const delegationMessageHistory = [
+        ...conversationHistory, // Include ALL prior conversation
+        new SystemMessage({
+          content: `You have been delegated a task by ${delegationData.sourceAgent}. ${delegationData.context ? `Context: ${delegationData.context}` : ''}`
+        }),
+        new HumanMessage({
+          content: delegationData.task
+        })
+      ]
+      
+      logger.debug('🔍 [DELEGATION CONTEXT] Building context with conversation history:', {
+        sourceAgent: delegationData.sourceAgent,
+        targetAgent: delegationData.targetAgent,
+        conversationHistoryLength: conversationHistory.length,
+        totalHistoryLength: delegationMessageHistory.length,
+        task: delegationData.task.slice(0, 100)
+      })
+
       const delegationContext: ExecutionContext = {
         threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         // Ensure we never set an invalid UUID that would break DB filters/RLS
         userId: preferredUserId || sourceUserId || contextUserId || NIL_UUID,
         agentId: delegationData.targetAgent,
-        messageHistory: [
-          new SystemMessage({
-            content: `You have been delegated a task by ${delegationData.sourceAgent}. ${delegationData.context ? `Context: ${delegationData.context}` : ''}`
-          }),
-          new HumanMessage({
-            content: delegationData.task
-          })
-        ],
+        messageHistory: delegationMessageHistory,
         metadata: {
           isDelegation: true,
           sourceAgent: delegationData.sourceAgent,
           delegationPriority: normalizedPriority,
           isSubAgentDelegation: isSubAgent,
           // Link delegated execution to its parent so UI can mirror steps
-          parentExecutionId: delegationData.sourceExecutionId
+          parentExecutionId: delegationData.sourceExecutionId,
+          // Track original conversation history length for debugging
+          originalHistoryLength: conversationHistory.length
         }
       }
       

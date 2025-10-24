@@ -222,13 +222,10 @@ function ConversationContent({
 
   return (
     <ChatContainerContent
-          className="custom-scrollbar flex w-full h-full flex-col items-center pt-16 md:pt-20"
+          className="custom-scrollbar flex w-full h-full flex-col items-center pt-20 pb-4"
           style={{
             scrollbarGutter: "stable both-edges",
-            // IMPROVED: Add dynamic bottom padding with extra margin to prevent input overlay
-            // Increased default from 88px to 120px + 16px safety margin
-            paddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 16px)`,
-            scrollPaddingBottom: `calc(env(safe-area-inset-bottom) + var(--chat-input-height, 120px) + 24px)`,
+            scrollbarWidth: "none",
           }}
         >
           {messages?.map((message, index) => {

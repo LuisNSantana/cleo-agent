@@ -291,6 +291,27 @@ export function AppSidebar() {
             </div>
           </div>
         </a>
+        
+        {/* Legal Links */}
+        <div className="flex items-center justify-center gap-3 pt-2 text-xs text-muted-foreground border-t border-border/40 mt-2">
+          <a 
+            href="/privacy" 
+            className="hover:text-foreground transition-colors underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Privacy Policy
+          </a>
+          <span className="text-muted-foreground/40">·</span>
+          <a 
+            href="/terms" 
+            className="hover:text-foreground transition-colors underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Terms of Service
+          </a>
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

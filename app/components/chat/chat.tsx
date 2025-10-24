@@ -18,6 +18,7 @@ import { redirect } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { useChatCore } from "./use-chat-core"
 import { TipOnboarding } from "../onboarding/tip-onboarding"
+import { WelcomeMessage } from "./welcome-message"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
 import ConfirmationPanel, { ConfirmationItem } from "@/components/chat/confirmation-panel"
@@ -346,80 +347,29 @@ export function Chat() {
         />
       )}
 
-      <AnimatePresence initial={false} mode="popLayout">
+            <AnimatePresence initial={false} mode="popLayout">
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="mx-auto max-w-[50rem] md:relative"
+            className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             layout="position"
             layoutId="onboarding"
-            transition={{
-              layout: {
-                duration: 0,
-              },
-            }}
+            transition={{ layout: { duration: 0 } }}
           >
-            {/* Desktop hero */}
-            <div className="hidden md:block">
-              <CleoMascot />
-            </div>
-            <h1
-              className="hidden md:block mb-6 mt-4 text-4xl font-extrabold tracking-tight leading-tight relative text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
-              aria-label="Let cleo be with you."
-            >
-              <span className="relative inline-block book-reveal-text bg-inherit">Let cleo be with you.</span>
-            </h1>
-
-            {/* Mobile hero (replicates desktop message + mini video) */}
-            <div
-              className="md:hidden flex flex-col items-center justify-center px-4"
-              style={{
-                // Respect notches and browser bars and ensure content centers in the visible viewport above the input area
-                paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-                minHeight: 'calc(100dvh - var(--chat-input-height) - var(--spacing-app-header) - env(safe-area-inset-bottom) - 24px)'
-              }}
-            >
-              <div className="scale-90 -translate-y-1">
-                <CleoMascot />
-              </div>
-              <h2
-                className="mt-3 text-2xl font-bold tracking-tight leading-tight text-center relative text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400"
-                aria-label="Let cleo be with you."
-              >
-                <span className="relative inline-block book-reveal-text bg-inherit">Let cleo be with you.</span>
-              </h2>
-            </div>
-            {/* First-run tips */}
-            <div className="mt-4 flex justify-center">
-              <TipOnboarding />
-            </div>
+            <WelcomeMessage />
           </motion.div>
         ) : (
-          <>
-            <Conversation key="conversation" {...conversationProps} />
-            {confirmationItems.length > 0 && (
-              <div className="w-full max-w-4xl mx-auto px-4 mt-2 md:static md:relative">
-                {/* IMPROVED: Better positioning to prevent overlay with input */}
-                {/* Changed from fixed to sticky with increased bottom offset */}
-                <div className="sticky bottom-[calc(var(--chat-input-height)+env(safe-area-inset-bottom)+16px)] z-30 px-4 md:px-0">
-                <ConfirmationPanel
-                  items={confirmationItems}
-                  onResolve={handleResolveConfirmation}
-                  loadingId={confirmationLoadingId}
-                />
-                </div>
-              </div>
-            )}
-          </>
+          <Conversation key="conversation" {...conversationProps} />
         )}
       </AnimatePresence>
 
       <motion.div
         className={cn(
-          "fixed md:relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-4xl pb-2 md:pb-0 bg-gradient-to-t from-background/80 to-transparent md:bg-transparent"
+          "z-50 mx-auto w-full max-w-3xl",
+          showOnboarding ? "relative" : "relative inset-x-0 bottom-0"
         )}
         layout="position"
         layoutId="chat-input-container"
@@ -442,9 +392,7 @@ export function Chat() {
             </button>
           )}
 
-          <ChatInput
-            {...chatInputProps}
-          />
+          <ChatInput {...chatInputProps} />
         </div>
       </motion.div>
 

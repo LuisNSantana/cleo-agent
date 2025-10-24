@@ -164,6 +164,12 @@ export class AgentDiscoveryService {
         return []
       }
       
+      // Validate environment variables before attempting connection
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        logger.warn('[AgentDiscovery] Supabase credentials not configured, skipping database agent discovery')
+        return []
+      }
+      
       // Dynamic import to avoid build issues
       const { createClient } = await import('@/lib/supabase/server-admin')
       const supabase = createClient()
@@ -183,7 +189,21 @@ export class AgentDiscoveryService {
       const { data: agents, error } = await query
       
       if (error) {
-        logger.error('[AgentDiscovery] Error fetching database agents:', error)
+        // Detect network errors specifically
+        const isNetworkError = error.message?.includes('fetch failed') || 
+                               error.message?.includes('network') ||
+                               error.message?.includes('ECONNREFUSED')
+        
+        if (isNetworkError) {
+          logger.warn('[AgentDiscovery] Network error fetching database agents (non-fatal):', {
+            message: error.message,
+            hint: 'Database connection unavailable, using cached/predefined agents only'
+          })
+          // Invalidate cache on network errors to force refresh when connection restored
+          this.lastRefresh = 0
+        } else {
+          logger.error('[AgentDiscovery] Error fetching database agents:', error)
+        }
         return []
       }
       
@@ -199,7 +219,25 @@ export class AgentDiscoveryService {
         parentAgentId: agent.parent_agent_id
       }))
     } catch (error) {
-      logger.error('[AgentDiscovery] Error discovering database agents:', error)
+      // Detect and handle network/fetch errors gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isNetworkError = errorMessage.includes('fetch failed') || 
+                             errorMessage.includes('network') ||
+                             errorMessage.includes('ECONNREFUSED')
+      
+      if (isNetworkError) {
+        logger.warn('[AgentDiscovery] Network error in database agent discovery (non-fatal):', {
+          message: errorMessage,
+          hint: 'Using cached/predefined agents only'
+        })
+        // Invalidate cache to retry on next request
+        this.lastRefresh = 0
+      } else {
+        logger.error('[AgentDiscovery] Error discovering database agents:', {
+          message: errorMessage,
+          details: error instanceof Error ? error.stack : undefined
+        })
+      }
       return []
     }
   }

@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-import { Check, Copy, Trash, File, FileText, FilePdf } from "@phosphor-icons/react"
+import { Check, Copy, Trash, ArrowClockwise } from "@phosphor-icons/react"
 import Image from "next/image"
 import { useRef, useState, useCallback } from "react"
 import { AttachmentPreview } from "@/components/chat/attachment-preview"
@@ -272,6 +272,16 @@ export function MessageUser({
             )}
           </button>
         </MessageAction>
+          <MessageAction tooltip="Reenviar" side="bottom">
+            <button
+              className="hover:bg-accent/60 text-muted-foreground hover:text-primary flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
+              aria-label="Retry"
+              onClick={onReloadAction}
+              type="button"
+            >
+              <ArrowClockwise className="size-4" />
+            </button>
+          </MessageAction>
         <MessageAction tooltip="Eliminar" side="bottom">
           <button
             className="hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex size-8 items-center justify-center rounded-lg bg-transparent transition-all scale-on-active hover-lift"
