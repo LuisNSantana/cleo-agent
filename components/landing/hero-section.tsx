@@ -199,10 +199,10 @@ export function HeroSection() {
             >
               <motion.div
                 animate={{
-                  scale: [1, 1.05, 1],
+                  scale: [1, 1.02, 1],
                 }}
                 transition={{
-                  duration: 2,
+                  duration: 2.5,
                   repeat: Infinity,
                   repeatType: "reverse",
                 }}
@@ -210,28 +210,36 @@ export function HeroSection() {
                 <Button
                   size="lg"
                   onClick={handleStartFree}
-                  className="group relative overflow-hidden bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-primary/40"
+                  className="group relative h-14 overflow-hidden bg-gradient-to-r from-primary via-primary to-blue-600 px-8 text-base font-semibold text-white shadow-2xl shadow-primary/40 transition-all hover:scale-105 hover:shadow-3xl hover:shadow-primary/50 active:scale-95"
                 >
-                  {/* Animated shine effect */}
+                  {/* Animated shimmer effect */}
                   <motion.div
-                    className="absolute inset-0 -z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    initial={{ x: "-100%" }}
+                    className="absolute inset-0 -z-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    initial={{ x: "-100%", skewX: -15 }}
                     animate={{ x: "200%" }}
                     transition={{
-                      duration: 3,
+                      duration: 2.5,
                       repeat: Infinity,
-                      repeatDelay: 1,
+                      repeatDelay: 1.5,
                       ease: "easeInOut",
                     }}
                   />
-                  <span className="relative z-10 flex items-center gap-2">
-                    {t.landing.heroCta}
+                  
+                  {/* Glow effect on hover */}
+                  <div className="absolute inset-0 -z-10 bg-gradient-to-r from-primary/0 via-blue-400/40 to-primary/0 opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-100" />
+                  
+                  <span className="relative z-10 flex items-center gap-2.5">
+                    <span className="bg-gradient-to-r from-white to-white/90 bg-clip-text">
+                      {t.landing.heroCta}
+                    </span>
                     <ArrowRight
                       weight="bold"
-                      className="transition-transform group-hover:translate-x-1"
+                      className="transition-all duration-300 group-hover:translate-x-1 group-hover:scale-110"
                     />
                   </span>
-                  <div className="absolute inset-0 -z-0 bg-gradient-to-r from-primary to-blue-600 opacity-0 transition-opacity group-hover:opacity-100" />
+                  
+                  {/* Hover gradient overlay */}
+                  <div className="absolute inset-0 -z-0 bg-gradient-to-r from-blue-600 via-primary to-purple-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 </Button>
               </motion.div>
 

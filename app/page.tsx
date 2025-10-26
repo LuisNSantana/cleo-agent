@@ -8,6 +8,7 @@ import { BenefitsSection } from "@/components/landing/benefits-section"
 import { FounderStorySection } from "@/components/landing/founder-story-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { ScrollToTop } from "@/components/landing/scroll-to-top"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
@@ -134,13 +135,18 @@ export default async function Home() {
                   href="https://huminarylabs.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground group"
                 >
-                  <img 
-                    src="/img/logo_huminarylabs.png" 
-                    alt="Huminary Labs"
-                    className="h-3 w-auto object-contain opacity-80"
-                  />
+                  <Avatar className="h-4 w-4">
+                    <AvatarImage 
+                      src="/img/logo_huminarylabs.png" 
+                      alt="Huminary Labs"
+                      className="object-contain"
+                    />
+                    <AvatarFallback className="text-[8px] bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                      H
+                    </AvatarFallback>
+                  </Avatar>
                   <span className="font-semibold">Huminary Labs</span>
                 </a>
               </div>
