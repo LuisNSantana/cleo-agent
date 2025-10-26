@@ -127,15 +127,15 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
           <AppSidebar />
         </div>
       )}
-      <div className="flex flex-1 h-dvh relative z-10">
+      <div className="flex flex-1 h-dvh relative z-10 bg-background">
         <main 
-          className="@container relative h-dvh overflow-y-auto transition-all duration-300 ease-in-out pt-header"
+          className="@container relative h-dvh overflow-y-auto transition-all duration-300 ease-in-out pt-header bg-background"
           style={{ 
             width: isOpen && !isMobile ? `${chatWidth}%` : '100%'
           }}
         >
           <Header hasSidebar={hasSidebar} />
-          <div className="h-full">
+          <div className="h-full bg-background">
             {children}
           </div>
         </main>

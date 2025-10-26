@@ -680,6 +680,19 @@ export async function POST(req: Request) {
   // Decide effective search flag based on quick intent and explicit request
   const effectiveEnableSearch = Boolean(enableSearch || documentId || (quickDelegationFlag && process.env.DEFAULT_SEARCH_ON_DELEGATION === 'true'))
 
+  // Count images BEFORE conversion for diagnostics
+  const imagesBeforeConversion = messages.reduce((acc: number, m: any) => {
+    if (Array.isArray(m.content)) {
+      const imageCount = m.content.filter((p: any) => 
+        p.type === 'image' || 
+        (p.type === 'file' && p.mediaType?.startsWith('image/'))
+      ).length
+      return acc + imageCount
+    }
+    return acc
+  }, 0)
+  console.log(`[IMAGE MGMT] Before conversion: ${imagesBeforeConversion} images detected in ${messages.length} messages`)
+
   // Convert multimodal messages to correct format for the model
     convertedMessages = await convertUserMultimodalMessages(
       messages,

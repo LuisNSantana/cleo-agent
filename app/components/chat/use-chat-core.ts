@@ -96,15 +96,17 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
     })
     
     // Add attachment content
+    let imageCount = 0
+    let fileCount = 0
     for (const attachment of attachments) {
       if (attachment.contentType?.startsWith('image/')) {
+        // Images should be sent as image type for multimodal models
         content.push({
-          type: "file",
-          name: attachment.name,
-          mediaType: attachment.contentType,
-          url: attachment.url,
+          type: "image",
+          image: attachment.url,
         })
-      } else if (!attachment.contentType?.startsWith('image/')) {
+        imageCount++
+      } else {
         // For non-image files (documents, etc.)
         content.push({
           type: "file", 
@@ -112,8 +114,11 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
           mediaType: attachment.contentType,
           url: attachment.url,
         })
+        fileCount++
       }
     }
+    
+    console.log(`[CLIENT CONVERSION] Converted ${attachments.length} attachments: ${imageCount} images (type:image), ${fileCount} files (type:file)`)
     
   // Converted message with attachments for multimodal content
     
@@ -510,10 +515,14 @@ export function useChatCore({
         let effectiveChatId = chatId
         try {
           if (!effectiveChatId && ensureChatExists) {
-            effectiveChatId = await ensureChatExists(effectiveUserId, text)
+            // Use text or fallback to "New Chat" for title generation
+            const titleText = text.trim() || "New Chat"
+            effectiveChatId = await ensureChatExists(effectiveUserId, titleText)
           }
         } catch (e) {
-          // ensureChatExists failed
+          // ensureChatExists failed - propagate error with details
+          console.error('[ChatAPI] Failed to create chat session:', e)
+          throw new Error(`Failed to create chat: ${(e as Error).message || 'Unknown error'}`)
         }
         if (!effectiveChatId) {
           throw new Error('Unable to create or locate a chat session')
@@ -562,31 +571,71 @@ export function useChatCore({
     } as MessageAISDK)
   }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      userId: effectiveUserId,
-      chatId: effectiveChatId,
-      model: resolvedModel,
-      isAuthenticated,
-      systemPrompt,
-      enableSearch,
-      messages: messagesToSend.map(convertToMessageAISDK),
-    }),
-    signal: abortControllerRef.current.signal,
-    // ✅ Keep connection alive even when tab is backgrounded
-    keepalive: true,
+  // Convert messages and log for debugging
+  const convertedMessages = messagesToSend.map(convertToMessageAISDK)
+  console.log('[CLIENT FETCH] Sending request:', {
+    endpoint,
+    userId: effectiveUserId,
+    chatId: effectiveChatId,
+    model: resolvedModel,
+    messageCount: convertedMessages.length,
+    lastMessage: convertedMessages[convertedMessages.length - 1]
   })
+
+  let response: Response
+  try {
+    // Determine if payload contains data URLs (large). If so, avoid keepalive=true
+    const hasDataUrlPayload = convertedMessages.some((m: any) => Array.isArray((m as any).content) && (m as any).content.some((p: any) => (p.type === 'image' && typeof p.image === 'string' && p.image.startsWith('data:')) || (p.type === 'file' && typeof p.url === 'string' && p.url.startsWith('data:'))))
+
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: effectiveUserId,
+        chatId: effectiveChatId,
+        model: resolvedModel,
+        isAuthenticated,
+        systemPrompt,
+        enableSearch,
+        messages: convertedMessages,
+      }),
+      signal: abortControllerRef.current.signal,
+      // Avoid keepalive for large payloads (browser limit ~64KB causes TypeError: Failed to fetch)
+      keepalive: hasDataUrlPayload ? false : true,
+    })
+  } catch (fetchError) {
+    console.error('[CLIENT FETCH] Network error:', {
+      error: fetchError,
+      message: (fetchError as Error).message,
+      name: (fetchError as Error).name,
+      endpoint,
+      chatId: effectiveChatId
+    })
+    throw new Error(`Network error: ${(fetchError as Error).message || 'Failed to connect to server'}`)
+  }
 
   // Sending chat request
 
         if (!response.ok) {
           let errText = "Failed to send message"
+          let statusCode = response.status
+          let statusText = response.statusText
           try {
             const errorData = await response.json()
             errText = errorData.error || errText
-          } catch {}
+            console.error('[CLIENT FETCH] Server error:', {
+              status: statusCode,
+              statusText,
+              error: errText,
+              errorData
+            })
+          } catch (parseErr) {
+            console.error('[CLIENT FETCH] Server error (failed to parse):', {
+              status: statusCode,
+              statusText,
+              parseError: parseErr
+            })
+          }
           throw new Error(errText)
         }
 
@@ -1327,8 +1376,22 @@ export function useChatCore({
       }
 
       const submitStartTime = performance.now()
-      const messageText = input.trim() // Guardar el texto antes de limpiar
+      let messageText = input.trim() // Guardar el texto antes de limpiar
       const currentFiles = [...files] // Guardar archivos antes de limpiar
+      
+      // If no text but has files, use a descriptive message
+      if (!messageText && currentFiles.length > 0) {
+        const hasImages = currentFiles.some(f => isImageFile(f))
+        const hasDocuments = currentFiles.some(f => !isImageFile(f))
+        
+        if (hasImages && hasDocuments) {
+          messageText = "Analiza estos archivos"
+        } else if (hasImages) {
+          messageText = currentFiles.length === 1 ? "Analiza esta imagen" : "Analiza estas imágenes"
+        } else {
+          messageText = currentFiles.length === 1 ? "Analiza este documento" : "Analiza estos documentos"
+        }
+      }
       
   // Start submission
 
@@ -1338,11 +1401,24 @@ export function useChatCore({
       setIsSubmitting(true)
 
       try {
+        // Ensure we have a chatId BEFORE uploading documents so we can store
+        // files under a stable path and avoid sending large base64 payloads.
+        let effectiveChatIdForUploads: string | null = chatId
+        if (!effectiveChatIdForUploads && user?.id && ensureChatExists) {
+          try {
+            const titleForChat = messageText || "New Chat"
+            effectiveChatIdForUploads = await ensureChatExists(user.id, titleForChat)
+          } catch (e) {
+            // If chat creation failed, continue without uploads (will fallback to data URLs)
+            effectiveChatIdForUploads = null
+          }
+        }
+
         // Handle file uploads to Supabase for documents (if needed)
         let supabaseAttachments: Attachment[] = []
         const documentFiles = currentFiles.filter((file) => !isImageFile(file))
-        if (documentFiles.length > 0 && user?.id && chatId) {
-          const uploadedAttachments = await handleFileUploads(user.id, chatId)
+        if (documentFiles.length > 0 && user?.id && effectiveChatIdForUploads) {
+          const uploadedAttachments = await handleFileUploads(user.id, effectiveChatIdForUploads)
           if (uploadedAttachments) {
             supabaseAttachments = uploadedAttachments
           }

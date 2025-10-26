@@ -154,6 +154,9 @@ export default async function RootLayout({
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {/* Dynamic theme-color based on user's color scheme preference */}
+        <meta name="theme-color" content="#FAF9FF" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#14161C" media="(prefers-color-scheme: dark)" />
         <link rel="manifest" href="/site.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
       </head>

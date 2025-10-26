@@ -1,6 +1,17 @@
 import type { CoreMessage } from "ai"
 
 export async function convertUserMultimodalMessages(messages: CoreMessage[], model: string, modelVision: boolean) {
+  // Count input images for diagnostics
+  let inputImageCount = 0
+  messages.forEach((msg) => {
+    if (Array.isArray(msg.content)) {
+      inputImageCount += msg.content.filter((p: any) => 
+        p.type === 'image' || 
+        (p.type === 'file' && p.mediaType?.startsWith('image/'))
+      ).length
+    }
+  })
+
   const converted = await Promise.all(
     messages.map(async (msg) => {
       if (msg.role === "user" && Array.isArray(msg.content)) {
@@ -12,7 +23,8 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
                 typeof part === "object" &&
                 "type" in part &&
                 ((part as { type: string }).type === "text" ||
-                  (part as { type: string }).type === "file")
+                  (part as { type: string }).type === "file" ||
+                  (part as { type: string }).type === "image")
             )
             .map(async (part: unknown) => {
               const typedPart = part as {
@@ -22,6 +34,18 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
                 name?: string
                 text?: string
                 content?: string
+                image?: string | URL
+              }
+
+              // Handle parts that are already in image format (e.g., from previous conversions)
+              if (typedPart.type === "image" && typedPart.image) {
+                if (!modelVision) {
+                  return {
+                    type: "text" as const,
+                    text: `[IMAGEN] - El modelo ${model} no soporta análisis de imágenes. Para analizar imágenes, selecciona Faster o Smarter con visión.`,
+                  }
+                }
+                return { type: "image" as const, image: typedPart.image }
               }
 
               if (
@@ -125,6 +149,16 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
       return msg
     })
   )
+
+  // Count output images for diagnostics
+  let outputImageCount = 0
+  converted.forEach((msg: any) => {
+    if (Array.isArray(msg.content)) {
+      outputImageCount += msg.content.filter((p: any) => p.type === 'image').length
+    }
+  })
+
+  console.log(`[IMAGE CONVERSION] Model ${model}, Vision: ${modelVision}, Input: ${inputImageCount} images → Output: ${outputImageCount} images`)
 
   return converted
 }
