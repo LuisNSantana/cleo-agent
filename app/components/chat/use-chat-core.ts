@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/toast"
 import { getOrCreateGuestUserId } from "@/lib/api"
 import { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { Attachment } from "@/lib/file-handling"
-import { isImageFile } from "@/lib/image-utils"
+import { isImageFile, preprocessImages } from "@/lib/image-utils"
 import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { getModelInfo } from "@/lib/models"
@@ -1414,17 +1414,20 @@ export function useChatCore({
           }
         }
 
-        // Handle file uploads to Supabase for documents (if needed)
+        // Preprocess images (compress/resize) before upload to reduce payload
+        const processedFiles = await preprocessImages(currentFiles, { maxBytes: 4 * 1024 * 1024, maxDimension: 2000 })
+
+        // Upload ALL files (images + documents) to Supabase when possible
         let supabaseAttachments: Attachment[] = []
-        const documentFiles = currentFiles.filter((file) => !isImageFile(file))
-        if (documentFiles.length > 0 && user?.id && effectiveChatIdForUploads) {
-          const uploadedAttachments = await handleFileUploads(user.id, effectiveChatIdForUploads)
+        if (processedFiles.length > 0 && user?.id && effectiveChatIdForUploads) {
+          // Cast to any to allow optional third param in environments with stale type caches
+          const uploadedAttachments = await (handleFileUploads as any)(user.id, effectiveChatIdForUploads, processedFiles)
           if (uploadedAttachments) {
             supabaseAttachments = uploadedAttachments
           }
         }
 
-        // Convert files to experimental_attachments format
+        // Convert remaining files (if any failed to upload) to data URLs as fallback
         const fileAttachments: Array<{
           name: string
           contentType: string
@@ -1432,7 +1435,14 @@ export function useChatCore({
         }> = []
 
         if (currentFiles.length > 0) {
-          for (const file of currentFiles) {
+          // Build a set of successfully uploaded keys to avoid duplicates
+          const uploadedKeySet = new Set(
+            supabaseAttachments.map((att) => `${att.name}|${att.contentType}`)
+          )
+
+          for (const file of processedFiles) {
+            const key = `${file.name}|${file.type}`
+            if (uploadedKeySet.has(key)) continue // already uploaded
             // Convert file to data URL
             const dataUrl = await new Promise<string>((resolve) => {
               const reader = new FileReader()
@@ -1462,9 +1472,8 @@ export function useChatCore({
 
         const filteredLocal = fileAttachments.filter((att) => {
           const key = `${att.name}|${att.contentType}`
-          const isImage = att.contentType?.startsWith('image/')
-          // Keep images; for non-images, only keep if there's no Supabase entry
-          return isImage || !supaSet.has(key)
+          // Only include local fallbacks for files not uploaded to Supabase
+          return !supaSet.has(key)
         })
 
         let allAttachments = [

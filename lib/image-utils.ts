@@ -143,3 +143,86 @@ export function getImageAnalysisPrompts(): string[] {
     "Explica el contexto de esta imagen"
   ]
 }
+
+/**
+ * Compress an image file using a canvas to fit under maxBytes and within maxDimension.
+ * Returns the original file if already small enough or compression fails.
+ */
+export async function compressImageFile(
+  file: File,
+  options: { maxBytes?: number; maxDimension?: number; quality?: number } = {}
+): Promise<File> {
+  const { maxBytes = 4 * 1024 * 1024, maxDimension = 2000, quality = 0.85 } = options
+
+  try {
+    if (!isImageFile(file)) return file
+    if (file.size <= maxBytes) return file
+
+    // Load image
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const url = URL.createObjectURL(file)
+      const image = new Image()
+      image.onload = () => {
+        URL.revokeObjectURL(url)
+        resolve(image)
+      }
+      image.onerror = (e) => {
+        URL.revokeObjectURL(url)
+        reject(e)
+      }
+      image.src = url
+    })
+
+    // Compute target size keeping aspect ratio
+    let { width, height } = img
+    if (width > height && width > maxDimension) {
+      height = Math.round((height * maxDimension) / width)
+      width = maxDimension
+    } else if (height > width && height > maxDimension) {
+      width = Math.round((width * maxDimension) / height)
+      height = maxDimension
+    } else if (width === height && width > maxDimension) {
+      width = height = maxDimension
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(img, 0, 0, width, height)
+
+    // Prefer WebP for better compression; fallback to JPEG if unsupported
+    const mime = 'image/webp'
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), mime, quality)
+    )
+    if (!blob) return file
+
+    // If still bigger than maxBytes, try a second pass at lower quality
+    let outBlob = blob
+    if (outBlob.size > maxBytes) {
+      const blob2: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), mime, Math.max(0.6, quality - 0.25))
+      )
+      if (blob2 && blob2.size < outBlob.size) outBlob = blob2
+    }
+
+    // Construct a File preserving name but changing extension if needed
+    const newName = file.name.replace(/\.(jpe?g|png|gif|webp|heic|heif|svg)$/i, '.webp')
+    const compressed = new File([outBlob], newName, { type: 'image/webp', lastModified: Date.now() })
+    return compressed.size < file.size ? compressed : file
+  } catch {
+    return file
+  }
+}
+
+/**
+ * Compress images in a list; non-images returned untouched.
+ */
+export async function preprocessImages(
+  files: File[],
+  options?: { maxBytes?: number; maxDimension?: number; quality?: number }
+): Promise<File[]> {
+  return Promise.all(files.map((f) => compressImageFile(f, options)))
+}
