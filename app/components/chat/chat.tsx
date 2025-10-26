@@ -23,7 +23,6 @@ import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
 import ConfirmationPanel, { ConfirmationItem } from "@/components/chat/confirmation-panel"
 import { VoiceMode } from "@/app/components/voice/voice-mode"
-import { Phone } from "lucide-react"
 import { ProjectChatHeader } from "./project-chat-header"
 import { useQuery } from "@tanstack/react-query"
 
@@ -222,6 +221,7 @@ export function Chat() {
       placeholder,
       onClearPlaceholderAction: handleClearPlaceholder,
       onShowPlaceholderAction: handleShowPlaceholder,
+      onVoiceModeAction: isAuthenticated ? () => setVoiceModeOpen(true) : undefined,
     }),
     [
       input,
@@ -380,20 +380,7 @@ export function Chat() {
         }}
         ref={inputRef}
       >
-        <div className="relative">
-          {/* Voice Mode Button - Only for authenticated users */}
-          {isAuthenticated && (
-            <button
-              onClick={() => setVoiceModeOpen(true)}
-              className="absolute -top-14 right-4 p-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-lg shadow-purple-500/25 transition-all hover:scale-105 z-10"
-              aria-label="Voice Mode"
-            >
-              <Phone className="w-5 h-5 text-white" />
-            </button>
-          )}
-
-          <ChatInput {...chatInputProps} />
-        </div>
+        <ChatInput {...chatInputProps} />
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />

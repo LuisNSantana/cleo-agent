@@ -27,7 +27,7 @@ export function ButtonSearch({
         <PopoverTrigger asChild>
           <Button
             variant="secondary"
-            className="border-border dark:bg-secondary rounded-full border bg-transparent"
+            className="border-border dark:bg-secondary rounded-full border bg-transparent dark:!text-gray-900 dark:hover:!text-gray-900"
           >
             <span className="inline-flex items-center gap-1"><GlobeIcon className="size-5" /> <span>Search</span></span>
           </Button>
@@ -41,9 +41,9 @@ export function ButtonSearch({
     <Button
       variant="secondary"
       className={cn(
-        "border-border dark:bg-secondary rounded-full border bg-transparent transition-all duration-150 has-[>span]:px-1.75 md:has-[>span]:px-3",
+        "border-border dark:bg-secondary rounded-full border bg-transparent transition-all duration-150 has-[>span]:px-1.75 md:has-[>span]:px-3 dark:!text-gray-900 dark:hover:!text-gray-900",
         isSelected &&
-          "border-[#0091FF]/20 bg-[#E5F3FE] text-[#0091FF] hover:bg-[#E5F3FE] hover:text-[#0091FF]"
+          "border-[#0091FF]/20 bg-[#E5F3FE] text-[#0091FF] hover:bg-[#E5F3FE] hover:text-[#0091FF] dark:bg-[#0091FF]/20 dark:text-[#0091FF] dark:hover:bg-[#0091FF]/20 dark:hover:text-[#0091FF] dark:!text-[#0091FF]"
       )}
       onClick={handleClick}
     >

@@ -74,56 +74,70 @@
 
 :root {
   /* ====================================================================
-     IMPROVED COLOR SYSTEM - WCAG AA/AAA Optimized
-     Based on Apple HIG, Material 3, WCAG 2.1
+     HUMAN-DIGITAL ESSENCE - Paleta Cleo 2025
+     Objetivo: Transmitir humanidad, inteligencia y cercanía emocional
+     Diferenciación: Estética pastel, cálida, moderna con trazos minimalistas
      ==================================================================== */
   
-  /* Light Mode: Premium warm palette with excellent contrast */
-  --background: #faf7f2;
-  --foreground: #1a1f2e;
+  /* Light Mode: Pastel suave, cálido y emocionalmente cercano */
   
-  --card: #ffffff;
-  --card-foreground: #1a1f2e;
-  --popover: #ffffff;
-  --popover-foreground: #1a1f2e;
+  /* === Colores base personalizados Cleo === */
+  --color-bg: #FAF9FF;          /* Fondo base general - pastel muy suave */
+  --color-surface: #FFFFFF;     /* Tarjetas, paneles, inputs */
+  --color-primary: #A9C7FF;     /* Botones principales, acentos - azul pastel */
+  --color-secondary: #FFC8D6;   /* Hover suaves, badges, detalles emocionales - rosa pastel */
+  --color-accent: #C3E5E0;      /* Resaltados suaves, bordes sutiles - menta pastel */
+  --color-text: #2D2A32;        /* Texto principal - oscuro suave */
+  --color-text-muted: #6E6A76;  /* Texto secundario - gris cálido */
+  --color-highlight: #B49CFF;   /* Íconos activos, microinteracciones - lila pastel */
+  --color-shadow: rgba(0, 0, 0, 0.05); /* Sombras suaves y difusas */
   
-  --primary: #3b5bdb;
-  --primary-foreground: #ffffff;
+  /* === Mapeo a variables de Tailwind/shadcn === */
+  --background: #FAF9FF;
+  --foreground: #2D2A32;
   
-  --secondary: #f1f3f5;
-  --secondary-foreground: #1a1f2e;
+  --card: #FFFFFF;
+  --card-foreground: #2D2A32;
+  --popover: #FFFFFF;
+  --popover-foreground: #2D2A32;
   
-  --muted: #e9ecef;
-  --muted-foreground: #495057;
+  --primary: #A9C7FF;           /* Azul pastel principal */
+  --primary-foreground: #2D2A32; /* Texto oscuro para mejor contraste */
   
-  --accent: #fff4e6;
-  --accent-foreground: #d9480f;
+  --secondary: #FFC8D6;         /* Rosa pastel secundario */
+  --secondary-foreground: #4A2845; /* Texto oscuro morado para contraste sobre rosa */
   
-  --destructive: #e03131;
-  --destructive-foreground: #ffffff;
+  --muted: #F5F4F8;             /* Versión atenuada del background */
+  --muted-foreground: #6E6A76;
   
-  --border: #dee2e6;
-  --input: #f8f9fa;
-  --ring: #3b5bdb;
+  --accent: #C3E5E0;            /* Menta pastel para acentos */
+  --accent-foreground: #2D2A32;
   
-  /* Chart colors */
-  --chart-1: #3b5bdb;
-  --chart-2: #2f9e44;
-  --chart-3: #f59f00;
-  --chart-4: #e03131;
-  --chart-5: #9c36b5;
+  --destructive: #FF9AA2;       /* Rojo pastel suave */
+  --destructive-foreground: #2D2A32;
   
-  --radius: 0.625rem;
+  --border: #E8E6F0;            /* Border suave pastel */
+  --input: #FFFFFF;             /* Inputs con fondo limpio */
+  --ring: #A9C7FF;              /* Ring = primary */
   
-  /* Sidebar colors - unified with main background */
-  --sidebar: #faf7f2;           /* Same as background */
-  --sidebar-foreground: #1a1f2e;
-  --sidebar-primary: #3b5bdb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e9ecef;    /* Same as muted */
-  --sidebar-accent-foreground: #495057;
-  --sidebar-border: #dee2e6;    /* Same as border */
-  --sidebar-ring: #3b5bdb;
+  /* Chart colors - Paleta pastel armoniosa */
+  --chart-1: #A9C7FF;           /* Azul pastel */
+  --chart-2: #C3E5E0;           /* Menta pastel */
+  --chart-3: #FFC8D6;           /* Rosa pastel */
+  --chart-4: #B49CFF;           /* Lila pastel */
+  --chart-5: #FFE5B4;           /* Durazno pastel */
+  
+  --radius: 1.25rem;            /* 20px - curvas suaves (rounded-2xl) */
+  
+  /* Sidebar colors - unified pastel design */
+  --sidebar: #FAF9FF;
+  --sidebar-foreground: #2D2A32;
+  --sidebar-primary: #A9C7FF;
+  --sidebar-primary-foreground: #2D2A32;
+  --sidebar-accent: #F5F4F8;
+  --sidebar-accent-foreground: #6E6A76;
+  --sidebar-border: #E8E6F0;
+  --sidebar-ring: #A9C7FF;
 }
 
 /* Typography utilities */
@@ -138,69 +152,90 @@ body {
 
 .dark {
   /* ====================================================================
-     Dark Mode Premium 2025 - OPTIMIZED
-     Based on ChatGPT, Claude, Linear best practices
-     - LIGHTER base (not pure black) for better readability
-     - Clear surface elevation with visible borders
-     - Proper contrast ratios (WCAG AA compliant)
-     - Warm tones for reduced eye strain
-     - Modern, comfortable, and professional
+     HUMAN-DIGITAL ESSENCE - Dark Mode
+     Tonos profundos pero conservando el alma pastel
+     Mantiene calidez emocional en ambiente nocturno
      ==================================================================== */
   
-  /* Base - OPTIMIZED: Lighter warm gray (ChatGPT/Linear style) */
-  --background: #212121;        /* Much lighter than before (#0f0f10) */
-  --foreground: #e8e8e8;        /* Soft white with excellent contrast */
+  /* === Colores base personalizados Cleo Dark === */
+  --color-bg: #14161C;          /* Fondo base - oscuro pero no negro puro */
+  --color-surface: #1C1F28;     /* Superficie elevada */
+  --color-primary: #7EA8FF;     /* Azul pastel brillante */
+  --color-secondary: #FFABC6;   /* Rosa pastel brillante */
+  --color-accent: #91DAD0;      /* Menta pastel brillante */
+  --color-text: #FFF8E7;        /* Texto principal - blanco amarilloso pastel suave */
+  --color-text-muted: #C8BFAD;  /* Texto atenuado - beige pastel */
+  --color-highlight: #B49CFF;   /* Lila pastel para destacados */
+  --color-shadow: rgba(0, 0, 0, 0.3); /* Sombras más pronunciadas en dark */
   
-  /* Elevated surfaces - Clear progression with better contrast */
-  --card: #2a2a2a;              /* First elevation - clearly visible */
-  --card-foreground: #e8e8e8;
-  --popover: #303030;           /* Second elevation - distinct layer */
-  --popover-foreground: #e8e8e8;
+  /* === Mapeo a variables de Tailwind/shadcn === */
+  --background: #14161C;
+  --foreground: #FFF8E7;        /* Blanco amarilloso pastel - más sutil que blanco puro */
   
-  /* Primary - Vibrant blue with excellent contrast */
-  --primary: #4a9eff;           /* Slightly brighter for better visibility */
-  --primary-foreground: #ffffff;
+  --card: #1C1F28;
+  --card-foreground: #FFF8E7;
+  --popover: #23262F;
+  --popover-foreground: #FFF8E7;
   
-  /* Secondary surfaces - Lighter for better definition */
-  --secondary: #323232;         /* More visible than before */
-  --secondary-foreground: #e8e8e8;
+  --primary: #7EA8FF;           /* Azul pastel brillante */
+  --primary-foreground: #14161C;
   
-  /* Muted elements - Better contrast */
-  --muted: #2f2f2f;             /* Lighter muted background */
-  --muted-foreground: #c0c0c0;  /* 15% lighter for better readability */
+  --secondary: #FFABC6;         /* Rosa pastel brillante */
+  --secondary-foreground: #14161C;
   
-  /* Accent - Vibrant blue */
-  --accent: #4a9eff;
-  --accent-foreground: #ffffff;
+  --muted: #23262F;             /* Superficie atenuada */
+  --muted-foreground: #C8BFAD;  /* Beige pastel para texto secundario */
   
-  /* Destructive - Balanced red */
-  --destructive: #ff5757;
-  --destructive-foreground: #ffffff;
+  --accent: #91DAD0;            /* Menta pastel brillante */
+  --accent-foreground: #14161C;
   
-  /* Borders - CRITICAL: Much more visible (ChatGPT style) */
-  --border: #404040;            /* 3x lighter - clearly defines elements */
-  --input: #2a2a2a;
-  --ring: #4a9eff;
+  --destructive: #FF9AA2;       /* Rojo pastel */
+  --destructive-foreground: #FFF8E7;
   
-  /* Chart colors - Vibrant but comfortable */
-  --chart-1: #60a5fa;
-  --chart-2: #4ade80;
-  --chart-3: #fbbf24;
-  --chart-4: #f87171;
-  --chart-5: #c084fc;
+  --border: #2C2F3B;            /* Border oscuro pero visible */
+  --input: #1C1F28;             /* Input = surface */
+  --ring: #7EA8FF;              /* Ring = primary */
   
-  /* Sidebar - Lighter unified design */
-  --sidebar: #212121;           /* Same as background */
-  --sidebar-foreground: #e8e8e8;
-  --sidebar-primary: #4a9eff;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2a2a2a;    /* Same as card */
-  --sidebar-accent-foreground: #d0d0d0;
-  --sidebar-border: #404040;    /* Same as border - visible */
-  --sidebar-ring: #4a9eff;
+  /* Chart colors - Paleta pastel brillante para dark */
+  --chart-1: #7EA8FF;           /* Azul pastel brillante */
+  --chart-2: #91DAD0;           /* Menta pastel */
+  --chart-3: #FFABC6;           /* Rosa pastel */
+  --chart-4: #B49CFF;           /* Lila pastel */
+  --chart-5: #FFD4A3;           /* Durazno pastel */
   
-  /* Glow effects for interactive elements */
-  --glow-primary: 0 0 20px rgba(74,158,255,0.2);
+  /* Sidebar - unified dark pastel */
+  --sidebar: #14161C;
+  --sidebar-foreground: #FFF8E7;
+  --sidebar-primary: #7EA8FF;
+  --sidebar-primary-foreground: #14161C;
+  --sidebar-accent: #23262F;
+  --sidebar-accent-foreground: #C8BFAD;
+  --sidebar-border: #2C2F3B;
+  --sidebar-ring: #7EA8FF;
+}
+
+/* === UTILITY CLASSES CLEO === */
+
+/* Sombras suaves y difusas - estilo Human-Digital Essence */
+.shadow-soft {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.dark .shadow-soft {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.shadow-glow-primary {
+  box-shadow: 0 6px 30px rgba(169, 199, 255, 0.25);
+}
+
+.dark .shadow-glow-primary {
+  box-shadow: 0 6px 30px rgba(126, 168, 255, 0.4);
+}
+
+/* Transiciones suaves */
+.transition-soft {
+  transition: all 300ms ease-in-out;
 }
 
 @layer base {

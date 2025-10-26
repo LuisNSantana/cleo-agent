@@ -30,6 +30,9 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
   const [editorWidth, setEditorWidth] = useState(400)
   const [editorCollapsed, setEditorCollapsed] = useState(false)
 
+  // Check if we're on the landing page
+  const isLandingPage = pathname === "/"
+
   // Resize state for the divider between chat and editor
   const [isResizing, setIsResizing] = useState(false)
   const [chatWidth, setChatWidth] = useState(70) // Percentage of available space
@@ -106,6 +109,11 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
       }
     }
   }, [isResizing, handleDividerMove, stopDividerResize])
+
+  // If we're on the landing page, just render children without app chrome
+  if (isLandingPage) {
+    return <>{children}</>
+  }
 
   return (
     <div className="bg-background flex h-dvh w-full overflow-hidden relative">

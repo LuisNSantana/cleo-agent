@@ -14,6 +14,7 @@ import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } f
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
+import { ButtonVoice } from "./button-voice"
 import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
@@ -41,6 +42,7 @@ type ChatInputProps = {
   onClearPlaceholderAction?: () => void
   onShowPlaceholderAction?: (placeholder: string) => void
   hideModelSelector?: boolean
+  onVoiceModeAction?: () => void
 }
 
 export function ChatInput({
@@ -64,6 +66,7 @@ export function ChatInput({
   onClearPlaceholderAction,
   onShowPlaceholderAction,
   hideModelSelector = false,
+  onVoiceModeAction,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -321,6 +324,12 @@ export function ChatInput({
                   isAuthenticated={isUserAuthenticated}
                 />
               ) : null}
+              {onVoiceModeAction && (
+                <ButtonVoice
+                  onClick={onVoiceModeAction}
+                  isAuthenticated={isUserAuthenticated}
+                />
+              )}
             </div>
             <PromptInputAction
               tooltip={status === "streaming" ? "Stop" : "Send"}

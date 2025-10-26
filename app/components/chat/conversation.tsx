@@ -4,11 +4,9 @@ import { ScrollButton } from "@/components/prompt-kit/scroll-button"
 import { UIMessage as MessageType } from "ai"
 import { useRef, useMemo, Fragment, useEffect } from "react"
 import { Message } from "./message"
-import { PipelineTimeline, type PipelineStep } from './pipeline-timeline'
+import { AgentExecutionFlow, type PipelineStep } from './agent-execution-flow'
 import { OptimizationInsights, extractPipelineOptimizations } from './optimization-insights'
-import { RealTimeOptimization, createOptimizationStatus, type OptimizationStatus } from './real-time-optimization'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
-import { PerformanceMetrics } from './performance-metrics'
 import { TypingIndicator } from "@/components/ui/typing-indicator"
 import { useStickToBottomContext } from "use-stick-to-bottom"
 
@@ -141,7 +139,6 @@ export function Conversation({
           userId={userId}
           messagePipelineSteps={messagePipelineSteps}
           currentMessageSteps={currentMessageSteps}
-          optimizationStatus={optimizationStatus}
           metrics={metrics}
           isActive={isActive}
           extractTextFromMessage={extractTextFromMessage}
@@ -162,7 +159,6 @@ function ConversationContent({
   userId,
   messagePipelineSteps,
   currentMessageSteps,
-  optimizationStatus,
   metrics,
   isActive,
   extractTextFromMessage,
@@ -177,7 +173,6 @@ function ConversationContent({
   userId?: string
   messagePipelineSteps: Map<string, PipelineStep[]>
   currentMessageSteps: PipelineStep[]
-  optimizationStatus: OptimizationStatus | null
   metrics: any
   isActive: boolean
   extractTextFromMessage: (msg?: MessageType) => string
@@ -261,21 +256,13 @@ function ConversationContent({
                 {/* Show pipeline BEFORE the final assistant response (only if we have steps) */}
                 {shouldShowPipelineBeforeThisMessage && (
                   <div className="group flex w-full max-w-4xl flex-col items-start gap-3 px-6 pb-3">
-                    <div className="w-full space-y-3">
-                      <div className="flex items-center gap-2 text-xs text-green-400">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <span className="font-medium">Pipeline completed</span>
-                        <span className="text-green-300/70">• {currentMessageSteps.length} steps executed</span>
-                      </div>
-                      <PipelineTimeline steps={currentMessageSteps} />
-                      {optimizationData && (
-                        <OptimizationInsights pipeline={optimizationData} />
-                      )}
-                      {/* Show final performance metrics */}
-                      {metrics && (
-                        <PerformanceMetrics metrics={metrics} />
-                      )}
-                    </div>
+                    <AgentExecutionFlow 
+                      steps={currentMessageSteps} 
+                      mode={optimizationData?.directResponse ? 'direct' : 'delegated'}
+                    />
+                    {optimizationData && (
+                      <OptimizationInsights pipeline={optimizationData} />
+                    )}
                   </div>
                 )}
 
@@ -303,65 +290,18 @@ function ConversationContent({
           {/* Pipeline LIVE: Show when streaming OR waiting for response (no assistant message yet OR streaming) */}
           {(status === "submitted" || (status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "user")) && (
             <div className="group min-h-scroll-anchor flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-              <div className="w-full space-y-3">
-                {currentMessageSteps.length > 0 ? (
-                  <>
-                    <div className="flex items-center gap-2 text-xs text-blue-400 mb-3">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                      <span className="font-medium">Executing pipeline</span>
-                      <span className="text-blue-300/70">• {currentMessageSteps.length} steps in progress</span>
-                    </div>
-                    <PipelineTimeline steps={currentMessageSteps} />
-                    
-                    {/* Real-time optimization feedback during execution */}
-                    {optimizationStatus && (
-                      <RealTimeOptimization status={optimizationStatus} />
-                    )}
-                    
-                    {/* Show performance metrics during execution */}
-                    {metrics && isActive && (
-                      <PerformanceMetrics metrics={metrics} />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 text-xs text-blue-400 mb-3">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                      <span className="font-medium">Initializing pipeline</span>
-                      <span className="text-blue-300/70">• Preparing delegation</span>
-                    </div>
-                    
-                    {/* Show analyzing state when no pipeline steps yet - using initial optimization status */}
-                    <RealTimeOptimization status={{
-                      stage: 'analyzing',
-                      route: 'direct',
-                      optimizations: ['Query complexity analysis', 'Initializing optimization pipeline'],
-                      timeElapsed: 0
-                    }} />
-                    
-                    <Loader />
-                  </>
-                )}
-              </div>
+              {currentMessageSteps.length > 0 ? (
+                <AgentExecutionFlow steps={currentMessageSteps} />
+              ) : (
+                <Loader />
+              )}
             </div>
           )}
 
           {/* Pipeline LIVE during streaming: Show when assistant message is streaming */}
           {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length > 0 && (
             <div className="group flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-              <div className="w-full space-y-3">
-                <div className="flex items-center gap-2 text-xs text-amber-400 mb-3">
-                  <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                  <span className="font-medium">Pipeline active</span>
-                  <span className="text-amber-300/70">• {currentMessageSteps.length} steps updating</span>
-                </div>
-                <PipelineTimeline steps={currentMessageSteps} />
-                
-                {/* Real-time optimization during streaming */}
-                {optimizationStatus && (
-                  <RealTimeOptimization status={optimizationStatus} />
-                )}
-              </div>
+              <AgentExecutionFlow steps={currentMessageSteps} />
             </div>
           )}
 

@@ -38,19 +38,40 @@ const appUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Cleo - Agent of Agents",
-    template: "%s · Cleo",
+    default: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
+    template: "%s · Cleo AI",
   },
   description:
-    "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
+    "Let Cleo be with you. AI-powered productivity platform with specialized agents that automate tasks, manage workflows, and boost efficiency 10x. Free trial, no credit card required.",
   applicationName: "Cleo",
   generator: "Next.js",
   keywords: [
-    "Cleo",
-    "AI Assistant",
+    // Primary keywords (high intent)
+    "AI productivity tool",
+    "AI task automation",
+    "AI workflow automation",
+    "AI assistant for work",
+    
+    // Long-tail keywords (specific searches)
+    "automate repetitive tasks AI",
+    "save time with AI agents",
+    "AI agents for business",
+    "productivity automation software",
+    
+    // Feature-based keywords
+    "multi-agent AI platform",
+    "AI orchestration platform",
+    "intelligent task management",
+    "AI workflow management",
+    
+    // Solution-focused
+    "increase productivity with AI",
+    "AI for remote work",
+    "business process automation",
+    
+    // Brand
+    "Cleo AI",
     "Huminary Labs",
-    "Agent of Agents",
-    "Productivity",
   ],
   authors: [{ name: "Huminary Labs" }],
   category: "productivity",
@@ -69,10 +90,10 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   openGraph: {
     type: "website",
-    siteName: "Cleo",
-    title: "Cleo - Agent of Agents",
+    siteName: "Cleo AI",
+    title: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
     description:
-      "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
+      "Let Cleo be with you. AI agents automate tasks, manage workflows, and make your life 10x easier. Join 1000+ professionals saving time daily. Start free.",
   url: appUrl,
     images: [
       {
@@ -80,16 +101,16 @@ export const metadata: Metadata = {
         url: "/opengraph-image?v=2",
         width: 1200,
         height: 630,
-        alt: "Cleo - Agent of Agents",
+        alt: "Cleo - AI Agents Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     creator: "@HuminaryLabs",
-    title: "Cleo - Agent of Agents",
+    title: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
     description:
-      "Cleo is an agent-of-agents AI assistant by Huminary Labs, designed to help you with empathy, context, and powerful tools.",
+      "Let Cleo be with you. AI agents automate tasks, manage workflows, and boost productivity 10x. Start free, no credit card.",
     // Keep in sync with openGraph.images and include cache-busting param
     images: ["/opengraph-image?v=2"],
   },
@@ -156,8 +177,8 @@ export default async function RootLayout({
                       >
                         <ThemeProvider
                           attribute="class"
-                          defaultTheme="dark"
-                          enableSystem={false}
+                          defaultTheme="system"
+                          enableSystem={true}
                           disableTransitionOnChange
                         >
                           <ToolConfirmationProvider>

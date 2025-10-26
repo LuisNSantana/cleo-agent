@@ -164,7 +164,7 @@ export function ModelSelector({
     <Button
       variant="outline"
       className={cn(
-        "dark:bg-secondary",
+        "dark:bg-secondary dark:!text-gray-900 dark:hover:!text-gray-900",
         // Guest users y desktop: botón completo. Mobile autenticado: círculo
         shouldShowFullButton ? "justify-between" : "size-9 p-0 rounded-full flex items-center justify-center",
         className
@@ -198,7 +198,7 @@ export function ModelSelector({
                 size="sm"
                 variant="secondary"
                 className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent justify-between",
+                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent justify-between dark:!text-gray-900 dark:hover:!text-gray-900",
                   className
                 )}
                 type="button"
