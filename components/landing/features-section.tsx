@@ -17,6 +17,7 @@ import {
   Check,
 } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const features = [
   {
@@ -103,7 +104,7 @@ export function FeaturesSection() {
 
   return (
     <section className="relative overflow-hidden bg-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-screen-2xl">
         {/* Section header */}
         <motion.div
           className="mb-16 text-center"
@@ -180,17 +181,22 @@ export function FeaturesSection() {
           ))}
         </motion.div>
 
-        {/* Bottom CTA */}
+        {/* Bottom highlight + CTA */}
         <motion.div
           className="mt-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.3 }}
         >
-          <p className="text-sm text-muted-foreground">
-            And hundreds more capabilities...
+          <p className="mx-auto max-w-3xl text-balance text-xl sm:text-2xl font-semibold tracking-tight text-foreground/90">
+            And hundreds more capabilities ready for you to explore
           </p>
+          <div className="mt-5 flex items-center justify-center">
+            <Button size="lg" className="rounded-full px-6" asChild>
+              <a href="/chat/guest">Try a live demo</a>
+            </Button>
+          </div>
         </motion.div>
       </div>
     </section>

@@ -74,7 +74,7 @@ export function LandingNav() {
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+  <nav className="mx-auto flex max-w-screen-2xl 2xl:max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <motion.div
           className="flex items-center gap-2 cursor-pointer"

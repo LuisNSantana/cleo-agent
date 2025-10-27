@@ -14,17 +14,24 @@ import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined }
+}) {
   // Check if user is authenticated via Supabase
   const supabase = await createClient()
   
   if (supabase) {
     const { data: { user } } = await supabase.auth.getUser()
     
-    // ONLY redirect authenticated users to /chat
-    // Guest users (no auth) should always see the landing page at /
-    if (user) {
-      redirect("/chat")
+    // Allow landing by default. Redirect only when explicitly requested
+    // via query (?go=chat) or env flag HOME_REDIRECT_AUTH=true.
+    const wantsChat =
+      (typeof searchParams?.go === 'string' && searchParams.go === 'chat') ||
+      process.env.HOME_REDIRECT_AUTH === 'true'
+    if (user && wantsChat) {
+      redirect('/chat')
     }
   }
   
@@ -65,7 +72,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       {/* JSON-LD for Google */}
       <script
         type="application/ld+json"
@@ -112,7 +119,7 @@ export default async function Home() {
       
       {/* Footer */}
       <footer className="border-t border-border/40 bg-background px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-screen-2xl">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="mb-4 flex items-center gap-2">

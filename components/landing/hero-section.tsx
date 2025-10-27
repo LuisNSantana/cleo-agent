@@ -79,7 +79,7 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+    <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 xl:to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
       {/* Animated background orbs */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <motion.div
@@ -108,7 +108,7 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="mx-auto max-w-7xl">
+  <div className="mx-auto max-w-screen-2xl 2xl:max-w-[90rem]">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Left column - Text content */}
           <motion.div
@@ -279,6 +279,33 @@ export function HeroSection() {
                 </p>
               </div>
             </motion.div>
+
+            {/* Small agent chips (relocated from right column to avoid overlap) */}
+            <motion.div
+              className="mt-6 hidden flex-wrap gap-3 xl:flex"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.1 }}
+            >
+              {floatingAgents.map((agent, index) => (
+                <motion.div
+                  key={agent.name}
+                  className="flex items-center gap-2 rounded-full border border-border/40 bg-card/60 px-3 py-1.5 shadow-sm backdrop-blur-sm"
+                  animate={{
+                    y: [0, -3, 0],
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, delay: index * 0.2 }}
+                >
+                  <Avatar className="h-6 w-6 border border-background/60">
+                    <AvatarImage src={agent.avatar} alt={agent.name} className="object-cover" loading="lazy" />
+                    <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary to-purple-600 text-white">
+                      {agent.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-foreground/90">{agent.name}</span>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
 
           {/* Right column - Onboarding Animation */}
@@ -290,7 +317,7 @@ export function HeroSection() {
           >
             <div className="relative w-full max-w-lg">
               {/* Main Onboarding Card */}
-              <div className="relative rounded-2xl border border-border/50 bg-card/80 p-6 shadow-2xl backdrop-blur-xl">
+              <div className="relative z-10 rounded-2xl border border-border/50 bg-card/80 p-6 shadow-2xl backdrop-blur-xl">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">AI Team Onboarding</h3>
                   <div className="flex items-center gap-2 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400">
@@ -341,6 +368,8 @@ export function HeroSection() {
                           )}
                         </div>
 
+                        {/* Removed floating agent cards from this column to avoid overlapping the onboarding card */}
+
                         {/* Task Info */}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground">{step.name}</p>
@@ -359,55 +388,17 @@ export function HeroSection() {
                     )
                   })}
                 </div>
-
-                {/* Progress Bar */}
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-primary to-blue-600"
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${((currentStep + 1) / onboardingSteps.length) * 100}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
               </div>
 
-              {/* Floating Agent Cards */}
-              {floatingAgents.map((agent, index) => (
+              {/* Progress Bar */}
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
                 <motion.div
-                  key={agent.name}
-                  className={`absolute ${agent.position} hidden rounded-lg border border-border/50 bg-card/90 p-2 shadow-lg backdrop-blur-sm xl:block`}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{
-                    opacity: [0.7, 1, 0.7],
-                    scale: [0.95, 1.05, 0.95],
-                    y: [0, -10, 0],
-                  }}
-                  transition={{
-                    duration: 3,
-                    delay: index * 0.5,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarImage 
-                        src={agent.avatar} 
-                        alt={agent.name}
-                        className="object-cover"
-                        loading="lazy"
-                      />
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-xs font-semibold">
-                        {agent.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="max-w-[150px] min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{agent.name}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">{agent.action}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  className="h-full bg-gradient-to-r from-primary to-blue-600"
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${((currentStep + 1) / onboardingSteps.length) * 100}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
             </div>
           </motion.div>
         </div>

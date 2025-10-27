@@ -17,8 +17,8 @@ export function FinalCTASection() {
   return (
     <>
       {/* Philosophy Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-blue-500/5 px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-blue-500/5 xl:to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+        <div className="mx-auto max-w-screen-2xl">
           <motion.div
             className="mx-auto max-w-3xl text-center"
             initial={{ opacity: 0, y: 20 }}

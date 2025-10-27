@@ -14,6 +14,7 @@ import {
   Sparkle,
 } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 
 const agents = [
@@ -118,7 +119,7 @@ export function AgentsSection() {
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-screen-2xl">
         {/* Section header */}
         <motion.div
           className="mb-16 text-center"
@@ -259,17 +260,25 @@ export function AgentsSection() {
           ))}
         </motion.div>
 
-        {/* Bottom text */}
+        {/* Bottom highlight + CTA */}
         <motion.div
-          className="mt-12 text-center"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          className="mt-16 text-center"
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.4 }}
         >
-          <p className="text-sm text-muted-foreground">
+          <p className="mx-auto max-w-3xl text-balance text-xl sm:text-2xl font-semibold tracking-tight text-foreground/90">
             Create your own custom agents with specific skills for your unique needs
           </p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <Button size="lg" className="rounded-full px-6" asChild>
+              <a href="/agents">Browse agents</a>
+            </Button>
+            <Button size="lg" variant="outline" className="rounded-full px-6" asChild>
+              <a href="/chat/guest">Try it now</a>
+            </Button>
+          </div>
         </motion.div>
       </div>
     </section>

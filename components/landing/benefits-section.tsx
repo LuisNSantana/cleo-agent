@@ -115,7 +115,7 @@ export function BenefitsSection() {
 
   return (
     <section className="relative overflow-hidden bg-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-screen-2xl">
         {/* Benefits */}
         <motion.div
           className="mb-24"
