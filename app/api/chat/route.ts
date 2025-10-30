@@ -998,7 +998,10 @@ export async function POST(req: Request) {
       })
     }
   } catch {}
-  const orchestratorBacked = model?.startsWith('agents:') || process.env.GLOBAL_CHAT_SUPERVISED === 'true' || impliesDelegation
+  
+  // ✅ MIGRATION: Always use CoreOrchestrator (unified flow via LangGraph)
+  // Removed dual-flow branching - HITL works consistently across all models
+  const orchestratorBacked = true
 
   // If the last message includes file attachments, hint the supervisor to prefer Iris for insights over web search
   try {
@@ -1796,149 +1799,17 @@ export async function POST(req: Request) {
         })
         } catch (e) {
           console.error('[ChatAPI] Orchestrator-backed path failed:', e)
-          // Fallback to normal streaming
+          return createErrorResponse({ message: 'Orchestrator execution failed', statusCode: 500 })
         }
     }
-    // (rest of original logic continues under global context)
-    // If execution path not returned earlier, continue with direct model streaming logic below (existing code after this block)
+    // ✅ MIGRATION: Removed simple streamText flow - all requests now use CoreOrchestrator
+    // This ensures HITL approval works consistently regardless of model selection
     
   } // end globalCtxRun body
 
-  // Ejecutar la parte superior (hasta orquestatorBacked) dentro del contexto, luego continuar fuera reutilizando variables ya preparadas.
-  const earlyResponse = await withRequestContext({ userId: realUserId, model: normalizedModel, requestId: outerRequestId }, globalCtxRun)
-  if (earlyResponse) {
-    return earlyResponse as any
-  }
-
-    // Prepare additional parameters for reasoning models
-  const resultStart = Date.now()
-  const { onError, onFinish, onToolResult } = makeStreamHandlers({
-    supabase,
-    chatId,
-    message_group_id,
-    model,
-    realUserId,
-    finalSystemPrompt,
-    convertedMessages,
-    resultStart,
-  })
-
-    // If tools are required (either because user enabled search or because tool registry is non-empty)
-    // and the selected model doesn't support tools, switch to a tool-capable fallback for this request only.
-    // We prefer DeepSeek Chat v3.1 (free via OpenRouter) which we know supports tools.
-    let effectiveModelId = originalModel
-    try {
-      const wantsTools = enableSearch || (toolsForRun && Object.keys(toolsForRun).length > 0)
-      if (wantsTools && modelConfig.tools === false) {
-        console.warn(`[ChatAPI] Swapping non-tool model ${normalizedModel} to tool-capable fallback 'openrouter:deepseek/deepseek-chat-v3.1:free' for this request`)
-        effectiveModelId = 'openrouter:deepseek/deepseek-chat-v3.1:free'
-      }
-    } catch {}
-
-    const effectiveModelConfig = effectiveModelId === originalModel
-      ? modelConfig
-      : (await getAllModels()).find((m) => m.id === effectiveModelId)
-
-    const modelInstance = effectiveModelConfig?.apiSdk ? effectiveModelConfig.apiSdk(apiKey, { enableSearch }) : undefined
-    const additionalParams: any = {
-      // Pass only the provider-specific apiKey; let each SDK fall back to its own env var
-  model: modelInstance!,
-      system: finalSystemPrompt,
-      messages: convertedMessages,
-      tools: toolsForRun,
-  ...(providerOptions ? { providerOptions } : {}),
-  ...(activeTools ? { activeTools } : {}),
-  // Avoid step cap when using xAI native Live Search to prevent early termination mid-search
-  ...(!(model === 'grok-3-mini' && enableSearch) ? { stopWhen: stepCountIs(8) } : {}),
-      onError,
-      onFinish,
-      onToolResult,
-  }
-
-    // Apply model-specific default params when available
-    if (modelConfig.defaults) {
-      const { temperature, topP, maxTokens } = modelConfig.defaults
-      if (typeof temperature === 'number') (additionalParams as any).temperature = temperature
-      if (typeof topP === 'number') (additionalParams as any).topP = topP
-      if (typeof maxTokens === 'number') (additionalParams as any).maxTokens = maxTokens
-    }
-
-    // OpenAI Responses API: some GPT-5 variants (e.g., gpt-5-mini-2025-08-07) reject 'temperature'/'top_p'.
-    // When using Smarter (gpt-5-mini-2025-08-07), strip these params to avoid 400 invalid_request_error.
-    if (normalizedModel === 'gpt-5-mini-2025-08-07') {
-      if ('temperature' in additionalParams) {
-        delete (additionalParams as any).temperature
-      }
-      if ('topP' in additionalParams) {
-        delete (additionalParams as any).topP
-      }
-      console.log('[GPT-5-mini] Stripped temperature/topP for Responses API compatibility')
-    }
-
-  // Clamp max output tokens to provider-safe limits using the original model id (includes provider prefixes)
-  additionalParams.maxTokens = clampMaxOutputTokens(originalModel, additionalParams.maxTokens)
-    
-    // Check if user is asking to open/view a document - reduce reasoning to avoid content in reasoning
-  const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toString() || ''
-    const isOpeningDocument = /abrir.*archivo|open.*document|mostrar.*documento|show.*document|ver.*archivo|view.*file|editar.*documento|work on.*doc/i.test(lastUserMessage)
-
-    // Add reasoning effort for GPT-5 models with model-specific tuning
-    if (model.startsWith('gpt-5')) {
-      if (model === 'gpt-5-nano' || isOpeningDocument) {
-        // For nano, or when opening documents, use minimal reasoning to avoid content in reasoning
-        additionalParams.reasoning_effort = 'minimal' // Less reasoning overhead, more tool response focus
-        console.log(`[GPT-5] Setting reasoning_effort to: minimal for ${model} ${isOpeningDocument ? '(document opening detected)' : '(nano optimization)'}`)
-      } else {
-        // For other GPT-5 models, keep medium
-        additionalParams.reasoning_effort = 'medium' // Can be: minimal, low, medium, high
-        console.log(`[GPT-5] Setting reasoning_effort to: medium for model ${model}`)
-      }
-    }
-
-    if (providerOptions) {
-      console.log('[ChatAPI] Provider options applied:', JSON.stringify(providerOptions))
-    }
-
-    // Record feature intent when search is enabled (non xAI live search)
-    try {
-      if (enableSearch && model !== 'grok-3-mini' && realUserId) {
-        const { trackFeatureUsage } = await import('@/lib/analytics')
-        await trackFeatureUsage(realUserId, 'feature.webSearch', { delta: 1 })
-      }
-    } catch {}
-
-  const result = await streamText(additionalParams)
-
-    // Placeholder: High-score missed tracking (will emit after model run if no delegation tool was called)
-    // We would inspect tool invocation results in onFinish handler (already wired) — if none match delegate_to_* and delegationIntent.score >= 0.75 emit event.
-    // Implementation deferred to dedicated task (todo id 12).
-
-    // For document opening queries, disable sending reasoning to prevent content in expandable
-  // Hide reasoning to avoid exposing internal planning; UI can add toggles later if desired
-  const sendReasoning = false
-
-    return result.toUIMessageStreamResponse({
-      sendReasoning, // Disable reasoning stream for doc opens to avoid content in expandable
-  onError: (error: unknown) => {
-        // Clean up global context on error
-        delete (globalThis as any).__currentUserId
-        delete (globalThis as any).__currentModel
-        
-        if (error instanceof Error) {
-          if (
-            error.message.includes("Rate limit") ||
-            error.message.includes("Request too large")
-          ) {
-            return "El documento es demasiado grande para procesar completamente. Por favor:\n\n1. Usa un archivo PDF más pequeño (menos de 20 páginas)\n2. Usa un documento más pequeño\n3. O describe qué información específica necesitas del documento\n4. O proporciona capturas de pantalla de las secciones relevantes\n\nLos modelos Faster y Smarter pueden analizar imágenes directamente."
-          }
-          if (error.message.includes("tokens per minute")) {
-            return "Has alcanzado el límite de tokens por minuto. El documento es muy largo. Espera un momento o usa un archivo más pequeño."
-          }
-        }
-        console.error(error)
-        return "An error occurred processing your request. If you uploaded a large file, try with a smaller one."
-      },
-  })
+  // Execute orchestrator flow within request context
+  const result = await withRequestContext({ userId: realUserId, model: normalizedModel, requestId: outerRequestId }, globalCtxRun)
+  return result as any
   } catch (err: unknown) {
     // Clean up global context on exception
     delete (globalThis as any).__currentUserId

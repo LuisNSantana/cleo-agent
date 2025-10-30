@@ -285,8 +285,9 @@ export class InterruptManager {
         return null
       }
 
-      // DIAGNOSTIC: Log full state every 10 attempts to debug why response not detected
-      if (attempt % 10 === 0 || state.response) {
+      // DIAGNOSTIC: Log full state every 50 attempts (25 seconds) to reduce noise
+      // Only log when debugging needed - changed from every 10 attempts to every 50
+      if (attempt % 50 === 0 || state.response) {
         console.log('🔍🔍 [WAIT-FOR-RESPONSE] Polling state:', {
           executionId,
           attempt: attempt + 1,

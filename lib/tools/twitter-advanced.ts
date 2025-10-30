@@ -11,7 +11,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getActiveTwitterCredentials, getSystemTwitterCredentials } from '@/lib/twitter/credentials'
-import { requestConfirmation } from '@/lib/confirmation/unified'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { trackToolUsage } from '@/lib/analytics'
 import { createHmac } from 'crypto'
@@ -265,30 +264,30 @@ export const postTweetWithMediaTool = tool({
     replyToId: z.string().optional().describe('ID of tweet to reply to')
   }),
   execute: async (params) => {
+    // NOTE: Human-in-the-loop approval is handled by approval-node.ts
+    // The approval-node intercepts tool calls BEFORE execution and pauses with interrupt()
+    // See: lib/agents/core/approval-node.ts and TOOL_APPROVAL_CONFIG
+    
     const started = Date.now()
     const userId = getCurrentUserId()
 
-    return requestConfirmation(
-      'postTweetWithMedia',
-      params,
-      async () => {
-        console.log('🐦 [Twitter Advanced] Posting tweet with media:', {
-          mediaCount: params.media.length,
-          textLength: params.text.length
-        })
+    console.log('🐦 [Twitter Advanced] Posting tweet with media:', {
+      mediaCount: params.media.length,
+      textLength: params.text.length
+    })
 
+    try {
+      // Upload all media first
+      const mediaIds: string[] = []
+      
+      for (const mediaItem of params.media) {
         try {
-          // Upload all media first
-          const mediaIds: string[] = []
-          
-          for (const mediaItem of params.media) {
-            try {
-              const mediaId = await uploadMedia(mediaItem.url, mediaItem.altText)
-              mediaIds.push(mediaId)
-            } catch (error) {
-              console.error('Failed to upload media:', error)
-              return {
-                success: false,
+          const mediaId = await uploadMedia(mediaItem.url, mediaItem.altText)
+          mediaIds.push(mediaId)
+        } catch (error) {
+          console.error('Failed to upload media:', error)
+          return {
+            success: false,
                 message: `Failed to upload media from ${mediaItem.url}: ${error instanceof Error ? error.message : 'Unknown error'}`
               }
             }
@@ -361,8 +360,6 @@ export const postTweetWithMediaTool = tool({
             message: error instanceof Error ? error.message : 'Failed to post tweet'
           }
         }
-      }
-    )
   }
 })
 
@@ -377,30 +374,30 @@ export const createTwitterThreadTool = tool({
     delayBetweenTweets: z.number().min(0).max(10000).optional().default(2000).describe('Milliseconds to wait between tweets (default: 2000ms)')
   }),
   execute: async (params) => {
+    // NOTE: Human-in-the-loop approval is handled by approval-node.ts
+    // The approval-node intercepts tool calls BEFORE execution and pauses with interrupt()
+    // See: lib/agents/core/approval-node.ts and TOOL_APPROVAL_CONFIG
+    
     const started = Date.now()
     const userId = getCurrentUserId()
 
-    return requestConfirmation(
-      'createTwitterThread',
-      { tweetCount: params.tweets.length, preview: params.tweets[0].text },
-      async () => {
-        console.log('🐦 [Twitter Advanced] Creating thread:', { tweetCount: params.tweets.length })
+    console.log('🐦 [Twitter Advanced] Creating thread:', { tweetCount: params.tweets.length })
 
-        try {
-          const postedTweets: any[] = []
-          let previousTweetId: string | undefined
+    try {
+      const postedTweets: any[] = []
+      let previousTweetId: string | undefined
 
-          for (let i = 0; i < params.tweets.length; i++) {
-            const tweet = params.tweets[i]
-            tweet.text = trimTo280(tweet.text)
+      for (let i = 0; i < params.tweets.length; i++) {
+        const tweet = params.tweets[i]
+        tweet.text = trimTo280(tweet.text)
 
-            // Upload media if provided
-            let mediaIds: string[] | undefined
-            if (tweet.mediaUrls && tweet.mediaUrls.length > 0) {
-              mediaIds = []
-              for (const mediaUrl of tweet.mediaUrls) {
-                try {
-                  const mediaId = await uploadMedia(mediaUrl)
+        // Upload media if provided
+        let mediaIds: string[] | undefined
+        if (tweet.mediaUrls && tweet.mediaUrls.length > 0) {
+          mediaIds = []
+          for (const mediaUrl of tweet.mediaUrls) {
+            try {
+              const mediaId = await uploadMedia(mediaUrl)
                   mediaIds.push(mediaId)
                 } catch (error) {
                   console.error(`Failed to upload media for tweet ${i + 1}:`, error)
@@ -490,7 +487,5 @@ export const createTwitterThreadTool = tool({
             message: error instanceof Error ? error.message : 'Failed to create thread'
           }
         }
-      }
-    )
   }
 })

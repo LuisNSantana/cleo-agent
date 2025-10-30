@@ -64,8 +64,9 @@ async function buildAvailableAgentsSection(userId?: string): Promise<string> {
     const lines: string[] = ['\n\n## AVAILABLE SPECIALIST AGENTS']
     lines.push('You have access to the following delegation tools:\n')
     
+    // ✅ FIX: Use canonical IDs (peter-financial, nora-medical instead of legacy peter-google, nora-community)
     // Separate predefined and custom agents for better organization
-    const predefined = specialists.filter(a => ['ami-creative', 'peter-google', 'apu-support', 'emma-ecommerce', 'toby-technical', 'astra-email', 'nora-community', 'iris-insights', 'notion-agent'].includes(a.id))
+    const predefined = specialists.filter(a => ['ami-creative', 'peter-financial', 'apu-support', 'emma-ecommerce', 'toby-technical', 'astra-email', 'nora-medical', 'iris-insights', 'notion-agent', 'wex-intelligence', 'jenn-community'].includes(a.id))
     const custom = specialists.filter(a => !predefined.includes(a))
     
     // List predefined agents first

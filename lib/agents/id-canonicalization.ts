@@ -17,10 +17,13 @@ const AGENT_ID_ALIASES: Record<string, string> = {
   'peter': 'peter-financial',
   'ami': 'ami-creative',
   'apu': 'apu-support',
-  'nora': 'nora-community',
+  'nora': 'nora-medical', // ✅ FIX: Was nora-community, should be nora-medical
+  'nora-community': 'nora-medical', // ✅ FIX: Legacy alias
   'astra': 'astra-email',
   'notion': 'notion-agent',
   'wex': 'wex-intelligence',
+  'iris': 'iris-insights', // ✅ FIX: Add Iris alias
+  'jenn': 'jenn-community', // ✅ FIX: Add Jenn alias
 }
 
 export function canonicalizeAgentId(id: string): string {
@@ -37,9 +40,10 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   'emma-ecommerce': 'Emma',
   'apu-support': 'Apu',
   'wex-intelligence': 'Wex',
-  'nora-community': 'Nora',
+  'nora-medical': 'Nora', // ✅ FIX: Corrected from nora-community
+  'jenn-community': 'Jenn', // ✅ FIX: Added Jenn
+  'iris-insights': 'Iris', // ✅ FIX: Added Iris
   // Sub-agents
-
   'astra-email': 'Astra',
   'notion-agent': 'Notion Agent',
   'luna-content-creator': 'Luna',
@@ -48,11 +52,33 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   // Legacy aliases kept for backward compatibility
   'peter-workspace': 'Peter',
   'ami-assistant': 'Ami',
+  'nora-community': 'Nora', // ✅ FIX: Legacy compatibility
 }
 
 export function getAgentDisplayName(id: string): string {
   const canonical = canonicalizeAgentId(id)
-  return AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id] || id
+  
+  // 1. Check predefined display names first (fast path)
+  if (AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]) {
+    return AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]
+  }
+  
+  // 2. For custom agents (UUIDs), try to get name from unified config
+  // ✅ FIX: Custom agents should show their name, not UUID
+  if (canonical.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { getAllAgentsSync } = require('./unified-config')
+      const agents = getAllAgentsSync()
+      const agent = agents.find((a: any) => a.id === canonical || a.id === id)
+      if (agent?.name) return agent.name
+    } catch {
+      // Fallback if sync method not available or errors
+    }
+  }
+  
+  // 3. Fallback to ID if nothing else works
+  return id
 }
 
 export function isCanonicalAgentId(id: string): boolean {

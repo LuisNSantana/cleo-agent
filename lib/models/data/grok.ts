@@ -29,7 +29,7 @@ const grokModels: ModelConfig[] = [
     outputCost: 0.5,
     priceUnit: "per 1M tokens",
     tags: ["fast","tools","text","reasoning"],
-    contextWindow: 262144,
+    contextWindow: 2000000, // Official xAI spec: 2M tokens (updated from 262144)
     vision: true,
     tools: true,
     audio: false,
@@ -42,7 +42,7 @@ const grokModels: ModelConfig[] = [
   modelPage: "https://x.ai/grok",
     releasedAt: "2025-09-27",
     icon: "faster",
-    defaults: { temperature: 0.3, topP: 0.9 },
+    defaults: { temperature: 0.3, topP: 0.9, maxTokens: 32768 }, // Increased from 4096 to 32k for deep analysis
     // Usar xAI directo; el provider-map permite fallback a OpenRouter si el toggle no está activo
     apiSdk: (apiKey?: string) => getXAIModel("grok-4-fast-reasoning", apiKey) as any,
   },

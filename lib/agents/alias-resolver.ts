@@ -40,7 +40,13 @@ export async function resolveAgentCanonicalKey(input: string): Promise<string> {
   }
 
   // 3) Fallback to static mapping
-  const canonical = canonicalizeAgentId(key)
+  // ✅ MIGRATION FIX: Try both lowercase and original case for static mapping
+  const canonicalLower = canonicalizeAgentId(key)
+  const canonicalOriginal = canonicalizeAgentId(input.trim())
+  
+  // Prefer the original case result if different from lowercase (handles case-sensitive mappings)
+  const canonical = canonicalOriginal !== input.trim() ? canonicalOriginal : canonicalLower
+  
   cache.set(key, { value: canonical, expiresAt: now + TTL_MS })
   return canonical
 }

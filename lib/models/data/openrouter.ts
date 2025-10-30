@@ -863,7 +863,7 @@ export const openrouterModels: ModelConfig[] = [
     description:
       "Latest Grok-4 model optimized for speed and performance. Free tier available through OpenRouter.",
     tags: ["free", "fast", "latest", "coding", "reasoning"],
-    contextWindow: 128000,
+    contextWindow: 2000000, // Official xAI spec: 2M tokens (updated from 128000)
     inputCost: 0,
     outputCost: 0,
     priceUnit: "free",
@@ -880,6 +880,7 @@ export const openrouterModels: ModelConfig[] = [
     modelPage: "https://x.ai/api",
     releasedAt: "2025-01-15",
     icon: "xai",
+    defaults: { temperature: 0.3, topP: 0.9, maxTokens: 32768 }, // Increased from 4096 to 32k for deep analysis
     apiSdk: (apiKey?: string, opts?: { enableSearch?: boolean }) =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,

@@ -22,6 +22,7 @@ import { DelegationHandler } from './delegation-handler'
 import { TimeoutManager, type ExecutionBudget } from './timeout-manager'
 import { executeToolsInParallel, type ToolCall as ExecutorToolCall, type ToolExecutionResult } from './tool-executor'
 import { createToolApprovalNode } from './approval-node'
+import { getAgentDisplayName } from '../id-canonicalization' // Import display name helper
 import {
   filterStaleToolMessages,
   normalizeSystemFirst,
@@ -327,7 +328,8 @@ export class GraphBuilder {
 
       // DEBUG: Log tool calls for debugging
       const toolCalls = (aiMessage as any).tool_calls || []
-      console.log(`🔧 [AGENT-NODE] ${agentConfig.id} generated ${toolCalls.length} tool call(s)`)
+      const agentDisplayName = getAgentDisplayName(agentConfig.id) // Get friendly name for logs
+      console.log(`🔧 [AGENT-NODE] ${agentDisplayName} generated ${toolCalls.length} tool call(s)`)
       if (toolCalls.length > 0) {
         console.log(`🔧 [AGENT-NODE] Tool calls:`, toolCalls.map((tc: any) => ({
           name: tc.name,
@@ -335,7 +337,7 @@ export class GraphBuilder {
           argsPreview: JSON.stringify(tc.args).slice(0, 100)
         })))
       } else {
-        console.log(`🔧 [AGENT-NODE] ${agentConfig.id} response (no tools):`, aiMessage.content.slice(0, 200))
+        console.log(`🔧 [AGENT-NODE] ${agentDisplayName} response (no tools):`, aiMessage.content.slice(0, 200))
       }
 
       this.eventEmitter.emit('node.completed', {
@@ -360,7 +362,8 @@ export class GraphBuilder {
   }
 
   private async prepareModel(agentConfig: AgentConfig, state: GraphState, filteredMessages: BaseMessage[]) {
-    console.log(`🚨🚨🚨 [CRITICAL DEBUG] prepareModel called for agent: ${agentConfig.id} 🚨🚨🚨`)
+    const agentDisplayName = getAgentDisplayName(agentConfig.id) // Get friendly name for logs
+    console.log(`🚨🚨🚨 [CRITICAL DEBUG] prepareModel called for agent: ${agentDisplayName} 🚨🚨🚨`)
     let enhancedConfig = agentConfig
 
     try {
@@ -396,8 +399,9 @@ export class GraphBuilder {
     const toolRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
     
     // DEBUG: Log available tools
-    console.log(`🛠️ [PREPARE-MODEL] ${enhancedConfig.id} tools bound:`, toolRuntime.names)
-    console.log(`🛠️ [PREPARE-MODEL] ${enhancedConfig.id} total tools: ${toolRuntime.lcTools.length}`)
+    const prepareDisplayName = getAgentDisplayName(enhancedConfig.id) // Get friendly name for logs
+    console.log(`🛠️ [PREPARE-MODEL] ${prepareDisplayName} tools bound:`, toolRuntime.names)
+    console.log(`🛠️ [PREPARE-MODEL] ${prepareDisplayName} total tools: ${toolRuntime.lcTools.length}`)
     if (enhancedConfig.id === 'astra-email') {
       console.log(`🛠️ [PREPARE-MODEL] Astra tools list:`, toolRuntime.names.join(', '))
       console.log(`🛠️ [PREPARE-MODEL] Has sendGmailMessage?`, toolRuntime.names.includes('sendGmailMessage'))

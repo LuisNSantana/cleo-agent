@@ -474,6 +474,10 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				requirements: z.string().optional(),
 			}),
 			execute: async ({ task, context, priority, requirements }) => {
+				// ✅ MIGRATION FIX: Canonicalize agent ID to resolve legacy aliases
+				const { resolveAgentCanonicalKey } = await import('../agents/alias-resolver')
+				const canonicalAgentId = await resolveAgentCanonicalKey(agentId)
+				
 				const orchestrator = getAgentOrchestrator() as any
 				// Dynamic import to avoid build issues
 				let userId: string | undefined
@@ -497,16 +501,16 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 					priority ? `Prioridad: ${priority}` : null,
 				].filter(Boolean).join('\n')
 
-				const exec = orchestrator.startAgentExecutionForUI?.(input, agentId, undefined, userId, [], true)
-					|| orchestrator.startAgentExecution?.(input, agentId)
+				const exec = orchestrator.startAgentExecutionForUI?.(input, canonicalAgentId, undefined, userId, [], true)
+					|| orchestrator.startAgentExecution?.(input, canonicalAgentId)
 				const execId: string | undefined = exec?.id
 				
 				// Check if execution failed to start (agent not found)
 				if (!exec || !execId) {
-					console.error(`❌ [DELEGATION] Failed to start execution for agent: ${agentId}`)
+					console.error(`❌ [DELEGATION] Failed to start execution for agent: ${canonicalAgentId} (original: ${agentId})`)
 					return {
 						status: 'failed',
-						targetAgent: agentId,
+						targetAgent: canonicalAgentId,
 						delegatedTask: task,
 						context: context || '',
 						priority: priority || 'normal',

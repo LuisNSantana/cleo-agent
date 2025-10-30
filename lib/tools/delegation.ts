@@ -331,16 +331,22 @@ async function runDelegation(params: {
         }
       }
       
-      // DEBUG: Log detailed execution status during delegation polling
-      console.log('🔍 [DELEGATION DEBUG] Polling execution:', {
-        execId,
-        snapshotStatus: snapshot?.status,
-        snapshotResult: snapshot?.result ? 'present' : 'missing',
-        snapshotMessages: snapshot?.messages?.length || 0,
-        currentStatus: status,
-        hasActiveInterrupt,
-        elapsed: Date.now() - startedAt
-      })
+      // DEBUG: Log detailed execution status every 10 seconds to reduce noise
+      // Only log when elapsed time is a multiple of 10 seconds
+      const elapsed = Date.now() - startedAt
+      const shouldLog = Math.floor(elapsed / 10000) !== Math.floor((elapsed - POLL_MS) / 10000)
+      
+      if (shouldLog) {
+        console.log('🔍 [DELEGATION DEBUG] Polling execution:', {
+          execId,
+          snapshotStatus: snapshot?.status,
+          snapshotResult: snapshot?.result ? 'present' : 'missing',
+          snapshotMessages: snapshot?.messages?.length || 0,
+          currentStatus: status,
+          hasActiveInterrupt,
+          elapsed
+        })
+      }
       
       // Emit progress events when status changes
       if (status !== lastStatus) {
@@ -591,8 +597,16 @@ export const delegateToNoraTool = tool({
 export const delegateToJennTool = tool({
   description: 'Delegate community management, social media strategy, and Twitter/X operations to Jenn. Use for content calendars, thread drafts, publishing, analytics reporting, and social engagement workflows.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements }) => {
-    return runDelegation({ agentId: 'jenn-community', task, context, priority, requirements })
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'jenn-community', task, context, priority, requirements, userId })
+  }
+});
+
+export const delegateToIrisTool = tool({
+  description: 'Delegate insight synthesis and analysis to Iris. ONLY use for: analyzing documents/PDFs/attachments, generating executive summaries, identifying trends and patterns, risk assessment with severity/probability/confidence, evidence-based recommendations. Iris excels at turning messy inputs into structured insights with traceability. Use when user provides attachments or needs deep analysis of documents.',
+  inputSchema: delegationSchema,
+  execute: async ({ task, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'iris-insights', task, context, priority, requirements, userId })
   }
 });
 
@@ -608,5 +622,6 @@ export const delegationTools = {
   delegate_to_notion_agent: delegateToNotionTool,
   delegate_to_nora: delegateToNoraTool,
   delegate_to_jenn: delegateToJennTool,
+  delegate_to_iris: delegateToIrisTool,
 
 };

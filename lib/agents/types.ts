@@ -50,6 +50,7 @@ export interface ExecutionStep {
   id: string
   timestamp: Date
   agent: string
+  agentName?: string // ✅ Friendly name for UI (custom agents support)
   action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt'
   content: string
   progress: number

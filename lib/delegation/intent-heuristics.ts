@@ -43,7 +43,11 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'astra-email': [
     'enviar correo','compose email','draft email','responder correo','firma','inbox zero'
   ],
-  'nora-community': [
+  'nora-medical': [ // ✅ FIX: Corrected from nora-community to nora-medical
+    'salud','health','medicina','medical','diagnóstico','síntomas','tratamiento','receta','prescription',
+    'doctor','hospital','consulta médica','enfermedad','disease','wellness','bienestar'
+  ],
+  'jenn-community': [ // ✅ FIX: Added Jenn for social/community management
     'comunidad','community','engagement','social strategy','campaña','followers','audiencia','redes sociales',
     'tweet','twitter','x.com','post','publicar','social media','contenido social','analytics social',
     'schedule post','programar publicación'

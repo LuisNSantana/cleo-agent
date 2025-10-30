@@ -102,6 +102,11 @@ export class AgentOrchestrator {
   // Store interval references for cleanup
   private metricsIntervals: NodeJS.Timeout[] = []
 
+  // Public getter for event emitter (needed for SSE listeners in app/api/chat/route.ts)
+  get emitter() {
+    return this.eventEmitter
+  }
+
   constructor(config: OrchestratorConfig = {}) {
     this.config = {
       enableMetrics: true,
@@ -1168,15 +1173,16 @@ export class AgentOrchestrator {
         if (!sourceExecution.steps) sourceExecution.steps = []
         const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
         
-        // Get agent metadata for display names
-        const targetMetadata = getAgentMetadata(progressData.targetAgent)
+        // Get agent display name (supports both predefined and custom agents)
+        const targetDisplayName = getAgentDisplayName(progressData.targetAgent)
         
         const newStep = {
           id: stepId,
           timestamp: new Date(),
           agent: progressData.targetAgent,
+          agentName: targetDisplayName, // ✅ Add friendly name for UI
           action: 'delegating' as const,
-          content: progressData.message || `${targetMetadata.name} working on task`,
+          content: progressData.message || `${targetDisplayName} working on task`,
           progress: progressData.progress || 0,
           metadata: {
             sourceAgent: progressData.sourceAgent,
@@ -1311,12 +1317,14 @@ export class AgentOrchestrator {
       if (delegationData.sourceExecutionId) {
         const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
         if (sourceExecution && sourceExecution.steps) {
+          const targetDisplayName = getAgentDisplayName(delegationData.targetAgent) // Get friendly name
           sourceExecution.steps.push({
             id: `delegation_accepted_${Date.now()}`,
             timestamp: new Date(),
             agent: delegationData.targetAgent,
+            agentName: targetDisplayName, // ✅ Add for UI
             action: 'delegating',
-            content: `${delegationData.targetAgent} accepted the task`,
+            content: `${targetDisplayName} accepted the task`,
             progress: 10,
             metadata: {
               sourceAgent: delegationData.sourceAgent,
@@ -1329,6 +1337,9 @@ export class AgentOrchestrator {
         }
       }
       
+      // Get friendly name for analyzing stage messages
+      const targetDisplayName5 = getAgentDisplayName(delegationData.targetAgent)
+      
       // Emit progress: agent found
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -1336,7 +1347,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'analyzing',
         status: 'accepted',
-        message: `${delegationData.targetAgent} acepta la tarea`,
+        message: `${targetDisplayName5} acepta la tarea`,
         progress: 10,
         sourceExecutionId: delegationData.sourceExecutionId
       })
@@ -1347,7 +1358,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'analyzing',
         status: 'accepted',
-        message: `${delegationData.targetAgent} accepts the task`,
+        message: `${targetDisplayName5} accepts the task`,
         progress: 10
       })
       
@@ -1425,6 +1436,9 @@ export class AgentOrchestrator {
       const sourceExecId = delegationData.sourceExecutionId || 'unknown'
       const delegationKey = `${sourceExecId}:${delegationData.sourceAgent}:${delegationData.targetAgent}`
       
+      // Get friendly name for messages
+      const targetDisplayName2 = getAgentDisplayName(delegationData.targetAgent)
+      
       // Emit progress: starting execution
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -1432,7 +1446,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'processing',
         status: 'in_progress',
-        message: `${delegationData.targetAgent} is processing the task`,
+        message: `${targetDisplayName2} is processing the task`,
         progress: 25,
         sourceExecutionId: delegationData.sourceExecutionId
       })
@@ -1443,7 +1457,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'processing',
         status: 'in_progress',
-        message: `${delegationData.targetAgent} is processing the task`,
+        message: `${targetDisplayName2} is processing the task`,
         progress: 25
       })
       
@@ -1617,6 +1631,9 @@ export class AgentOrchestrator {
       } else {
         // Execute regular agent with delegated task
         
+        // Get friendly name for messages
+        const targetDisplayName3 = getAgentDisplayName(delegationData.targetAgent)
+        
         // Add progress step: main agent working
         if (delegationData.sourceExecutionId) {
           const sourceExecution = this.activeExecutions.get(delegationData.sourceExecutionId)
@@ -1625,8 +1642,9 @@ export class AgentOrchestrator {
               id: `delegation_researching_${Date.now()}`,
               timestamp: new Date(),
               agent: delegationData.targetAgent,
+              agentName: targetDisplayName3,
               action: 'delegating',
-              content: `${delegationData.targetAgent} executing tools`,
+              content: `${targetDisplayName3} executing tools`,
               progress: 60,
               metadata: {
                 sourceAgent: delegationData.sourceAgent,
@@ -1646,7 +1664,7 @@ export class AgentOrchestrator {
           task: delegationData.task,
           stage: 'researching',
           status: 'in_progress',
-          message: `${delegationData.targetAgent} ejecutando herramientas`,
+          message: `${targetDisplayName3} ejecutando herramientas`,
           progress: 60,
           sourceExecutionId: delegationData.sourceExecutionId
         })
@@ -1657,7 +1675,7 @@ export class AgentOrchestrator {
           task: delegationData.task,
           stage: 'researching',
           status: 'in_progress',
-          message: `${delegationData.targetAgent} executing tools`,
+          message: `${targetDisplayName3} executing tools`,
           progress: 60
         })
         
@@ -1737,6 +1755,9 @@ export class AgentOrchestrator {
         }
       }
       
+      // Get friendly name for finalizing messages
+      const targetDisplayName4 = getAgentDisplayName(delegationData.targetAgent)
+      
       // Emit progress: finalizing
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -1744,7 +1765,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'finalizing',
         status: 'completing',
-        message: `${delegationData.targetAgent} finalizando respuesta`,
+        message: `${targetDisplayName4} finalizando respuesta`,
         progress: 90,
         sourceExecutionId: delegationData.sourceExecutionId
       })
@@ -1755,7 +1776,7 @@ export class AgentOrchestrator {
         task: delegationData.task,
         stage: 'finalizing',
         status: 'completing',
-        message: `${delegationData.targetAgent} finalizing response`,
+        message: `${targetDisplayName4} finalizing response`,
         progress: 90
       })
       
@@ -1767,8 +1788,9 @@ export class AgentOrchestrator {
             id: `delegation_completed_${Date.now()}`,
             timestamp: new Date(),
             agent: delegationData.targetAgent,
+            agentName: targetDisplayName4,
             action: 'delegating',
-            content: `${delegationData.targetAgent} completed the task`,
+            content: `${targetDisplayName4} completed the task`,
             progress: 100,
             metadata: {
               sourceAgent: delegationData.sourceAgent,

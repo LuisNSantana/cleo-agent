@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackToolUsage } from '@/lib/analytics'
 import { getCurrentUserId } from '@/lib/server/request-context'
-import { requestConfirmation } from '@/lib/confirmation/unified'
+// ✅ MIGRATION: Removed requestConfirmation import - now using approval-node.ts
 
 // Token cache
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
@@ -121,88 +121,84 @@ export const shareDriveFileTool = tool({
     notificationMessage: z.string().optional().describe('Custom message in notification email')
   }),
   execute: async ({ fileId, shareWith, sendNotification, notificationMessage }) => {
-    return requestConfirmation(
-      'shareDriveFile',
-      { fileId, shareWith, sendNotification, notificationMessage },
-      async () => {
-        const started = Date.now()
-        const userId = await getCurrentUserId()
-        
-        if (!userId) {
-          return { success: false, message: 'User not authenticated' }
+    // ✅ MIGRATION: Removed requestConfirmation wrapper
+    // Approval now handled by approval-node.ts using TOOL_APPROVAL_CONFIG
+    const started = Date.now()
+    const userId = await getCurrentUserId()
+    
+    if (!userId) {
+      return { success: false, message: 'User not authenticated' }
+    }
+
+    const token = await getGoogleDriveAccessToken(userId)
+    if (!token) {
+      return { success: false, message: 'Drive not connected' }
+    }
+
+    console.log('📁 [Drive Advanced] Sharing file:', { fileId, type: shareWith.type, role: shareWith.role })
+
+    try {
+      // Build permission
+      const permission: any = {
+        type: shareWith.type,
+        role: shareWith.role
+      }
+
+      if (shareWith.type === 'user' || shareWith.type === 'group') {
+        if (!shareWith.emailAddress) {
+          return { success: false, message: 'Email address required for user/group sharing' }
         }
+        permission.emailAddress = shareWith.emailAddress
+      }
 
-        const token = await getGoogleDriveAccessToken(userId)
-        if (!token) {
-          return { success: false, message: 'Drive not connected' }
+      if (shareWith.type === 'domain') {
+        if (!shareWith.domain) {
+          return { success: false, message: 'Domain required for domain sharing' }
         }
+        permission.domain = shareWith.domain
+      }
 
-        console.log('📁 [Drive Advanced] Sharing file:', { fileId, type: shareWith.type, role: shareWith.role })
+      if (shareWith.expirationTime) {
+        permission.expirationTime = shareWith.expirationTime
+      }
 
-        try {
-          // Build permission
-          const permission: any = {
-            type: shareWith.type,
-            role: shareWith.role
-          }
+      // Create permission
+      const result = await makeGoogleDriveRequest(
+        token,
+        `files/${fileId}/permissions?sendNotificationEmail=${sendNotification}${notificationMessage ? `&emailMessage=${encodeURIComponent(notificationMessage)}` : ''}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(permission)
+        }
+      )
 
-          if (shareWith.type === 'user' || shareWith.type === 'group') {
-            if (!shareWith.emailAddress) {
-              return { success: false, message: 'Email address required for user/group sharing' }
-            }
-            permission.emailAddress = shareWith.emailAddress
-          }
+      // Get file details
+      const file = await makeGoogleDriveRequest(token, `files/${fileId}?fields=name,webViewLink,mimeType`)
 
-          if (shareWith.type === 'domain') {
-            if (!shareWith.domain) {
-              return { success: false, message: 'Domain required for domain sharing' }
-            }
-            permission.domain = shareWith.domain
-          }
+      await trackToolUsage(userId, 'shareDriveFile', { ok: true, execMs: Date.now() - started })
 
-          if (shareWith.expirationTime) {
-            permission.expirationTime = shareWith.expirationTime
-          }
-
-          // Create permission
-          const result = await makeGoogleDriveRequest(
-            token,
-            `files/${fileId}/permissions?sendNotificationEmail=${sendNotification}${notificationMessage ? `&emailMessage=${encodeURIComponent(notificationMessage)}` : ''}`,
-            {
-              method: 'POST',
-              body: JSON.stringify(permission)
-            }
-          )
-
-          // Get file details
-          const file = await makeGoogleDriveRequest(token, `files/${fileId}?fields=name,webViewLink,mimeType`)
-
-          await trackToolUsage(userId, 'shareDriveFile', { ok: true, execMs: Date.now() - started })
-
-          return {
-            success: true,
-            message: `File shared with ${shareWith.type}${shareWith.emailAddress ? ` (${shareWith.emailAddress})` : ''}`,
-            permission: {
-              id: result.id,
-              type: shareWith.type,
-              role: shareWith.role,
-              ...(shareWith.expirationTime && { expiresAt: shareWith.expirationTime })
-            },
-            file: {
-              name: file.name,
-              webViewLink: file.webViewLink,
-              type: file.mimeType
-            }
-          }
-        } catch (error) {
-          console.error('Error sharing file:', error)
-          return {
-            success: false,
-            message: error instanceof Error ? error.message : 'Failed to share file'
-          }
+      return {
+        success: true,
+        message: `File shared with ${shareWith.type}${shareWith.emailAddress ? ` (${shareWith.emailAddress})` : ''}`,
+        permission: {
+          id: result.id,
+          type: shareWith.type,
+          role: shareWith.role,
+          ...(shareWith.expirationTime && { expiresAt: shareWith.expirationTime })
+        },
+        file: {
+          name: file.name,
+          webViewLink: file.webViewLink,
+          type: file.mimeType
         }
       }
-    )
+    } catch (error) {
+      console.error('Error sharing file:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to share file'
+      }
+    }
   }
 })
 

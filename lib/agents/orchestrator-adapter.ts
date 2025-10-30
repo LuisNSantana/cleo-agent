@@ -38,6 +38,9 @@ export function getAgentOrchestrator() {
   const core = getCore()
   return {
     __id: 'core-adapter',
+    // CRITICAL FIX: Expose eventEmitter so SSE listeners can subscribe to interrupts
+    // This allows app/api/chat/route.ts to listen for 'execution.interrupted' events
+    eventEmitter: core.emitter,
     // Legacy imperative execute used by agent-store
     executeAgent(input: string, agentId?: string) {
       return createAndRunExecution(input, agentId, [])

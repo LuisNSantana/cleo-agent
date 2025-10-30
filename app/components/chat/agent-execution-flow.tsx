@@ -75,6 +75,8 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
           <div className="space-y-2">
             <AnimatePresence mode="popLayout">
               {activeSteps.map((step, index) => {
+                // Use agentName from step if available (from server), otherwise fallback to metadata lookup
+                const displayName = (step as any).agentName || getAgentMetadata(step.agent).name
                 const meta = getAgentMetadata(step.agent)
                 const isLatest = index === 0
                 
@@ -131,7 +133,7 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="text-sm font-semibold text-foreground">
-                              {meta.name}
+                              {displayName}
                             </h4>
                             {isLatest && (
                               <motion.div

@@ -309,7 +309,7 @@ const fallbackModels: ModelConfig[] = [
     defaults: {
       temperature: 0.5,
       topP: 0.9,
-      maxTokens: 4096,
+      maxTokens: 16384, // OpenAI official max output (increased from 4096)
     },
     apiSdk: (apiKey?: string) => openproviders("gpt-4o-mini", undefined, apiKey),
   }

@@ -38,7 +38,7 @@ export const langchainModels: ModelConfig[] = [
     apiSdk: () => createLangChainSdk().chat("langchain-balanced-local"),
     defaults: {
       temperature: 0.7,
-      maxTokens: 4096,
+      maxTokens: 8192, // Increased from 4096 for better local responses
     },
   },
   {
@@ -67,7 +67,7 @@ export const langchainModels: ModelConfig[] = [
     apiSdk: () => createLangChainSdk().chat("langchain-balanced"),
     defaults: {
       temperature: 0.7,
-      maxTokens: 6144,
+      maxTokens: 12288, // Increased from 6144 for complex reasoning tasks
     },
   },
   {
@@ -96,7 +96,7 @@ export const langchainModels: ModelConfig[] = [
     apiSdk: () => createLangChainSdk().chat("langchain-fast"),
     defaults: {
       temperature: 0.7,
-      maxTokens: 4096,
+      maxTokens: 8192, // Increased from 4096 for better fast responses
     },
   }
 ]
