@@ -98,72 +98,64 @@ async function createAndRunExecution(
 		messageCount: messageHistory.length
 	})
 	
-	// CRITICAL FIX: Don't await executeAgent! Return the execution immediately
-	// so SSE polling can start watching it while it's still running.
-	// The execution will be in CoreOrchestrator.activeExecutions immediately.
-	
-	// CRITICAL: Pass timeout for HITL-enabled agents
-	// Need minimum 10 minutes to allow 5-minute approval wait + buffer + execution time
-	// This prevents delegations from timing out while waiting for user approval
-	const HITL_SAFE_TIMEOUT_MS = 600_000 // 10 minutes
-	
-	// Start execution (don't await)
-	const executionPromise = core.executeAgent(target, ctx, { timeout: HITL_SAFE_TIMEOUT_MS })
-	
-	// Get the execution ID that was just created (it's in activeExecutions now)
-	// CoreOrchestrator.executeAgent creates the execution synchronously before async work
-	const executions = core.getActiveExecutions()
-	const execution = executions.find(e => 
-		e.agentId === targetId && 
-		e.userId === finalUserId &&
-		e.threadId === ctx.threadId
-	)
-	
-	if (!execution) {
-		logger.error('[LEGACY WRAPPER] Failed to find execution after starting:', {
-			targetId,
-			userId: finalUserId,
-			threadId: ctx.threadId,
-			activeExecutionIds: executions.map(e => e.id)
-		})
-		// Fallback: wait for promise and try again
-		await executionPromise
-		const retryExecs = core.getActiveExecutions()
-		const retryExec = retryExecs.find(e => e.agentId === targetId && e.userId === finalUserId)
-		if (retryExec) return retryExec
-		throw new Error('Execution not found in CoreOrchestrator')
-	}
-	
-	logger.debug('[LEGACY WRAPPER] Found running execution:', {
-		id: execution.id,
-		status: execution.status,
-		stepsCount: execution.steps?.length || 0
-	})
-	
-	// Start execution in background (don't block HTTP response)
-	executionPromise.then(result => {
-		logger.debug('[LEGACY WRAPPER] Execution completed:', {
-			id: execution.id,
-			status: execution.status
-		})
+	// Delegate to CoreOrchestrator (which handles everything including HITL)
+	try {
+		const result = await core.executeAgent(target, ctx, {})
 		
-		// Notify legacy listeners for backward compatibility
-		try {
-			listeners.forEach(fn => fn({ 
-				type: 'execution_completed', 
-				agentId: execution.agentId, 
-				timestamp: new Date(), 
-				data: { executionId: execution.id } 
-			}))
-		} catch (err) {
-			logger.warn('[LEGACY WRAPPER] Error notifying listeners:', err)
+		// Get the execution from CoreOrchestrator (authoritative source)
+		const executions = core.getActiveExecutions()
+		const execution = executions.find(e => e.agentId === targetId && e.userId === finalUserId)
+		
+		if (execution) {
+			// Notify legacy listeners for backward compatibility
+			try {
+				listeners.forEach(fn => fn({ 
+					type: 'execution_completed', 
+					agentId: execution.agentId, 
+					timestamp: new Date(), 
+					data: { executionId: execution.id } 
+				}))
+			} catch {}
+			
+			return execution
 		}
-	}).catch(err => {
-		logger.error('[LEGACY WRAPPER] Execution failed:', err)
-	})
-	
-	// Return the execution immediately (it's running in background)
-	return execution
+		
+		// Fallback: create minimal execution object if not found
+		return {
+			id: `exec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+			agentId: targetId,
+			threadId: ctx.threadId,
+			userId: finalUserId,
+			status: 'completed',
+			startTime: new Date(),
+			endTime: new Date(),
+			result: result.content,
+			messages: result.messages?.map((msg: any, idx: number) => ({
+				id: `msg_${idx}`,
+				type: msg.constructor?.name === 'AIMessage' ? 'ai' as const : 'human' as const,
+				content: String(msg.content || ''),
+				timestamp: new Date(),
+				metadata: { sender: targetId }
+			})) || [],
+			steps: [],
+			metrics: {
+				totalTokens: result.tokensUsed || 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				executionTime: result.executionTime || 0,
+				executionTimeMs: result.executionTime || 0,
+				tokensUsed: result.tokensUsed || 0,
+				toolCallsCount: 0,
+				handoffsCount: 0,
+				errorCount: 0,
+				retryCount: 0,
+				cost: 0
+			}
+		}
+	} catch (error) {
+		logger.error('[LEGACY WRAPPER] Execution failed:', error)
+		throw error
+	}
 }
 
 // ----------------------------------------------------------------------------

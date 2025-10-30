@@ -235,7 +235,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       { userId: task.user_id, requestId: `task-${task.task_id}` },
       async () => {
         // Start execution with orchestrator (supports delegations)
-        const execution = orchestrator.startAgentExecutionWithHistory(
+        const execution = await orchestrator.startAgentExecutionWithHistory(
           taskPrompt,
           agent.id,
           []

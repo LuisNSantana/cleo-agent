@@ -91,6 +91,48 @@ export type Database = {
           },
         ]
       }
+      agent_interrupts: {
+        Row: {
+          id: string
+          execution_id: string
+          thread_id: string
+          user_id: string
+          agent_id: string
+          status: string
+          interrupt_payload: Json
+          response: Json | null
+          created_at: string
+          updated_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          execution_id: string
+          thread_id: string
+          user_id: string
+          agent_id: string
+          status: string
+          interrupt_payload: Json
+          response?: Json | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          execution_id?: string
+          thread_id?: string
+          user_id?: string
+          agent_id?: string
+          status?: string
+          interrupt_payload?: Json
+          response?: Json | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       user_service_connections: {
         Row: {
           id: string

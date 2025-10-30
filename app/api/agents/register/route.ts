@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/agent-orchestrator'
 import { AgentConfig } from '@/lib/agents/types'
 
 export async function POST(req: Request) {

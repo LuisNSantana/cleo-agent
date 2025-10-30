@@ -269,7 +269,30 @@ export function Chat() {
 
     const confirmationItems: ConfirmationItem[] = useMemo(() => {
       if (!pendingToolConfirmation) return []
-      const previewSource: any = pendingToolConfirmation.preview || pendingToolConfirmation.pendingAction?.input || {}
+      
+      console.log('🔍 [CHAT.TSX] Building confirmationItems from:', {
+        toolName: pendingToolConfirmation.toolName,
+        hasPreview: !!pendingToolConfirmation.preview,
+        hasEmailData: !!pendingToolConfirmation.preview?.emailData,
+        previewKeys: Object.keys(pendingToolConfirmation.preview || {})
+      })
+      
+      // Use the preview directly if it exists (for interrupts with rich data like emails)
+      if (pendingToolConfirmation.preview && typeof pendingToolConfirmation.preview === 'object') {
+        return [{
+          id: pendingToolConfirmation.confirmationId,
+          toolName: pendingToolConfirmation.toolName,
+          category: pendingToolConfirmation.category || inferCategory(pendingToolConfirmation.toolName),
+          sensitivity: (pendingToolConfirmation.sensitivity as any) || inferSensitivity(pendingToolConfirmation.toolName),
+          undoable: pendingToolConfirmation.undoable ?? (!/delete|destroy|purge/i.test(pendingToolConfirmation.toolName)),
+          timestamp: Date.now(),
+          preview: pendingToolConfirmation.preview, // Use the rich preview directly
+          message: pendingToolConfirmation.preview.summary
+        }]
+      }
+      
+      // Fallback for legacy confirmations without rich preview
+      const previewSource: any = pendingToolConfirmation.pendingAction?.input || {}
       const details: {label: string; value: string}[] = []
       // Flatten simple key/value pairs into details (limit 12 to keep UI tidy)
       if (previewSource && typeof previewSource === 'object') {
@@ -365,6 +388,22 @@ export function Chat() {
           <Conversation key="conversation" {...conversationProps} />
         )}
       </AnimatePresence>
+
+      {/* Tool Approval Panel - renders above input when approval is needed */}
+      {confirmationItems.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="z-50 mx-auto w-full max-w-3xl px-4 pb-4"
+        >
+          <ConfirmationPanel
+            items={confirmationItems}
+            onResolve={handleResolveConfirmation}
+            loadingId={confirmationLoadingId}
+          />
+        </motion.div>
+      )}
 
       <motion.div
         className={cn(

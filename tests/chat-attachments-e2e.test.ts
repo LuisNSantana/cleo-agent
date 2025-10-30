@@ -8,7 +8,7 @@
 import type { ChatRequest } from '@/app/api/chat/schema'
 
 // Avoid heavy orchestrator/supabase imports by mocking the enhanced adapter upfront
-jest.mock('@/lib/agents/orchestrator-adapter-enhanced', () => ({
+jest.mock('@/lib/agents/agent-orchestrator', () => ({
   __esModule: true,
   getAgentOrchestrator: () => ({
     startAgentExecutionForUI: jest.fn(),

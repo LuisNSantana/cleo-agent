@@ -1087,21 +1087,27 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       console.log('📤 [CLIENT-STORE] Submitting approval response:', { executionId, type: response.type })
       
       try {
-        const res = await fetch('/api/chat/resume', {
+        // NEW ENDPOINT: Route approvals through interrupt manager
+        // Map HumanResponse to simple approved boolean for the endpoint
+        const approved = response.type === 'accept' || response.type === 'response' || response.type === 'edit'
+
+        const res = await fetch('/api/interrupt/respond', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ executionId, response })
+          body: JSON.stringify({ executionId, approved })
         })
 
         if (!res.ok) {
-          const error = await res.json()
-          throw new Error(error.message || 'Failed to submit approval')
+          let errorPayload: any = null
+          try { errorPayload = await res.json() } catch {}
+          console.error('❌ [CLIENT-STORE] Interrupt respond failed:', errorPayload || res.statusText)
+          throw new Error(errorPayload?.error || 'Failed to submit approval')
         }
 
         const result = await res.json()
         console.log('✅ [CLIENT-STORE] Approval submitted successfully:', result)
 
-        // Remove interrupt from store
+        // Remove interrupt from store (UI cleanup)
         get().removeInterrupt(executionId)
 
         return result

@@ -1,6 +1,24 @@
 /**
  * Resume Execution Endpoint
- * Handles user responses to interrupt approvals
+ * Handles     // 2. Get interrupt state
+    const interrupt = await InterruptManager.getInterrupt(executionId)
+    if (!interrupt) {
+      return NextResponse.json(
+        { error: 'Interrupt not found', executionId },
+        { status: 404 }
+      )
+    }
+
+    // Check if already responded
+    if (interrupt.status !== 'pending') {
+      return NextResponse.json(
+        { 
+          error: 'Interrupt already processed', 
+          executionId,
+          currentStatus: interrupt.status 
+        },
+        { status: 409 }
+      )nterrupt approvals
  * 
  * Based on LangGraph official patterns:
  * - Receives HumanResponse from UI
@@ -43,7 +61,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Check if interrupt exists
-    const interrupt = InterruptManager.getInterrupt(executionId)
+    const interrupt = await InterruptManager.getInterrupt(executionId)
     if (!interrupt) {
       return NextResponse.json(
         { error: 'Interrupt not found', executionId },
@@ -116,7 +134,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const interrupt = InterruptManager.getInterrupt(executionId)
+    const interrupt = await InterruptManager.getInterrupt(executionId)
     
     if (!interrupt) {
       return NextResponse.json(

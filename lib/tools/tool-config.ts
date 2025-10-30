@@ -5,7 +5,39 @@
  * Based on tool sensitivity and potential impact.
  */
 
-import { ToolApprovalConfig } from '@/lib/agents/core/approval-handler'
+/**
+ * Tool approval configuration type
+ */
+export interface ToolApprovalConfig {
+  /**
+   * Tool name
+   */
+  toolName: string
+  /**
+   * Whether human approval is required before execution
+   */
+  requiresApproval: boolean
+  /**
+   * Risk level of the tool
+   */
+  riskLevel: 'low' | 'medium' | 'high'
+  /**
+   * Message to show during approval
+   */
+  approvalMessage?: string
+  /**
+   * Optional description of why approval is needed
+   */
+  reason?: string
+  /**
+   * Whether the tool arguments can be edited during approval
+   */
+  allowEdit?: boolean
+  /**
+   * Whether the tool can be ignored/rejected during approval
+   */
+  allowIgnore?: boolean
+}
 
 /**
  * Tool approval configuration by tool name
@@ -85,6 +117,48 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     requiresApproval: true,
     riskLevel: 'medium',
     approvalMessage: '📝 ¿Actualizar esta página de Notion?'
+  },
+
+  // Twitter/X Tools
+  postTweet: {
+    toolName: 'postTweet',
+    requiresApproval: true,
+    riskLevel: 'high',
+    approvalMessage: '🐦 ¿Publicar este tweet en X/Twitter?',
+    reason: 'Posting to social media is public and permanent',
+    allowEdit: false,
+    allowIgnore: true
+  },
+
+  createTwitterThread: {
+    toolName: 'createTwitterThread',
+    requiresApproval: true,
+    riskLevel: 'high',
+    approvalMessage: '🧵 ¿Publicar este hilo en X/Twitter?',
+    reason: 'Thread will be posted publicly on your timeline',
+    allowEdit: false,
+    allowIgnore: true
+  },
+
+  postTweetWithMedia: {
+    toolName: 'postTweetWithMedia',
+    requiresApproval: true,
+    riskLevel: 'high',
+    approvalMessage: '📸 ¿Publicar este tweet con imágenes en X/Twitter?',
+    reason: 'Tweet with media will be posted publicly',
+    allowEdit: false,
+    allowIgnore: true
+  },
+
+  // Google Drive Tools - Share actions
+  shareDriveFile: {
+    toolName: 'shareDriveFile',
+    requiresApproval: true,
+    riskLevel: 'high',
+    approvalMessage: '🔗 ¿Compartir este archivo de Drive?',
+    reason: 'Sharing may expose file content to others',
+    allowEdit: false,
+    allowIgnore: true
   },
 
   // ==========================================

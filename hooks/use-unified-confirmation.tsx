@@ -29,6 +29,47 @@ export function useUnifiedConfirmation() {
     }
   }, [])
 
+  // Listen for SSE interrupt events (for HITL interrupts from LangGraph)
+  useEffect(() => {
+    const handleInterrupt = (event: any) => {
+      const detail = event.detail
+      console.log('🎯 [useUnifiedConfirmation] Interrupt event received:', detail)
+      
+      if (detail && detail.interrupt) {
+        const confirmation: PendingConfirmation = {
+          id: detail.executionId || `interrupt_${Date.now()}`,
+          toolName: detail.interrupt.action_request?.action || 'unknown_tool',
+          params: detail.interrupt.action_request?.args || {},
+          message: detail.interrupt.description || 'Tool execution requires approval',
+          timestamp: Date.now()
+        }
+        
+        console.log('✅ [useUnifiedConfirmation] Creating confirmation:', confirmation)
+        
+        setPendingConfirmations(prev => {
+          // Avoid duplicates
+          if (prev.some(p => p.id === confirmation.id)) {
+            console.log('⚠️ [useUnifiedConfirmation] Duplicate confirmation ignored:', confirmation.id)
+            return prev
+          }
+          console.log('📋 [useUnifiedConfirmation] Adding confirmation to pending list')
+          return [...prev, confirmation]
+        })
+      } else {
+        console.warn('⚠️ [useUnifiedConfirmation] Invalid interrupt event detail:', detail)
+      }
+    }
+
+    console.log('👂 [useUnifiedConfirmation] Setting up interrupt listener')
+    // Listen for custom interrupt events (emitted by SSE handler)
+    window.addEventListener('interrupt', handleInterrupt as EventListener)
+    
+    return () => {
+      console.log('🔇 [useUnifiedConfirmation] Removing interrupt listener')
+      window.removeEventListener('interrupt', handleInterrupt as EventListener)
+    }
+  }, [])
+
   // Poll for updates (simple approach for now)
   useEffect(() => {
     refreshConfirmations()

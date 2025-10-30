@@ -1,54 +1,171 @@
 /**
  * Interrupt State Manager
- * Manages pending interrupts (human-in-the-loop approvals) during agent execution
+ * Manages pending interrupts (human-in-the-loop approvals) du    // If not     // If not in memory, check Supabase
+    try {
+      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
+      const supabase = await createClient()
+      if (!supabase) {
+        console.warn('⚠️ [INTERRUPT] Supabase not available for fallback')
+        return undefined
+      }
+      
+      const { data, error } = await supabase
+        .from('agent_interrupts')
+        .select('*')
+        .eq('execution_id', executionId)
+        .eq('status', 'pending')
+        .single() check Supabase
+    try {
+      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
+      const supabase = await createClient()
+      const { data, error } = await supabase
+        .from('agent_interrupts')
+        .select('*')
+        .eq('execution_id', executionId)
+        .eq('status', 'pending')
+        .single() execution
  * 
+ * Uses Supabase for persistent storage across serverless function instances
  * Based on LangGraph official patterns from agent-chat-ui
  */
 
 import { HumanInterrupt, InterruptState, HumanResponse, isHumanInterrupt } from '../types/interrupt'
+import { createClient } from '@/lib/supabase/server'
 
 /**
- * In-memory storage for active interrupts
- * Key: executionId
- * Value: InterruptState
+ * DEPRECATED: In-memory storage - kept for backward compatibility during migration
+ * Use Supabase storage for production (serverless-safe)
  */
 const activeInterrupts = new Map<string, InterruptState>()
 
 export class InterruptManager {
   /**
-   * Store a new interrupt waiting for user response
+   * Store interrupt state (in-memory + Supabase)
    */
   static async storeInterrupt(
     executionId: string,
     threadId: string,
-    interrupt: HumanInterrupt
-  ): Promise<InterruptState> {
-    const state: InterruptState = {
+    payload: HumanInterrupt,
+    userId?: string,
+    agentId?: string
+  ): Promise<void> {
+    const actionRequest = payload.action_request
+    
+    console.log('🛑 [INTERRUPT] Storing new interrupt:', {
       executionId,
       threadId,
-      interrupt,
-      timestamp: new Date(),
-      status: 'pending'
-    }
-
-    activeInterrupts.set(executionId, state)
-
-    console.log('🛑 [INTERRUPT] Stored new interrupt:', {
-      executionId,
-      threadId,
-      action: interrupt.action_request.action,
-      description: interrupt.description,
-      config: interrupt.config
+      userId,
+      agentId,
+      action: actionRequest.action,
+      description: payload.description,
+      config: payload.config,
+      existingInterruptStatus: activeInterrupts.get(executionId)?.status
     })
 
-    return state
+    const interruptState: InterruptState = {
+      executionId,
+      threadId,
+      status: 'pending',
+      interrupt: payload,
+      timestamp: new Date(),
+      response: undefined
+    }
+
+    // Store in memory (L1 cache)
+    activeInterrupts.set(executionId, interruptState)
+    
+    // Persist to Supabase (survives process restarts)
+    try {
+      const supabase = await createClient()
+      if (!supabase) {
+        console.warn('⚠️ [INTERRUPT] Supabase not available, skipping persistence')
+        return
+      }
+      
+      if (!userId) {
+        console.warn('⚠️ [INTERRUPT] No userId provided, skipping Supabase persistence')
+        return
+      }
+      
+      const { error } = await supabase
+        .from('agent_interrupts')
+        .insert({
+          execution_id: executionId,
+          thread_id: threadId,
+          user_id: userId,
+          agent_id: agentId || 'unknown',
+          status: 'pending',
+          interrupt_payload: payload as any
+        })
+      
+      if (error) {
+        console.error('❌ [INTERRUPT] Failed to persist to Supabase:', error)
+        // Continue anyway - in-memory storage will work for short-lived interrupts
+      } else {
+        console.log('✅ [INTERRUPT] Persisted to Supabase')
+      }
+    } catch (dbError) {
+      console.error('❌ [INTERRUPT] Supabase error:', dbError)
+      // Continue anyway
+    }
+    
+    console.log('✅ [INTERRUPT] Interrupt stored successfully. Active interrupts count:', activeInterrupts.size)
   }
 
   /**
-   * Get pending interrupt for an execution
+   * Get pending interrupt for an execution (check Supabase if not in memory)
    */
-  static getInterrupt(executionId: string): InterruptState | undefined {
-    return activeInterrupts.get(executionId)
+  static async getInterrupt(executionId: string): Promise<InterruptState | undefined> {
+    // Check L1 cache first
+    let state = activeInterrupts.get(executionId)
+    
+    if (state) {
+      console.log('🔍 [INTERRUPT] Found in memory cache:', executionId)
+      return state
+    }
+    
+    // If not in memory, check Supabase
+    try {
+      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
+      const supabase = await createClient()
+      if (!supabase) {
+        console.warn('⚠️ [INTERRUPT] Supabase not available for fallback')
+        return undefined
+      }
+      
+      const { data, error } = await supabase
+        .from('agent_interrupts')
+        .select('*')
+        .eq('execution_id', executionId)
+        .eq('status', 'pending')
+        .single()
+      
+      if (error) {
+        if (error.code !== 'PGRST116') { // Not found is expected
+          console.error('❌ [INTERRUPT] Supabase query error:', error)
+        }
+        return undefined
+      }
+      
+      if (data) {
+        console.log('✅ [INTERRUPT] Found in Supabase, restoring to memory:', executionId)
+        // Restore to memory cache
+        state = {
+          executionId: data.execution_id,
+          threadId: data.thread_id,
+          status: data.status as 'pending',
+          interrupt: data.interrupt_payload as unknown as HumanInterrupt,
+          timestamp: new Date(data.created_at),
+          response: data.response as unknown as HumanResponse | undefined
+        }
+        activeInterrupts.set(executionId, state)
+        return state
+      }
+    } catch (dbError) {
+      console.error('❌ [INTERRUPT] Supabase error:', dbError)
+    }
+    
+    return undefined
   }
 
   /**
@@ -61,13 +178,14 @@ export class InterruptManager {
   }
 
   /**
-   * Update interrupt status with user response
+   * Update interrupt status with user response (memory + Supabase)
    */
   static async updateInterruptResponse(
     executionId: string,
     response: HumanResponse
   ): Promise<InterruptState | null> {
-    const state = activeInterrupts.get(executionId)
+    // Get state (will check Supabase if not in memory)
+    const state = await InterruptManager.getInterrupt(executionId)
     
     if (!state) {
       console.error('❌ [INTERRUPT] No interrupt found for executionId:', executionId)
@@ -87,6 +205,34 @@ export class InterruptManager {
       newStatus: state.status
     })
 
+    // Update in memory
+    activeInterrupts.set(executionId, state)
+    
+    // Update in Supabase
+    try {
+      const supabase = await createClient()
+      if (!supabase) {
+        console.warn('⚠️ [INTERRUPT] Supabase not available, skipping DB update')
+        return state  // Return the state even if we couldn't persist
+      }
+      
+      const { error } = await supabase
+        .from('agent_interrupts')
+        .update({
+          status: state.status,
+          response: response as any
+        })
+        .eq('execution_id', executionId)
+      
+      if (error) {
+        console.error('❌ [INTERRUPT] Failed to update Supabase:', error)
+      } else {
+        console.log('✅ [INTERRUPT] Updated in Supabase')
+      }
+    } catch (dbError) {
+      console.error('❌ [INTERRUPT] Supabase error:', dbError)
+    }
+
     return state
   }
 
@@ -94,10 +240,16 @@ export class InterruptManager {
    * Clear interrupt after execution completes
    */
   static clearInterrupt(executionId: string): boolean {
+    // DEBUG: Log stack trace to see who's calling this
+    console.log('🧹 [INTERRUPT] clearInterrupt called for:', executionId)
+    console.trace('🧹 [INTERRUPT] Stack trace:')
+    
     const deleted = activeInterrupts.delete(executionId)
     
     if (deleted) {
       console.log('🧹 [INTERRUPT] Cleared interrupt for executionId:', executionId)
+    } else {
+      console.log('⚠️ [INTERRUPT] No interrupt found to clear for:', executionId)
     }
     
     return deleted
@@ -113,6 +265,7 @@ export class InterruptManager {
 
   /**
    * Wait for user response to interrupt (with timeout)
+   * CRITICAL: Must check Supabase (L2) not just memory (L1) for serverless compatibility
    */
   static async waitForResponse(
     executionId: string,
@@ -122,18 +275,35 @@ export class InterruptManager {
     const maxAttempts = Math.floor(timeoutMs / pollInterval)
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const state = activeInterrupts.get(executionId)
+      // CRITICAL FIX: Use getInterrupt() which checks Supabase fallback
+      // In serverless, the approval may come from a different process
+      // Memory cache is NOT shared between processes
+      const state = await this.getInterrupt(executionId)
       
       if (!state) {
         console.error('❌ [INTERRUPT] Interrupt disappeared during wait:', executionId)
         return null
       }
 
+      // DIAGNOSTIC: Log full state every 10 attempts to debug why response not detected
+      if (attempt % 10 === 0 || state.response) {
+        console.log('🔍🔍 [WAIT-FOR-RESPONSE] Polling state:', {
+          executionId,
+          attempt: attempt + 1,
+          maxAttempts,
+          hasResponse: !!state.response,
+          responseType: state.response?.type,
+          status: state.status,
+          fullState: JSON.stringify(state, null, 2)
+        })
+      }
+
       if (state.response) {
         console.log('✅ [INTERRUPT] Received user response:', {
           executionId,
           responseType: state.response.type,
-          attemptNumber: attempt + 1
+          attemptNumber: attempt + 1,
+          source: activeInterrupts.has(executionId) ? 'memory' : 'supabase'
         })
         return state.response
       }
@@ -148,6 +318,13 @@ export class InterruptManager {
     })
     
     return null
+  }
+
+  /**
+   * Clear all interrupts from memory (for testing only)
+   */
+  static clearAll(): void {
+    activeInterrupts.clear()
   }
 }
 

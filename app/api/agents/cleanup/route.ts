@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
     const orchestrator = getAgentOrchestrator()
     
     // Get current agent configs before cleanup
-    const beforeAgents = Array.from(orchestrator.getAgentConfigs().keys())
+    const agentConfigs = await orchestrator.getAgentConfigs()
+    const beforeAgents = Array.from(agentConfigs.keys())
   const runtimeAgentsBefore = beforeAgents.filter(id => /^custom_\d+$/.test(id))
     
     console.log(`🧹 Starting cleanup of ${runtimeAgentsBefore.length} runtime agents...`)
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
     })
     
     // Get final count
-    const afterAgents = Array.from(orchestrator.getAgentConfigs().keys())
+    const agentConfigsAfter = await orchestrator.getAgentConfigs()
+    const afterAgents = Array.from(agentConfigsAfter.keys())
     const cleanedUpCount = runtimeAgentsBefore.length
     
     return NextResponse.json({

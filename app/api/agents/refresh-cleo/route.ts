@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { initializeDynamicOrchestrator, refreshDynamicAgents } from '@/lib/agents/dynamic/orchestrator-integration'
 import { getCleoDynamicConfig } from '@/lib/agents/predefined/cleo-dynamic'
-import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator, registerRuntimeAgent } from '@/lib/agents/agent-orchestrator'
 import logger from '@/lib/utils/logger'
 
 export async function POST(request: NextRequest) {

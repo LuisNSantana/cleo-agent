@@ -273,7 +273,10 @@ export const createCalendarEventTool = tool({
     addConference: z.boolean().optional().default(false).describe('Auto-add Google Meet if true or if "meeting" in summary.')
   }),
   execute: async ({ summary, description, startDateTime, endDateTime, timeZone = 'Europe/Madrid', location, attendees, calendarId = 'primary', reminders, addConference = false }) => {
-  const { requestConfirmation } = await import('../confirmation/unified')
+    // NOTE: Human-in-the-loop approval is handled by approval-node.ts
+    // The approval-node intercepts tool calls BEFORE execution and pauses with interrupt()
+    // See: lib/agents/core/approval-node.ts and TOOL_APPROVAL_CONFIG
+    
     // Title refinement heuristics
     function refineTitle(raw: string, desc?: string): string {
       if (!raw) return 'Untitled Event'
@@ -295,19 +298,16 @@ export const createCalendarEventTool = tool({
       if (trimmed.length > 65) return trimmed.slice(0,62) + '…'
       return trimmed
     }
+    
     const refinedSummary = refineTitle(summary, description)
-    return requestConfirmation(
-      'createCalendarEvent',
-      { summary: refinedSummary, originalSummary: summary, description, startDateTime, endDateTime, timeZone, location, attendees, calendarId, reminders, addConference },
-      async () => {
-        const userId = getCurrentUserId()
-        const uuidLike = typeof userId === 'string' && /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(userId)
-        
-        try {
-          const started = Date.now()
-          if (!userId || !uuidLike) return { success: false, message: 'Inicia sesión para crear eventos en tu Calendario de Google' }
+    const userId = getCurrentUserId()
+    const uuidLike = typeof userId === 'string' && /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(userId)
+    
+    try {
+      const started = Date.now()
+      if (!userId || !uuidLike) return { success: false, message: 'Inicia sesión para crear eventos en tu Calendario de Google' }
 
-          const accessToken = await getGoogleCalendarAccessToken(userId)
+      const accessToken = await getGoogleCalendarAccessToken(userId)
           if (!accessToken) return { success: false, message: 'Connect Google Calendar' }
 
       // Validate dates with Luxon
@@ -372,9 +372,7 @@ export const createCalendarEventTool = tool({
         if (userId) await trackToolUsage(userId, 'googleCalendar.createEvent', { ok: false, execMs: 0, errorType: 'create_error' })
         return { success: false, message: `Failed: ${message}` }
       }
-    }
-  )
-},
+  }
 })
 
 // Export

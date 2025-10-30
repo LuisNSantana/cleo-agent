@@ -13,7 +13,7 @@ import { AgentErrorHandler } from './error-handler'
 import { SystemMessage } from '@langchain/core/messages'
 import { AsyncLocalStorage } from 'async_hooks'
 import { withRequestContext, getRequestContext } from '@/lib/server/request-context'
-import { MemorySaver } from '@langchain/langgraph'
+import { MemorySaver, Command } from '@langchain/langgraph'
 import { InterruptManager } from './interrupt-manager'
 import { isHumanInterrupt, type HumanInterrupt, type HumanResponse } from '../types/interrupt'
 
@@ -61,6 +61,12 @@ export class ExecutionManager {
       if (execRegistry) {
         const execution = execRegistry.find((e: AgentExecution) => e.id === executionId)
         if (execution) {
+          // Ensure primary steps array includes the interrupt for pollers
+          try {
+            if (!Array.isArray(execution.steps)) (execution as any).steps = []
+            ;(execution as any).steps.push(step)
+          } catch {}
+
           if (!execution.snapshot) execution.snapshot = {}
           if (!execution.snapshot.steps) execution.snapshot.steps = []
           execution.snapshot.steps.push(step)
@@ -142,6 +148,9 @@ export class ExecutionManager {
         }
       );
       
+      // Shared state for tracking approval wait (accessible from both timeout and stream)
+      const approvalState = { isWaiting: false }
+      
       // Use stream() instead of invoke() to detect interrupts
       // Based on official LangGraph patterns from agent-chat-ui
       const graphPromise = withRequestContext(
@@ -161,12 +170,21 @@ export class ExecutionManager {
             for await (const event of stream) {
               // Check for __interrupt__ event (human-in-the-loop)
               if (event && typeof event === 'object' && '__interrupt__' in event) {
-                const interruptPayload = (event as any).__interrupt__
+                const rawInterruptPayload = (event as any).__interrupt__
                 
                 console.log('🛑 [EXECUTION] Interrupt detected:', {
                   executionId: execution.id,
-                  payload: interruptPayload
+                  payload: rawInterruptPayload
                 })
+
+                // Extract payload from LangGraph wrapper: [{ id: string, value: {...} }]
+                let interruptPayload = rawInterruptPayload
+                if (Array.isArray(interruptPayload) && interruptPayload.length > 0) {
+                  const firstItem = interruptPayload[0]
+                  if (firstItem && typeof firstItem === 'object' && 'value' in firstItem) {
+                    interruptPayload = firstItem.value
+                  }
+                }
 
                 // Validate and store interrupt
                 if (isHumanInterrupt(interruptPayload)) {
@@ -188,20 +206,23 @@ export class ExecutionManager {
                     args: interruptPayload.action_request.args
                   })
                   
-                  // Store interrupt state for UI
+                  // Store interrupt state for UI (with Supabase persistence)
                   await InterruptManager.storeInterrupt(
                     execution.id,
                     threadConfig.configurable.thread_id,
-                    interruptPayload
+                    interruptPayload,
+                    context.userId,
+                    agentConfig.id
                   )
 
                   // Create a synthetic step for the interrupt that will be picked up by pollLogic
                   const interruptStep = {
                     id: `interrupt-${execution.id}-${Date.now()}`,
-                    timestamp: new Date().toISOString(),
+                    timestamp: new Date(), // Use Date object, not ISO string
                     agent: agentConfig.id,
-                    action: 'interrupt',
+                    action: 'interrupt' as const,
                     content: interruptPayload.description || `Approval required for ${interruptPayload.action_request.action}`,
+                    progress: 0,
                     metadata: {
                       type: 'interrupt',
                       interruptType: 'approval_required',
@@ -213,7 +234,13 @@ export class ExecutionManager {
                     }
                   }
 
-                  // Store interrupt step in execution snapshot for polling detection
+                  // Store interrupt step in active execution for polling detection
+                  try {
+                    if (!Array.isArray(execution.steps)) (execution as any).steps = []
+                    ;(execution as any).steps.push(interruptStep)
+                  } catch {}
+
+                  // Also store in legacy snapshot for any consumers still reading snapshot
                   this.updateExecutionSnapshot(execution.id, interruptStep)
 
                   // Also emit event for immediate SSE streaming
@@ -228,13 +255,25 @@ export class ExecutionManager {
 
                   console.log('⏸️ [EXECUTION] Execution paused, waiting for user response...')
                   
-                  // Wait for user response (with timeout)
+                  // Mark that we're waiting for approval (used by timeout logic)
+                  approvalState.isWaiting = true
+                  
+                  // Wait for user response with fixed 5-minute timeout
+                  // CRITICAL: Do NOT use GRAPH_EXECUTION_TIMEOUT here - approval wait time
+                  // should NOT count against execution timeout since user may take time to respond
+                  console.log('⏳ [EXECUTION] Calling waitForResponse for:', execution.id)
+                  const APPROVAL_TIMEOUT_MS = 300000 // Fixed 5 minutes for user to approve
                   const response = await InterruptManager.waitForResponse(
                     execution.id,
-                    GRAPH_EXECUTION_TIMEOUT || 300000
+                    APPROVAL_TIMEOUT_MS
                   )
+                  console.log('✅ [EXECUTION] Received response from waitForResponse:', response?.type || 'null')
+                  
+                  // Clear approval wait marker
+                  approvalState.isWaiting = false
 
                   if (!response) {
+                    console.error('❌ [EXECUTION] No response received, throwing timeout error')
                     throw new Error('Timeout waiting for user approval')
                   }
 
@@ -255,15 +294,15 @@ export class ExecutionManager {
                   console.log('▶️ [EXECUTION] Resuming execution with user response:', response.type)
 
                   // Resume execution with Command(resume=...)
-                  // Based on LangGraph official pattern
-                  const resumeStream = await compiledGraph.stream(null, {
+                  // CRITICAL: Correct LangGraph syntax - pass Command as first argument, not in config
+                  // See: https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/
+                  const resumeCommand = new Command({
+                    resume: response
+                  })
+                  
+                  const resumeStream = await compiledGraph.stream(resumeCommand, {
                     ...threadConfig,
-                    streamMode: 'values',
-                    input: {
-                      command: {
-                        resume: [response]
-                      }
-                    }
+                    streamMode: 'values'
                   })
 
                   // Continue processing resumed stream
@@ -284,9 +323,21 @@ export class ExecutionManager {
 
             return result
           } catch (streamError) {
-            // Clean up interrupt on error
+            // CRITICAL FIX: Only clean up interrupt if it's not still waiting for user response
+            // If an error happens BEFORE the user responds, we should NOT clear the interrupt
             if (interruptDetected) {
-              InterruptManager.clearInterrupt(execution.id)
+              const currentInterruptState = await InterruptManager.getInterrupt(execution.id)
+              if (currentInterruptState && currentInterruptState.status === 'pending') {
+                console.warn('⚠️ [EXECUTION] Stream error occurred but interrupt still pending, NOT clearing:', {
+                  executionId: execution.id,
+                  error: (streamError as Error).message
+                })
+                // Do NOT clear - user may still want to approve
+              } else {
+                // Interrupt was already resolved or doesn't exist - safe to clear
+                console.log('🧹 [EXECUTION] Clearing interrupt after stream error (already resolved)')
+                InterruptManager.clearInterrupt(execution.id)
+              }
             }
             throw streamError
           }
@@ -296,14 +347,37 @@ export class ExecutionManager {
       let result;
       if (GRAPH_EXECUTION_TIMEOUT) {
         try {
+          // Use a dynamic timeout that DISABLES while waiting for approval
+          let timeoutId: NodeJS.Timeout | null = null
+          const createDynamicTimeout = () => {
+            return new Promise<never>((_, reject) => {
+              const checkTimeout = () => {
+                // Don't timeout if waiting for user approval
+                if (approvalState.isWaiting) {
+                  console.log('⏸️ [TIMEOUT] Waiting for approval, timeout paused')
+                  timeoutId = setTimeout(checkTimeout, 1000)
+                  return
+                }
+                
+                const elapsed = Date.now() - startTime
+                
+                if (elapsed >= GRAPH_EXECUTION_TIMEOUT) {
+                  logger.error(`⏱️ [EXECUTION] Graph execution timeout for ${agentConfig.id} after ${GRAPH_EXECUTION_TIMEOUT}ms`);
+                  reject(new Error(`Graph execution timeout after ${GRAPH_EXECUTION_TIMEOUT}ms`));
+                } else {
+                  // Check again in 1 second
+                  timeoutId = setTimeout(checkTimeout, 1000)
+                }
+              }
+              checkTimeout()
+            })
+          }
+          
           result = await Promise.race([
-            graphPromise,
-            new Promise<never>((_, reject) =>
-              setTimeout(() => {
-                logger.error(`⏱️ [EXECUTION] Graph execution timeout for ${agentConfig.id} after ${GRAPH_EXECUTION_TIMEOUT}ms`);
-                reject(new Error(`Graph execution timeout after ${GRAPH_EXECUTION_TIMEOUT}ms`));
-              }, GRAPH_EXECUTION_TIMEOUT)
-            ),
+            graphPromise.finally(() => {
+              if (timeoutId) clearTimeout(timeoutId)
+            }),
+            createDynamicTimeout()
           ]);
         } catch (timeoutError) {
           logger.error(`🚨 [EXECUTION] Graph timeout caught for ${agentConfig.id}:`, timeoutError);
@@ -314,9 +388,64 @@ export class ExecutionManager {
       }
 
       // Extract final response
+      // CRITICAL: Handle different message types properly
+      // 1. AIMessage with content (normal response)
+      // 2. ToolMessage (tool execution result)
+      // 3. AIMessage after tools (agent's interpretation of tool results)
       const finalMessages = result.messages || []
       const lastMessage = finalMessages[finalMessages.length - 1]
-      const content = lastMessage?.content || 'No response generated'
+      
+      console.log('📋 [EXECUTION] Extracting final content from messages:', {
+        totalMessages: finalMessages.length,
+        lastMessageType: lastMessage?.constructor?.name || lastMessage?._getType?.() || typeof lastMessage,
+        lastMessageHasContent: !!lastMessage?.content,
+        lastMessageContent: lastMessage?.content ? String(lastMessage.content).substring(0, 100) : 'EMPTY'
+      })
+      
+      // Try to find the last AIMessage with actual content
+      let content = ''
+      for (let i = finalMessages.length - 1; i >= 0; i--) {
+        const msg = finalMessages[i]
+        const msgType = msg?.constructor?.name || msg?._getType?.() || ''
+        
+        // Check if it's an AI message with content
+        if ((msgType === 'AIMessage' || msgType === 'ai') && msg.content) {
+          const textContent = typeof msg.content === 'string' ? msg.content : String(msg.content)
+          if (textContent.trim()) {
+            content = textContent
+            console.log(`✅ [EXECUTION] Found AIMessage with content at index ${i}:`, content.substring(0, 100))
+            break
+          }
+        }
+      }
+      
+      // Fallback: If no AIMessage with content, try extracting from tool results
+      if (!content && lastMessage) {
+        const msgType = lastMessage?.constructor?.name || lastMessage?._getType?.() || ''
+        if (msgType === 'ToolMessage' || msgType === 'tool') {
+          try {
+            const toolResult = JSON.parse(lastMessage.content as string)
+            if (toolResult.success && toolResult.message) {
+              content = toolResult.message
+            } else if (toolResult.summary) {
+              content = toolResult.summary
+            }
+            console.log('✅ [EXECUTION] Extracted content from ToolMessage:', content)
+          } catch {
+            // Not JSON, use raw content
+            content = lastMessage.content as string || 'Task completed successfully'
+            console.log('✅ [EXECUTION] Using raw ToolMessage content:', content?.substring(0, 100))
+          }
+        }
+      }
+      
+      // Final fallback
+      if (!content) {
+        content = lastMessage?.content as string || 'Task completed successfully'
+        console.log('⚠️ [EXECUTION] Using fallback content:', content)
+      }
+      
+      console.log('📤 [EXECUTION] Final extracted content:', content.substring(0, 200))
 
       const executionResult: ExecutionResult = {
         content: content as string,

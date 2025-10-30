@@ -43,7 +43,9 @@ export function getRuntimeConfig(): RuntimeConfig {
   // - External API calls with reasonable latency
   // Still allows extensions via delegationExtendOnProgressMs when progress detected
   const defaultSpecialistLimit = 120_000 // 2 minutes (was 10 min)
-  const defaultSupervisorLimit = 180_000 // 3 minutes for orchestration (was 10 min)
+  // Supervisor orchestrates delegations and may wait for approvals (HITL).
+  // Use a generous default of 10 minutes to accommodate a 5-minute approval window + buffer.
+  const defaultSupervisorLimit = 600_000 // 10 minutes
 
   let specialistLimit = intFromEnv('AGENT_SPECIALIST_MAX_EXECUTION_MS', defaultSpecialistLimit)
   if (specialistLimit < 0) {

@@ -7,7 +7,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getActiveTwitterCredentials, getSystemTwitterCredentials } from '@/lib/twitter/credentials'
-import { requestConfirmation } from '@/lib/confirmation/unified'
 import { redactInput } from '@/lib/actions/snapshot-store'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { createHmac } from 'crypto'
@@ -98,14 +97,16 @@ export const postTweetTool = tool({
     quote_tweet_id: z.string().optional().describe('ID of tweet to quote (optional)')
   }),
   execute: async ({ content, reply_to_id, quote_tweet_id }) => {
-    // Wrap with confirmation (social action) to show enriched preview
-    return requestConfirmation('postTweet', { content, reply_to_id, quote_tweet_id }, async () => {
-      try {
-        const analysis = analyzeTweet(content)
-        if (analysis.overLimit) {
-          return { success: false, error: `Tweet too long (${analysis.charCount}). Provide shorter content.` }
-        }
-      const credentials = await getTwitterCredentials()
+    // NOTE: Human-in-the-loop approval is handled by approval-node.ts
+    // The approval-node intercepts tool calls BEFORE execution and pauses with interrupt()
+    // See: lib/agents/core/approval-node.ts and TOOL_APPROVAL_CONFIG
+    
+    try {
+      const analysis = analyzeTweet(content)
+      if (analysis.overLimit) {
+        return { success: false, error: `Tweet too long (${analysis.charCount}). Provide shorter content.` }
+      }
+    const credentials = await getTwitterCredentials()
       // Prefer OAuth 2.0 Bearer token for v2 endpoint; fall back to OAuth 1.0a user auth for v1.1
       const hasBearer = !!credentials.bearer_token
       const hasOAuth1 = !!credentials.api_key && !!credentials.api_secret && !!credentials.access_token && !!credentials.access_token_secret
@@ -247,7 +248,6 @@ export const postTweetTool = tool({
         error: error instanceof Error ? error.message : 'Failed to post tweet. Please check your connection and Twitter API credentials.'
       }
     }
-    })
   }
 })
 

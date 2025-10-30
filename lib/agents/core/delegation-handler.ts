@@ -12,6 +12,7 @@
 import { logger } from '@/lib/logger'
 import { EventEmitter } from './event-emitter'
 import { ExecutionManager } from './execution-manager'
+import { InterruptManager } from './interrupt-manager'
 
 export interface DelegationRequest {
   sourceAgent: string
@@ -43,10 +44,20 @@ export interface DelegationResult {
 export class DelegationHandler {
   private activeDelegations = new Map<string, Promise<DelegationResult>>()
   private delegationHistory = new Map<string, DelegationResult>()
+  // Track child execution IDs for each delegation key so we can clean up interrupts on timeout
+  private delegationExecutions = new Map<string, string>()
   private eventEmitter: EventEmitter
 
   constructor(eventEmitter: EventEmitter) {
     this.eventEmitter = eventEmitter
+    
+    // Listen for child execution start events to track execution IDs
+    this.eventEmitter.on('delegation.execution.started', (data: { delegationKey: string; executionId: string }) => {
+      if (data.delegationKey && data.executionId) {
+        this.delegationExecutions.set(data.delegationKey, data.executionId)
+        logger.debug('DELEGATION', `Tracked child execution: ${data.delegationKey} -> ${data.executionId}`)
+      }
+    })
   }
 
   /**
@@ -163,6 +174,27 @@ export class DelegationHandler {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         cleanup()
+        
+        // CRITICAL: Clean up orphaned interrupt when delegation times out
+        const childExecutionId = this.delegationExecutions.get(delegationKey)
+        if (childExecutionId) {
+          logger.warn('DELEGATION', `Delegation timed out, cleaning up orphaned interrupt`, {
+            delegationKey,
+            childExecutionId
+          })
+          
+          // Clear the interrupt from cache to prevent "processing" state sticking
+          try {
+            InterruptManager.clearInterrupt(childExecutionId)
+            logger.info('DELEGATION', `✅ Cleared orphaned interrupt for ${childExecutionId}`)
+          } catch (error) {
+            logger.error('DELEGATION', `Failed to clear interrupt for ${childExecutionId}`, error)
+          }
+          
+          // Remove from tracking
+          this.delegationExecutions.delete(delegationKey)
+        }
+        
         reject(new Error(`Delegation ${delegationKey} timed out after ${timeoutMs / 1000}s`))
       }, timeoutMs)
 
@@ -175,6 +207,10 @@ export class DelegationHandler {
 
         if (eventKey === delegationKey) {
           cleanup()
+          
+          // Clean up execution tracking on successful completion
+          this.delegationExecutions.delete(delegationKey)
+          
           resolve({
             success: true,
             result: data.result,

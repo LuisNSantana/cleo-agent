@@ -69,7 +69,15 @@ export interface InterruptState {
  * Type guard to check if a value is a HumanInterrupt
  */
 export function isHumanInterrupt(value: unknown): value is HumanInterrupt {
-  const obj = Array.isArray(value) ? value[0] : value
+  // LangGraph wraps interrupts as: [{ id: string, value: {...} }]
+  // Need to extract .value from the wrapper
+  let obj = Array.isArray(value) ? value[0] : value
+  
+  // If wrapped in {id, value} structure, extract the actual payload
+  if (obj && typeof obj === 'object' && 'value' in obj) {
+    obj = (obj as any).value
+  }
+  
   return (
     obj !== null &&
     typeof obj === 'object' &&

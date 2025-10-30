@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 
 export const dynamic = 'force-dynamic'
 

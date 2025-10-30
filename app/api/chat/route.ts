@@ -29,7 +29,8 @@ import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
 import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
 import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
 import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getGlobalOrchestrator as getCoreOrchestrator } from '@/lib/agents/core/orchestrator'
 import { getRuntimeConfig } from '@/lib/agents/runtime-config'
 import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
@@ -985,7 +986,7 @@ export async function POST(req: Request) {
     // Basic regex fallback + intelligent analysis
     const lm = String(lastUserText || '').toLowerCase()
     const basicDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
-  const intelligentFlag = !!intelligentDelegation && intelligentDelegation.confidence > 0.6
+  const intelligentFlag = !!intelligentDelegation && intelligentDelegation.confidence >= 0.6
   impliesDelegation = basicDelegation || intelligentFlag
     
     if (intelligentDelegation && intelligentDelegation.confidence > 0.5) {
@@ -1219,11 +1220,17 @@ export async function POST(req: Request) {
         // Shared state for polling (accessible from both start and cancel)
         let pollInterval: ReturnType<typeof setInterval> | null = null
         let streamClosed = false
+        let interruptListener: ((data: any) => void) | null = null
         
         const stopPolling = () => {
           if (pollInterval) {
             clearInterval(pollInterval)
             pollInterval = null
+          }
+          // Clean up interrupt listener
+          if (interruptListener) {
+            orchestrator.eventEmitter?.off('execution.interrupted', interruptListener)
+            interruptListener = null
           }
         }
         
@@ -1235,6 +1242,46 @@ export async function POST(req: Request) {
             function send(obj: any) {
               try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)) } catch {}
             }
+            
+            // CRITICAL: Listen for interrupt events from execution-manager
+            // This handles HITL interrupts for both direct and delegated executions
+            // IMPORTANT: This listener must fire for ALL interrupts, including delegated sub-executions
+            interruptListener = (interruptData: any) => {
+              console.log('🛑 [CHAT SSE LISTENER] Interrupt event received:', {
+                currentExecId: execId,
+                interruptExecId: interruptData.executionId,
+                agentId: interruptData.agentId,
+                action: interruptData.interrupt?.action_request?.action,
+                listenerRegistered: true
+              })
+              
+              // Track this interrupt to avoid duplicate emissions from polling fallback
+              const interruptId = interruptData.step?.id || `${interruptData.executionId}-${interruptData.interrupt?.action_request?.action}`
+              emittedInterrupts.add(interruptId)
+              
+              // Send interrupt event to frontend regardless of which execution it came from
+              // This handles both: 
+              // 1. Direct executions (execId === interruptData.executionId)
+              // 2. Delegated executions (Cleo delegates to ASTRA, ASTRA's interrupt comes here)
+              send({
+                type: 'interrupt',
+                interrupt: {
+                  executionId: interruptData.executionId,
+                  parentExecutionId: execId, // Cleo's execution is parent
+                  threadId: interruptData.threadId,
+                  interrupt: interruptData.interrupt,
+                  step: interruptData.step,
+                  source: 'direct_listener' // Mark as primary source
+                }
+              })
+              console.log('✅ [CHAT SSE] Interrupt event emitted IMMEDIATELY via direct listener:', interruptData.executionId)
+            }
+            
+            // Register listener BEFORE starting execution
+            // This ensures we catch interrupts from delegated sub-agents (like ASTRA)
+            console.log('📡 [CHAT SSE] Registering interrupt listener for execution:', execId)
+            orchestrator.eventEmitter?.on('execution.interrupted', interruptListener)
+            
             // Signal start
             send({ type: 'start', executionId: execId })
             // Emit an immediate initial step so the UI shows a pipeline right away
@@ -1254,6 +1301,7 @@ export async function POST(req: Request) {
             let lastStepCount = 0
             const openDelegations = new Map<string, { targetAgent?: string; startTime?: number }>()
             const generatedSteps = new Set<string>() // Track synthetic steps to avoid duplicates
+            const emittedInterrupts = new Set<string>() // Track emitted interrupts to avoid duplicates
             const runtimeConfig = getRuntimeConfig()
             
             // PHASE 1: Updated timeouts to match scheduled tasks (hierarchical multi-agent support)
@@ -1446,7 +1494,18 @@ export async function POST(req: Request) {
               }
 
               try {
-                const snapshot = execId ? orchestrator.getExecution?.(execId) : null
+                // CRITICAL: Read directly from CoreOrchestrator.activeExecutions (single source of truth)
+                // This ensures we see interrupt steps that were added to the authoritative execution state
+                const coreOrch = getCoreOrchestrator()
+                const snapshot = execId ? coreOrch.getExecutionStatus(execId) : null
+
+                console.log('🔍 [SSE POLLING] Snapshot retrieved:', {
+                  execId,
+                  found: !!snapshot,
+                  status: snapshot?.status,
+                  stepsCount: snapshot?.steps?.length || 0,
+                  stepActions: snapshot?.steps?.map(s => s.action) || []
+                })
 
                 if (!snapshot) {
                   if (elapsedMs > MAX_POLL_TIME) {
@@ -1495,30 +1554,52 @@ export async function POST(req: Request) {
                     })
 
                     // HUMAN-IN-THE-LOOP: Detect interrupt steps and emit special event
+                    // NOTE: This is SECONDARY to the direct event listener (line ~1250)
+                    // The direct listener emits immediately when interrupt() is called
+                    // This polling-based detection is a FALLBACK for edge cases
                     const isInterruptStep = step?.action === 'interrupt' && step?.metadata?.type === 'interrupt'
                     if (isInterruptStep) {
-                      console.log('⏸️ [INTERRUPT] Detected interrupt step, emitting to frontend:', {
-                        executionId: snapshot.executionId,
+                      // CRITICAL: Use the child execution ID (the one with the interrupt stored)
+                      // NOT the parent snapshot.id
+                      const childExecutionId = step.metadata?.executionId || snapshot.id
+                      
+                      // Track interrupt ID to check if already emitted
+                      const interruptStepId = step.id || `${childExecutionId}-${step.metadata?.interrupt?.action_request?.action}`
+                      const alreadyEmitted = emittedInterrupts.has(interruptStepId)
+                      
+                      console.log('⏸️ [INTERRUPT FALLBACK] Detected interrupt step via polling:', {
+                        parentExecutionId: snapshot.id,
+                        childExecutionId: childExecutionId,
                         tool: step.metadata?.interrupt?.action_request?.action,
-                        requiresApproval: step.metadata?.requiresApproval
+                        requiresApproval: step.metadata?.requiresApproval,
+                        alreadyEmittedViaListener: alreadyEmitted,
+                        note: alreadyEmitted ? 'Skip - already emitted by direct listener' : 'Emitting now (listener missed it)'
                       })
                       
-                      // Send interrupt event (frontend useToolApprovals listens to this)
-                      send({ 
-                        type: 'interrupt', 
-                        interrupt: {
-                          executionId: snapshot.executionId || 'unknown',
-                          threadId: step.metadata?.threadId || 'unknown',
-                          interrupt: step.metadata?.interrupt,
-                          step
-                        }
-                      })
+                      // OPTIMIZATION: Only send if we haven't already sent this interrupt via listener
+                      if (!alreadyEmitted) {
+                        emittedInterrupts.add(interruptStepId)
+                        
+                        // Send interrupt event (frontend useToolApprovals listens to this)
+                        send({ 
+                          type: 'interrupt', 
+                          interrupt: {
+                            executionId: childExecutionId, // ← FIXED: Use child execution ID
+                            parentExecutionId: snapshot.id,
+                            threadId: step.metadata?.threadId || 'unknown',
+                            interrupt: step.metadata?.interrupt,
+                            step,
+                            source: 'polling_fallback' // Mark as fallback
+                          }
+                        })
+                        
+                        console.log('⚠️ [INTERRUPT FALLBACK] Emitted interrupt (direct listener missed it):', childExecutionId)
+                      }
                       
-                      // Also send as regular step for timeline visualization
+                      // Always send as regular step for timeline visualization
                       send({ type: 'execution-step', step })
                       try { persistedParts.push({ type: 'execution-step', step }) } catch {}
                       
-                      console.log('✅ [INTERRUPT] Interrupt event emitted to SSE stream')
                       continue
                     }
                     

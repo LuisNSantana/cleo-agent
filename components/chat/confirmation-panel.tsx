@@ -1,14 +1,38 @@
 "use client"
-import React, { useEffect, useMemo, useCallback, useState } from 'react'
+
+import React, { useCallback, useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Check, X, AlertTriangle, Calendar, Mail, Folder, Settings, Trash2, Loader2, ChevronDown, ChevronUp, Hash, AtSign, Link as LinkIcon } from 'lucide-react'
-import clsx from 'clsx'
+import { Badge } from '@/components/ui/badge'
+import Image from 'next/image'
+import { 
+  Check, 
+  X, 
+  AlertTriangle, 
+  Mail, 
+  Calendar, 
+  FileText, 
+  Settings,
+  Zap,
+  Shield,
+  Info,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export interface ConfirmationItemPreviewDetail {
   label: string
   value: string
   type?: string
+  important?: boolean
+}
+
+export interface EmailData {
+  to?: string | string[]
+  subject?: string
+  body?: string
 }
 
 export interface ConfirmationItemPreview {
@@ -16,6 +40,7 @@ export interface ConfirmationItemPreview {
   summary?: string
   details?: ConfirmationItemPreviewDetail[]
   warnings?: string[]
+  emailData?: EmailData
 }
 
 export interface ConfirmationItem {
@@ -33,254 +58,246 @@ interface ConfirmationPanelProps {
   items: ConfirmationItem[]
   onResolve: (id: string, approved: boolean) => Promise<void> | void
   loadingId?: string | null
-  minimal?: boolean // forces compact mode
+  minimal?: boolean
 }
 
-const categoryIcon: Record<string, React.ReactNode> = {
-  calendarActions: <Calendar className="h-5 w-5" />,
-  emailActions: <Mail className="h-5 w-5" />,
-  fileActions: <Folder className="h-5 w-5" />,
-  socialActions: <Settings className="h-5 w-5" />,
-  dataModification: <Settings className="h-5 w-5" />,
-  delete: <Trash2 className="h-5 w-5" />
+const toolIconsMap: Record<string, { type: 'svg' | 'component', value: string | React.ReactNode }> = {
+  sendGmailMessage: { type: 'svg', value: '/icons/gmail-icon.svg' },
+  sendEmail: { type: 'svg', value: '/icons/gmail-icon.svg' },
+  createCalendarEvent: { type: 'svg', value: '/icons/google-calendar.svg' },
+  updateCalendarEvent: { type: 'svg', value: '/icons/google-calendar.svg' },
+  createDocument: { type: 'svg', value: '/icons/google-drive.svg' },
+  updateDocument: { type: 'svg', value: '/icons/google-drive.svg' },
+  createNotionPage: { type: 'svg', value: '/icons/notion-icon.svg' },
+  updateNotionPage: { type: 'svg', value: '/icons/notion-icon.svg' },
+  getWeather: { type: 'component', value: <Mail className="h-4 w-4" /> },
+  searchWeb: { type: 'svg', value: '/icons/tavily-color.png' },
+  deleteItem: { type: 'component', value: <AlertTriangle className="h-4 w-4" /> },
+  default: { type: 'component', value: <Zap className="h-4 w-4" /> }
 }
 
-const sensitivityColor: Record<string, {border: string; bg: string; chip: string; text: string}> = {
-  low: { border: 'border-slate-300 dark:border-slate-600', bg: 'bg-slate-50 dark:bg-slate-900/70', chip: 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200', text: 'text-slate-800 dark:text-slate-200' },
-  medium: { border: 'border-amber-300 dark:border-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/40', chip: 'bg-amber-200 dark:bg-amber-600 text-amber-900 dark:text-amber-50', text: 'text-amber-900 dark:text-amber-100' },
-  high: { border: 'border-orange-400 dark:border-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/40', chip: 'bg-orange-300 dark:bg-orange-700 text-orange-900 dark:text-orange-50', text: 'text-orange-900 dark:text-orange-100' },
-  critical: { border: 'border-red-500 dark:border-red-700', bg: 'bg-red-50 dark:bg-red-900/40', chip: 'bg-red-500 dark:bg-red-700 text-white', text: 'text-red-900 dark:text-red-100' }
+function ToolIcon({ toolName }: { toolName: string }) {
+  const iconConfig = toolIconsMap[toolName] || toolIconsMap.default
+  
+  if (iconConfig.type === 'svg') {
+    return (
+      <Image 
+        src={iconConfig.value as string} 
+        alt={toolName}
+        width={18}
+        height={18}
+        className="object-contain"
+      />
+    )
+  }
+  
+  return <>{iconConfig.value}</>
 }
 
-// Utility: strip basic markdown bold/italics and asterisks for compact preview snippets
-function sanitizeInline(text?: string) {
-  if (!text) return ''
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`(.+?)`/g, '$1')
-    .trim()
+const sensitivityConfig = {
+  low: { 
+    color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
+    icon: <Info className="h-3.5 w-3.5" />,
+    label: 'Low Risk',
+    gradient: 'from-blue-50/50 to-cyan-50/30 dark:from-blue-950/20 dark:to-cyan-950/10',
+    borderColor: 'border-blue-500/20'
+  },
+  medium: { 
+    color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+    icon: <Shield className="h-3.5 w-3.5" />,
+    label: 'Medium Risk',
+    gradient: 'from-amber-50/50 to-yellow-50/30 dark:from-amber-950/20 dark:to-yellow-950/10',
+    borderColor: 'border-amber-500/20'
+  },
+  high: { 
+    color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+    label: 'High Risk',
+    gradient: 'from-orange-50/50 to-red-50/30 dark:from-orange-950/20 dark:to-red-950/10',
+    borderColor: 'border-orange-500/20'
+  },
+  critical: { 
+    color: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+    label: 'Critical',
+    gradient: 'from-red-50/50 to-pink-50/30 dark:from-red-950/20 dark:to-pink-950/10',
+    borderColor: 'border-red-500/20'
+  }
 }
 
-export function ConfirmationPanel({ items, onResolve, loadingId, minimal }: ConfirmationPanelProps) {
-  const [index, setIndex] = useState(0)
-  const current = items[index]
-  const isNarrow = typeof window !== 'undefined' ? window.innerWidth < 520 : false
-  const compact = minimal || isNarrow
-  const [detailsOpen, setDetailsOpen] = useState<boolean>(true)
+function truncateText(text: string, maxLength: number = 150): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength) + '...'
+}
 
-  // Derived queue meta
-  const queueInfo = useMemo(() => ({ total: items.length, position: index + 1 }), [items.length, index])
+function ConfirmationItemCard({ 
+  item, 
+  onResolve, 
+  isLoading 
+}: { 
+  item: ConfirmationItem
+  onResolve: (id: string, approved: boolean) => void
+  isLoading: boolean
+}) {
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const sensitivity = item.sensitivity || 'medium'
+  const config = sensitivityConfig[sensitivity]
 
-  const handleApprove = useCallback(async () => {
-    if (!current) return
-    await onResolve(current.id, true)
-    setIndex(0)
-  }, [current, onResolve])
-
-  const handleReject = useCallback(async () => {
-    if (!current) return
-    await onResolve(current.id, false)
-    setIndex(0)
-  }, [current, onResolve])
+  const handleApprove = useCallback(() => onResolve(item.id, true), [item.id, onResolve])
+  const handleReject = useCallback(() => onResolve(item.id, false), [item.id, onResolve])
 
   // Keyboard shortcuts
   useEffect(() => {
-    const listener = (e: KeyboardEvent) => {
-      if (!current) return
-      if (e.key === 'Enter') { e.preventDefault(); handleApprove() }
-      if (e.key === 'Escape') { e.preventDefault(); handleReject() }
-      if (e.key === 'ArrowRight' && queueInfo.total > 1) { setIndex((i) => (i + 1) % queueInfo.total) }
-      if (e.key === 'ArrowLeft' && queueInfo.total > 1) { setIndex((i) => (i - 1 + queueInfo.total) % queueInfo.total) }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !isLoading) {
+        e.preventDefault()
+        handleApprove()
+      } else if (e.key === 'Escape' && !isLoading) {
+        e.preventDefault()
+        handleReject()
+      }
     }
-    window.addEventListener('keydown', listener)
-    return () => window.removeEventListener('keydown', listener)
-  }, [current, handleApprove, handleReject, queueInfo.total])
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleApprove, handleReject, isLoading])
 
-  if (!current) return null
-
-  // Auto‑collapse details on very small screens to save space
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (window.innerWidth < 480) setDetailsOpen(false)
-    }
-  }, [current?.id])
-  const colors = sensitivityColor[current.sensitivity] || sensitivityColor.medium
-  const icon = categoryIcon[current.category] || <Settings className="h-5 w-5" />
+  const details = item.preview?.details || []
+  const hasDetails = details.length > 0
+  const emailData = item.preview?.emailData
 
   return (
-      <Card role="dialog" aria-labelledby={`confirm-title-${current.id}`} aria-describedby={`confirm-desc-${current.id}`} className={clsx('w-full shadow-sm border mb-3 rounded-lg', colors.border, colors.bg, compact && 'py-2') }>
-        <div className="flex flex-col gap-3 p-4">
-          <header className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className={clsx('flex h-10 w-10 items-center justify-center rounded-md border', colors.border, colors.bg)}>
-                {icon}
-              </div>
-              <div className="space-y-1">
-                <h2 id={`confirm-title-${current.id}`} className={clsx('font-semibold leading-tight flex items-center gap-2 flex-wrap', colors.text, compact && 'text-sm') }>
-                  {sanitizeInline(current.preview.title) || current.toolName}
-                  <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', colors.chip)}>
-                    {current.sensitivity}
-                  </span>
-                  {!current.undoable && !compact && (
-                    <span className="text-[10px] uppercase tracking-wide font-semibold bg-red-600 text-white px-2 py-0.5 rounded">
-                      Irreversible
-                    </span>
-                  )}
-                </h2>
-                {current.preview.summary && !compact && (
-                  <p id={`confirm-desc-${current.id}`} className="text-sm text-muted-foreground max-w-prose">
-                    {sanitizeInline(current.preview.summary)}
-                  </p>
-                )}
-                {!compact && <button
-                  type="button"
-                  onClick={() => setDetailsOpen(o => !o)}
-                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary rounded"
-                  aria-expanded={detailsOpen}
-                  aria-controls={`confirm-details-${current.id}`}
-                >
-                  {detailsOpen ? <ChevronUp className="h-3 w-3"/> : <ChevronDown className="h-3 w-3"/>}
-                  {detailsOpen ? 'Ocultar detalles' : 'Ver detalles'}
-                </button>}
-              </div>
-            </div>
-            {queueInfo.total > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">{queueInfo.position}/{queueInfo.total}</span>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="outline" disabled={queueInfo.total<2} onClick={() => setIndex(i => (i - 1 + queueInfo.total)%queueInfo.total)} className="h-8 w-8">←</Button>
-                  <Button size="icon" variant="outline" disabled={queueInfo.total<2} onClick={() => setIndex(i => (i + 1)%queueInfo.total)} className="h-8 w-8">→</Button>
-                </div>
-              </div>
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="w-full max-w-2xl mx-auto"
+    >
+      {/* iOS-inspired Card */}
+      <div className="bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-slate-700/50">
+        {/* Header Bar - iOS style */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-6 bg-blue-500 rounded-full" />
+            <h3 className="text-sm font-medium text-slate-200">
+              {item.preview?.title || 'Approval Required'}
+            </h3>
+          </div>
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "text-[10px] font-medium border",
+              sensitivity === 'critical' || sensitivity === 'high'
+                ? "bg-red-500/10 text-red-400 border-red-500/30"
+                : "bg-blue-500/10 text-blue-400 border-blue-500/30"
             )}
-          </header>
-
-          {/* Specialized tweet preview */}
-          { current.toolName === 'postTweet' && detailsOpen && !compact && (
-            <div className="flex flex-col gap-2" id={`confirm-details-${current.id}`}>
-              {/* Character counter */}
-              {(() => {
-                const textDetail = current.preview.details?.find(d => d.label === 'Text')
-                const text = textDetail?.value || ''
-                const length = [...text].length
-                const nearLimit = length >= 250 && length <= 280
-                const overLimit = length > 280
-                return (
-                  <div className={clsx('flex items-center justify-between rounded border px-3 py-2 text-xs', overLimit ? 'border-red-500 bg-red-100/50 dark:bg-red-900/30' : nearLimit ? 'border-amber-400 bg-amber-100/40 dark:bg-amber-900/30' : 'border-border/40 bg-background/50') }>
-                    <span className="font-medium">Caracteres</span>
-                    <span className={clsx('font-mono', overLimit && 'text-red-600 dark:text-red-400', nearLimit && 'text-amber-600 dark:text-amber-300')}>{length} / 280</span>
-                  </div>
-                )
-              })()}
-              {/* Tweet text block */}
-              {(() => {
-                const text = current.preview.details?.find(d => d.label === 'Text')?.value || ''
-                return (
-                  <div className="rounded border border-border/40 bg-background/50 p-3">
-                    <span className="block text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">Contenido</span>
-                    <p className="text-sm whitespace-pre-wrap break-words leading-snug max-h-52 overflow-auto">{text}</p>
-                  </div>
-                )
-              })()}
-              {/* Hashtags, mentions, urls extraction (basic regex again on client) */}
-              {(() => {
-                const text = current.preview.details?.find(d => d.label === 'Text')?.value || ''
-                const hashtags = Array.from(text.match(/#[A-Za-z0-9_]+/g) || [])
-                const mentions = Array.from(text.match(/@[A-Za-z0-9_]+/g) || [])
-                const urls = Array.from(text.match(/https?:\/\/\S+/g) || [])
-                const hasMeta = hashtags.length + mentions.length + urls.length > 0
-                if (!hasMeta) return null
-                return (
-                  <div className="flex flex-col gap-2">
-                    {hashtags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 items-center">
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><Hash className="h-3 w-3"/>Hashtags</span>
-                        {hashtags.slice(0,12).map(h => (
-                          <span key={h} className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[11px] font-medium">{h}</span>
-                        ))}
-                      </div>
-                    )}
-                    {mentions.length > 0 && (
-                      <div className="flex flex-wrap gap-1 items-center">
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><AtSign className="h-3 w-3"/>Menciones</span>
-                        {mentions.slice(0,12).map(m => (
-                          <span key={m} className="px-2 py-0.5 rounded-full bg-indigo-200 dark:bg-indigo-700 text-[11px] font-medium">{m}</span>
-                        ))}
-                      </div>
-                    )}
-                    {urls.length > 0 && (
-                      <div className="flex flex-wrap gap-1 items-center">
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"><LinkIcon className="h-3 w-3"/>Links</span>
-                        {urls.slice(0,6).map(u => (
-                          <span key={u} className="px-2 py-0.5 rounded bg-emerald-200 dark:bg-emerald-700 text-[10px] max-w-[160px] truncate" title={u}>{u}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
-          )}
-          {/* Generic details fallback */}
-          { current.toolName !== 'postTweet' && !compact && detailsOpen && current.preview.details && current.preview.details.length > 0 && (
-            <div id={`confirm-details-${current.id}`} className="grid gap-2 sm:grid-cols-2">
-              {current.preview.details.slice(0,10).map((d, idx) => (
-                <div key={idx} className="flex flex-col rounded border border-border/40 bg-background/50 px-3 py-2 min-w-0">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium truncate" title={d.label}>{d.label}</span>
-                  <span className="text-xs break-words leading-snug max-h-24 overflow-auto whitespace-pre-wrap" title={d.value}>{d.value || '—'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Warnings */}
-          { !compact && current.preview.warnings && current.preview.warnings.length > 0 && (
-            <div className="rounded-md border border-orange-300/60 bg-orange-100/40 dark:border-orange-700 dark:bg-orange-900/30 p-2 space-y-1">
-              <div className="flex items-center gap-1 text-xs font-medium text-orange-800 dark:text-orange-200">
-                <AlertTriangle className="h-3 w-3" /> Alerta
-              </div>
-              <ul className="pl-4 space-y-0.5 text-xs text-orange-700 dark:text-orange-300 list-disc">
-                {current.preview.warnings.map((w,i) => <li key={i}>{w}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/* Raw message */}
-          { !compact && current.message && !current.preview.summary && (
-            <pre className="max-h-32 overflow-auto rounded bg-muted/20 p-2 text-[11px] whitespace-pre-wrap font-mono text-muted-foreground leading-snug">
-              {sanitizeInline(current.message)}
-            </pre>
-          )}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-1">
-              {!compact && (
-                <div className="text-[10px] text-muted-foreground order-2 sm:order-1 tracking-wide">
-                  ↵ Enter = Aprobar • Esc = Cancelar • {new Date(current.timestamp).toLocaleTimeString()}
-                </div>
-              )}
-              <div className="flex gap-2 order-1 sm:order-2 w-full sm:w-auto">
-                <Button
-                  onClick={handleApprove}
-                  disabled={loadingId === current.id}
-                  className={clsx('bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none h-9 text-sm', compact ? 'min-w-[0] px-3' : 'sm:min-w-[140px]')}
-                >
-                  {loadingId === current.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-                  {compact ? 'OK' : 'Aprobar'}
-                </Button>
-                <Button
-                  onClick={handleReject}
-                  disabled={loadingId === current.id}
-                  variant="outline"
-                  className={clsx('flex-1 sm:flex-none h-9 text-sm border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950', compact ? 'min-w-[0] px-3' : 'sm:min-w-[110px]')}
-                >
-                  <X className="h-4 w-4 mr-1" /> Cancelar
-                </Button>
-              </div>
-            </div>
+          >
+            {config.label}
+          </Badge>
         </div>
-      </Card>
+
+        {/* Email Content - iOS Gmail Style */}
+        {emailData ? (
+          <div className="px-4 py-3 space-y-3">
+            {/* To Field - iOS style */}
+            <div className="flex items-start gap-3 py-2 border-b border-slate-700/30">
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Para</span>
+              <div className="flex-1 flex flex-wrap gap-1.5">
+                {(Array.isArray(emailData.to) ? emailData.to : [emailData.to]).map((email, idx) => (
+                  <div key={idx} className="inline-flex items-center gap-1.5 bg-slate-700/50 hover:bg-slate-700 transition-colors rounded-full px-3 py-1">
+                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-[10px] font-semibold text-blue-400">
+                        {email?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="text-sm text-slate-200 font-medium">{email}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Subject Field - iOS style */}
+            <div className="flex items-start gap-3 py-2 border-b border-slate-700/30">
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Asunto</span>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-slate-100">{emailData.subject}</p>
+              </div>
+            </div>
+
+            {/* Body Field - iOS style */}
+            <div className="flex items-start gap-3 py-2">
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Mensaje</span>
+              <div className="flex-1">
+                <div className="bg-slate-800/50 rounded-lg p-4 max-h-[300px] overflow-y-auto">
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                    {emailData.body}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Non-email generic view */
+          <div className="px-4 py-3">
+            <p className="text-sm text-slate-300 mb-2">{item.preview?.summary}</p>
+            {hasDetails && details.slice(0, 3).map((detail, idx) => (
+              <div key={idx} className="flex gap-2 py-2 border-b border-slate-700/30 last:border-0">
+                <span className="text-xs text-slate-400 font-medium w-20 flex-shrink-0">{detail.label}</span>
+                <span className="text-sm text-slate-200 flex-1">{truncateText(detail.value, 100)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Action Buttons - iOS style */}
+        <div className="flex gap-0 border-t border-slate-700/50">
+          <button
+            onClick={handleReject}
+            disabled={isLoading}
+            className="flex-1 py-3.5 text-sm font-semibold text-red-400 hover:bg-slate-800/50 active:bg-slate-800 transition-colors border-r border-slate-700/50 disabled:opacity-50"
+          >
+            Rechazar
+          </button>
+          <button
+            onClick={handleApprove}
+            disabled={isLoading}
+            className="flex-1 py-3.5 text-sm font-semibold text-blue-400 hover:bg-slate-800/50 active:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Enviando...' : 'Aprobar y Enviar'}
+          </button>
+        </div>
+
+        {/* Keyboard hint */}
+        <div className="px-4 py-2 bg-slate-800/30 border-t border-slate-700/30">
+          <p className="text-[10px] text-slate-500 text-center">
+            <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[9px] font-mono">↵</kbd> aprobar · 
+            <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[9px] font-mono ml-2">Esc</kbd> rechazar
+          </p>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
-export default ConfirmationPanel
+export default function ConfirmationPanel({ 
+  items, 
+  onResolve, 
+  loadingId 
+}: ConfirmationPanelProps) {
+  if (!items || items.length === 0) return null
+
+  const currentItem = items[0]
+  const isLoading = loadingId === currentItem.id
+
+  return (
+    <AnimatePresence mode="wait">
+      <ConfirmationItemCard
+        key={currentItem.id}
+        item={currentItem}
+        onResolve={onResolve}
+        isLoading={isLoading}
+      />
+    </AnimatePresence>
+  )
+}

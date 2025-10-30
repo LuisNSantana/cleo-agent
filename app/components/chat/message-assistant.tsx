@@ -21,6 +21,7 @@ import { useMemo } from 'react'
 import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from '@/app/components/chat/optimization-insights'
 import { Loader } from '@/components/prompt-kit/loader'
+import { ApprovalMessage } from '@/app/components/chat/approval-message'
 
 type MessageAssistantProps = {
   children: string
@@ -91,15 +92,35 @@ export function MessageAssistant({
     }
   )
 
-  // Extract execution steps (injected via SSE as { type: 'execution-step', step })
+    // Extract execution steps (injected via SSE as { type: 'execution-step', step })
   const pipelineSteps: PipelineStep[] = useMemo(() => {
     try {
       const steps = (parts || [])
         .filter((p: any) => p && p.type === 'execution-step' && p.step)
         .map((p: any) => p.step)
         .filter(Boolean)
-      return steps as PipelineStep[]
-    } catch {
+      return steps
+    } catch (error) {
+      console.error('Error extracting pipeline steps:', error)
+      return []
+    }
+  }, [parts])
+
+  // Extract interrupt parts (human-in-the-loop approvals)
+  const interruptParts = useMemo(() => {
+    try {
+      return (parts || [])
+        .filter((p: any) => p && p.type === 'interrupt' && p.interrupt)
+        .map((p: any) => ({
+          executionId: p.interrupt.executionId,
+          threadId: p.interrupt.threadId,
+          interrupt: p.interrupt.interrupt,
+          timestamp: new Date(),
+          status: 'pending' as const
+        }))
+        .filter(Boolean)
+    } catch (error) {
+      console.error('❌ [MESSAGE-ASSISTANT] Error extracting interrupt parts:', error)
       return []
     }
   }, [parts])
@@ -286,6 +307,21 @@ export function MessageAssistant({
             <OpenDocumentToolDisplay result={openDocumentResult as any} />
           </div>
         ) : null}
+
+        {/* Human-in-the-loop interrupt approvals */}
+        {interruptParts && interruptParts.length > 0 && interruptParts.map((interrupt, idx) => (
+          <div key={`interrupt-${interrupt.executionId}-${idx}`} className="mb-3">
+            <ApprovalMessage 
+              interrupt={interrupt as any}
+              onApproved={() => {
+                console.log('✅ [MESSAGE-ASSISTANT] Interrupt approved:', interrupt.executionId)
+              }}
+              onRejected={() => {
+                console.log('❌ [MESSAGE-ASSISTANT] Interrupt rejected:', interrupt.executionId)
+              }}
+            />
+          </div>
+        ))}
 
         {contentNullOrEmpty ? (
           status === 'streaming' && pipelineSteps.length === 0 ? (

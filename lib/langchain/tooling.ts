@@ -50,7 +50,17 @@ export function buildToolRuntime(selected?: string[], modelId?: string): ToolRun
       func: async (input: any) => {
         const startTime = Date.now()
         try {
-          const out = await t.execute(input ?? {})
+          // CRITICAL FIX: Establish request context for tool execution
+          // AsyncLocalStorage can lose context after interrupt()/resume()
+          const { withRequestContext, getRequestContext } = await import('@/lib/server/request-context')
+          const currentContext = getRequestContext()
+          
+          // Execute tool with context preservation
+          const out = await withRequestContext(
+            currentContext || {},
+            async () => await t.execute(input ?? {})
+          )
+          
           const executionTime = Date.now() - startTime
           // Return compact JSON for the tool result
           try { return JSON.stringify(out).slice(0, 8000) } catch { return String(out) }
@@ -67,9 +77,18 @@ export function buildToolRuntime(selected?: string[], modelId?: string): ToolRun
     lcTools,
     names: lcTools.map(t => t.name),
     run: async (name: string, args: any) => {
+      // CRITICAL FIX: Preserve request context when calling tool directly
+      const { withRequestContext, getRequestContext } = await import('@/lib/server/request-context')
+      const currentContext = getRequestContext()
+      
       const impl = toolMap.get(name)
       if (!impl) throw new Error(`Unknown tool: ${name}`)
-      const out = await impl.execute(args ?? {})
+      
+      const out = await withRequestContext(
+        currentContext || {},
+        async () => await impl.execute(args ?? {})
+      )
+      
       try { return JSON.stringify(out).slice(0, 8000) } catch { return String(out) }
     }
   }

@@ -25,7 +25,7 @@ describe('Delegación - Flujos críticos', () => {
       offEvent: jest.fn()
     }
     ;(global as any).__cleoOrchestrator = orchestratorMock
-    jest.doMock('@/lib/agents/orchestrator-adapter-enhanced', () => ({
+    jest.doMock('@/lib/agents/agent-orchestrator', () => ({
       __esModule: true,
       getAgentOrchestrator: () => orchestratorMock
     }))
@@ -49,7 +49,7 @@ describe('Delegación - Flujos críticos', () => {
       offEvent: jest.fn()
     }
     ;(global as any).__cleoOrchestrator = orchestratorMock
-    jest.doMock('@/lib/agents/orchestrator-adapter-enhanced', () => ({
+    jest.doMock('@/lib/agents/agent-orchestrator', () => ({
       __esModule: true,
       getAgentOrchestrator: () => orchestratorMock
     }))

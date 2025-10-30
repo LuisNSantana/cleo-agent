@@ -242,42 +242,40 @@ export function useChatCore({
   const seenConfirmationIdsRef = useRef<Set<string>>(new Set())
   async function respondToToolConfirmation(accept: boolean) {
     if (!pendingToolConfirmation) return
-    const body = {
-      confirmationId: pendingToolConfirmation.confirmationId,
-      toolCallId: pendingToolConfirmation.toolCallId,
-      accept,
-    }
+    
+    const { confirmationId, toolCallId, toolName } = pendingToolConfirmation
+    
     try {
-      const res = await fetch('/api/confirmations', {
+      // ALWAYS use the new interrupt endpoint - confirmationId now contains the correct executionId
+      console.log('📤 [CHAT-CORE] Sending interrupt response:', {
+        executionId: confirmationId,
+        approved: accept,
+        toolName
+      })
+      
+      // Call InterruptManager endpoint
+      const res = await fetch('/api/interrupt/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pendingToolConfirmation.confirmationId, approved: accept })
+        body: JSON.stringify({ 
+          executionId: confirmationId, 
+          approved: accept 
+        })
       })
-      if (!res.ok) throw new Error('Failed confirming tool')
-      const json = await res.json()
-      if (accept && json.executed) {
-        const toolMsg: ChatMessage = {
-          id: `tool-${pendingToolConfirmation.toolCallId}`,
-          role: 'assistant',
-          content: '',
-          createdAt: new Date(),
-          parts: [
-            {
-              type: 'tool-invocation',
-              toolInvocation: {
-                state: 'result',
-                toolName: pendingToolConfirmation.toolName,
-                toolCallId: pendingToolConfirmation.toolCallId,
-                result: json.result || { success: true, message: json.message || 'Action completed' },
-              },
-            } as any,
-          ],
-        }
-        setMessages((m) => [...m, toolMsg])
+      
+      if (!res.ok) {
+        const error = await res.json()
+        console.error('❌ [CHAT-CORE] Interrupt response failed:', error)
+        throw new Error(error.error || 'Failed to respond to interrupt')
       }
+      
+      const json = await res.json()
+      console.log('✅ [CHAT-CORE] Interrupt response successful:', json)
+      
     } catch (e) {
-      console.error('Confirm tool error', e)
+      console.error('❌ [CHAT-CORE] Confirm tool error:', e)
     } finally {
+      // Always clear pending confirmation
       setPendingToolConfirmation(null)
     }
   }
@@ -905,9 +903,13 @@ export function useChatCore({
                       ensureParts(assistantMessageObj)
                       const interruptData = (data as any).interrupt
                       
+                      console.log('🚨🚨🚨 [CHAT-CORE] RAW INTERRUPT DATA:', JSON.stringify(data, null, 2))
                       console.log('⏸️ [CHAT-CORE] Received interrupt event:', {
                         executionId: interruptData.executionId,
-                        tool: interruptData.interrupt?.action_request?.action
+                        tool: interruptData.interrupt?.action_request?.action,
+                        interruptDataKeys: Object.keys(interruptData || {}),
+                        nestedInterruptKeys: Object.keys(interruptData?.interrupt || {}),
+                        currentPendingConfirmation: pendingToolConfirmation ? 'EXISTS' : 'NULL'
                       })
 
                       // Add interrupt as a special part that UI can render
@@ -916,7 +918,95 @@ export function useChatCore({
                         interrupt: interruptData,
                       } as any)
 
-                      // Also dispatch window event for useToolApprovals hook
+                      // CRITICAL FIX: Set pendingToolConfirmation state so UI renders approval panel
+                      // This was the missing piece - we were emitting events but not updating state
+                      const actionRequest = interruptData.interrupt?.action_request
+                      
+                      console.log('🔍 [CHAT-CORE] Action request check:', {
+                        hasActionRequest: !!actionRequest,
+                        action: actionRequest?.action,
+                        hasPendingConfirmation: !!pendingToolConfirmation
+                      })
+                      
+                      if (actionRequest && !pendingToolConfirmation) {
+                        // CRITICAL FIX: Use interrupt.executionId first (child/delegated agent ID)
+                        // NOT interruptData.executionId (which is the parent/supervisor ID)
+                        // The interrupt is stored in the CHILD execution (e.g., astra-email)
+                        // so we must send the CHILD executionId to the respond endpoint
+                        const actualExecutionId = interruptData.interrupt?.executionId || 
+                                                 interruptData.executionId ||
+                                                 `interrupt-${Date.now()}`
+                        
+                        console.log('🔍 [CHAT-CORE] Interrupt execution IDs:', {
+                          fromData: interruptData.executionId,
+                          fromInterrupt: interruptData.interrupt?.executionId,
+                          fromMetadata: interruptData.metadata?.executionId,
+                          using: actualExecutionId,
+                          correctOrder: 'Using interrupt.executionId FIRST (child agent)'
+                        })
+                        
+                        // Avoid duplicate prompts
+                        if (seenConfirmationIdsRef.current.has(actualExecutionId)) {
+                          console.log('⚠️ [CHAT-CORE] Duplicate interrupt ignored:', actualExecutionId)
+                        } else {
+                          seenConfirmationIdsRef.current.add(actualExecutionId)
+                          
+                          console.log('✅ [CHAT-CORE] Setting pendingToolConfirmation for interrupt:', {
+                            executionId: actualExecutionId,
+                            toolName: actionRequest.action,
+                            args: Object.keys(actionRequest.args || {}),
+                            emailPreview: actionRequest.action === 'sendGmailMessage' ? {
+                              to: actionRequest.args.to,
+                              subject: actionRequest.args.subject,
+                              textPreview: actionRequest.args.text?.substring(0, 100)
+                            } : undefined
+                          })
+                          
+                          // Build rich preview for email
+                          let preview: any = {
+                            title: `${actionRequest.action} requires approval`,
+                            summary: interruptData.interrupt?.description || `Approve execution of ${actionRequest.action}`,
+                            details: Object.entries(actionRequest.args || {}).map(([key, value]) => ({
+                              label: key,
+                              value: typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value),
+                              type: typeof value,
+                              important: ['to', 'subject', 'text', 'body', 'html'].includes(key)
+                            }))
+                          }
+                          
+                          // Special handling for email
+                          if (actionRequest.action === 'sendGmailMessage' || actionRequest.action === 'sendEmail') {
+                            preview.emailData = {
+                              to: actionRequest.args.to,
+                              subject: actionRequest.args.subject,
+                              body: actionRequest.args.text || actionRequest.args.body || actionRequest.args.html
+                            }
+                          }
+                          
+                          console.log('🎯 [CHAT-CORE] ABOUT TO SET pendingToolConfirmation:', {
+                            executionId: actualExecutionId,
+                            toolName: actionRequest.action,
+                            hasEmailData: !!preview.emailData,
+                            emailTo: preview.emailData?.to,
+                            emailSubject: preview.emailData?.subject
+                          })
+                          
+                          setPendingToolConfirmation({
+                            toolCallId: actualExecutionId,
+                            toolName: actionRequest.action,
+                            confirmationId: actualExecutionId,
+                            preview,
+                            pendingAction: actionRequest,
+                            category: 'approval',
+                            sensitivity: 'high', // Email should be high sensitivity
+                            undoable: interruptData.interrupt?.config?.allow_ignore ?? false
+                          })
+                          
+                          console.log('✅✅✅ [CHAT-CORE] pendingToolConfirmation SET SUCCESSFULLY')
+                        }
+                      }
+
+                      // Also dispatch window event for legacy hooks
                       if (typeof window !== 'undefined') {
                         window.dispatchEvent(new CustomEvent('interrupt', {
                           detail: interruptData

@@ -9,7 +9,7 @@
  * - MessageProcessor: shared message normalisation utilities
  */
 
-import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph'
+import { StateGraph, MessagesAnnotation, START, END, Annotation } from '@langchain/langgraph'
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { AgentConfig, ConversationMode } from '../types'
 import { ModelFactory } from './model-factory'
@@ -21,8 +21,7 @@ import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
 import { DelegationHandler } from './delegation-handler'
 import { TimeoutManager, type ExecutionBudget } from './timeout-manager'
 import { executeToolsInParallel, type ToolCall as ExecutorToolCall, type ToolExecutionResult } from './tool-executor'
-import { applyApprovalWrappers } from './approval-handler'
-import { TOOL_APPROVAL_CONFIG } from '@/lib/tools/tool-config'
+import { createToolApprovalNode } from './approval-node'
 import {
   filterStaleToolMessages,
   normalizeSystemFirst,
@@ -47,11 +46,18 @@ export interface DualModeGraphConfig {
   enableDirectMode: boolean
 }
 
-type GraphState = {
-  messages: BaseMessage[]
-  userId?: string
-  metadata?: Record<string, any>
-}
+// Extended state annotation that includes MessagesAnnotation + custom fields
+// This ensures metadata and other fields are properly preserved across graph nodes
+const GraphStateAnnotation = Annotation.Root({
+  ...MessagesAnnotation.spec,
+  userId: Annotation<string | undefined>,
+  metadata: Annotation<Record<string, any> | undefined>({
+    reducer: (left, right) => ({ ...left, ...right }), // Merge metadata objects
+    default: () => ({})
+  })
+})
+
+type GraphState = typeof GraphStateAnnotation.State
 
 type BaseToolRuntime = ReturnType<typeof buildToolRuntime>
 
@@ -76,7 +82,7 @@ export class GraphBuilder {
   }
 
   async buildDualModeGraph(config: DualModeGraphConfig): Promise<StateGraph<any>> {
-    const graph = new StateGraph(MessagesAnnotation)
+    const graph = new StateGraph(GraphStateAnnotation)
     const { agents, supervisorAgent, enableDirectMode } = config
 
     logger.debug('🏗️ Building dual-mode graph', {
@@ -122,14 +128,170 @@ export class GraphBuilder {
     return graph
   }
 
+  /**
+   * Create a tool execution node
+   * 
+   * This node extracts tool calls from the last AI message and executes them.
+   * It's separate from the agent node to allow the approval node to intercept.
+   */
+  private async createToolNode(agentConfig: AgentConfig) {
+    return async (state: GraphState) => {
+      const lastMessage = state.messages[state.messages.length - 1]
+      
+      if (!(lastMessage instanceof AIMessage) || !lastMessage.tool_calls || lastMessage.tool_calls.length === 0) {
+        logger.warn('🔧 [TOOL-NODE] No tool calls found, this should not happen (conditional edge failed)', { 
+          agent: agentConfig.id 
+        })
+        // Return empty update - don't add any messages
+        return {}
+      }
+
+      const toolCalls = lastMessage.tool_calls
+      logger.info('🔧 [TOOL-NODE] Executing tools', {
+        agent: agentConfig.id,
+        toolCount: toolCalls.length,
+        tools: toolCalls.map(tc => tc.name)
+      })
+
+      // Get tool runtime from state metadata (passed from agent node)
+      // CRITICAL FIX: Metadata may lose functions during serialization
+      // Rebuild toolRuntime if it's missing the .run() method
+      let toolRuntime = state.metadata?.toolRuntime
+      
+      if (!toolRuntime || typeof toolRuntime.run !== 'function') {
+        logger.warn('🔧 [TOOL-NODE] toolRuntime missing or invalid, rebuilding from agent config')
+        
+        // Rebuild tool runtime for this agent
+        const selectedTools = agentConfig.tools || []
+        toolRuntime = buildToolRuntime(selectedTools, agentConfig.model)
+        
+        logger.info('🔧 [TOOL-NODE] Rebuilt toolRuntime', {
+          hasRun: typeof toolRuntime.run === 'function',
+          toolCount: toolRuntime.lcTools?.length,
+          toolNames: toolRuntime.names?.join(', ')
+        })
+      }
+
+      const timeoutManager = new TimeoutManager(this.getExecutionBudget(agentConfig))
+
+      // Filter delegation vs regular tools
+      const delegationCalls = toolCalls.filter((call: any) => this.isDelegationTool(call.name))
+      const regularCalls = toolCalls.filter((call: any) => !this.isDelegationTool(call.name))
+
+      const resultMessages: BaseMessage[] = []
+
+      // Execute regular tools in parallel
+      if (regularCalls.length > 0) {
+        const executionResults = await executeToolsInParallel(
+          regularCalls,
+          toolRuntime,
+          {
+            agentId: agentConfig.id,
+            maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
+            toolTimeoutMs: 60000
+          },
+          this.eventEmitter as unknown as any
+        )
+
+        for (const result of executionResults) {
+          timeoutManager.recordToolCall()
+          resultMessages.push(result.toolMessage)
+        }
+      }
+
+      // Execute delegation tools sequentially
+      for (const call of delegationCalls) {
+        timeoutManager.recordToolCall()
+        const delegationMessage = await this.handleDelegationCall(call, agentConfig, state)
+        resultMessages.push(delegationMessage)
+      }
+
+      logger.info('✅ [TOOL-NODE] Tool execution complete', {
+        agent: agentConfig.id,
+        resultCount: resultMessages.length
+      })
+
+      return { messages: resultMessages }
+    }
+  }
+
+  /**
+   * Build a simple agent graph with tool approval support
+   * 
+   * Pattern follows official LangGraph HITL guidelines:
+   * agent -> check_approval -> (conditional) tools -> agent (loop)
+   * 
+   * The check_approval node uses interrupt() to pause execution when
+   * tools requiring approval are detected. User can approve/reject/edit
+   * via the resume endpoint.
+   */
   async buildGraph(agentConfig: AgentConfig): Promise<StateGraph<any>> {
-    const graph = new StateGraph(MessagesAnnotation)
-    graph.addNode('execute' as any, await this.createAgentNode(agentConfig))
-    graph.addEdge(START, 'execute' as any)
-    graph.addEdge('execute' as any, END)
+    const graph = new StateGraph(GraphStateAnnotation)
+    
+    // Add agent node (LLM with tools)
+    graph.addNode('agent' as any, await this.createAgentNode(agentConfig))
+    
+    // Add approval checkpoint node (CRITICAL for HITL)
+    graph.addNode('check_approval' as any, createToolApprovalNode())
+    
+    // Add tool execution node
+    graph.addNode('tools' as any, await this.createToolNode(agentConfig))
+    
+    // Routing: START -> agent
+    graph.addEdge(START, 'agent' as any)
+    
+    // Routing: agent -> check_approval (always check after LLM response)
+    graph.addEdge('agent' as any, 'check_approval' as any)
+    
+    // Routing: check_approval -> tools (if has tool calls) or END (if done)
+    graph.addConditionalEdges(
+      'check_approval' as any,
+      (state: GraphState) => {
+        const lastMessage = state.messages[state.messages.length - 1]
+        const hasToolCalls = lastMessage && 
+          'tool_calls' in lastMessage && 
+          Array.isArray((lastMessage as any).tool_calls) &&
+          (lastMessage as any).tool_calls.length > 0
+        
+        logger.debug('🔀 [GRAPH] Conditional edge decision', {
+          hasToolCalls,
+          decision: hasToolCalls ? 'tools' : 'end'
+        })
+        
+        return hasToolCalls ? 'tools' : '__end__'
+      },
+      {
+        'tools': 'tools' as any,
+        '__end__': END
+      }
+    )
+    
+    // Routing: tools -> agent (loop back for next iteration)
+    graph.addEdge('tools' as any, 'agent' as any)
+    
+    logger.debug('✅ Agent graph built with approval support', {
+      agent: agentConfig.id,
+      nodes: ['agent', 'check_approval', 'tools']
+    })
+    
     return graph
   }
 
+  /**
+   * Creates the agent node following LangGraph HITL best practices.
+   * 
+   * Pattern: agent -> check_approval -> tools -> agent (loop via graph edges)
+   * 
+   * This node:
+   * 1. Invokes the model ONCE with current messages
+   * 2. Returns the AI response (may contain tool_calls)
+   * 3. Passes toolRuntime in metadata for tools node
+   * 4. Graph edges handle iteration, NOT internal loops
+   * 
+   * The check_approval node (after this) will use interrupt() if tool_calls need approval.
+   * The tools node will execute approved tool_calls and return ToolMessages.
+   * Graph edges route back to this agent node to continue the conversation.
+   */
   private async createAgentNode(agentConfig: AgentConfig) {
     return async (state: GraphState) => {
       const initialMessages = Array.isArray(state.messages) ? state.messages : []
@@ -145,61 +307,60 @@ export class GraphBuilder {
       const budget = this.getExecutionBudget(agentConfig)
       const timeoutManager = new TimeoutManager(budget)
 
+      // Prepare model with tools bound
       const { model, toolRuntime, enhancedAgent } = await this.prepareModel(agentConfig, state, filteredMessages)
       agentConfig = enhancedAgent
 
-      let workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
-      let response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+      // Build message stack with system prompt
+      const workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
+      
+      // Invoke model ONCE - no internal loop
+      const response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
 
-      const toolLoopLimit = agentConfig.role === 'supervisor' ? SUPERVISOR_TOOL_LOOP_LIMIT : SPECIALIST_TOOL_LOOP_LIMIT
-
-      for (let cycle = 0; cycle < toolLoopLimit; cycle++) {
-        const toolCalls = this.extractToolCalls(response)
-        if (toolCalls.length === 0) break
-
-        const budgetStatus = timeoutManager.checkBudget()
-        if (budgetStatus.exceeded) {
-          logger.warn('⏱️ Budget exceeded before tool execution', {
-            agentId: agentConfig.id,
-            reason: budgetStatus.reason
+      // Convert to AIMessage if needed
+      const aiMessage = response instanceof AIMessage 
+        ? response 
+        : new AIMessage(response.content || '', {
+            tool_calls: response.tool_calls || [],
+            additional_kwargs: response.additional_kwargs || {}
           })
-          workingMessages = this.forceFinalizationMessage(workingMessages, budgetStatus.reason)
-          break
-        }
 
-        const toolMessages = await this.handleToolCalls({
-          toolCalls,
-          toolRuntime,
-          agentConfig,
-          state,
-          timeoutManager
-        })
-
-        workingMessages = normalizeSystemFirst([...workingMessages, ...toolMessages])
-        response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+      // DEBUG: Log tool calls for debugging
+      const toolCalls = (aiMessage as any).tool_calls || []
+      console.log(`🔧 [AGENT-NODE] ${agentConfig.id} generated ${toolCalls.length} tool call(s)`)
+      if (toolCalls.length > 0) {
+        console.log(`🔧 [AGENT-NODE] Tool calls:`, toolCalls.map((tc: any) => ({
+          name: tc.name,
+          id: tc.id,
+          argsPreview: JSON.stringify(tc.args).slice(0, 100)
+        })))
+      } else {
+        console.log(`🔧 [AGENT-NODE] ${agentConfig.id} response (no tools):`, aiMessage.content.slice(0, 200))
       }
-
-      const finalMessage = this.buildFinalAssistantMessage({
-        response,
-        workingMessages,
-        agentConfig,
-        filteredMessages
-      })
 
       this.eventEmitter.emit('node.completed', {
         nodeId: agentConfig.id,
         agentId: agentConfig.id,
         executionId,
-        response: finalMessage.content
+        response: aiMessage.content
       })
 
+      // MessagesAnnotation has a built-in reducer that APPENDS messages
+      // So we only need to return the NEW message, not the full history
       return {
-        messages: [...filteredMessages, finalMessage]
+        messages: [aiMessage],
+        metadata: {
+          ...state.metadata,
+          toolRuntime, // CRITICAL: Pass toolRuntime to next nodes
+          agentId: agentConfig.id,
+          executionId
+        }
       }
     }
   }
 
   private async prepareModel(agentConfig: AgentConfig, state: GraphState, filteredMessages: BaseMessage[]) {
+    console.log(`🚨🚨🚨 [CRITICAL DEBUG] prepareModel called for agent: ${agentConfig.id} 🚨🚨🚨`)
     let enhancedConfig = agentConfig
 
     try {
@@ -232,36 +393,37 @@ export class GraphBuilder {
       executionId: state.metadata?.executionId
     })
 
-  const rawRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
-  const approvedTools = applyApprovalWrappers(rawRuntime.lcTools, TOOL_APPROVAL_CONFIG) as unknown as typeof rawRuntime.lcTools
-    const runtimeWithApprovals: ToolRuntimeWithApprovals = {
-      ...rawRuntime,
-      lcTools: approvedTools,
-      run: async (name: string, args: any) => {
-        const tool = approvedTools.find((t) => t.name === name)
-        if (!tool) {
-          return rawRuntime.run(name, args)
-        }
-        const result = await tool.invoke(args ?? {})
-        if (typeof result === 'string') return result
-        try {
-          return JSON.stringify(result)
-        } catch {
-          return String(result)
-        }
-      }
+    const toolRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
+    
+    // DEBUG: Log available tools
+    console.log(`🛠️ [PREPARE-MODEL] ${enhancedConfig.id} tools bound:`, toolRuntime.names)
+    console.log(`🛠️ [PREPARE-MODEL] ${enhancedConfig.id} total tools: ${toolRuntime.lcTools.length}`)
+    if (enhancedConfig.id === 'astra-email') {
+      console.log(`🛠️ [PREPARE-MODEL] Astra tools list:`, toolRuntime.names.join(', '))
+      console.log(`🛠️ [PREPARE-MODEL] Has sendGmailMessage?`, toolRuntime.names.includes('sendGmailMessage'))
     }
-
+    
     const model = typeof (baseModel as any).bindTools === 'function'
-      ? (baseModel as any).bindTools(runtimeWithApprovals.lcTools)
+      ? (baseModel as any).bindTools(toolRuntime.lcTools)
       : baseModel
 
-    return { model, toolRuntime: runtimeWithApprovals, enhancedAgent: enhancedConfig }
+    return { model, toolRuntime, enhancedAgent: enhancedConfig }
   }
 
   private async initialiseMessageStack(agentConfig: AgentConfig, filteredMessages: BaseMessage[], state: GraphState) {
     const systemMessage = await this.buildSystemMessage(agentConfig, filteredMessages, state)
     const combined = [systemMessage, ...filteredMessages.filter((msg) => msg.constructor.name !== 'SystemMessage')]
+    
+    // DEBUG: Log message stack for Astra
+    if (agentConfig.id === 'astra-email') {
+      console.log(`📨 [MESSAGE-STACK] Astra receiving ${combined.length} messages`)
+      combined.forEach((msg, idx) => {
+        const role = msg.constructor.name.replace('Message', '').toLowerCase()
+        const preview = (msg as any).content?.slice(0, 150) || ''
+        console.log(`📨 [MESSAGE-STACK] ${idx}: ${role} - ${preview}`)
+      })
+    }
+    
     return normalizeSystemFirst(combined)
   }
 

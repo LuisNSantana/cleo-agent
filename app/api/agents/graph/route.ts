@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllAgents } from '@/lib/agents/unified-config'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 
 export async function GET() {
   try {

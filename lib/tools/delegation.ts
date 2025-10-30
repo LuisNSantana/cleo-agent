@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 import { getCurrentUserId } from '@/lib/server/request-context'
 import { logger } from '@/lib/utils/logger'
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization'
@@ -306,6 +306,31 @@ async function runDelegation(params: {
       const snapshot = execId ? orchestrator.getExecution?.(execId) : null
       status = snapshot?.status || status
       
+      // CRITICAL: Check for active interrupts in delegated execution
+      // If the child agent has an interrupt (e.g., waiting for tool approval),
+      // we need to wait for it to be resolved before considering the execution complete
+      let hasActiveInterrupt = false
+      if (execId) {
+        try {
+          const { InterruptManager } = await import('../agents/core/interrupt-manager')
+          const interruptState = await InterruptManager.getInterrupt(execId)
+          hasActiveInterrupt = !!(interruptState && interruptState.status === 'pending')
+          
+          if (hasActiveInterrupt) {
+            console.log('⏸️ [DELEGATION] Child execution has active interrupt, waiting for user response:', {
+              execId,
+              interruptStatus: interruptState?.status,
+              agentId
+            })
+            // Don't count interrupt wait time against delegation timeout
+            // Similar to approval wait pause in execution-manager
+            lastProgressAt = Date.now() // Reset progress timer
+          }
+        } catch (err) {
+          console.warn('⚠️ [DELEGATION] Failed to check interrupt status:', err)
+        }
+      }
+      
       // DEBUG: Log detailed execution status during delegation polling
       console.log('🔍 [DELEGATION DEBUG] Polling execution:', {
         execId,
@@ -313,6 +338,7 @@ async function runDelegation(params: {
         snapshotResult: snapshot?.result ? 'present' : 'missing',
         snapshotMessages: snapshot?.messages?.length || 0,
         currentStatus: status,
+        hasActiveInterrupt,
         elapsed: Date.now() - startedAt
       })
       

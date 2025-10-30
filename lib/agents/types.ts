@@ -50,7 +50,7 @@ export interface ExecutionStep {
   id: string
   timestamp: Date
   agent: string
-  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing'
+  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt'
   content: string
   progress: number
   metadata?: any

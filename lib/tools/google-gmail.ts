@@ -262,10 +262,9 @@ export const getGmailMessageTool = tool({
 })
 
 // 📤 Send email (simple, no attachments)
-// Note: The system prompt enforces user approval before calling this tool. The UI/agent should
-// first draft the message and only call send after explicit confirmation from the user.
+// Uses LangGraph interrupt() for human-in-the-loop approval before sending
 export const sendGmailMessageTool = tool({
-  description: '📤 Send an email via Gmail. Supports To, Cc, Bcc, Subject, and plain text or HTML body. For replies, pass threadId and In-Reply-To headers.',
+  description: '📤 Send an email via Gmail. Supports To, Cc, Bcc, Subject, and plain text or HTML body. For replies, pass threadId and In-Reply-To headers. REQUIRES USER APPROVAL before sending.',
   inputSchema: z.object({
     to: z.array(z.string().email()).describe('Recipients list'),
     subject: z.string().default('(No subject)'),
@@ -284,60 +283,59 @@ export const sendGmailMessageTool = tool({
     const token = await getGmailAccessToken(userId)
     if (!token) return { success: false, message: 'Connect Gmail in Settings' }
 
-    const { requestConfirmation } = await import('../confirmation/unified')
-    return requestConfirmation(
-      'sendGmailMessage',
-      { to, subject, text, html, cc, bcc, replyTo, threadId, inReplyTo, references },
-      async () => {
-        try {
-          const started = Date.now()
-          // Build MIME message per RFC 2822
-          const boundary = `----=_Part_${Date.now()}`
-          const headers: string[] = []
-          headers.push(`To: ${to.join(', ')}`)
-          if (cc?.length) headers.push(`Cc: ${cc.join(', ')}`)
-          if (bcc?.length) headers.push(`Bcc: ${bcc.join(', ')}`)
-          if (replyTo) headers.push(`Reply-To: ${replyTo}`)
-          if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`)
-          if (references) headers.push(`References: ${references}`)
-          headers.push(`Subject: ${encodeRFC2047(subject)}`)
-          headers.push('MIME-Version: 1.0')
+    // NOTE: Human-in-the-loop approval is handled by approval-handler.ts wrapper
+    // The wrapToolWithApproval() function intercepts this execute() call
+    // and pauses execution with interrupt() before reaching this code.
+    // See: lib/agents/core/approval-handler.ts and TOOL_APPROVAL_CONFIG
+    
+    try {
+      const started = Date.now()
+      // Build MIME message per RFC 2822
+      const boundary = `----=_Part_${Date.now()}`
+      const headers: string[] = []
+      headers.push(`To: ${to.join(', ')}`)
+      if (cc?.length) headers.push(`Cc: ${cc.join(', ')}`)
+      if (bcc?.length) headers.push(`Bcc: ${bcc.join(', ')}`)
+      if (replyTo) headers.push(`Reply-To: ${replyTo}`)
+      if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`)
+      if (references) headers.push(`References: ${references}`)
+      headers.push(`Subject: ${encodeRFC2047(subject)}`)
+      headers.push('MIME-Version: 1.0')
 
-          let mime = ''
-          if (text && html) {
-            headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`)
-            mime = `${headers.join('\r\n')}\r\n\r\n` +
-              `--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}\r\n` +
-              `--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n` +
-              `--${boundary}--`
-          } else if (html) {
-            headers.push('Content-Type: text/html; charset=UTF-8')
-            mime = `${headers.join('\r\n')}\r\n\r\n${html}`
-          } else {
-            headers.push('Content-Type: text/plain; charset=UTF-8')
-            mime = `${headers.join('\r\n')}\r\n\r\n${text ?? ''}`
-          }
-
-          const raw = Buffer.from(mime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-
-          const body: any = { raw }
-          if (threadId) body.threadId = threadId
-
-          const res = await gmailRequest(token, `users/me/messages/send`, {
-            method: 'POST',
-            body: JSON.stringify(body),
-          })
-
-          await trackToolUsage(userId, 'gmail.sendMessage', { ok: true, execMs: Date.now() - started, params: { hasHtml: !!html } })
-          return { success: true, message: 'Email sent', id: res.id, threadId: res.threadId }
-        } catch (error) {
-          console.error('[Gmail] send error:', error)
-          const userIdStr = getCurrentUserId()
-          if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
-          return { success: false, message: 'Failed to send email' }
-        }
+      let mime = ''
+      if (text && html) {
+        headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`)
+        mime = `${headers.join('\r\n')}\r\n\r\n` +
+          `--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}\r\n` +
+          `--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n` +
+          `--${boundary}--`
+      } else if (html) {
+        headers.push('Content-Type: text/html; charset=UTF-8')
+        mime = `${headers.join('\r\n')}\r\n\r\n${html}`
+      } else {
+        headers.push('Content-Type: text/plain; charset=UTF-8')
+        mime = `${headers.join('\r\n')}\r\n\r\n${text ?? ''}`
       }
-    )
+
+      const raw = Buffer.from(mime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+      const body: any = { raw }
+      if (threadId) body.threadId = threadId
+
+      const res = await gmailRequest(token, `users/me/messages/send`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+
+      await trackToolUsage(userId, 'gmail.sendMessage', { ok: true, execMs: Date.now() - started, params: { hasHtml: !!html } })
+      console.log(`📤 [Gmail] Email sent successfully:`, { id: res.id, threadId: res.threadId })
+      return { success: true, message: 'Email sent', id: res.id, threadId: res.threadId }
+    } catch (error) {
+      console.error('[Gmail] send error:', error)
+      const userIdStr = getCurrentUserId()
+      if (userIdStr) await trackToolUsage(userIdStr, 'gmail.sendMessage', { ok: false, execMs: 0, errorType: 'send_error' })
+      return { success: false, message: 'Failed to send email' }
+    }
   }
 })
 

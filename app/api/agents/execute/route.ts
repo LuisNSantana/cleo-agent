@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 import { ExecuteAgentRequest } from '@/lib/agents/types'
 import { createClient } from '@/lib/supabase/server'
 import { withRequestContext } from '@/lib/server/request-context'

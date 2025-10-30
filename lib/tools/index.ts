@@ -2,7 +2,7 @@
 // Rebuilt clean version including all tool groups (Google, Gmail, Shopify, Skyvern, SerpAPI, Notion, Delegation, Utilities, Credentials)
 import { tool } from 'ai'
 import { z } from 'zod'
-import { getAgentOrchestrator } from '@/lib/agents/orchestrator-adapter-enhanced'
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 import { ensureToolsHaveRequestContext, wrapToolExecuteWithRequestContext } from './context-wrapper'
 
 // Core single tools

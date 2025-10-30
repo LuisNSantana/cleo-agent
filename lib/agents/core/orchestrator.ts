@@ -190,6 +190,97 @@ export class AgentOrchestrator {
   this.metricsCollector?.recordExecutionFailure(execution)
     })
 
+    // CRITICAL: Listen for interrupts from delegated executions
+    // When a child execution (e.g., Astra) hits an interrupt, we need to propagate
+    // the interrupt step to the parent execution (e.g., Cleo) immediately
+    // so that the parent's polling can detect it and show the approval UI
+    this.eventEmitter.on('execution.interrupted', (interruptData: any) => {
+      try {
+        logger.debug('🛑 [ORCHESTRATOR] Interrupt detected in execution:', {
+          executionId: interruptData.executionId,
+          agentId: interruptData.agentId,
+          userId: interruptData.userId,
+          action: interruptData.interrupt?.action_request?.action,
+          hasStep: !!interruptData.step,
+          stepAction: interruptData.step?.action
+        })
+
+        // Find parent execution (typically cleo-supervisor) by checking all active executions
+        // Strategy: Parent is cleo-supervisor OR any execution that started before the child
+        // and is from the same user
+        const allExecutions = Array.from(this.activeExecutions.values())
+        
+        // First, try to find cleo-supervisor execution for this user
+        let parentExecution = allExecutions.find(
+          (exec: any) => 
+            exec.id !== interruptData.executionId && // Not the child
+            exec.agentId === 'cleo-supervisor' && // Is Cleo
+            exec.userId === interruptData.userId && // Same user
+            exec.startTime && // Has started
+            (Date.now() - new Date(exec.startTime).getTime()) < 600000 // Within last 10 minutes
+        )
+        
+        // Fallback: find any execution that started before the child and is still active
+        if (!parentExecution) {
+          const childExec = allExecutions.find(e => e.id === interruptData.executionId)
+          if (childExec?.startTime) {
+            parentExecution = allExecutions.find(
+              (exec: any) => 
+                exec.id !== interruptData.executionId && // Not the child
+                exec.userId === interruptData.userId && // Same user
+                exec.startTime && // Has started
+                new Date(exec.startTime).getTime() < new Date(childExec.startTime).getTime() && // Started before child
+                (Date.now() - new Date(exec.startTime).getTime()) < 600000 // Within last 10 minutes
+            )
+          }
+        }
+        
+        if (parentExecution && interruptData.step) {
+          // Propagate the interrupt step to the parent execution immediately (use steps, not snapshot)
+          if (!Array.isArray(parentExecution.steps)) (parentExecution as any).steps = []
+          ;(parentExecution as any).steps.push(interruptData.step)
+          
+          logger.info('🔄 [ORCHESTRATOR] Propagated interrupt step from delegation to parent:', {
+            parentExecId: parentExecution.id,
+            parentAgent: parentExecution.agentId,
+            childExecId: interruptData.executionId,
+            childAgent: interruptData.agentId,
+            interruptAction: interruptData.interrupt?.action_request?.action,
+            parentStepsCount: (parentExecution as any).steps?.length,
+            propagatedStep: {
+              id: interruptData.step.id,
+              action: interruptData.step.action,
+              agent: interruptData.step.agent
+            }
+          })
+          
+          // CRITICAL DEBUG: Verify step is actually in the array
+          const found = (parentExecution as any).steps?.find((s: any) => s.id === interruptData.step.id)
+          if (found) {
+            console.log('✅ [ORCHESTRATOR] VERIFIED: Interrupt step exists in parent.steps')
+          } else {
+            console.error('❌ [ORCHESTRATOR] ERROR: Step not found after push!')
+          }
+        } else {
+          // DEBUG: Why didn't we propagate?
+          logger.warn('🔄 [ORCHESTRATOR] Could not find parent execution for interrupt:', {
+            childExecId: interruptData.executionId,
+            childAgent: interruptData.agentId,
+            parentExecutionFound: !!parentExecution,
+            stepExists: !!interruptData.step,
+            reason: !parentExecution ? 'NO_PARENT_FOUND' : 'NO_STEP_IN_EVENT_DATA',
+            activeExecutions: Array.from(this.activeExecutions.keys())
+          })
+        }
+        
+        // CRITICAL: Always propagate to external listeners (SSE streams) regardless of parent propagation
+        // The event 'execution.interrupted' is listened to by chat/route.ts for SSE emission
+        // DO NOT block or consume this event - multiple listeners need it
+      } catch (error) {
+        logger.error('❌ [ORCHESTRATOR] Error handling execution.interrupted event:', error)
+      }
+    })
+
     // Delegation events - handle multi-agent handoffs
     this.eventEmitter.on('delegation.requested', async (delegationData: any) => {
       await this.handleDelegation(delegationData)
@@ -391,6 +482,23 @@ export class AgentOrchestrator {
 
   // Track in active executions early for visibility
   this.activeExecutions.set(execution.id, execution)
+
+    // If this is a delegation, emit the execution.started event for tracking
+    if (context.metadata?.isDelegation) {
+      const sourceExecId = context.metadata.parentExecutionId || 'unknown'
+      const sourceAgent = context.metadata.sourceAgent || 'unknown'
+      const delegationKey = `${sourceExecId}:${sourceAgent}:${execution.agentId}`
+      
+      this.eventEmitter.emit('delegation.execution.started', {
+        delegationKey,
+        executionId: execution.id
+      })
+      
+      logger.debug('DELEGATION', `Emitted execution.started for child`, {
+        delegationKey,
+        childExecutionId: execution.id
+      })
+    }
 
     // Structured log: execution.start (core)
     emitExecutionEvent({
@@ -606,7 +714,9 @@ export class AgentOrchestrator {
     await this.initializeAgent(supervisorConfig)
     const processedContext = await this.prepareExecutionContext(context)
 
-    // CRITICAL FIX: Add absolute timeout with proper error handling
+    // CRITICAL FIX: Supervisor timeout should be long enough for HITL (approvals)
+    // and should PAUSE while an active interrupt is waiting for user input.
+    // Base timeout comes from runtime, but we manage it dynamically below.
     const supervisorTimeoutConfig = this.runtime.maxExecutionMsSupervisor
     const SUPERVISOR_TIMEOUT = Number.isFinite(supervisorTimeoutConfig) && supervisorTimeoutConfig > 0
       ? supervisorTimeoutConfig
@@ -627,17 +737,74 @@ export class AgentOrchestrator {
         execution.id
       );
 
-      result = SUPERVISOR_TIMEOUT
-        ? await Promise.race([
-            supervisorPromise,
-            new Promise<never>((_, reject) =>
-              setTimeout(() => {
-                timedOut = true;
-                reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`));
-              }, SUPERVISOR_TIMEOUT)
-            ),
+      if (SUPERVISOR_TIMEOUT) {
+        // Dynamic timeout that pauses while a child execution is waiting for approval
+        // Track potential child execution with an active interrupt
+        let waitingForApproval = false
+        let lastKnownChildExecId: string | null = null
+        let intervalId: NodeJS.Timeout | null = null
+
+        // Listener to detect interrupts from delegated executions
+        const pauseOnInterrupt = (interruptData: any) => {
+          try {
+            // Same user, and likely our parent execution (Cleo supervisor)
+            if (interruptData?.userId === processedContext.userId) {
+              waitingForApproval = true
+              lastKnownChildExecId = String(interruptData.executionId || '') || lastKnownChildExecId
+            }
+          } catch {}
+        }
+
+        this.eventEmitter?.on('execution.interrupted', pauseOnInterrupt)
+
+        // Build a controllable timer that checks every second
+        const startTime = Date.now()
+        const dynamicTimeout = new Promise<never>((_, reject) => {
+          const check = async () => {
+            try {
+              // If we're in approval wait, verify via InterruptManager whether it's still pending
+              if (waitingForApproval && lastKnownChildExecId) {
+                try {
+                  const { InterruptManager } = await import('../core/interrupt-manager')
+                  const state = await InterruptManager.getInterrupt(lastKnownChildExecId)
+                  if (!state || state.status !== 'pending') {
+                    // Interrupt resolved or not found → resume timeout counting
+                    waitingForApproval = false
+                  }
+                } catch {}
+              }
+
+              const elapsed = Date.now() - startTime
+              if (!waitingForApproval && elapsed >= SUPERVISOR_TIMEOUT) {
+                timedOut = true
+                reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`))
+                return
+              }
+            } finally {
+              // Re-arm check each second unless promise already resolved/rejected
+              intervalId = setTimeout(check, 1000)
+            }
+          }
+          check()
+        })
+
+        try {
+          result = await Promise.race([
+            supervisorPromise.finally(() => {
+              if (intervalId) clearTimeout(intervalId)
+              this.eventEmitter?.off('execution.interrupted', pauseOnInterrupt)
+            }),
+            dynamicTimeout
           ]) as ExecutionResult
-        : await supervisorPromise as ExecutionResult;
+        } catch (err) {
+          // Ensure listener cleanup on error
+          this.eventEmitter?.off('execution.interrupted', pauseOnInterrupt)
+          if (intervalId) clearTimeout(intervalId)
+          throw err
+        }
+      } else {
+        result = await supervisorPromise as ExecutionResult
+      }
     } catch (error) {
       // CRITICAL: Always return a response to user, even on error/timeout
       logger.error('❌ [SUPERVISOR] Execution failed:', error);
@@ -1254,6 +1421,10 @@ export class AgentOrchestrator {
       
   logger.info(`🚀 [DELEGATION] Executing ${targetAgentConfig.name} with delegated task`)
       
+      // Generate delegation key for tracking (matching delegation-handler logic)
+      const sourceExecId = delegationData.sourceExecutionId || 'unknown'
+      const delegationKey = `${sourceExecId}:${delegationData.sourceAgent}:${delegationData.targetAgent}`
+      
       // Emit progress: starting execution
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
@@ -1659,6 +1830,37 @@ export class AgentOrchestrator {
           }
           
           originalExecution.messages.push(delegationMessage)
+          
+          // CRITICAL: Propagate interrupt steps from delegated execution to parent
+          // This allows parent polling to detect interrupts from child executions
+          // Find the delegated execution by searching for recent executions with matching targetAgent
+          const delegatedExecution = Array.from(this.activeExecutions.values()).find(
+            (exec: any) => exec.agentId === delegationData.targetAgent && 
+                           exec.startTime && 
+                           (Date.now() - new Date(exec.startTime).getTime()) < 60000 // Within last minute
+          )
+          
+          if ((delegatedExecution?.steps && delegatedExecution.steps.length > 0) || (delegatedExecution?.snapshot?.steps && delegatedExecution.snapshot.steps.length > 0)) {
+            // Prefer primary steps; fallback to snapshot.steps if needed
+            const sourceSteps = Array.isArray(delegatedExecution.steps) && delegatedExecution.steps.length > 0
+              ? delegatedExecution.steps
+              : (delegatedExecution.snapshot?.steps || [])
+            const interruptSteps = sourceSteps.filter(
+              (step: any) => step?.action === 'interrupt' && step?.metadata?.type === 'interrupt'
+            )
+            if (interruptSteps.length > 0) {
+              if (!Array.isArray(originalExecution.steps)) (originalExecution as any).steps = []
+
+              interruptSteps.forEach((step: any) => {
+                ;(originalExecution as any).steps.push(step)
+                logger.debug('🔄 [DELEGATION] Propagated interrupt step from delegation to parent:', {
+                  parentExecId: delegationData.sourceExecutionId,
+                  childAgentId: delegationData.targetAgent,
+                  interruptAction: step.metadata?.interrupt?.action_request?.action
+                })
+              })
+            }
+          }
           
           // Update metrics (cumulative)
           originalExecution.metrics.executionTime += delegationResult.executionTime || 0
