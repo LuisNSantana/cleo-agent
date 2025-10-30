@@ -136,6 +136,11 @@ export interface AgentExecution {
   steps?: ExecutionStep[]
   currentStep?: string
   conversationContext?: ConversationContext
+  // Snapshot state for polling and interrupt detection
+  snapshot?: {
+    steps?: any[]
+    [key: string]: any
+  }
 }
 
 export type ExecutionStatus =

@@ -1,6 +1,12 @@
 /**
- * Enhanced Graph Builder for Dual-Mode Agent System
- * Supports both direct and supervised execution modes
+ * Graph Builder (2025 Refactor)
+ *
+ * Compact orchestrator for Cleo's dual-mode agent system with modular helpers:
+ * - TimeoutManager: centralised budgets (time, tools, cycles)
+ * - ToolExecutor: parallel tool execution with timeouts
+ * - DelegationHandler: single-flight delegations + progress events
+ * - ApprovalHandler: human-in-the-loop wrappers for sensitive tools
+ * - MessageProcessor: shared message normalisation utilities
  */
 
 import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph'
@@ -12,22 +18,22 @@ import { ExecutionManager } from './execution-manager'
 import { buildToolRuntime } from '@/lib/langchain/tooling'
 import { applyToolHeuristics } from './tool-heuristics'
 import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
-import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/tool-selection-logger'
-import { resolveNotionKey } from '@/lib/notion/credentials'
+import { DelegationHandler } from './delegation-handler'
+import { TimeoutManager, type ExecutionBudget } from './timeout-manager'
+import { executeToolsInParallel, type ToolCall as ExecutorToolCall, type ToolExecutionResult } from './tool-executor'
+import { applyApprovalWrappers } from './approval-handler'
+import { TOOL_APPROVAL_CONFIG } from '@/lib/tools/tool-config'
+import {
+  filterStaleToolMessages,
+  normalizeSystemFirst,
+  synthesizeFinalContent,
+  convertMessagesToPromptFormat
+} from './message-processor'
 import logger from '@/lib/utils/logger'
 
-type DelegationCompletionPayload = {
-  sourceExecutionId?: string
-  sourceAgent?: string
-  targetAgent?: string
-  result?: unknown
-  continuationHint?: string
-}
-
-type DelegationFailurePayload = {
-  sourceExecutionId?: string
-  error?: string
-}
+const TOOL_TIMEOUT_MS = 60_000
+const SUPERVISOR_TOOL_LOOP_LIMIT = 5
+const SPECIALIST_TOOL_LOOP_LIMIT = 3
 
 export interface GraphBuilderConfig {
   modelFactory: ModelFactory
@@ -41,1500 +47,551 @@ export interface DualModeGraphConfig {
   enableDirectMode: boolean
 }
 
-/**
- * Enhanced Graph Builder with Dual-Mode Support
- * 
- * Builds LangGraph workflows that support:
- * - Direct mode: User → Agent → Response
- * - Supervised mode: User → Router → Agent → Supervisor → Response
- */
+type GraphState = {
+  messages: BaseMessage[]
+  userId?: string
+  metadata?: Record<string, any>
+}
+
+type BaseToolRuntime = ReturnType<typeof buildToolRuntime>
+
+type ToolRuntimeWithApprovals = Omit<BaseToolRuntime, 'lcTools' | 'run'> & {
+  lcTools: BaseToolRuntime['lcTools']
+  run: (name: string, args: any) => Promise<string>
+}
+
 export class GraphBuilder {
   private modelFactory: ModelFactory
   private eventEmitter: EventEmitter
   private executionManager: ExecutionManager
   private runtime: RuntimeConfig
+  private delegationHandler: DelegationHandler
 
   constructor(config: GraphBuilderConfig) {
     this.modelFactory = config.modelFactory
     this.eventEmitter = config.eventEmitter
     this.executionManager = config.executionManager
-  this.runtime = getRuntimeConfig()
+    this.runtime = getRuntimeConfig()
+    this.delegationHandler = new DelegationHandler(this.eventEmitter)
   }
 
-  /**
-   * Filter out stale ToolMessages that would cause LangChain errors
-   * ToolMessages must immediately follow AIMessages with tool_calls
-   */
-  private filterStaleToolMessages(messages: BaseMessage[]): BaseMessage[] {
-    const result: BaseMessage[] = []
-    
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i]
-      
-    if (msg.constructor.name === 'ToolMessage') {
-        // Check if previous message is AIMessage with tool_calls
-        const prevMsg = result[result.length - 1]
-        if (prevMsg && prevMsg.constructor.name === 'AIMessage' && (prevMsg as any).tool_calls?.length > 0) {
-          // Valid ToolMessage - keep it
-          result.push(msg)
-        } else {
-      // Invalid/stale ToolMessage - convert to AIMessage text to preserve order
-      // Avoid inserting SystemMessage mid-conversation (Anthropic constraint)
-      const text = `[tool:${(msg as any).tool_call_id || 'unknown'}] ${msg.content?.toString?.().slice(0, 400) || ''}`
-      result.push(new AIMessage({ content: text }))
-        }
-      } else {
-        result.push(msg)
-      }
-    }
-    
-    return result
-  }
-
-  /**
-   * Ensure only the first SystemMessage remains and is placed at the beginning.
-   * Prevents provider errors like "System messages are only permitted as the first passed message."
-   */
-  private normalizeSystemFirst(messages: BaseMessage[]): BaseMessage[] {
-    const system: BaseMessage[] = []
-    const rest: BaseMessage[] = []
-    for (const m of messages) {
-      const t = (m as any)?._getType ? (m as any)._getType() : undefined
-      if (t === 'system') {
-        if (system.length === 0) system.push(m)
-        // skip duplicates
-      } else {
-        rest.push(m)
-      }
-    }
-    return system.length > 0 ? [system[0], ...rest] : rest
-  }
-
-  /**
-   * Build a dual-mode agent graph
-   */
   async buildDualModeGraph(config: DualModeGraphConfig): Promise<StateGraph<any>> {
-    const graphBuilder = new StateGraph(MessagesAnnotation)
+    const graph = new StateGraph(MessagesAnnotation)
     const { agents, supervisorAgent, enableDirectMode } = config
 
-  logger.debug('🏗️ Building dual-mode graph with agents:', Array.from(agents.keys()))
+    logger.debug('🏗️ Building dual-mode graph', {
+      agents: Array.from(agents.keys()),
+      supervisor: supervisorAgent.id,
+      enableDirectMode
+    })
 
-    // Add router node for conversation mode detection
-    graphBuilder.addNode('router' as any, async (state: any) => {
-  logger.debug('🧭 Router: Analyzing conversation mode...')
-      
+    graph.addNode('router' as any, async (state: GraphState) => {
       const lastMessage = state.messages[state.messages.length - 1]
-      const conversationMode = this.detectConversationMode(state, lastMessage)
-      
-      // Create proper LangChain message with mode metadata
+      const conversationMode = this.detectConversationMode(lastMessage)
       const updatedMessages = this.preserveConversationMode(state.messages, conversationMode)
-      
-  logger.info(`🎯 Router: Mode detected - ${conversationMode.mode} (target: ${conversationMode.targetAgent})`)
-      
+
+      logger.info('🎯 Router decision', conversationMode)
       return { messages: updatedMessages }
     })
 
-    // Add agent nodes
-    for (const [agentId, agentConfig] of agents) {
-      if (agentId === supervisorAgent.id) continue // Skip supervisor in agent nodes
-      
-      graphBuilder.addNode(agentId as any, await this.createAgentNode(agentConfig))
-      
-      // Add conditional edges for dual-mode routing
+    for (const [agentId, agentConfig] of agents.entries()) {
+      if (agentId === supervisorAgent.id) continue
+
+      const node = await this.createAgentNode(agentConfig)
+      graph.addNode(agentId as any, node)
+
       if (enableDirectMode) {
-        graphBuilder.addConditionalEdges(
-          agentId as any,
-          this.createDualModeRouter(agentId),
-          {
-            'finalize': 'finalize' as any,
-            '__end__': END
-          }
-        )
+        graph.addConditionalEdges(agentId as any, this.createDualModeRouter(agentId), {
+          finalize: 'finalize' as any,
+          __end__: END
+        })
       } else {
-        // Standard supervised mode only
-        graphBuilder.addEdge(agentId as any, 'finalize' as any)
+        graph.addEdge(agentId as any, 'finalize' as any)
       }
     }
 
-    // Add finalize node (supervisor)
     if (supervisorAgent) {
-      graphBuilder.addNode('finalize' as any, await this.createAgentNode(supervisorAgent))
-      graphBuilder.addEdge('finalize' as any, END)
+      graph.addNode('finalize' as any, await this.createAgentNode(supervisorAgent))
+      graph.addEdge('finalize' as any, END)
     }
 
-    // Router conditional edges to agents
-    const routerConditionalMap = this.buildRouterConditionalMap(agents, supervisorAgent.id)
-    graphBuilder.addConditionalEdges('router' as any, this.createRouterFunction(agents), routerConditionalMap)
+    graph.addConditionalEdges('router' as any, this.createRouterFunction(agents), this.buildRouterConditionalMap(agents, supervisorAgent.id))
+    graph.addEdge(START, 'router' as any)
 
-    // Set entry point
-    graphBuilder.addEdge(START, 'router' as any)
-
-  logger.debug('✅ Dual-mode graph built successfully')
-    return graphBuilder
+    logger.debug('✅ Dual-mode graph ready')
+    return graph
   }
 
-  /**
-   * Detect conversation mode from state and message
-   */
-  private detectConversationMode(state: any, lastMessage: any): { mode: ConversationMode, targetAgent?: string } {
-    // Check for explicit mode in message metadata
-    if (lastMessage?.additional_kwargs?.conversation_mode) {
+  async buildGraph(agentConfig: AgentConfig): Promise<StateGraph<any>> {
+    const graph = new StateGraph(MessagesAnnotation)
+    graph.addNode('execute' as any, await this.createAgentNode(agentConfig))
+    graph.addEdge(START, 'execute' as any)
+    graph.addEdge('execute' as any, END)
+    return graph
+  }
+
+  private async createAgentNode(agentConfig: AgentConfig) {
+    return async (state: GraphState) => {
+      const initialMessages = Array.isArray(state.messages) ? state.messages : []
+      const filteredMessages = filterStaleToolMessages(initialMessages)
+      const executionId = state.metadata?.executionId || ExecutionManager.getCurrentExecutionId()
+
+      this.eventEmitter.emit('node.entered', {
+        nodeId: agentConfig.id,
+        agentId: agentConfig.id,
+        executionId
+      })
+
+      const budget = this.getExecutionBudget(agentConfig)
+      const timeoutManager = new TimeoutManager(budget)
+
+      const { model, toolRuntime, enhancedAgent } = await this.prepareModel(agentConfig, state, filteredMessages)
+      agentConfig = enhancedAgent
+
+      let workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
+      let response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+
+      const toolLoopLimit = agentConfig.role === 'supervisor' ? SUPERVISOR_TOOL_LOOP_LIMIT : SPECIALIST_TOOL_LOOP_LIMIT
+
+      for (let cycle = 0; cycle < toolLoopLimit; cycle++) {
+        const toolCalls = this.extractToolCalls(response)
+        if (toolCalls.length === 0) break
+
+        const budgetStatus = timeoutManager.checkBudget()
+        if (budgetStatus.exceeded) {
+          logger.warn('⏱️ Budget exceeded before tool execution', {
+            agentId: agentConfig.id,
+            reason: budgetStatus.reason
+          })
+          workingMessages = this.forceFinalizationMessage(workingMessages, budgetStatus.reason)
+          break
+        }
+
+        const toolMessages = await this.handleToolCalls({
+          toolCalls,
+          toolRuntime,
+          agentConfig,
+          state,
+          timeoutManager
+        })
+
+        workingMessages = normalizeSystemFirst([...workingMessages, ...toolMessages])
+        response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+      }
+
+      const finalMessage = this.buildFinalAssistantMessage({
+        response,
+        workingMessages,
+        agentConfig,
+        filteredMessages
+      })
+
+      this.eventEmitter.emit('node.completed', {
+        nodeId: agentConfig.id,
+        agentId: agentConfig.id,
+        executionId,
+        response: finalMessage.content
+      })
+
       return {
-        mode: lastMessage.additional_kwargs.conversation_mode,
-        targetAgent: lastMessage.additional_kwargs.target_agent_id
+        messages: [...filteredMessages, finalMessage]
+      }
+    }
+  }
+
+  private async prepareModel(agentConfig: AgentConfig, state: GraphState, filteredMessages: BaseMessage[]) {
+    let enhancedConfig = agentConfig
+
+    try {
+      const { shouldUseDynamicDiscovery, enhanceAgentWithDynamicTools, registerDynamicTools } = await import('./dynamic-agent-enhancement')
+      if (shouldUseDynamicDiscovery(agentConfig)) {
+        await registerDynamicTools(state.userId)
+        enhancedConfig = await enhanceAgentWithDynamicTools(agentConfig, state.userId)
+        logger.info('🚀 Dynamic tool discovery applied', {
+          agent: agentConfig.id,
+          toolCount: enhancedConfig.tools.length
+        })
+      }
+    } catch (error) {
+      logger.warn('⚠️ Dynamic enhancement failed, continuing with static config', {
+        agent: agentConfig.id,
+        error
+      })
+    }
+
+    const baseModel = await this.modelFactory.getModel(enhancedConfig.model, {
+      temperature: enhancedConfig.temperature,
+      maxTokens: enhancedConfig.maxTokens
+    })
+
+    const selectedTools = await applyToolHeuristics({
+      agentId: enhancedConfig.id,
+      userId: state.userId,
+      messages: filteredMessages,
+      selectedTools: enhancedConfig.tools || [],
+      executionId: state.metadata?.executionId
+    })
+
+  const rawRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
+  const approvedTools = applyApprovalWrappers(rawRuntime.lcTools, TOOL_APPROVAL_CONFIG) as unknown as typeof rawRuntime.lcTools
+    const runtimeWithApprovals: ToolRuntimeWithApprovals = {
+      ...rawRuntime,
+      lcTools: approvedTools,
+      run: async (name: string, args: any) => {
+        const tool = approvedTools.find((t) => t.name === name)
+        if (!tool) {
+          return rawRuntime.run(name, args)
+        }
+        const result = await tool.invoke(args ?? {})
+        if (typeof result === 'string') return result
+        try {
+          return JSON.stringify(result)
+        } catch {
+          return String(result)
+        }
       }
     }
 
-    // Check for requested agent (implies direct mode)
-    if (lastMessage?.additional_kwargs?.requested_agent_id) {
+    const model = typeof (baseModel as any).bindTools === 'function'
+      ? (baseModel as any).bindTools(runtimeWithApprovals.lcTools)
+      : baseModel
+
+    return { model, toolRuntime: runtimeWithApprovals, enhancedAgent: enhancedConfig }
+  }
+
+  private async initialiseMessageStack(agentConfig: AgentConfig, filteredMessages: BaseMessage[], state: GraphState) {
+    const systemMessage = await this.buildSystemMessage(agentConfig, filteredMessages, state)
+    const combined = [systemMessage, ...filteredMessages.filter((msg) => msg.constructor.name !== 'SystemMessage')]
+    return normalizeSystemFirst(combined)
+  }
+
+  private async buildSystemMessage(agentConfig: AgentConfig, filteredMessages: BaseMessage[], state: GraphState) {
+    const isCleoSupervisor = (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo')
+    const isScheduledTask = state.metadata?.isScheduledTask === true
+
+    if (!isCleoSupervisor || isScheduledTask) {
+      return new SystemMessage(agentConfig.prompt)
+    }
+
+    try {
+      const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
+      const { createClient } = await import('@/lib/supabase/server')
+      const { withRequestContext } = await import('@/lib/server/request-context')
+
+      const promptMessages = convertMessagesToPromptFormat(filteredMessages)
+      const result = await withRequestContext({
+        userId: state.userId,
+        model: agentConfig.model,
+        requestId: state.metadata?.executionId || `exec_${Date.now()}`
+      }, async () => {
+        return buildFinalSystemPrompt({
+          baseSystemPrompt: agentConfig.prompt,
+          model: agentConfig.model,
+          messages: promptMessages,
+          supabase: await createClient(),
+          realUserId: state.userId ?? null,
+          enableSearch: true,
+          debugRag: false
+        })
+      })
+
+      const prompt = result?.finalSystemPrompt ?? agentConfig.prompt
+      logger.debug('🧠 Dynamic system prompt built for Cleo')
+      return new SystemMessage(prompt)
+    } catch (error) {
+      logger.warn('⚠️ Failed to build dynamic system prompt; using static prompt', error)
+      return new SystemMessage(agentConfig.prompt)
+    }
+  }
+
+  private async invokeModel(model: any, messages: BaseMessage[], timeoutManager: TimeoutManager, agentConfig: AgentConfig) {
+    timeoutManager.recordAgentCycle()
+    const budgetStatus = timeoutManager.checkBudget()
+    if (budgetStatus.exceeded) {
+      throw new Error(`Agent cycle limit reached: ${budgetStatus.reason}`)
+    }
+
+    logger.debug('🤖 Invoking model', {
+      agentId: agentConfig.id,
+      messageCount: messages.length
+    })
+
+    try {
+      return await model.invoke(messages)
+    } catch (error) {
+      logger.error('💥 Model invocation failed', { agent: agentConfig.id, error })
+      throw error
+    }
+  }
+
+  private extractToolCalls(response: any): ExecutorToolCall[] {
+    const toolCalls = response?.tool_calls || response?.additional_kwargs?.tool_calls || []
+    if (!Array.isArray(toolCalls)) return []
+    return toolCalls as ExecutorToolCall[]
+  }
+
+  private async handleToolCalls(params: {
+    toolCalls: ExecutorToolCall[]
+    toolRuntime: ToolRuntimeWithApprovals
+    agentConfig: AgentConfig
+    state: GraphState
+    timeoutManager: TimeoutManager
+  }): Promise<BaseMessage[]> {
+    const { toolCalls, toolRuntime, agentConfig, state, timeoutManager } = params
+    const messages: BaseMessage[] = []
+
+    const delegationCalls = toolCalls.filter((call) => this.isDelegationTool(call.name))
+    const regularCalls = toolCalls.filter((call) => !this.isDelegationTool(call.name))
+
+    if (regularCalls.length > 0) {
+      logger.info('⚡ Executing regular tools in parallel', {
+        agentId: agentConfig.id,
+        count: regularCalls.length
+      })
+
+      const executionResults = await executeToolsInParallel(
+        regularCalls,
+        toolRuntime,
+        {
+          agentId: agentConfig.id,
+          maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
+          toolTimeoutMs: TOOL_TIMEOUT_MS
+        },
+        this.eventEmitter as unknown as any
+      )
+
+      for (let index = 0; index < executionResults.length; index++) {
+        const result = executionResults[index]
+        timeoutManager.recordToolCall()
+        messages.push(result.toolMessage)
+        this.emitToolResultEvent(agentConfig.id, regularCalls[index], result)
+      }
+    }
+
+    for (const call of delegationCalls) {
+      timeoutManager.recordToolCall()
+      const delegationMessage = await this.handleDelegationCall(call, agentConfig, state)
+      messages.push(delegationMessage)
+    }
+
+    return messages
+  }
+
+  private emitToolResultEvent(agentId: string, call: ExecutorToolCall, result: ToolExecutionResult) {
+    const toolName = call?.name || call?.function?.name || 'unknown'
+    if (result.success) {
+      this.eventEmitter.emit('tool.completed', {
+        agentId,
+        toolName,
+        result: result.toolMessage.content
+      })
+    } else {
+      this.eventEmitter.emit('tool.failed', {
+        agentId,
+        toolName,
+        error: result.error
+      })
+    }
+  }
+
+  private async handleDelegationCall(call: ExecutorToolCall, agentConfig: AgentConfig, state: GraphState): Promise<BaseMessage> {
+    const rawArgs = typeof call.args === 'string' ? this.safeJsonParse(call.args) : call.args || {}
+    const targetAgentId = this.deriveAgentIdFromToolName(call.name, rawArgs.agentId)
+    const task = rawArgs.task || rawArgs.prompt || 'Tarea delegada'
+
+    logger.info('🔄 Delegation requested', {
+      sourceAgent: agentConfig.id,
+      targetAgent: targetAgentId,
+      taskPreview: task.slice(0, 120)
+    })
+
+    const result = await this.delegationHandler.delegateToAgent({
+      sourceAgent: agentConfig.id,
+      targetAgent: targetAgentId,
+      task,
+      context: rawArgs.context,
+      handoffMessage: rawArgs.handoffMessage,
+      priority: rawArgs.priority,
+      sourceExecutionId: state.metadata?.executionId || ExecutionManager.getCurrentExecutionId(),
+      userId: state.userId,
+      conversationHistory: state.messages || []
+    })
+
+    if (!result.success) {
+      const errorMessage = `❌ Delegation to ${targetAgentId} failed: ${result.error?.message || 'unknown error'}`
+      logger.error('❌ Delegation failed', { agentId: agentConfig.id, error: result.error })
+      return new ToolMessage({
+        content: errorMessage,
+        tool_call_id: String(call.id || call.tool_call_id || `delegation_${Date.now()}`)
+      })
+    }
+
+    const continuation = result.continuationHint || 'Usa este resultado para continuar antes de finalizar.'
+    const summary = `✅ Delegation result from ${targetAgentId}\n\nTask: ${task}\n\nOutput:\n${typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? {})}\n\n${continuation}`
+
+    return new ToolMessage({
+      content: summary,
+      tool_call_id: String(call.id || call.tool_call_id || `delegation_${Date.now()}`)
+    })
+  }
+
+  private buildFinalAssistantMessage(params: {
+    response: any
+    workingMessages: BaseMessage[]
+    agentConfig: AgentConfig
+    filteredMessages: BaseMessage[]
+  }): AIMessage {
+    const { response, workingMessages, agentConfig, filteredMessages } = params
+    const text = this.extractResponseContent(response, workingMessages)
+
+    logger.info('📝 Agent node completed', {
+      agentId: agentConfig.id,
+      responsePreview: text.slice(0, 200)
+    })
+
+    return new AIMessage({
+      content: text,
+      additional_kwargs: {
+        sender: agentConfig.id,
+        conversation_mode: filteredMessages[filteredMessages.length - 1]?.additional_kwargs?.conversation_mode
+      }
+    })
+  }
+
+  private extractResponseContent(response: any, workingMessages: BaseMessage[]): string {
+    const content = typeof response?.content === 'string' ? response.content : ''
+    if (content && content.trim().length > 0) return content.trim()
+
+    const synthesis = synthesizeFinalContent(workingMessages)
+    if (synthesis && synthesis.trim().length > 0) return synthesis.trim()
+
+    return 'Task completed successfully.'
+  }
+
+  private forceFinalizationMessage(messages: BaseMessage[], reason?: string) {
+    const instruction = reason
+      ? `Presupuesto agotado (${reason}). Entrega un resumen conciso con los resultados disponibles y próximos pasos.`
+      : 'Presupuesto agotado. Entrega un resumen conciso con los resultados disponibles.'
+
+    return normalizeSystemFirst([
+      ...messages,
+      new HumanMessage({ content: instruction })
+    ])
+  }
+
+  private detectConversationMode(lastMessage: BaseMessage | undefined): { mode: ConversationMode; targetAgent?: string } {
+    const kwargs = (lastMessage as any)?.additional_kwargs || {}
+
+    if (kwargs.conversation_mode) {
+      return {
+        mode: kwargs.conversation_mode,
+        targetAgent: kwargs.target_agent_id
+      }
+    }
+
+    if (kwargs.requested_agent_id) {
       return {
         mode: 'direct',
-        targetAgent: lastMessage.additional_kwargs.requested_agent_id
+        targetAgent: kwargs.requested_agent_id
       }
     }
 
-    // Default to supervised mode
     return { mode: 'supervised' }
   }
 
-  /**
-   * Preserve conversation mode in messages
-   */
-  private preserveConversationMode(messages: any[], conversationMode: { mode: ConversationMode, targetAgent?: string }): any[] {
-    return messages.map((msg: any, index: number) => {
-      if (index === messages.length - 1) {
-        // Update the last message with conversation mode
-        if (msg instanceof HumanMessage) {
-          return new HumanMessage({
-            content: msg.content,
-            additional_kwargs: {
-              ...msg.additional_kwargs,
-              conversation_mode: conversationMode.mode,
-              target_agent_id: conversationMode.targetAgent
-            }
-          })
-        } else if (msg instanceof AIMessage) {
-          return new AIMessage({
-            content: msg.content,
-            additional_kwargs: {
-              ...msg.additional_kwargs,
-              conversation_mode: conversationMode.mode,
-              target_agent_id: conversationMode.targetAgent
-            }
-          })
-        }
+  private preserveConversationMode(messages: BaseMessage[], conversationMode: { mode: ConversationMode; targetAgent?: string }): BaseMessage[] {
+    return messages.map((msg, index) => {
+      if (index !== messages.length - 1) return msg
+
+      if (msg instanceof HumanMessage || msg instanceof AIMessage) {
+        return new (msg.constructor as any)({
+          content: msg.content,
+          additional_kwargs: {
+            ...msg.additional_kwargs,
+            conversation_mode: conversationMode.mode,
+            target_agent_id: conversationMode.targetAgent
+          }
+        })
       }
+
       return msg
     })
   }
 
-  /**
-   * OPTIMIZATION: Execute multiple independent tools in parallel
-   * Returns ToolMessages for successful executions
-   */
-  private async executeToolsInParallel(
-    toolCalls: any[],
-    toolRuntime: any,
-    agentConfig: AgentConfig,
-    executionStart: number,
-    maxExecutionMs: number,
-    maxToolCalls: number,
-    currentToolCalls: number
-  ): Promise<Array<PromiseSettledResult<any>>> {
-    const TOOL_TIMEOUT_MS = 60_000 // 60s per tool
-    
-    const toolPromises = toolCalls.map(async (call) => {
-      const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
-      const name = call?.name || call?.function?.name
-      let args = call?.args || call?.function?.arguments || {}
-      
-      // Emit tool.executing event
-      this.eventEmitter.emit('tool.executing', {
-        agentId: agentConfig.id,
-        toolName: name,
-        callId: callId,
-        args: args
-      })
-      
-      try {
-        if (typeof args === 'string') {
-          try { args = JSON.parse(args) } catch {}
-        }
-        
-        // Execute with timeout
-        const toolPromise = toolRuntime.run(String(name), args)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_TIMEOUT_MS/1000}s`)), TOOL_TIMEOUT_MS)
-        )
-        
-        const output = await Promise.race([toolPromise, timeoutPromise])
-        
-        // Create ToolMessage with result
-        const { ToolMessage } = await import('@langchain/core/messages')
-        const toolMessage = new ToolMessage({
-          content: typeof output === 'string' ? output : JSON.stringify(output),
-          tool_call_id: callId
-        })
-        
-        this.eventEmitter.emit('tool.completed', {
-          agentId: agentConfig.id,
-          toolName: name,
-          result: output
-        })
-        
-        return toolMessage
-      } catch (error) {
-        logger.error(`❌ Tool ${name} failed:`, error)
-        
-        const { ToolMessage } = await import('@langchain/core/messages')
-        const errorMessage = new ToolMessage({
-          content: `Error: ${(error as Error).message}`,
-          tool_call_id: callId
-        })
-        
-        this.eventEmitter.emit('tool.failed', {
-          agentId: agentConfig.id,
-          toolName: name,
-          error: error
-        })
-        
-        return errorMessage
-      }
-    })
-    
-    // Execute all tools in parallel with Promise.allSettled
-    return Promise.allSettled(toolPromises)
-  }
-
-  /**
-   * Create an agent execution node
-   */
-  private async createAgentNode(agentConfig: AgentConfig) {
-    return async (state: any) => {
-      // Enhance agent with dynamic tools if applicable
-      let enhancedConfig = agentConfig
-      try {
-        const { shouldUseDynamicDiscovery, enhanceAgentWithDynamicTools, registerDynamicTools } = 
-          await import('./dynamic-agent-enhancement')
-        
-        if (shouldUseDynamicDiscovery(agentConfig)) {
-          // Register dynamic tools globally first
-          await registerDynamicTools(state.userId)
-          
-          // Enhance the agent configuration
-          enhancedConfig = await enhanceAgentWithDynamicTools(agentConfig, state.userId)
-          logger.info(`🚀 [GraphBuilder] Enhanced ${agentConfig.name} with ${enhancedConfig.tools.length} tools (was ${agentConfig.tools.length})`)
-        }
-      } catch (error) {
-        logger.warn(`⚠️ [GraphBuilder] Failed to enhance agent ${agentConfig.name}, using static config:`, error)
-      }
-      
-      // Use enhanced config for the rest of the execution
-      agentConfig = enhancedConfig
-      
-      this.eventEmitter.emit('node.entered', {
-        nodeId: agentConfig.id,
-        agentId: agentConfig.id,
-        state
-      })
-
-      // Ensure executionId is preserved in state metadata
-      if (!state.metadata) {
-        state.metadata = {}
-      }
-      if (!state.metadata.executionId) {
-        state.metadata.executionId = ExecutionManager.getCurrentExecutionId()
-      }
-      
-  logger.debug('🔍 [DEBUG] Agent node starting with executionId:', state.metadata.executionId)
-
-      // Filter out stale ToolMessages that don't follow LangChain's rules
-      // ToolMessages must immediately follow AIMessages with tool_calls
-      const filteredStateMessages = this.filterStaleToolMessages(state.messages)
-
-      try {
-        // Get model for this agent
-        logger.debug('[GraphBuilder] Requesting model from ModelFactory', { agentId: agentConfig.id, model: agentConfig.model })
-        const baseModel = await this.modelFactory.getModel(agentConfig.model, {
-          temperature: agentConfig.temperature,
-          maxTokens: agentConfig.maxTokens
-        })
-
-          // Build and bind tools (if any) with heuristic filtering
-          const selectedTools = await applyToolHeuristics({
-            agentId: agentConfig.id,
-            userId: state.userId,
-            messages: state.messages || [],
-            selectedTools: agentConfig.tools || [],
-            executionId: state.metadata?.executionId
-          })
-          // Pass model id to runtime to allow provider-specific adjustments (e.g., Gemini name sanitization)
-          const toolRuntime = buildToolRuntime(selectedTools, agentConfig.model)
-        const model: any = (typeof (baseModel as any).bindTools === 'function')
-          ? (baseModel as any).bindTools(toolRuntime.lcTools)
-          : baseModel
-
-  // Prepare messages with agent prompt
-        // For Cleo supervisor agent, use dynamic prompt building ONLY for interactive chat (not scheduled tasks)
-        // Scheduled tasks use the optimized prompt from task-executor.ts
-        let systemMessage: SystemMessage
-        const isScheduledTask = state.metadata?.isScheduledTask === true
-        
-        if ((agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') && !isScheduledTask) {
-          try {
-            const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
-            const { createClient } = await import('@/lib/supabase/server')
-            
-            // Extract user message for context
-            const userMessage = filteredStateMessages.find(m => m.constructor.name === 'HumanMessage')?.content
-            
-            // Convert BaseMessage to compatible format
-            const messagesForPrompt = filteredStateMessages.map(msg => ({
-              role: msg.constructor.name === 'HumanMessage' ? 'user' : 
-                    msg.constructor.name === 'AIMessage' ? 'assistant' : 
-                    msg.constructor.name === 'SystemMessage' ? 'system' : 'assistant',
-              content: msg.content
-            }))
-            
-            const { withRequestContext } = await import('@/lib/server/request-context')
-            const promptResult = await withRequestContext({ userId: state.userId, model: agentConfig.model, requestId: state.executionId || `exec_${Date.now()}` }, async () => {
-              return buildFinalSystemPrompt({
-                baseSystemPrompt: agentConfig.prompt,
-                model: agentConfig.model,
-                messages: messagesForPrompt,
-                supabase: await createClient(),
-                realUserId: state.userId,
-                enableSearch: true,
-                debugRag: false
-              })
-            })
-            
-            systemMessage = new SystemMessage(promptResult?.finalSystemPrompt ?? agentConfig.prompt)
-            logger.debug('🧠 [Cleo] Using dynamic system prompt with routing hints and RAG')
-          } catch (error) {
-            logger.warn('⚠️ [Cleo] Failed to build dynamic prompt, falling back to static:', error)
-            systemMessage = new SystemMessage(agentConfig.prompt)
-          }
-        } else {
-          systemMessage = new SystemMessage(agentConfig.prompt)
-          if (isScheduledTask) {
-            logger.debug('📋 [Cleo] Using static prompt for scheduled task (optimized)')
-          }
-        }
-        
-  let messages: any[] = [systemMessage, ...filteredStateMessages]
-  // Execution safety caps - higher for supervisor agents with delegation
-  const EXECUTION_START = Date.now()
-  const { getRuntimeConfig } = await import('../runtime-config')
-  const runtime = getRuntimeConfig()
-  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' 
-    ? runtime.maxExecutionMsSupervisor 
-    : runtime.maxExecutionMsSpecialist
-  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' 
-    ? runtime.maxToolCallsSupervisor 
-    : runtime.maxToolCallsSpecialist
-  let totalToolCalls = 0
-
-        // Execute model with basic tool loop (max 3 iterations)
-        let response
-        try {
-          messages = this.normalizeSystemFirst(messages)
-          response = await model.invoke(messages)
-        } catch (error) {
-          logger.error('🔍 [DEBUG] First model invocation failed:', error)
-          throw error
-        }
-
-        // Handle tool calls if present
-  for (let i = 0; i < 3; i++) {
-          const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
-          if (!toolCalls || toolCalls.length === 0) break
-
-          this.eventEmitter.emit('tools.called', {
-            agentId: agentConfig.id,
-            count: toolCalls.length,
-            tools: toolCalls.map((t: any) => t?.name)
-          })
-
-          // OPTIMIZATION: Identify delegation vs non-delegation tools
-          // Delegations must be sequential (they depend on each other)
-          // Non-delegation tools can run in parallel for better performance
-          const delegationTools = toolCalls.filter((t: any) => 
-            (t?.name || '').startsWith('delegate_to_') || 
-            (t?.name || '').includes('delegation')
-          )
-          const independentTools = toolCalls.filter((t: any) => 
-            !(t?.name || '').startsWith('delegate_to_') && 
-            !(t?.name || '').includes('delegation')
-          )
-
-          // Execute independent tools in parallel (up to 3 concurrent)
-          if (independentTools.length > 0) {
-            logger.info(`⚡ [OPTIMIZATION] Executing ${independentTools.length} independent tools in parallel`)
-            const parallelResults = await this.executeToolsInParallel(
-              independentTools, 
-              toolRuntime, 
-              agentConfig, 
-              EXECUTION_START, 
-              MAX_EXECUTION_MS, 
-              MAX_TOOL_CALLS, 
-              totalToolCalls
-            )
-            
-            // Add tool results to messages
-            for (const result of parallelResults) {
-              if (result.status === 'fulfilled' && result.value) {
-                messages.push(result.value)
-                totalToolCalls++
-              } else if (result.status === 'rejected') {
-                logger.error(`❌ Tool execution failed:`, result.reason)
-              }
-            }
-          }
-
-          // Execute delegation tools sequentially (they need order)
-          for (const call of delegationTools) {
-            // Stop if we are running out of budget
-            if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-              logger.info('⏱️ [SAFEGUARD] Budget hit before executing tool. Forcing finalization.')
-              messages = [
-                ...messages,
-                new HumanMessage({ content: 'Please finalize with a concise, clear summary using the results gathered so far. Do not call more tools.' })
-              ]
-              response = await model.invoke(messages)
-              break
-            }
-            const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
-            const name = call?.name || call?.function?.name
-            let args = call?.args || call?.function?.arguments || {}
-            
-            // Emit tool.executing event before execution
-            this.eventEmitter.emit('tool.executing', { 
-              agentId: agentConfig.id, 
-              toolName: name, 
-              callId: callId,
-              args: args 
-            })
-            
-            try {
-              if (typeof args === 'string') {
-                try { args = JSON.parse(args) } catch {}
-              }
-              
-              // OPTIMIZATION: Add individual tool timeout (60s) to prevent single slow tool from blocking entire execution
-              const TOOL_TIMEOUT_MS = 60_000 // 60 seconds per tool (LangGraph best practice)
-              const toolPromise = toolRuntime.run(String(name), args)
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_TIMEOUT_MS/1000}s`)), TOOL_TIMEOUT_MS)
-              )
-              
-              const output = await Promise.race([toolPromise, timeoutPromise])
-              
-              // Check if this is a delegation tool response that requires handoff
-              if (this.isDelegationToolResponse(output)) {
-                logger.info('🔄 [HANDOFF] Delegation detected:', output)
-                
-                const delegationData = this.parseDelegationResponse(output)
-                
-                // Create promise to wait for delegation completion
-                const delegationPromise = new Promise<DelegationCompletionPayload>((resolve, reject) => {
-                  let timeoutHandle: ReturnType<typeof setTimeout>
-                  let onCompleted: (result: DelegationCompletionPayload) => void
-                  let onFailed: (error: DelegationFailurePayload) => void
-
-                  const cleanup = () => {
-                    if (timeoutHandle) clearTimeout(timeoutHandle)
-                    if (onCompleted) this.eventEmitter.off('delegation.completed', onCompleted)
-                    if (onFailed) this.eventEmitter.off('delegation.failed', onFailed)
-                  }
-
-                  onCompleted = (result: DelegationCompletionPayload) => {
-                    // Compare using execution context ID instead of agent names for more reliable matching
-                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
-                    if (result.sourceExecutionId === currentExecutionId) {
-                      logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
-                      cleanup()
-                      resolve(result)
-                    } else {
-                      logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
-                        resultExecutionId: result.sourceExecutionId,
-                        currentExecutionId,
-                        sourceAgent: result.sourceAgent,
-                        targetAgent: result.targetAgent
-                      })
-                    }
-                  }
-
-                  onFailed = (error: DelegationFailurePayload) => {
-                    // Compare using execution context ID instead of agent names
-                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
-                    if (error.sourceExecutionId === currentExecutionId) {
-                      logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
-                      cleanup()
-                      reject(new Error(error.error || 'Delegation failed'))
-                    } else {
-                      logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
-                        errorExecutionId: error.sourceExecutionId,
-                        currentExecutionId
-                      })
-                    }
-                  }
-
-                  const onTimeout = () => {
-                    logger.warn('⏱️ [DELEGATION] Delegation promise timed out', {
-                      executionId: ExecutionManager.getCurrentExecutionId(),
-                      targetAgent: delegationData.targetAgent || delegationData.agentId
-                    })
-                    cleanup()
-                    reject(new Error(`Delegation timeout after ${runtime.delegationTimeoutMs} ms`))
-                  }
-
-                  timeoutHandle = setTimeout(onTimeout, runtime.delegationTimeoutMs)
-                  this.eventEmitter.on('delegation.completed', onCompleted)
-                  this.eventEmitter.on('delegation.failed', onFailed)
-                })
-                
-                // OPTIMIZATION: Emit progress events for better UX
-                // This allows the UI to show "Delegating to Astra...", "Astra processing...", etc.
-                const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
-                const targetAgentName = delegationData.agentId || delegationData.targetAgent
-                
-                logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
-                
-                // Emit progress: delegation starting
-                this.eventEmitter.emit('delegation.progress', {
-                  sourceAgent: agentConfig.id,
-                  targetAgent: targetAgentName,
-                  status: 'starting',
-                  message: `Delegating to ${targetAgentName}...`,
-                  timestamp: new Date().toISOString()
-                })
-                
-                // CRITICAL FIX: Include conversation history in delegation request
-                // This ensures delegated agents have full context from the conversation
-                this.eventEmitter.emit('delegation.requested', {
-                  sourceAgent: agentConfig.id,
-                  targetAgent: targetAgentName,
-                  task: delegationData.delegatedTask || delegationData.task,
-                  context: delegationData.context,
-                  handoffMessage: delegationData.handoffMessage,
-                  priority: delegationData.priority || 'normal',
-                  sourceExecutionId: currentExecutionId,
-                  userId: state.userId, // Include userId for proper context propagation
-                  conversationHistory: state.messages || [] // Pass full conversation history to delegated agent
-                })
-                
-                try {
-                  // OPTIMIZATION: Emit progress during wait
-                  logger.debug('⏳ [DELEGATION] Waiting for delegation to complete...')
-                  this.eventEmitter.emit('delegation.progress', {
-                    sourceAgent: agentConfig.id,
-                    targetAgent: targetAgentName,
-                    status: 'processing',
-                    message: `${targetAgentName} is processing the task...`,
-                    timestamp: new Date().toISOString()
-                  })
-                  
-                  const delegationResult = await delegationPromise
-                  
-                  // OPTIMIZATION: Emit progress: completed successfully
-                  this.eventEmitter.emit('delegation.progress', {
-                    sourceAgent: agentConfig.id,
-                    targetAgent: targetAgentName,
-                    status: 'completed',
-                    message: `${targetAgentName} completed the task`,
-                    timestamp: new Date().toISOString()
-                  })
-                  
-                  const rawResult = delegationResult?.result
-                  const delegatedText = typeof rawResult === 'string'
-                    ? rawResult.trim()
-                    : JSON.stringify(rawResult ?? {})
-                  const delegatedSender = String(
-                    delegationData.targetAgent ||
-                      delegationData.agentId ||
-                      delegationResult?.targetAgent ||
-                      'agente delegado'
-                  )
-
-                  if (!state.metadata) state.metadata = {}
-                  const existingDelegations = Array.isArray(state.metadata.delegations)
-                    ? state.metadata.delegations
-                    : []
-                  state.metadata.delegations = [
-                    ...existingDelegations,
-                    {
-                      agentId: delegatedSender,
-                      task: delegationData.delegatedTask || delegationData.task,
-                      result: delegatedText,
-                      completedAt: new Date().toISOString()
-                    }
-                  ]
-
-                  // Default behavior: add as tool result and continue model loop.
-                  // Provide guidance so Cleo can chain additional delegations before finalizing.
-                  logger.info('✅ [DELEGATION] Delegation completed, adding result to conversation')
-                  const continuationHint = delegationResult?.continuationHint ||
-                    delegationData?.continuationHint ||
-                    'Acción interna: Usa este resultado para continuar con la solicitud original. Si el usuario pidió pasos adicionales (por ejemplo, enviar un correo con los hallazgos), realiza la siguiente delegación antes de finalizar.'
-                  const summarizedTask = delegationData.delegatedTask || delegationData.task || 'Tarea delegada'
-                  const toolSummary = `✅ Delegation result from ${delegatedSender}\n\nTask: ${summarizedTask}\n\nOutput:\n${delegatedText}\n\n${continuationHint}`
-
-                  messages = [
-                    ...messages,
-                    new ToolMessage({
-                      content: toolSummary,
-                      tool_call_id: String(callId)
-                    })
-                  ]
-                } catch (delegationError) {
-                  logger.error('❌ [DELEGATION] Delegation failed:', delegationError)
-                  
-                  // OPTIMIZATION: Emit progress: failed
-                  this.eventEmitter.emit('delegation.progress', {
-                    sourceAgent: agentConfig.id,
-                    targetAgent: targetAgentName,
-                    status: 'failed',
-                    message: `${targetAgentName} failed: ${delegationError instanceof Error ? delegationError.message : String(delegationError)}`,
-                    timestamp: new Date().toISOString()
-                  })
-                  
-                  messages = [
-                    ...messages,
-                    new ToolMessage({ 
-                      content: `❌ Delegation to ${delegationData.targetAgent || delegationData.agentId} failed: ${delegationError instanceof Error ? delegationError.message : String(delegationError)}`, 
-                      tool_call_id: String(callId) 
-                    })
-                  ]
-                }
-              } else {
-                messages = [
-                  ...messages,
-                  new ToolMessage({ content: String(output), tool_call_id: String(callId) })
-                ]
-              }
-              
-              totalToolCalls++
-              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
-            } catch (err) {
-              messages = [
-                ...messages,
-                new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
-              ]
-              this.eventEmitter.emit('tool.failed', { agentId: agentConfig.id, name, callId, error: err })
-            }
-          }
-
-          // Check budgets before re-invocation
-          if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-            logger.info('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
-            messages = [
-              ...messages,
-              new HumanMessage({ content: 'Por favor, entrega la respuesta final ahora. Resume los hallazgos con 5 opciones y enlaces. No llames más herramientas.' })
-            ]
-          }
-          // Re-invoke model with tool outputs
-          messages = this.normalizeSystemFirst(messages)
-          response = await model.invoke(messages)
-        }
-
-  // FINAL SAFEGUARD: Ensure we always produce a user-visible message
-        const toText = (v: any) => (typeof v === 'string' ? v : (v?.toString?.() ?? ''))
-        let textContent = toText(response?.content ?? '')
-        if (!textContent || !String(textContent).trim()) {
-          // Try to get a short confirmation by asking the model
-          try {
-            messages.push(new HumanMessage({ content: 'Provide a concise confirmation of the actions taken (1-3 lines). If you created or updated any items, include the direct link(s). Do not call tools.' }))
-            messages = this.normalizeSystemFirst(messages)
-            const retry = await model.invoke(messages)
-            textContent = toText(retry?.content ?? '')
-            response = retry
-          } catch {
-            // ignore and synthesize from tool output below
-          }
-        }
-
-        // If still empty, synthesize from the latest tool output (Drive/Notion/etc.)
-        if (!textContent || !String(textContent).trim()) {
-          const summarizePayload = (payload: any): { summary?: string; link?: string } => {
-            if (!payload || typeof payload !== 'object') return {}
-
-            const lines: string[] = []
-            let link: string | undefined
-
-            if (typeof payload.message === 'string' && payload.message.trim()) {
-              lines.push(payload.message.trim())
-            }
-
-            if (payload.success === false && typeof payload.error === 'string' && payload.error.trim()) {
-              lines.push(payload.error.trim())
-            }
-
-            if (Array.isArray(payload.files)) {
-              const files = payload.files
-              const count = files.length
-              const names = files
-                .map((f: any) => (f && typeof f.name === 'string' ? f.name : null))
-                .filter(Boolean)
-                .slice(0, 5) as string[]
-              const plural = count === 1 ? 'archivo' : 'archivos'
-              const base = count === 0
-                ? 'No se encontraron archivos en Google Drive.'
-                : `Encontré ${count} ${plural} en Google Drive` + (names.length ? `: ${names.join(', ')}` : '')
-              lines.push(base)
-
-              const firstWithLink = files.find((f: any) => f?.webViewLink || f?.webContentLink)
-              if (firstWithLink?.webViewLink) link = firstWithLink.webViewLink
-              else if (firstWithLink?.webContentLink) link = firstWithLink.webContentLink
-            }
-
-            if (payload.query && typeof payload.query === 'string' && payload.query.trim()) {
-              lines.push(`Consulta utilizada: "${payload.query.trim()}".`)
-            }
-
-            const candidateFile = payload.file && typeof payload.file === 'object' ? payload.file : undefined
-            if (candidateFile) {
-              const details: string[] = []
-              if (candidateFile.name || candidateFile.title) {
-                details.push(`Archivo: ${candidateFile.name || candidateFile.title}`)
-              }
-              if (candidateFile.mimeType) {
-                details.push(`Tipo: ${candidateFile.mimeType}`)
-              }
-              if (candidateFile.modifiedTime) {
-                details.push(`Última edición: ${candidateFile.modifiedTime}`)
-              }
-              if (details.length) {
-                lines.push(details.join(' · '))
-              }
-              if (candidateFile.webViewLink) link = candidateFile.webViewLink
-              else if (candidateFile.webContentLink) link = candidateFile.webContentLink
-            }
-
-            if (typeof payload.summary === 'string' && payload.summary.trim()) {
-              lines.push(payload.summary.trim())
-            }
-
-            const summary = lines.length ? lines.join(' ') : undefined
-            return { summary, link }
-          }
-
-          let synthesizedSummary: string | undefined
-          let extractedLink: string | undefined
-
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const m = messages[i]
-            if (m instanceof ToolMessage) {
-              const c = toText((m as any).content)
-              try {
-                const parsed = JSON.parse(c)
-                const { summary, link } = summarizePayload(parsed)
-                if (!synthesizedSummary && summary) synthesizedSummary = summary
-                if (!extractedLink && link) extractedLink = link
-                if (parsed?.url && typeof parsed.url === 'string') extractedLink = parsed.url
-                if (parsed?.page?.url) extractedLink = String(parsed.page.url)
-                if (parsed?.database?.url) extractedLink = String(parsed.database.url)
-              } catch {
-                const match = c.match(/https?:\/\/[\w.-]+\.[\w.-]+[^\s)\]}]*/)
-                if (match && !extractedLink) extractedLink = match[0]
-                if (!synthesizedSummary && c && c.trim()) {
-                  synthesizedSummary = c.trim()
-                }
-              }
-            }
-          }
-
-          if (synthesizedSummary) {
-            textContent = synthesizedSummary
-            if (extractedLink && !synthesizedSummary.includes(extractedLink)) {
-              textContent = `${textContent} ${extractedLink}`.trim()
-            }
-          } else {
-            textContent = extractedLink
-              ? `Listo. He completado la acción solicitada y aquí tienes el enlace: ${extractedLink}`
-              : 'Listo. He completado la acción solicitada.'
-          }
-        }
-
-        // Ensure we always have non-empty final text content
-        if (!textContent || !String(textContent).trim()) {
-          textContent = 'Task completed successfully.'
-        }
-
-        // Emit completion and log the assistant response for observability
-        logger.info('[GraphBuilder] Agent node completed', { agentId: agentConfig.id, executionId: state.metadata?.executionId, responseSnippet: String(textContent).slice(0, 500) })
-        this.eventEmitter.emit('node.completed', {
-          nodeId: agentConfig.id,
-          agentId: agentConfig.id,
-          response: textContent
-        })
-
-        return {
-          messages: [
-            ...filteredStateMessages,
-            new AIMessage({
-              content: textContent,
-              additional_kwargs: { 
-                sender: agentConfig.id,
-                conversation_mode: state.messages[state.messages.length - 1]?.additional_kwargs?.conversation_mode
-              }
-            })
-          ]
-        }
-      } catch (error) {
-        logger.error('[GraphBuilder] Agent node error', { agentId: agentConfig.id, error })
-        this.eventEmitter.emit('node.error', {
-          nodeId: agentConfig.id,
-          agentId: agentConfig.id,
-          error: error
-        })
-
-        // Return error message to keep graph flowing
-        return {
-          messages: [
-            ...filteredStateMessages,  // Use filtered messages even in error case
-            new AIMessage({
-              content: `Error executing ${agentConfig.name}: ${(error as Error).message}`,
-              additional_kwargs: { sender: agentConfig.id, error: true }
-            })
-          ]
-        }
-      }
-    }
-  }
-
-  /**
-   * Create dual-mode router for agent nodes
-   */
   private createDualModeRouter(agentId: string) {
-    return async (state: any) => {
+    return async (state: GraphState) => {
       const lastMessage = state.messages[state.messages.length - 1]
-      const conversationMode = lastMessage?.additional_kwargs?.conversation_mode
-
-  logger.debug(`🚦 ${agentId} routing decision: ${conversationMode === 'direct' ? 'END' : 'finalize'}`)
-
-      // Direct mode: bypass supervisor
-      if (conversationMode === 'direct') {
-        return '__end__'
-      }
-
-      // Supervised mode: route to supervisor
-      return 'finalize'
+      const mode = (lastMessage as any)?.additional_kwargs?.conversation_mode
+      logger.debug('🚦 Dual-mode routing', { agentId, mode })
+      return mode === 'direct' ? '__end__' : 'finalize'
     }
   }
 
-  /**
-   * Build router conditional mapping
-   */
   private buildRouterConditionalMap(agents: Map<string, AgentConfig>, supervisorId: string): Record<string, any> {
     const map: Record<string, any> = {}
-    
     for (const agentId of agents.keys()) {
       if (agentId !== supervisorId) {
         map[agentId] = agentId as any
       }
     }
-    
-    map['finalize'] = 'finalize' as any
-  return map
+    map.finalize = 'finalize' as any
+    return map
   }
 
-  /**
-   * Create router function for agent selection
-   */
   private createRouterFunction(agents: Map<string, AgentConfig>) {
-    return async (state: any) => {
+    return async (state: GraphState) => {
       const lastMessage = state.messages[state.messages.length - 1]
-      const targetAgent = lastMessage?.additional_kwargs?.target_agent_id
-      const conversationMode = lastMessage?.additional_kwargs?.conversation_mode
+      const kwargs = (lastMessage as any)?.additional_kwargs || {}
 
-      // Direct mode with specific target
-      if (conversationMode === 'direct' && targetAgent && agents.has(targetAgent)) {
-  logger.info(`🎯 Router: Direct routing to ${targetAgent}`)
-        return targetAgent
-        // No model invocation here; just routing
+      const directTarget = kwargs.conversation_mode === 'direct' ? kwargs.target_agent_id : undefined
+      if (directTarget && agents.has(directTarget)) {
+        logger.info('🎯 Router: direct target selected', { directTarget })
+        return directTarget
       }
 
-      // Requested agent
-      const requestedAgent = lastMessage?.additional_kwargs?.requested_agent_id
-      if (requestedAgent && agents.has(requestedAgent)) {
-  logger.info(`🔀 Router: Routing to requested agent ${requestedAgent}`)
-        return requestedAgent
+      if (kwargs.requested_agent_id && agents.has(kwargs.requested_agent_id)) {
+        logger.info('🎯 Router: requested agent selected', { requested: kwargs.requested_agent_id })
+        return kwargs.requested_agent_id
       }
 
-      // Default: route to supervisor
-  logger.info('🔀 Router: Routing to finalize (supervised mode)')
+      logger.info('🔀 Router: fallback to supervisor')
       return 'finalize'
     }
   }
 
-  /**
-   * Build a simple agent graph that works with existing system
-   */
-  async buildGraph(agentConfig: AgentConfig): Promise<StateGraph<any>> {
-    const graphBuilder = new StateGraph(MessagesAnnotation)
+  private getExecutionBudget(agentConfig: AgentConfig): ExecutionBudget {
+    const maxExecutionMs = agentConfig.role === 'supervisor'
+      ? this.runtime.maxExecutionMsSupervisor
+      : this.runtime.maxExecutionMsSpecialist
 
-    // Add main execution node
-    graphBuilder.addNode('execute', async (state: any) => {
-      this.eventEmitter.emit('node.entered', {
-        nodeId: 'execute',
-        agentId: agentConfig.id,
-        state
-      })
+    const maxToolCalls = agentConfig.role === 'supervisor'
+      ? this.runtime.maxToolCallsSupervisor
+      : this.runtime.maxToolCallsSpecialist
 
-      // Filter out stale ToolMessages that don't follow LangChain's rules
-      const filteredStateMessages = this.filterStaleToolMessages(state.messages)
+    const maxAgentCycles = agentConfig.role === 'supervisor' ? SUPERVISOR_TOOL_LOOP_LIMIT : SPECIALIST_TOOL_LOOP_LIMIT
 
-      try {
-        // Get model for this agent
-        const baseModel = await this.modelFactory.getModel(agentConfig.model, {
-          temperature: agentConfig.temperature,
-          maxTokens: agentConfig.maxTokens
-        })
-
-        // Build and bind tools (if any) with heuristic filtering (legacy path)
-        const selectedToolsLegacy = await applyToolHeuristics({
-          agentId: agentConfig.id,
-          userId: state.userId,
-          messages: state.messages || [],
-          selectedTools: agentConfig.tools || [],
-          executionId: state.metadata?.executionId
-        })
-  // Pass model id here as well (legacy path)
-  const toolRuntime = buildToolRuntime(selectedToolsLegacy, agentConfig.model)
-        const model: any = (typeof (baseModel as any).bindTools === 'function')
-          ? (baseModel as any).bindTools(toolRuntime.lcTools)
-          : baseModel
-
-  // Prepare messages with agent prompt
-        // For Cleo supervisor agent, use dynamic prompt building ONLY for interactive chat (not scheduled tasks)
-        // Scheduled tasks use the optimized prompt from task-executor.ts (legacy path)
-        let systemMessage: SystemMessage
-        const isScheduledTaskLegacy = state.metadata?.isScheduledTask === true
-        
-        if ((agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo') && !isScheduledTaskLegacy) {
-          try {
-            const { buildFinalSystemPrompt } = await import('@/lib/chat/prompt')
-            const { createClient } = await import('@/lib/supabase/server')
-            
-            // Extract user message for context
-            const userMessage = filteredStateMessages.find(m => m.constructor.name === 'HumanMessage')?.content
-            
-            // Convert BaseMessage to compatible format
-            const messagesForPrompt = filteredStateMessages.map(msg => ({
-              role: msg.constructor.name === 'HumanMessage' ? 'user' : 
-                    msg.constructor.name === 'AIMessage' ? 'assistant' : 
-                    msg.constructor.name === 'SystemMessage' ? 'system' : 'assistant',
-              content: msg.content
-            }))
-            
-            const { withRequestContext, getCurrentUserId } = await import('@/lib/server/request-context')
-            // Ensure ALS context is present for tools and caches used during prompt build (RAG/webSearch)
-            const effectiveUserId = state.userId || getCurrentUserId() || (globalThis as any)?.__currentUserId || ''
-            const promptResult = await withRequestContext({
-              userId: effectiveUserId,
-              model: agentConfig.model,
-              requestId: state.executionId || `exec_${Date.now()}`
-            }, async () => {
-              // Also set global fallbacks, in case some tool reads global vars
-              try {
-                ;(globalThis as any).__currentUserId = effectiveUserId
-                ;(globalThis as any).__currentModel = agentConfig.model
-              } catch {}
-              const res = await buildFinalSystemPrompt({
-                baseSystemPrompt: agentConfig.prompt,
-                model: agentConfig.model,
-                messages: messagesForPrompt,
-                supabase: await createClient(),
-                realUserId: effectiveUserId,
-                enableSearch: true,
-                debugRag: false
-              })
-              return res
-            })
-            logger.debug('🧠 [Cleo] Prompt built with user context', { hasUserId: !!effectiveUserId, execId: state.executionId })
-            
-            systemMessage = new SystemMessage(promptResult?.finalSystemPrompt ?? agentConfig.prompt)
-            logger.debug('🧠 [Cleo Legacy] Using dynamic system prompt with routing hints and RAG')
-          } catch (error) {
-            logger.warn('⚠️ [Cleo Legacy] Failed to build dynamic prompt, falling back to static:', error)
-            systemMessage = new SystemMessage(agentConfig.prompt)
-          }
-        } else {
-          systemMessage = new SystemMessage(agentConfig.prompt)
-          if (isScheduledTaskLegacy) {
-            logger.debug('📋 [Cleo Legacy] Using static prompt for scheduled task (optimized)')
-          }
-        }
-        
-  let messages: any[] = [systemMessage, ...filteredStateMessages]
-  // Execution safety caps - higher for supervisor agents with delegation
-  const EXECUTION_START = Date.now()
-  const runtimeLocal = this.runtime || getRuntimeConfig()
-  const MAX_EXECUTION_MS = agentConfig.role === 'supervisor' 
-    ? runtimeLocal.maxExecutionMsSupervisor 
-    : runtimeLocal.maxExecutionMsSpecialist
-  const MAX_TOOL_CALLS = agentConfig.role === 'supervisor' 
-    ? runtimeLocal.maxToolCallsSupervisor 
-    : runtimeLocal.maxToolCallsSpecialist
-  let totalToolCalls = 0
-
-        // Execute model with basic tool loop (max 3 iterations)
-        let response
-        try {
-          messages = this.normalizeSystemFirst(messages)
-          response = await model.invoke(messages)
-        } catch (error) {
-          logger.error('🔍 [DEBUG] BuildGraph - First model invocation failed:', error)
-          throw error
-        }
-
-        // Handle tool calls if present
-        const toolCallHistory: string[] = []
-  for (let i = 0; i < 3; i++) {
-          const toolCalls = (response as any)?.tool_calls || (response as any)?.additional_kwargs?.tool_calls || []
-          
-          if (!toolCalls || toolCalls.length === 0) {
-            break
-          }
-
-          // Check for repeated tool calls (potential infinite loop)
-          const currentToolNames = toolCalls.map((t: any) => t?.name).join(',')
-          if (toolCallHistory.includes(currentToolNames) && toolCalls.length === 1) {
-            // Force a final response by clearing tool calls and asking for summary
-            messages.push(new AIMessage({
-              content: "I need to provide a summary of the current task status and results."
-            }))
-            break
-          }
-          toolCallHistory.push(currentToolNames)
-          
-          // Add the AI response with tool calls to messages
-          messages.push(response)
-
-          this.eventEmitter.emit('tools.called', {
-            agentId: agentConfig.id,
-            count: toolCalls.length,
-            tools: toolCalls.map((t: any) => t?.name)
-          })
-          logger.debug(`🛠️  [Graph] ${agentConfig.id} invoked ${toolCalls.length} tools:`, toolCalls.map((t: any) => t?.name).join(', '))
-
-          for (const call of toolCalls) {
-            // Stop if we are running out of budget
-            if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-              logger.info('⏱️ [SAFEGUARD] Budget hit before executing tool. Adding fallback tool response.')
-              // Add fallback tool response for this call to maintain LangChain message structure
-              const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
-              messages.push(new ToolMessage({ 
-                content: 'Tool execution cancelled due to time/budget limits. Using available results.', 
-                tool_call_id: String(callId) 
-              }))
-              continue // Continue to handle remaining tool calls
-            }
-            const callId = call?.id || call?.tool_call_id || `tool_${Date.now()}`
-            const name = call?.name || call?.function?.name
-            let args = call?.args || call?.function?.arguments || {}
-            
-            // Emit tool.executing event before execution
-            this.eventEmitter.emit('tool.executing', { 
-              agentId: agentConfig.id, 
-              toolName: name, 
-              callId: callId,
-              args: args 
-            })
-            
-            try {
-              if (typeof args === 'string') {
-                try { args = JSON.parse(args) } catch {}
-              }
-              // Structured execution start log
-              let notionCredentialPresent: boolean | undefined
-              if (name && String(name).toLowerCase().includes('notion')) {
-                try {
-                  const key = await resolveNotionKey(state.userId)
-                  notionCredentialPresent = !!key
-                } catch { notionCredentialPresent = false }
-              }
-              logToolExecutionStart({
-                event: 'tool_start',
-                agentId: agentConfig.id,
-                userId: state.userId,
-                executionId: state.metadata?.executionId,
-                tool: String(name),
-                argsShape: args && typeof args === 'object' ? Object.keys(args) : [],
-                notionCredentialPresent
-              })
-              logger.debug(`➡️  [Tool] ${agentConfig.id} -> ${name}(${JSON.stringify(args).slice(0, 100)}...)`)
-              const output = await toolRuntime.run(String(name), args)
-              logger.debug(`⬅️  [Tool] ${name} result:`, output?.toString?.().slice?.(0, 200) ?? String(output).slice(0, 200))
-              // Structured execution end log (success)
-              logToolExecutionEnd({
-                event: 'tool_end',
-                agentId: agentConfig.id,
-                userId: state.userId,
-                executionId: state.metadata?.executionId,
-                tool: String(name),
-                success: true,
-                durationMs: 0,
-                notionCredentialPresent
-              })
-              // Delegation-aware handling: if tool output indicates a handoff, orchestrate delegation
-              if (this.isDelegationToolResponse(output)) {
-                logger.info('� [HANDOFF] Delegation detected in buildGraph:', output)
-                const delegationData = this.parseDelegationResponse(output)
-
-                // Create promise to await delegation completion
-                const delegationPromise = new Promise<DelegationCompletionPayload>((resolve, reject) => {
-                  let timeoutHandle: ReturnType<typeof setTimeout>
-                  let onCompleted: (result: DelegationCompletionPayload) => void
-                  let onFailed: (error: DelegationFailurePayload) => void
-
-                  const cleanup = () => {
-                    if (timeoutHandle) clearTimeout(timeoutHandle)
-                    if (onCompleted) this.eventEmitter.off('delegation.completed', onCompleted)
-                    if (onFailed) this.eventEmitter.off('delegation.failed', onFailed)
-                  }
-
-                  onCompleted = (result: DelegationCompletionPayload) => {
-                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
-                    if (result.sourceExecutionId === currentExecutionId) {
-                      logger.info('🎯 [DELEGATION] Delegation completed for our execution:', currentExecutionId)
-                      cleanup()
-                      resolve(result)
-                    } else {
-                      logger.debug('🔍 [DELEGATION] Ignoring completion for different execution:', {
-                        resultExecutionId: result.sourceExecutionId,
-                        currentExecutionId,
-                        sourceAgent: result.sourceAgent,
-                        targetAgent: result.targetAgent
-                      })
-                    }
-                  }
-
-                  onFailed = (error: DelegationFailurePayload) => {
-                    const currentExecutionId = ExecutionManager.getCurrentExecutionId()
-                    if (error.sourceExecutionId === currentExecutionId) {
-                      logger.warn('❌ [DELEGATION] Delegation failed for our execution:', currentExecutionId)
-                      cleanup()
-                      reject(new Error(error.error || 'Delegation failed'))
-                    } else {
-                      logger.debug('🔍 [DELEGATION] Ignoring failure for different execution:', {
-                        errorExecutionId: error.sourceExecutionId,
-                        currentExecutionId
-                      })
-                    }
-                  }
-
-                  const onTimeout = () => {
-                    logger.warn('⏱️ [DELEGATION] Delegation promise timed out', {
-                      executionId: ExecutionManager.getCurrentExecutionId(),
-                      targetAgent: delegationData.targetAgent || delegationData.agentId
-                    })
-                    cleanup()
-                    reject(new Error(`Delegation timeout after ${this.runtime.delegationTimeoutMs / 1000} seconds`))
-                  }
-
-                  timeoutHandle = setTimeout(onTimeout, this.runtime.delegationTimeoutMs)
-                  this.eventEmitter.on('delegation.completed', onCompleted)
-                  this.eventEmitter.on('delegation.failed', onFailed)
-                })
-
-                // Emit request
-                const currentExecutionId = ExecutionManager.getCurrentExecutionId() || state.metadata?.executionId
-                logger.debug('🔍 [DEBUG] Emitting delegation.requested with executionId:', currentExecutionId, 'from AsyncLocalStorage:', !!ExecutionManager.getCurrentExecutionId(), 'from state:', !!state.metadata?.executionId)
-                
-                // CRITICAL FIX: Include conversation history in delegation request
-                // This ensures delegated agents have full context from the conversation
-                this.eventEmitter.emit('delegation.requested', {
-                  sourceAgent: agentConfig.id,
-                  targetAgent: delegationData.agentId || delegationData.targetAgent,
-                  task: delegationData.delegatedTask || delegationData.task,
-                  context: delegationData.context,
-                  handoffMessage: delegationData.handoffMessage,
-                  priority: delegationData.priority || 'normal',
-                  sourceExecutionId: currentExecutionId,
-                  userId: state.userId, // Include userId for proper context propagation
-                  conversationHistory: state.messages || [] // Pass full conversation history to delegated agent
-                })
-
-                try {
-                  logger.debug('⏳ [DELEGATION] Waiting for delegated task to complete... executionId:', currentExecutionId)
-                  const delegationResult = await delegationPromise
-                  logger.info('✅ [DELEGATION] Completed, injecting result into conversation. ExecutionId:', currentExecutionId)
-
-                  const rawResult = delegationResult?.result
-                  const delegatedText = typeof rawResult === 'string'
-                    ? rawResult.trim()
-                    : JSON.stringify(rawResult ?? {})
-                  const delegatedSender = String(
-                    delegationData.targetAgent ||
-                      delegationData.agentId ||
-                      delegationResult?.targetAgent ||
-                      'agente delegado'
-                  )
-
-                  if (!state.metadata) state.metadata = {}
-                  const existingDelegations = Array.isArray(state.metadata.delegations)
-                    ? state.metadata.delegations
-                    : []
-                  state.metadata.delegations = [
-                    ...existingDelegations,
-                    {
-                      agentId: delegatedSender,
-                      task: delegationData.delegatedTask || delegationData.task,
-                      result: delegatedText,
-                      completedAt: new Date().toISOString()
-                    }
-                  ]
-
-                  logger.info('✅ [DELEGATION] Delegation completed, adding structured result to conversation')
-                  const continuationHint = delegationResult?.continuationHint ||
-                    delegationData?.continuationHint ||
-                    'Acción interna: Usa este resultado para continuar con la solicitud original. Si el usuario pidió pasos adicionales (por ejemplo, enviar un correo con los hallazgos), realiza la siguiente delegación antes de finalizar.'
-                  const summarizedTask = delegationData.delegatedTask || delegationData.task || 'Tarea delegada'
-                  const toolSummary = `✅ Delegation result from ${delegatedSender}\n\nTask: ${summarizedTask}\n\nOutput:\n${delegatedText}\n\n${continuationHint}`
-
-                  messages = [
-                    ...messages,
-                    new ToolMessage({
-                      content: toolSummary,
-                      tool_call_id: String(callId)
-                    })
-                  ]
-                  logger.debug('🔄 [DELEGATION] ToolMessage injected, continuing graph execution...')
-                } catch (delegationError) {
-                  logger.error('❌ [DELEGATION] Delegation failed in buildGraph:', delegationError)
-                  messages = [
-                    ...messages,
-                    new ToolMessage({ 
-                      content: `❌ Delegation to ${delegationData.targetAgent || delegationData.agentId} failed: ${delegationError instanceof Error ? delegationError.message : String(delegationError)}`, 
-                      tool_call_id: String(callId) 
-                    })
-                  ]
-                }
-              } else {
-                const outputStr = typeof output === 'string' ? output : JSON.stringify(output)
-                messages = [
-                  ...messages,
-                  new ToolMessage({ content: outputStr, tool_call_id: String(callId) })
-                ]
-              }
-              totalToolCalls++
-              this.eventEmitter.emit('tool.completed', { agentId: agentConfig.id, toolName: name, callId, result: output })
-            } catch (err) {
-              messages = [
-                ...messages,
-                new ToolMessage({ content: `Error: ${err instanceof Error ? err.message : String(err)}`, tool_call_id: String(callId) })
-              ]
-              logger.error(`❌ [Tool] ${name} failed:`, err)
-              // Structured execution end log (failure)
-              logToolExecutionEnd({
-                event: 'tool_end',
-                agentId: agentConfig.id,
-                userId: state.userId,
-                executionId: state.metadata?.executionId,
-                tool: String(name),
-                success: false,
-                durationMs: 0,
-                error: err instanceof Error ? err.message : String(err)
-              })
-              this.eventEmitter.emit('tool.failed', { agentId: agentConfig.id, name, callId, error: err })
-            }
-          }
-
-          // Check budgets before re-invocation
-          if (Date.now() - EXECUTION_START > MAX_EXECUTION_MS || totalToolCalls >= MAX_TOOL_CALLS) {
-            logger.info('⏱️ [SAFEGUARD] Budget hit after tools. Forcing finalization.')
-            
-            // CRITICAL: Ensure all tool_calls are resolved before forcing finalization
-            const lastMessage = messages[messages.length - 1]
-            if (lastMessage && 'tool_calls' in lastMessage && lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
-              logger.debug('🔧 [SAFEGUARD] Found unresolved tool_calls, adding fallback ToolMessages')
-              const existingToolCallIds = new Set()
-              
-              // Collect all existing tool_call_ids from ToolMessages
-              for (const msg of messages) {
-                if (msg instanceof ToolMessage && msg.tool_call_id) {
-                  existingToolCallIds.add(msg.tool_call_id)
-                }
-              }
-              
-              // Add fallback ToolMessages for any unresolved tool_calls
-              for (const toolCall of lastMessage.tool_calls) {
-                if (!existingToolCallIds.has(toolCall.id)) {
-                  logger.debug(`🔧 [SAFEGUARD] Adding fallback ToolMessage for unresolved tool_call: ${toolCall.id}`)
-                  messages.push(new ToolMessage({
-                    content: 'Budget exceeded. Task completed with available resources.',
-                    tool_call_id: toolCall.id
-                  }))
-                }
-              }
-            }
-            
-            messages.push(new HumanMessage({ content: 'Ahora entrega la respuesta final. Resume claramente y enlaza a las fuentes. Evita más herramientas.' }))
-          }
-          // Re-invoke model with tool outputs
-          try {
-            messages = this.normalizeSystemFirst(messages)
-            response = await model.invoke(messages)
-          } catch (error) {
-            logger.error('🔍 [DEBUG] BuildGraph - Model re-invocation failed:', error)
-            throw error
-          }
-        }
-
-        // FINAL SAFEGUARD: Ensure all tool_calls are resolved before finalizing
-        const finalMessage = messages[messages.length - 1]
-        if (finalMessage && 'tool_calls' in finalMessage && finalMessage.tool_calls && finalMessage.tool_calls.length > 0) {
-          logger.info('🚨 [FINAL SAFEGUARD] Unresolved tool_calls detected at end of loop, resolving them')
-          const existingToolCallIds = new Set()
-          
-          // Collect all existing tool_call_ids from ToolMessages
-          for (const msg of messages) {
-            if (msg instanceof ToolMessage && msg.tool_call_id) {
-              existingToolCallIds.add(msg.tool_call_id)
-            }
-          }
-          
-          // Add fallback ToolMessages for any unresolved tool_calls
-          for (const toolCall of finalMessage.tool_calls) {
-            if (!existingToolCallIds.has(toolCall.id)) {
-              logger.debug(`🚨 [FINAL SAFEGUARD] Adding final fallback ToolMessage for: ${toolCall.id}`)
-              messages.push(new ToolMessage({
-                content: 'Tool execution completed.',
-                tool_call_id: toolCall.id
-              }))
-            }
-          }
-          
-          // Re-invoke model one last time to get proper response
-          try {
-            messages = this.normalizeSystemFirst(messages)
-            response = await model.invoke(messages)
-            logger.debug('🚨 [FINAL SAFEGUARD] Model re-invoked after resolving tool_calls')
-          } catch (error) {
-            logger.warn('🚨 [FINAL SAFEGUARD] Final re-invocation failed, using existing response')
-          }
-        }
-
-        // Ensure we always have a final response
-        if (!response.content || String(response.content || '').trim() === '') {
-          logger.debug('🔍 [DEBUG] BuildGraph - Empty response detected, requesting final summary')
-          // Add a system message to force a response
-          messages.push(new HumanMessage({
-            content: "Please provide a summary of the current task status and any results obtained so far."
-          }))
-          try {
-            messages = this.normalizeSystemFirst(messages)
-            response = await model.invoke(messages)
-            logger.debug('🔍 [DEBUG] BuildGraph - Final summary response generated')
-          } catch (error) {
-            logger.warn('🔍 [DEBUG] BuildGraph - Final summary failed, using fallback')
-            response = {
-              content: "Task execution completed. Please check the task status for detailed results."
-            }
-          }
-        }
-
-  logger.debug('🔍 [DEBUG] BuildGraph - Final response content:', response.content)
-  logger.debug('🔍 [DEBUG] BuildGraph - Final response type:', typeof response.content)
-  logger.debug('🔍 [DEBUG] BuildGraph - Final response length:', response.content?.length || 0)
-
-  // Log final response for observability (legacy buildGraph path)
-  logger.info('[GraphBuilder] buildGraph final response', { agentId: agentConfig.id, responseSnippet: String(response.content).slice(0, 500) })
-        // Ensure we have non-empty content before returning
-        const finalContent = response?.content && String(response.content).trim() 
-          ? String(response.content).trim()
-          : 'Task completed successfully.'
-
-        console.log('🔴 [GRAPH CRITICAL] Final content being returned:', {
-          agentId: agentConfig.id,
-          originalContent: response?.content,
-          finalContent,
-          willReturnMessage: true
-        })
-
-        this.eventEmitter.emit('node.completed', {
-          nodeId: 'execute',
-          agentId: agentConfig.id,
-          response: finalContent
-        })
-
-        const finalReturn = {
-          messages: [
-            ...filteredStateMessages,  // Use filtered messages instead of raw state.messages
-            new AIMessage({
-              content: finalContent,
-              additional_kwargs: { sender: agentConfig.id }
-            })
-          ]
-        }
-        
-        console.log('🔴 [GRAPH CRITICAL] Returning state with messages:', {
-          agentId: agentConfig.id,
-          messageCount: finalReturn.messages.length,
-          lastMessageContent: finalReturn.messages[finalReturn.messages.length - 1]?.content
-        })
-        
-        return finalReturn
-      } catch (error) {
-        this.eventEmitter.emit('node.error', {
-          nodeId: 'execute',
-          agentId: agentConfig.id,
-          error: error
-        })
-
-        // Return error message to keep graph flowing
-        return {
-          messages: [
-            ...filteredStateMessages,  // Use filtered messages even in error case
-            new AIMessage({
-              content: `Error executing ${agentConfig.name}: ${(error as Error).message}`,
-              additional_kwargs: { sender: agentConfig.id, error: true }
-            })
-          ]
-        }
-      }
-    })
-
-    // Set entry and exit points
-    graphBuilder.addEdge(START, 'execute' as any)
-    graphBuilder.addEdge('execute' as any, END)
-
-    return graphBuilder
-  }
-
-  /**
-   * Check if a tool response indicates a delegation request
-   */
-  private isDelegationToolResponse(output: any): boolean {
-    try {
-      // Handle string responses that might be JSON
-      if (typeof output === 'string') {
-        try {
-          const parsed = JSON.parse(output)
-          return parsed?.nextAction === 'handoff_to_agent' || parsed?.status === 'delegated'
-        } catch {
-          return false
-        }
-      }
-      
-      // Handle object responses directly
-      return output?.nextAction === 'handoff_to_agent' || output?.status === 'delegated'
-    } catch {
-      return false
+    return {
+      maxExecutionMs,
+      maxToolCalls,
+      maxAgentCycles
     }
   }
 
-  /**
-   * Parse delegation tool response safely
-   */
-  private parseDelegationResponse(output: any): any {
+  private isDelegationTool(name?: string): boolean {
+    if (!name) return false
+    const toolName = name.toLowerCase()
+    return toolName.startsWith('delegate_to_') || toolName.includes('delegation')
+  }
+
+  private deriveAgentIdFromToolName(toolName?: string, explicit?: string): string {
+    if (explicit && typeof explicit === 'string') return explicit
+    if (!toolName) return 'unknown-agent'
+    return toolName.replace(/^delegate_to_/, '').replace(/_/g, '-').trim() || 'unknown-agent'
+  }
+
+  private safeJsonParse(value: string) {
     try {
-      if (typeof output === 'string') {
-        return JSON.parse(output)
-      }
-      return output
+      return JSON.parse(value)
     } catch {
       return {}
     }

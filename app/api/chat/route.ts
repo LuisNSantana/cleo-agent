@@ -604,6 +604,10 @@ export async function POST(req: Request) {
     let delegationIntent: ReturnType<typeof scoreDelegationIntent> | null = null
   const quickDelegationCheck = /\b(delega|delegate|ask|pregunta|call|llama|usa|use|pídele|with|encárgalo|handoff|sub[- ]?agent|agente)\b/i
   let quickDelegationFlag = false
+  
+  // CRITICAL: Load agents EARLY if delegation is likely
+  // This ensures keywords are enriched BEFORE intent scoring
+  let availableAgents: any[] = []
     
     try {
       const lastUser = [...messages].reverse().find(m => m.role === 'user')
@@ -626,9 +630,21 @@ export async function POST(req: Request) {
       // OPTIMIZATION: Only run expensive heuristics if delegation keywords present
       quickDelegationFlag = !!(lastUserPlain.trim() && quickDelegationCheck.test(lastUserPlain))
       if (quickDelegationFlag) {
-        // Get available agents for scoring optimization
+        // EARLY AGENT LOADING: Load agents BEFORE intent scoring so keywords are enriched
         const { agentLoader } = await import('@/lib/agents/agent-loader')
-        const availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+        availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+        
+        // Enrich intent heuristics with user's custom agents
+        const { enrichKeywordsWithAgents } = await import('@/lib/delegation/intent-heuristics')
+        enrichKeywordsWithAgents(availableAgents.map(a => ({
+          id: a.id,
+          name: a.name,
+          tags: a.tags,
+          description: a.description
+        })))
+        
+        console.log(`[ChatAPI] 🔄 Loaded ${availableAgents.length} agents and enriched keywords BEFORE intent scoring`)
+        
         const availableAgentIds = availableAgents
           .filter(a => a.role !== 'supervisor')
           .map(a => a.id)
@@ -855,12 +871,17 @@ export async function POST(req: Request) {
 
     // Ensure all delegation tools are present only when delegation is likely
     // This reduces cold start time for simple Q&A
+    // OPTIMIZATION: Reuse agents already loaded during intent scoring
     if (quickDelegationFlag) {
       try {
-        const { agentLoader } = await import('@/lib/agents/agent-loader')
-        const agents = await agentLoader.loadAgents({ userId: realUserId })
+        // If agents were already loaded, reuse them; otherwise load now
+        if (availableAgents.length === 0) {
+          const { agentLoader } = await import('@/lib/agents/agent-loader')
+          availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+          console.log(`[ChatAPI] 🔄 Late-loading ${availableAgents.length} agents for tools`)
+        }
         
-        for (const a of agents) {
+        for (const a of availableAgents) {
           if (a.role !== 'supervisor') {
             ensureDelegationToolForAgent(a.id, a.name)
           }
@@ -868,7 +889,7 @@ export async function POST(req: Request) {
         // After ensuring, refresh registry reference (tools is mutated inside helper)
     toolsForRun = tools as typeof tools
         
-        console.log(`[ChatAPI] Loaded ${agents.length} agents with delegation tools`)
+        console.log(`[ChatAPI] ✅ Ensured delegation tools for ${availableAgents.length} agents`)
       } catch (e) {
         console.warn('[ChatAPI] Failed to ensure delegation tools', e)
       }
@@ -886,15 +907,18 @@ export async function POST(req: Request) {
 
     // Optional delegation-only toolset for general chat
     // When CHAT_DELEGATION_ONLY=true, expose only delegate_to_* tools (+ minimal helpers)
-    // OPTIMIZED: Use cached agents, and only if delegation is relevant
+    // OPTIMIZED: Use already-loaded agents to avoid redundant DB calls
     try {
       if (process.env.CHAT_DELEGATION_ONLY === 'true' && quickDelegationFlag) {
-        const { agentLoader } = await import('@/lib/agents/agent-loader')
-        const agents = await agentLoader.loadAgents({ userId: realUserId })
+        // Reuse agents already loaded
+        if (availableAgents.length === 0) {
+          const { agentLoader } = await import('@/lib/agents/agent-loader')
+          availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+        }
         
         // Ensure delegation tools exist for all specialist agents
         const delegateToolNames: string[] = []
-        for (const a of agents) {
+        for (const a of availableAgents) {
           if (a.role !== 'supervisor') {
             const toolName = ensureDelegationToolForAgent(a.id, a.name)
             delegateToolNames.push(toolName)
@@ -1469,6 +1493,34 @@ export async function POST(req: Request) {
                       content: step?.content?.slice(0, 100),
                       metadata: step?.metadata
                     })
+
+                    // HUMAN-IN-THE-LOOP: Detect interrupt steps and emit special event
+                    const isInterruptStep = step?.action === 'interrupt' && step?.metadata?.type === 'interrupt'
+                    if (isInterruptStep) {
+                      console.log('⏸️ [INTERRUPT] Detected interrupt step, emitting to frontend:', {
+                        executionId: snapshot.executionId,
+                        tool: step.metadata?.interrupt?.action_request?.action,
+                        requiresApproval: step.metadata?.requiresApproval
+                      })
+                      
+                      // Send interrupt event (frontend useToolApprovals listens to this)
+                      send({ 
+                        type: 'interrupt', 
+                        interrupt: {
+                          executionId: snapshot.executionId || 'unknown',
+                          threadId: step.metadata?.threadId || 'unknown',
+                          interrupt: step.metadata?.interrupt,
+                          step
+                        }
+                      })
+                      
+                      // Also send as regular step for timeline visualization
+                      send({ type: 'execution-step', step })
+                      try { persistedParts.push({ type: 'execution-step', step }) } catch {}
+                      
+                      console.log('✅ [INTERRUPT] Interrupt event emitted to SSE stream')
+                      continue
+                    }
                     
                     send({ type: 'execution-step', step })
                     // Accumulate for DB persistence

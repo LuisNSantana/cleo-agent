@@ -35,6 +35,7 @@ import {
 } from './types'
 import { getAgentMetadata } from './agent-metadata'
 import { getAllAgents } from './unified-config'
+import { HumanInterrupt, HumanResponse, InterruptState } from './types/interrupt'
 
 interface ClientAgentStore {
   // State
@@ -58,6 +59,9 @@ interface ClientAgentStore {
   // Delegation Progress State
   activeDelegations: Record<string, DelegationProgress>
   currentDelegationId: string | null
+  // Interrupt State (Human-in-the-Loop)
+  activeInterrupts: Record<string, InterruptState>
+  pendingApprovals: string[] // executionIds awaiting user response
   // Thread mapping per agent to keep conversation context across confirms
   _agentThreadMap?: Record<string, string>
   // Map execution id -> thread id used for that run (to persist final message reliably)
@@ -94,6 +98,11 @@ interface ClientAgentStore {
   completeDelegation: (delegationId: string, success: boolean) => void
   clearActiveDelegations: () => void
   processDelegationSteps: (steps: any[]) => void
+  // Interrupt Actions (Human-in-the-Loop)
+  addInterrupt: (executionId: string, interrupt: InterruptState) => void
+  removeInterrupt: (executionId: string) => void
+  submitApprovalResponse: (executionId: string, response: HumanResponse) => Promise<void>
+  getPendingInterrupt: (executionId: string) => InterruptState | undefined
   // Graph layout persistence
   setNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   setNodePositions: (positions: Record<string, { x: number; y: number }>) => void
@@ -123,6 +132,9 @@ export const useClientAgentStore = create<ClientAgentStore>()(
     delegationEvents: [],
     activeDelegations: {},
     currentDelegationId: null,
+    // Interrupt state
+    activeInterrupts: {},
+    pendingApprovals: [],
   _agentThreadMap: {},
     _executionThreadMap: {},
   _finalPosted: {},
@@ -1042,6 +1054,65 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           }
         }
       }
+    },
+
+    // Interrupt Actions (Human-in-the-Loop)
+    addInterrupt: (executionId, interrupt) => {
+      set(state => ({
+        activeInterrupts: {
+          ...state.activeInterrupts,
+          [executionId]: interrupt
+        },
+        pendingApprovals: [...state.pendingApprovals, executionId]
+      }))
+      
+      console.log('🛑 [CLIENT-STORE] Added interrupt for execution:', executionId)
+    },
+
+    removeInterrupt: (executionId) => {
+      set(state => {
+        const newInterrupts = { ...state.activeInterrupts }
+        delete newInterrupts[executionId]
+        
+        return {
+          activeInterrupts: newInterrupts,
+          pendingApprovals: state.pendingApprovals.filter(id => id !== executionId)
+        }
+      })
+      
+      console.log('🧹 [CLIENT-STORE] Removed interrupt for execution:', executionId)
+    },
+
+    submitApprovalResponse: async (executionId, response) => {
+      console.log('📤 [CLIENT-STORE] Submitting approval response:', { executionId, type: response.type })
+      
+      try {
+        const res = await fetch('/api/chat/resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ executionId, response })
+        })
+
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(error.message || 'Failed to submit approval')
+        }
+
+        const result = await res.json()
+        console.log('✅ [CLIENT-STORE] Approval submitted successfully:', result)
+
+        // Remove interrupt from store
+        get().removeInterrupt(executionId)
+
+        return result
+      } catch (error) {
+        console.error('❌ [CLIENT-STORE] Failed to submit approval:', error)
+        throw error
+      }
+    },
+
+    getPendingInterrupt: (executionId) => {
+      return get().activeInterrupts[executionId]
     }
   }))
 )

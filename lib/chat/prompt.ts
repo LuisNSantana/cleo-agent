@@ -47,8 +47,70 @@ async function getUserProfileBlock(supabase: any, userId: string | null): Promis
   }
 }
 
+/**
+ * Build dynamic agent availability section for system prompt
+ * Lists all available specialist agents with their descriptions and delegation tools
+ */
+async function buildAvailableAgentsSection(userId?: string): Promise<string> {
+  try {
+    const { agentLoader } = await import('@/lib/agents/agent-loader')
+    const agents = await agentLoader.loadAgents({ userId })
+    
+    // Filter out supervisor and group by type
+    const specialists = agents.filter(a => a.role !== 'supervisor')
+    
+    if (specialists.length === 0) return ''
+    
+    const lines: string[] = ['\n\n## AVAILABLE SPECIALIST AGENTS']
+    lines.push('You have access to the following delegation tools:\n')
+    
+    // Separate predefined and custom agents for better organization
+    const predefined = specialists.filter(a => ['ami-creative', 'peter-google', 'apu-support', 'emma-ecommerce', 'toby-technical', 'astra-email', 'nora-community', 'iris-insights', 'notion-agent'].includes(a.id))
+    const custom = specialists.filter(a => !predefined.includes(a))
+    
+    // List predefined agents first
+    for (const agent of predefined) {
+      const toolName = `delegate_to_${agent.id.replace(/[^a-zA-Z0-9]/g, '_')}`
+      const desc = agent.description || 'Specialist agent'
+      lines.push(`**${agent.name}** (${toolName})`)
+      lines.push(`  → ${desc}`)
+      if (agent.isSubAgent && agent.parentAgentId) {
+        lines.push(`  → Type: Sub-agent`)
+      }
+      lines.push('')
+    }
+    
+    // List custom user agents
+    if (custom.length > 0) {
+      lines.push('**YOUR CUSTOM AGENTS:**')
+      for (const agent of custom) {
+        const toolName = `delegate_to_${agent.id.replace(/[^a-zA-Z0-9]/g, '_')}`
+        const desc = agent.description || 'Custom specialist agent'
+        const tags = agent.tags?.length ? ` [${agent.tags.join(', ')}]` : ''
+        lines.push(`**${agent.name}** (${toolName})${tags}`)
+        lines.push(`  → ${desc}`)
+        if (agent.isSubAgent && agent.parentAgentId) {
+          lines.push(`  → Type: Sub-agent`)
+        }
+        lines.push('')
+      }
+    }
+    
+    lines.push('**DELEGATION GUIDELINES:**')
+    lines.push('✓ Delegate when task clearly matches an agent\'s expertise')
+    lines.push('✓ Delegate for specialized tools or domain knowledge')
+    lines.push('✓ Use the exact tool name shown above (e.g., delegate_to_ami_creative)')
+    lines.push('✗ For general queries, respond directly without delegation')
+    
+    return lines.join('\n')
+  } catch (error) {
+    console.warn('[PROMPT] Failed to build agents section:', error)
+    return ''
+  }
+}
+
 // Build a dynamic internal hint to steer delegation without exposing it to the user
-async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective) {
+async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective, userId?: string) {
   const base = `\n\nOPTIMIZED AGENT SYSTEM ACTIVE:
 🚀 NEW ARCHITECTURE: 68% tool reduction vs legacy system
 ⚡ SMART ROUTING: Complexity-based delegation (simple=direct, complex=specialist)
@@ -87,18 +149,45 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
       })
       
       if (delegationDecision.shouldDelegate && delegationDecision.targetAgent) {
-        // Get dynamic agent mapping from database
+        const normalize = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_')
+
+        // Get dynamic agent mapping from database (may fail in local/dev without service key)
         const { getDynamicAgentMapping } = await import('@/lib/agents/dynamic-delegation')
         const agentMap = await getDynamicAgentMapping()
-        
-        const toolName = agentMap[delegationDecision.targetAgent]
-        
+
+        const decisionKey = delegationDecision.targetAgent.toLowerCase()
+        let toolName = agentMap[decisionKey]
+
+        // Fallback: attempt to resolve via agent loader (covers custom agents when DB mapping unavailable)
+        if (!toolName && userId) {
+          try {
+            const { agentLoader } = await import('@/lib/agents/agent-loader')
+            const agents = await agentLoader.loadAgents({ userId })
+            const matched = agents.find((agent) => {
+              const idMatch = agent.id === delegationDecision.targetAgent || agent.id.toLowerCase() === decisionKey
+              const nameMatch = agent.name?.toLowerCase() === decisionKey
+              return idMatch || nameMatch
+            })
+
+            if (matched) {
+              toolName = `delegate_to_${normalize(matched.id)}`
+            }
+          } catch (agentLoadError) {
+            console.warn('[DELEGATION] Unable to hydrate custom agent mapping', agentLoadError)
+          }
+        }
+
+        // Final fallback: sanitize provided target (ensures deterministic format)
+        if (!toolName) {
+          toolName = `delegate_to_${normalize(delegationDecision.targetAgent)}`
+        }
+
         return `${base}
 
 🎯 SMART DELEGATION DECISION:
 - Complexity Score: ${complexity.score}/100 (${complexity.recommendation})
 - Target: ${delegationDecision.targetAgent.toUpperCase()} specialist
-- Tool: ${toolName || 'delegate_to_' + delegationDecision.targetAgent}
+- Tool: ${toolName}
 - Reasoning: ${delegationDecision.reasoning}
 - Optimization: Focused specialist vs legacy 25+ tool overload
 - Expected: 60-75% better accuracy with domain expertise`
@@ -154,6 +243,21 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
         mappedTool = leafToDelegateMap[recommended.leafTool]
       } else if (canonicalTool && leafToDelegateMap[canonicalTool]) {
         mappedTool = leafToDelegateMap[canonicalTool]
+      } else {
+        const normalize = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_')
+        const sanitizedFromAgentName = recommended.agentName
+          ? `delegate_to_${normalize(recommended.agentName.toLowerCase())}`
+          : undefined
+        const sanitizedFromAgentId = recommended.agentId
+          ? `delegate_to_${normalize(recommended.agentId)}`
+          : undefined
+
+        const agentIdLooksCustom = Boolean(recommended.agentId && /-/.test(recommended.agentId))
+        if (sanitizedFromAgentId && agentIdLooksCustom) {
+          if (!mappedTool || (sanitizedFromAgentName && mappedTool === sanitizedFromAgentName)) {
+            mappedTool = sanitizedFromAgentId
+          }
+        }
       }
     }
 
@@ -582,19 +686,14 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
-  const internalHint = await buildInternalDelegationHint(userMessage, routerHint)
+  const internalHint = await buildInternalDelegationHint(userMessage, routerHint, realUserId || undefined)
   
-  // Add agent capability information for smart delegation
-  const capabilityInfo = `\n\nAGENT SPECIALIZATION & DELEGATION RULES
-- Peter (delegate_to_peter): ONLY for Google Docs/Sheets/Slides creation. Do NOT delegate to Peter for email, calendar, general tasks, or anything outside Google Workspace document creation.
-- Ami (delegate_to_ami): General organization, scheduling, email management, file management, and research. Handles Gmail, Calendar, Drive files, and administrative tasks.
-- Astra (delegate_to_astra): Long-form email drafting/sending and complex communication workflows. For simple image prompts, stay in the main chat, rely on the built-in image generator, and respond with a short caption instead of delegating.
-- Before delegating: Consider if you can handle the task directly with your available tools. Only delegate when the specialist agent has unique capabilities or access.
-- Agent visibility: Each agent can see their own tools, tags, and specializations when making delegation decisions.`
+  // Build dynamic list of available agents (predefined + user custom)
+  const agentsSection = await buildAvailableAgentsSection(realUserId || undefined)
   
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${capabilityInfo}`
+    ? `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${agentsSection}`
+    : `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${agentsSection}`
 
   if (
     (typeof selectedBasePrompt === 'string' && selectedBasePrompt.includes('{{user_lang}}')) ||

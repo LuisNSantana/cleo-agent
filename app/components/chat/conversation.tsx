@@ -9,6 +9,9 @@ import { OptimizationInsights, extractPipelineOptimizations } from './optimizati
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { TypingIndicator } from "@/components/ui/typing-indicator"
 import { useStickToBottomContext } from "use-stick-to-bottom"
+import { useToolApprovals } from '@/hooks/use-tool-approvals'
+import { ApprovalMessage } from './approval-message'
+import type { InterruptState } from '@/lib/agents/types/interrupt'
 
 type ConversationProps = {
   messages: MessageType[]
@@ -28,6 +31,11 @@ export function Conversation({
   userId,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
+
+  // Hook for managing tool approvals
+  const { chatInterrupts, allPendingApprovals } = useToolApprovals({
+    chatId: userId // Use userId as chat context
+  })
 
   // Extract pipeline steps PER MESSAGE instead of globally
   const messagePipelineSteps = useMemo(() => {
@@ -144,6 +152,7 @@ export function Conversation({
           extractTextFromMessage={extractTextFromMessage}
           initialMessageCount={initialMessageCount}
           latestMessage={latestMessage}
+          chatInterrupts={chatInterrupts}
         />
       </ChatContainerRoot>
     </div>
@@ -164,6 +173,7 @@ function ConversationContent({
   extractTextFromMessage,
   initialMessageCount,
   latestMessage,
+  chatInterrupts,
 }: {
   messages: MessageType[]
   status: "streaming" | "ready" | "submitted" | "error"
@@ -178,6 +188,7 @@ function ConversationContent({
   extractTextFromMessage: (msg?: MessageType) => string
   initialMessageCount: React.MutableRefObject<number>
   latestMessage: MessageType
+  chatInterrupts: InterruptState[]
 }) {
   const { scrollToBottom, isAtBottom, state } = useStickToBottomContext()
   const lastAutoscrollMessageRef = useRef<string | null>(null)
@@ -308,6 +319,24 @@ function ConversationContent({
           {/* Show TypingIndicator when streaming but no content yet */}
           {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length === 0 && (
             <TypingIndicator />
+          )}
+
+          {/* Human-in-the-Loop: Show approval requests */}
+          {chatInterrupts.length > 0 && (
+            <div className="w-full max-w-4xl px-6 pb-3">
+              {chatInterrupts.map(interrupt => (
+                <ApprovalMessage
+                  key={interrupt.executionId}
+                  interrupt={interrupt}
+                  onApproved={() => {
+                    console.log('✅ Approval approved, execution continuing...')
+                  }}
+                  onRejected={() => {
+                    console.log('❌ Approval rejected, execution cancelled')
+                  }}
+                />
+              ))}
+            </div>
           )}
 
           {/* Simple In-Chat Confirmation */}

@@ -6,13 +6,16 @@ import logger from '@/lib/utils/logger'
 
 import { BaseMessage } from '@langchain/core/messages'
 import { AgentConfig, AgentExecution, ExecutionResult, ExecutionOptions } from '../types'
-import { logToolExecutionStart, logToolExecutionEnd } from '@/lib/diagnostics/tool-selection-logger'
+import { logToolExecutionStart, logToolExecutionEnd, logToolInterrupt, logToolInterruptResume } from '@/lib/diagnostics/tool-selection-logger'
 import { resolveNotionKey } from '@/lib/notion/credentials'
 import { EventEmitter } from './event-emitter'
 import { AgentErrorHandler } from './error-handler'
 import { SystemMessage } from '@langchain/core/messages'
 import { AsyncLocalStorage } from 'async_hooks'
 import { withRequestContext, getRequestContext } from '@/lib/server/request-context'
+import { MemorySaver } from '@langchain/langgraph'
+import { InterruptManager } from './interrupt-manager'
+import { isHumanInterrupt, type HumanInterrupt, type HumanResponse } from '../types/interrupt'
 
 // AsyncLocalStorage for execution context
 const executionContext = new AsyncLocalStorage<string>()
@@ -44,6 +47,32 @@ export class ExecutionManager {
   constructor(config: ExecutionManagerConfig) {
     this.eventEmitter = config.eventEmitter
     this.errorHandler = config.errorHandler
+  }
+
+  /**
+   * Updates the global execution registry with a new interrupt step
+   * This allows pollLogic to detect interrupts via snapshot.steps
+   */
+  private updateExecutionSnapshot(executionId: string, step: any): void {
+    try {
+      const g = globalThis as any
+      const execRegistry = g.__cleoExecRegistry as AgentExecution[] | undefined
+      
+      if (execRegistry) {
+        const execution = execRegistry.find((e: AgentExecution) => e.id === executionId)
+        if (execution) {
+          if (!execution.snapshot) execution.snapshot = {}
+          if (!execution.snapshot.steps) execution.snapshot.steps = []
+          execution.snapshot.steps.push(step)
+          console.log('✅ [EXECUTION-MANAGER] Updated snapshot with interrupt step:', {
+            executionId,
+            totalSteps: execution.snapshot.steps.length
+          })
+        }
+      }
+    } catch (error) {
+      console.error('❌ [EXECUTION-MANAGER] Error updating snapshot:', error)
+    }
   }
 
   /**
@@ -85,8 +114,17 @@ export class ExecutionManager {
         metadata: context.metadata || {}
       }
 
-      // Compile graph and execute within request context so tools can read userId
-      const compiledGraph = graph.compile()
+      // Compile graph WITH checkpointer for interrupt() support (human-in-the-loop)
+      // MemorySaver enables LangGraph to pause execution during interrupt() calls
+      const checkpointer = new MemorySaver()
+      const compiledGraph = graph.compile({ checkpointer })
+      
+      // Thread configuration for checkpointer (required for interrupt/resume)
+      const threadConfig = {
+        configurable: {
+          thread_id: context.threadId || execution.id
+        }
+      }
       
       // CRITICAL: Use timeout from options if provided, otherwise 300s default  
       // This allows legacy orchestrator to control timeout properly
@@ -99,14 +137,159 @@ export class ExecutionManager {
         { 
           isScheduledTask: context.metadata?.isScheduledTask,
           timeoutSource: options.timeout ? 'options' : 'default',
-          optionsTimeout: options.timeout
+          optionsTimeout: options.timeout,
+          threadId: threadConfig.configurable.thread_id
         }
       );
       
+      // Use stream() instead of invoke() to detect interrupts
+      // Based on official LangGraph patterns from agent-chat-ui
       const graphPromise = withRequestContext(
         { userId: context.userId, model: agentConfig.id, requestId: execution.id }, 
         async () => {
-          return compiledGraph.invoke(initialState)
+          let result: any = null
+          let interruptDetected: HumanInterrupt | null = null
+
+          try {
+            // Stream events from graph execution
+            const stream = await compiledGraph.stream(initialState, {
+              ...threadConfig,
+              streamMode: 'values' // Get state updates
+            })
+
+            // Process stream events
+            for await (const event of stream) {
+              // Check for __interrupt__ event (human-in-the-loop)
+              if (event && typeof event === 'object' && '__interrupt__' in event) {
+                const interruptPayload = (event as any).__interrupt__
+                
+                console.log('🛑 [EXECUTION] Interrupt detected:', {
+                  executionId: execution.id,
+                  payload: interruptPayload
+                })
+
+                // Validate and store interrupt
+                if (isHumanInterrupt(interruptPayload)) {
+                  interruptDetected = interruptPayload
+                  
+                  const interruptStartTime = Date.now()
+                  
+                  // Log interrupt event
+                  logToolInterrupt({
+                    event: 'tool_interrupt',
+                    agentId: agentConfig.id,
+                    userId: context.userId,
+                    executionId: execution.id,
+                    tool: interruptPayload.action_request.action,
+                    action: interruptPayload.action_request.action,
+                    interruptType: 'approval_required',
+                    config: interruptPayload.config,
+                    description: interruptPayload.description,
+                    args: interruptPayload.action_request.args
+                  })
+                  
+                  // Store interrupt state for UI
+                  await InterruptManager.storeInterrupt(
+                    execution.id,
+                    threadConfig.configurable.thread_id,
+                    interruptPayload
+                  )
+
+                  // Create a synthetic step for the interrupt that will be picked up by pollLogic
+                  const interruptStep = {
+                    id: `interrupt-${execution.id}-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    agent: agentConfig.id,
+                    action: 'interrupt',
+                    content: interruptPayload.description || `Approval required for ${interruptPayload.action_request.action}`,
+                    metadata: {
+                      type: 'interrupt',
+                      interruptType: 'approval_required',
+                      executionId: execution.id,
+                      threadId: threadConfig.configurable.thread_id,
+                      interrupt: interruptPayload,
+                      pipelineStep: true,
+                      requiresApproval: true
+                    }
+                  }
+
+                  // Store interrupt step in execution snapshot for polling detection
+                  this.updateExecutionSnapshot(execution.id, interruptStep)
+
+                  // Also emit event for immediate SSE streaming
+                  this.eventEmitter.emit('execution.interrupted', {
+                    executionId: execution.id,
+                    threadId: threadConfig.configurable.thread_id,
+                    interrupt: interruptPayload,
+                    agentId: agentConfig.id,
+                    userId: context.userId,
+                    step: interruptStep // Include step for SSE handling
+                  })
+
+                  console.log('⏸️ [EXECUTION] Execution paused, waiting for user response...')
+                  
+                  // Wait for user response (with timeout)
+                  const response = await InterruptManager.waitForResponse(
+                    execution.id,
+                    GRAPH_EXECUTION_TIMEOUT || 300000
+                  )
+
+                  if (!response) {
+                    throw new Error('Timeout waiting for user approval')
+                  }
+
+                  const waitTimeMs = Date.now() - interruptStartTime
+                  
+                  // Log resume event
+                  logToolInterruptResume({
+                    event: 'tool_interrupt_resume',
+                    agentId: agentConfig.id,
+                    userId: context.userId,
+                    executionId: execution.id,
+                    tool: interruptPayload.action_request.action,
+                    action: interruptPayload.action_request.action,
+                    responseType: response.type,
+                    waitTimeMs
+                  })
+
+                  console.log('▶️ [EXECUTION] Resuming execution with user response:', response.type)
+
+                  // Resume execution with Command(resume=...)
+                  // Based on LangGraph official pattern
+                  const resumeStream = await compiledGraph.stream(null, {
+                    ...threadConfig,
+                    streamMode: 'values',
+                    input: {
+                      command: {
+                        resume: [response]
+                      }
+                    }
+                  })
+
+                  // Continue processing resumed stream
+                  for await (const resumeEvent of resumeStream) {
+                    result = resumeEvent
+                  }
+
+                  // Clear interrupt after successful resume
+                  InterruptManager.clearInterrupt(execution.id)
+                } else {
+                  console.warn('⚠️ [EXECUTION] Invalid interrupt payload, continuing:', interruptPayload)
+                }
+              }
+              
+              // Track latest state
+              result = event
+            }
+
+            return result
+          } catch (streamError) {
+            // Clean up interrupt on error
+            if (interruptDetected) {
+              InterruptManager.clearInterrupt(execution.id)
+            }
+            throw streamError
+          }
         }
       );
 

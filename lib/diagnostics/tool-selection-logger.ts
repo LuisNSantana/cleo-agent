@@ -32,6 +32,29 @@ export interface ToolExecutionEndLog extends BaseLog {
   notionCredentialPresent?: boolean
 }
 
+export interface ToolInterruptLog extends BaseLog {
+  event: 'tool_interrupt'
+  tool: string
+  action: string
+  interruptType: 'approval_required'
+  config: {
+    allow_accept: boolean
+    allow_edit: boolean
+    allow_respond: boolean
+    allow_ignore: boolean
+  }
+  description?: string
+  args?: Record<string, any>
+}
+
+export interface ToolInterruptResumeLog extends BaseLog {
+  event: 'tool_interrupt_resume'
+  tool: string
+  action: string
+  responseType: 'accept' | 'edit' | 'response' | 'ignore'
+  waitTimeMs: number
+}
+
 function debugEnabled(): boolean {
   const v = process.env.ENABLE_TOOL_SELECTION_DEBUG
   return v === '1' || v === 'true'
@@ -53,6 +76,14 @@ export function logToolExecutionStart(data: Omit<ToolExecutionStartLog, 'ts' | '
 }
 
 export function logToolExecutionEnd(data: Omit<ToolExecutionEndLog, 'ts' | 'phase'>) {
+  emit({ ...data, ts: new Date().toISOString(), phase: 'execution' })
+}
+
+export function logToolInterrupt(data: Omit<ToolInterruptLog, 'ts' | 'phase'>) {
+  emit({ ...data, ts: new Date().toISOString(), phase: 'execution' })
+}
+
+export function logToolInterruptResume(data: Omit<ToolInterruptResumeLog, 'ts' | 'phase'>) {
   emit({ ...data, ts: new Date().toISOString(), phase: 'execution' })
 }
 

@@ -899,6 +899,35 @@ export function useChatCore({
                     break
                   }
 
+                  case "interrupt": {
+                    // Human-in-the-loop interrupt event
+                    try {
+                      ensureParts(assistantMessageObj)
+                      const interruptData = (data as any).interrupt
+                      
+                      console.log('⏸️ [CHAT-CORE] Received interrupt event:', {
+                        executionId: interruptData.executionId,
+                        tool: interruptData.interrupt?.action_request?.action
+                      })
+
+                      // Add interrupt as a special part that UI can render
+                      assistantMessageObj.parts.push({
+                        type: 'interrupt',
+                        interrupt: interruptData,
+                      } as any)
+
+                      // Also dispatch window event for useToolApprovals hook
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('interrupt', {
+                          detail: interruptData
+                        }))
+                      }
+                    } catch (error) {
+                      console.error('❌ [CHAT-CORE] Error processing interrupt:', error)
+                    }
+                    break
+                  }
+
                   case "text-delta":
                     // Update text part
                     const textPart = assistantMessageObj.parts.findLast(

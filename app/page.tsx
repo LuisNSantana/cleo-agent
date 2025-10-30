@@ -17,8 +17,11 @@ export const dynamic = "force-dynamic"
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined }
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  // Await searchParams as required by Next.js 15
+  const params = searchParams ? await searchParams : {}
+  
   // Check if user is authenticated via Supabase
   const supabase = await createClient()
   
@@ -28,7 +31,7 @@ export default async function Home({
     // Allow landing by default. Redirect only when explicitly requested
     // via query (?go=chat) or env flag HOME_REDIRECT_AUTH=true.
     const wantsChat =
-      (typeof searchParams?.go === 'string' && searchParams.go === 'chat') ||
+      (typeof params?.go === 'string' && params.go === 'chat') ||
       process.env.HOME_REDIRECT_AUTH === 'true'
     if (user && wantsChat) {
       redirect('/chat')
