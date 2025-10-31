@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { exchangeTwitterCode, getTwitterUserInfo } from "@/lib/twitter/oauth-helpers"
 
 export async function GET(
   request: NextRequest,
@@ -90,6 +91,62 @@ export async function GET(
         accountInfo = await getGoogleUserInfo(tokenData.access_token)
         console.log('Google user info retrieved successfully')
         break
+      case "twitter":
+      case "x":
+        console.log(`🐦 [Twitter OAuth] Processing Twitter OAuth for service: ${service}`)
+        console.log(`🐦 [Twitter OAuth] Checking for code verifier cookie...`)
+        
+        const codeVerifier = request.cookies.get('twitter_code_verifier')?.value
+        if (!codeVerifier) {
+          console.error('🐦 [Twitter OAuth] ❌ Missing Twitter code verifier cookie')
+          console.log('🐦 [Twitter OAuth] Available cookies:', request.cookies.getAll().map(c => c.name))
+          return NextResponse.redirect(`${returnTo}?error=session_expired`)
+        }
+        console.log(`🐦 [Twitter OAuth] ✅ Code verifier found (length: ${codeVerifier.length})`)
+        
+        const clientId = process.env.TWITTER_CLIENT_ID
+        const clientSecret = process.env.TWITTER_CLIENT_SECRET
+        
+        if (!clientId || !clientSecret) {
+          console.error('🐦 [Twitter OAuth] ❌ Missing Twitter credentials in environment')
+          return NextResponse.redirect(`${returnTo}?error=twitter_config_missing`)
+        }
+        console.log(`🐦 [Twitter OAuth] ✅ Client ID and Secret configured`)
+        
+        const redirectUri = `${baseUrl}/api/connections/${service}/callback`
+        console.log(`🐦 [Twitter OAuth] Redirect URI: ${redirectUri}`)
+        console.log(`🐦 [Twitter OAuth] Authorization code: ${code.substring(0, 20)}...`)
+        
+        try {
+          console.log(`🐦 [Twitter OAuth] Exchanging code for access token...`)
+          tokenData = await exchangeTwitterCode({ 
+            code, 
+            codeVerifier, 
+            redirectUri, 
+            clientId,
+            clientSecret 
+          })
+          console.log('🐦 [Twitter OAuth] ✅ Token exchange successful')
+          console.log(`🐦 [Twitter OAuth] Token type: ${tokenData.token_type || 'bearer'}`)
+          console.log(`🐦 [Twitter OAuth] Has refresh token: ${!!tokenData.refresh_token}`)
+          console.log(`🐦 [Twitter OAuth] Expires in: ${tokenData.expires_in || 'unknown'}`)
+        } catch (tokenError) {
+          console.error('🐦 [Twitter OAuth] ❌ Token exchange failed:', tokenError)
+          throw tokenError
+        }
+        
+        try {
+          console.log('🐦 [Twitter OAuth] Fetching user info...')
+          accountInfo = await getTwitterUserInfo(tokenData.access_token)
+          console.log('🐦 [Twitter OAuth] ✅ User info retrieved:', accountInfo?.data?.username || 'unknown')
+        } catch (userInfoError) {
+          console.error('🐦 [Twitter OAuth] ❌ Failed to fetch user info:', userInfoError)
+          throw userInfoError
+        }
+        
+        console.log('🐦 [Twitter OAuth] ✅ Twitter OAuth completed successfully')
+        // Clear the code verifier cookie after successful exchange
+        break
       case "notion":
         tokenData = await exchangeNotionCode(code, baseUrl)
         accountInfo = await getNotionUserInfo(tokenData.access_token)
@@ -128,7 +185,13 @@ export async function GET(
 
     // Close popup window and notify opener. If no opener, redirect to Settings > Connections.
     const targetOrigin = (() => { try { return new URL(returnTo).origin } catch { return baseUrl } })()
-    return new NextResponse(`
+    
+    // Add success parameter to returnTo URL
+    const returnToUrl = new URL(returnTo)
+    returnToUrl.searchParams.set('success', `${service}_connected`)
+    const finalReturnTo = returnToUrl.toString()
+    
+    const response = new NextResponse(`
       <html>
         <head>
           <title>Connection Successful</title>
@@ -145,26 +208,48 @@ export async function GET(
               }, ${JSON.stringify(targetOrigin)});
               window.close();
             } else {
-              console.log('🔧 [OAuth Callback] No opener found, redirecting to:', ${JSON.stringify(returnTo)});
-              window.location.replace(${JSON.stringify(returnTo)});
+              console.log('🔧 [OAuth Callback] No opener found, redirecting to:', ${JSON.stringify(finalReturnTo)});
+              window.location.replace(${JSON.stringify(finalReturnTo)});
             }
           </script>
           <div style="text-align: center; padding: 40px; font-family: system-ui;">
             <h2>✅ Connection Successful!</h2>
             <p>Successfully connected to ${service}. This window will close automatically.</p>
-            <p><a href="${returnTo}">Click here if the window doesn't close</a></p>
+            <p><a href="${finalReturnTo}">Click here if the window doesn't close</a></p>
           </div>
         </body>
       </html>
     `, {
       headers: { "Content-Type": "text/html" },
     })
+    
+    // Clear Twitter code verifier cookie if this was a Twitter/X OAuth flow
+    if (service === 'twitter' || service === 'x') {
+      response.cookies.delete('twitter_code_verifier')
+    }
+    
+    return response
   } catch (error) {
     console.error(`Error in ${service} OAuth callback:`, error)
     
-    // Return error page that closes popup
+    // Manejar errores específicos de rate limiting
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    let userFriendlyError = 'connection_failed'
+    
+    if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+      userFriendlyError = 'rate_limit_exceeded'
+    } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      userFriendlyError = 'authorization_failed'
+    } else if (errorMessage.includes('code_verifier') || errorMessage.includes('Missing')) {
+      userFriendlyError = 'session_expired'
+    }
+    
+    // Return error page that closes popup or redirects
     return new NextResponse(`
       <html>
+        <head>
+          <title>Connection Failed</title>
+        </head>
         <body>
           <script>
             if (window.opener) {
@@ -172,14 +257,18 @@ export async function GET(
                 type: 'oauth-error',
                 success: false, 
                 service: '${service}',
-                error: 'Connection failed'
+                error: '${userFriendlyError}'
               }, '*');
               window.close();
             } else {
-              window.location.replace(${JSON.stringify(request.nextUrl.origin + '?error=callback_failed')});
+              window.location.replace(${JSON.stringify(request.nextUrl.origin + `/integrations?error=${userFriendlyError}`)});
             }
           </script>
-          <p>Connection failed. You can close this window.</p>
+          <div style="text-align: center; padding: 40px; font-family: system-ui;">
+            <h2>❌ Connection Failed</h2>
+            <p>Unable to complete the connection. Please try again later.</p>
+            <p><a href="/integrations">Return to Integrations</a></p>
+          </div>
         </body>
       </html>
     `, {

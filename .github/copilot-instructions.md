@@ -1,47 +1,117 @@
 # Cleo Multi-Agent AI Platform — Copilot Guide
 
-**Stack**: Next.js 15 · React 19 · TypeScript · LangChain/LangGraph · Supabase · Docker
+**Stack**: Next.js 15 (App Router) · React 19 · TypeScript · LangChain/LangGraph · Supabase · Docker
 
-## Quick essentials
-- Primary entry: `app/api/chat/route.ts` (SSE via Vercel AI SDK, sets `runtime = "nodejs"` and `maxDuration = 300` for long delegations)
-- LangChain router endpoint: `app/api/multi-model-chat/route.ts` (multi-model switch + RAG controls)
-- Modular orchestrator core: `lib/agents/core/` (graph builder, execution manager, error handler, memory, metrics)
-- Enhanced adapter: `lib/agents/orchestrator-adapter-enhanced.ts` (bridges legacy orchestrator, maintains global execution registry)
-- Supabase helpers: `lib/supabase/` (`createClient`, auth middleware, storage utilities)
+---
 
-## Architecture map
-- Specialist agents live in `lib/agents/predefined/`; metadata served through `lib/agents/unified-config.ts` (prefer async APIs, sync variants are `@deprecated`).
-- Dual-mode chat (direct vs supervised) documented in `docs/dual-mode-agent-system.md`; pipeline timeline details in `docs/global-chat-orchestrator-and-pipeline.md`.
-- Delegation heuristics and scoring reside in `lib/delegation/intent-heuristics.ts`; they feed router hints consumed inside `app/api/chat/route.ts`.
-- Tool registry centralized in `lib/tools/index.ts` with Zod schemas; new tools should wrap `ensureToolsHaveRequestContext` to inherit request metadata.
-- LangChain pipeline (`lib/langchain/`) handles model routing, RAG assembly (`retrieve.ts`, `buildContextBlock`), and streaming events.
+## Core architecture
 
-## Data & integrations
-- Supabase schema migrations live in `/migrations` (timestamped SQL). Start from `supabase_schema.sql`, append deltas in dated files.
-- Environment essentials (see `.env.example`): Supabase keys, `OPENAI_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `CSRF_SECRET`, `ENCRYPTION_KEY`, optional `OLLAMA_BASE_URL`.
-- WebSocket voice proxy: `server/websocket-proxy.js` with deployment instructions in `server/README.md`.
-- Analytics dashboards consume views defined in `20250910_orchestrator_chat_pipeline_analytics.sql` and `2025-10-05_dashboard_agent_analytics.sql`; update views when execution schema changes.
+**Chat entry points**:
+- `app/api/chat/route.ts`: Main SSE endpoint (Vercel AI SDK). Sets `runtime = "nodejs"` and `maxDuration = 300` for delegation-heavy flows.
+- `app/api/multi-model-chat/route.ts`: Multi-model routing + RAG controls (optional LangChain alternative).
 
-## Development workflow
-- Install with `pnpm install` (`packageManager` pinned to `pnpm@10.14.0`).
-- Local dev: `pnpm dev` (Next.js Turbopack). Docker stack: `pnpm docker:dev`, `pnpm docker:dev-logs`, `pnpm docker:dev-down`.
-- Tests: `pnpm test:context` (TS compile + Node test runner in `.tmp-tests`), `pnpm test:jest` (Jest UI/unit), `pnpm docker:test` (containerized run).
-- Quality gates: `pnpm lint`, `pnpm type-check`, and `pnpm build` before release deployments.
+**Agent orchestration** (LangGraph-based):
+- Core engine: `lib/agents/core/` (`graph-builder.ts`, `execution-manager.ts`, `event-emitter.ts`, `timeout-manager.ts`, `tool-executor.ts`).
+- Adapter layer: `lib/agents/orchestrator-adapter.ts` bridges legacy APIs to modular core; maintains global execution registry on `globalThis.__cleoExecRegistry`.
+- Dual modes: Direct agent chat vs supervised delegation. See `docs/dual-mode-agent-system.md` and `docs/global-chat-orchestrator-and-pipeline.md`.
+
+**Agent configuration**:
+- Predefined specialists: `lib/agents/predefined/` (Emma, Peter, Apu, Toby, Ami, Nora, Jenn, etc.).
+- Unified loader: `lib/agents/unified-config.ts` (async `getAllAgents`, `getAgentById`). Sync variants (`getAllAgentsSync`) are `@deprecated`—migrate orchestrators to async.
+- Delegation scoring: `lib/delegation/intent-heuristics.ts` scores user intent against agent keywords; feeds router hints to `app/api/chat/route.ts`.
+
+**Tool ecosystem**:
+- Registry: `lib/tools/index.ts` (Zod-validated). New tools must call `ensureToolsHaveRequestContext(tools)` at export to inject user metadata.
+- Context wrapper: `lib/tools/context-wrapper.ts` wraps execute functions with `withRequestContext` from `lib/server/request-context.ts` (AsyncLocalStorage-based).
+- Supabase/tool calls inherit `userId`, `requestId`, `model` for logging and rate limiting.
+
+**RAG pipeline**:
+- Retrieval: `lib/rag/retrieve.ts` (`retrieveRelevant`, `buildContextBlock`). Supports hybrid vector+text search, reranking, and Redis caching.
+- Client toggles: `options.enableSearch` in chat requests. Backend respects `maxContextChars` to stay within prompt budgets.
+- Embeddings: `lib/rag/embeddings.ts`; Reranking: `lib/rag/reranking.ts`; Chunking: `lib/rag/chunking.ts`.
+
+---
+
+## Data layer (Supabase)
+
+**Client creation**:
+- Server: `lib/supabase/server.ts` (`createClient` async, respects cookies/auth).
+- Client: `lib/supabase/client.ts` (browser bundle).
+- Admin: `lib/supabase/admin.ts` (service role, bypasses RLS).
+
+**Migrations**: `/migrations` (timestamped SQL). Baseline: `supabase_schema.sql`; append deltas in dated files (`20251028_agent_interrupts.sql`, etc.). Update analytics views (`20250910_orchestrator_chat_pipeline_analytics.sql`, `2025-10-05_dashboard_agent_analytics.sql`) when execution schema changes.
+
+**Request context**: Wrap Supabase calls and tools with `withRequestContext({ userId, model, requestId }, async () => ...)` so metadata flows through AsyncLocalStorage. Functions like `getCurrentUserId()` read from this context.
+
+---
+
+## Development workflows
+
+**Package manager**: `pnpm@10.14.0` (pinned in `package.json`).
+
+**Local dev**:
+```bash
+pnpm install
+pnpm dev  # Next.js Turbopack on http://localhost:3000
+```
+
+**Docker stack** (recommended for Supabase/Postgres locally):
+```bash
+pnpm docker:dev         # Start containers, follow logs
+pnpm docker:dev-logs    # Tail logs
+pnpm docker:dev-down    # Stop and cleanup
+pnpm docker:dev-restart # Restart Cleo container
+```
+
+**Testing**:
+- `pnpm test:context`: TS compile to `.tmp-tests`, run via Node test runner (integration tests).
+- `pnpm test:jest`: Jest (UI/unit tests).
+- `pnpm docker:test`: Containerized test run.
+
+**Quality gates**: `pnpm lint`, `pnpm type-check`, `pnpm build` before deployments.
+
+**Environment**: See `.env.example`. Required: Supabase keys, `OPENAI_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `CSRF_SECRET`, `ENCRYPTION_KEY`. Optional: `OLLAMA_BASE_URL` for local models.
+
+---
 
 ## Implementation patterns
-- Execution graph nodes live in `lib/agents/core/graph-builder.ts`; emit UI events through `lib/agents/logging-events.ts` to surface in chat timelines.
-- Streaming helper `lib/chat/stream-handlers.ts` wraps Vercel AI SDK events. Extend it when adding new timeline chips or tool annotations.
-- File uploads route through `lib/file-handling.ts` (Supabase storage + antivirus heuristics). Reuse `persistAttachmentMetadata` for audit trails.
-- RAG toggles: client sends `options.enableSearch`; propagate to metadata and respect `maxContextChars` in `lib/rag/build-context.ts`.
-- Use `withRequestContext` from `lib/server/request-context.ts` when invoking tools or Supabase so user metadata is available for logging and rate limits.
+
+**Execution events**: Graph nodes in `lib/agents/core/graph-builder.ts` emit structured events via `lib/agents/logging-events.ts` (`emitExecutionEvent`). These surface as timeline chips in the UI (`components/chat/pipeline-timeline.tsx`).
+
+**Streaming**: `lib/chat/stream-handlers.ts` wraps Vercel AI SDK events (`onToolResult`, `onFinish`). Extend `makeStreamHandlers` when adding new tool annotations or timeline chips. SSE events accumulate in `parts` JSONB (persisted to `messages` table).
+
+**File uploads**: `lib/file-handling.ts` validates (25MB, allowed MIME types), stores in Supabase Storage, checks heuristics. Use `persistAttachmentMetadata` for audit trails.
+
+**Human-in-the-loop confirmations**: Tools can return `isConfirmationRequest: true` objects (see `lib/confirmation/wrapper.ts`). Stored in `globalThis.__pendingConfirmations` for polling endpoints.
+
+**Agent delegation**: Tools like `delegate_to_emma` call `getAgentOrchestrator().startAgentExecutionForUI(...)`. Adapter emits progress events (`execution.started`, `execution.completed`) that UI subscribes to for real-time updates.
+
+---
 
 ## Frontend conventions
-- App Router layouts in `app/layout.tsx` + `app/layout-client.tsx`; shared UI primitives reside in `components/ui/` (shadcn-derived).
-- Chat experience composed from `components/chat/` (timeline, tool confirmations) and `app/agents/components/` (reasoning graph, modals).
-- State management uses Zustand stores (`lib/agents/client-store.ts`, `app/**/stores.ts`); prefer extending existing stores over creating new globals.
-- Styling: Tailwind v4 utility classes + `tailwind-merge` helpers. Keep motion effects under `components/motion-primitives/`.
 
-## Observability & debugging
-- Server logs use emoji markers (`⚡` processing, `🧭` routing, `[RERANK]` RAG); tail `pnpm docker:logs` or inspect Vercel logs to follow the pipeline.
-- Supabase errors normalized in `lib/supabase/errors.ts`; handle returns with structured `{ status, error }` objects.
-- Dashboard analytics (`app/dashboard/`) expects timelines populated; if chips disappear, check execution events and Supabase materialized views.
+**Layout**: `app/layout.tsx` (RSC server layout) + `app/layout-client.tsx` (client providers). Shared UI: `components/ui/` (Radix primitives, inspired by shadcn/ui). Motion effects: `components/motion-primitives/`.
+
+**Chat UI**: `components/chat/` (timeline, tool confirmations), `app/agents/components/` (reasoning graph, modals). State: Zustand stores (`lib/agents/client-store.ts`, `app/**/stores.ts`). Prefer extending existing stores over creating new globals.
+
+**Styling**: Tailwind v4 utility classes + `tailwind-merge` for conditional classNames.
+
+---
+
+## Observability
+
+**Logs**: Server uses emoji markers (`⚡` processing, `🧭` routing, `[RERANK]` RAG). Tail `pnpm docker:logs` or Vercel logs.
+
+**Analytics dashboards**: `app/dashboard/` renders execution timelines from Supabase materialized views. If chips disappear, verify execution events and view definitions.
+
+**Error handling**: Supabase errors normalized in helper modules (e.g., `lib/supabase/server.ts`). Return structured `{ status, error }` objects. Client toasts and fallback UI in `components/ui/toast.tsx`.
+
+---
+
+## Special integrations
+
+**WebSocket voice proxy**: `server/websocket-proxy.js` proxies OpenAI Realtime API (browsers can't send WS auth headers). Deployment: `server/README.md`.
+
+**Ollama support**: Set `OLLAMA_BASE_URL` for local models. Model resolver in `lib/models/resolve.ts` auto-detects Ollama vs cloud providers.
+
+**Delegation heuristics**: Keyword dictionaries in `lib/delegation/intent-heuristics.ts`. Extend `AGENT_KEYWORDS` when adding new specialists. Scoring is O(n) over keywords—simple and extensible.

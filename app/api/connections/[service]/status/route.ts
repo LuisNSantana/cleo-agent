@@ -17,6 +17,7 @@ export async function GET(
       service === 'google-sheets' ||
       service === 'google-slides'
     ) return 'google-workspace'
+    if (service === 'x') return 'twitter'
     return service
   })()
   
