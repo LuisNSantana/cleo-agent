@@ -56,7 +56,10 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     'insights instagram','instagram analytics','publicar instagram','foto instagram','image post',
     // Facebook keywords
     'facebook','fb','página facebook','facebook page','post facebook','programar facebook','schedule facebook',
-    'facebook insights','page insights','facebook analytics','publicación programada'
+    'facebook insights','page insights','facebook analytics','publicación programada',
+    // Telegram keywords
+    'telegram','canal telegram','channel telegram','publicar telegram','telegram channel','telegram broadcast',
+    'telegram message','mensaje telegram','anuncio telegram','telegram announcement'
   ],
   'iris-insights': [
     { k: 'insight', w: 2 }, { k: 'insights', w: 2 }, 'resumen ejecutivo','hallazgos','recomendaciones','riesgos','tendencias',

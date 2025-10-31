@@ -53,14 +53,17 @@ const AGENT_DELEGATION_RULES = {
       // Facebook
       "facebook", "fb", "página facebook", "facebook page", "post facebook", "programar facebook", "schedule facebook",
       "facebook insights", "facebook analytics", "publicación programada",
+      // Telegram
+      "telegram", "canal telegram", "channel telegram", "publicar telegram", "telegram channel", "telegram broadcast",
+      "telegram message", "mensaje telegram", "anuncio telegram", "telegram announcement",
       // General social media
       "content", "contenido", "post", "publicar", "engagement", "audience", "audiencia", 
       "trends", "tendencias", "hashtags", "viral", "social", "community management", 
       "analytics", "métricas", "scheduling", "programación", "content creation", "creación de contenido", 
       "copywriting", "social strategy", "brand voice", "influencer", "ugc", "social listening", "crisis management"
     ],
-    description: "complete multi-platform community management (Twitter/X, Instagram, Facebook), social media strategy, content creation & publishing, analytics & insights, scheduling, audience engagement, brand monitoring, crisis management",
-    role: "Complete Community Manager (Jenn): Full-spectrum social media management across Twitter/X, Instagram, and Facebook including content creation & publishing, analytics & insights, scheduling, moderation, audience engagement, and strategic planning."
+    description: "complete multi-platform community management (Twitter/X, Instagram, Facebook, Telegram), social media strategy, content creation & publishing, analytics & insights, scheduling, audience engagement, brand monitoring, crisis management, channel broadcasting",
+    role: "Complete Community Manager (Jenn): Full-spectrum social media management across Twitter/X, Instagram, Facebook, and Telegram including content creation & publishing, analytics & insights, scheduling, moderation, audience engagement, channel broadcasting, and strategic planning."
   },
   Wex: {
     keywords: [
@@ -262,8 +265,8 @@ const STOP_CONDITIONS_AND_BUDGET = `STOP CONDITIONS:
 const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
  - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
  - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
- - For social media via Jenn: complete multi-platform community management (Twitter/X, Instagram, Facebook) including content creation, publishing, analytics, scheduling, and engagement. Jenn handles all social media tasks directly with integrated tools for all platforms.
- - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Jenn as the likely specialist (e.g., "¿Quieres que Jenn gestione X/Y/Z en Instagram/Facebook/Twitter?").
+ - For social media via Jenn: complete multi-platform community management (Twitter/X, Instagram, Facebook, Telegram) including content creation, publishing, analytics, scheduling, and engagement. Jenn handles all social media tasks directly with integrated tools for all platforms.
+ - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Jenn as the likely specialist (e.g., "¿Quieres que Jenn gestione X/Y/Z en Instagram/Facebook/Twitter/Telegram?").
  - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
  - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Jenn; "reporte de métricas" → Jenn).
  - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
@@ -275,7 +278,7 @@ const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Email triage → Ami; email compose/send → delegate_to_astra
 - Financial analysis/Business planning → Peter
  - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
-  - Social content creation/copywriting/analytics/metrics/reporting (Twitter/X, Instagram, Facebook) → Jenn handles directly with integrated tools for all platforms
+  - Social content creation/copywriting/analytics/metrics/reporting (Twitter/X, Instagram, Facebook, Telegram) → Jenn handles directly with integrated tools for all platforms
  - Evidence gathering (PDF/URL/Doc) → Iris synthesizes insights (Resumen Ejecutivo, Hallazgos, Tendencias, Riesgos, Recomendaciones, Próximos Pasos, Referencias)
   - Medical information & triage (no diagnóstico) → Nora devuelve resumen basado en evidencia con fuentes y banderas de riesgo
  - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)

@@ -8,7 +8,7 @@ import { AgentConfig } from '../types'
 export const JENN_AGENT: AgentConfig = {
   id: 'jenn-community',
   name: 'Jenn',
-  description: 'Multi-platform Community Manager & Social Media specialist. Manages Twitter/X, Instagram, and Facebook with advanced content creation, publishing, analytics, scheduling, and audience engagement capabilities across all channels.',
+  description: 'Multi-platform Community Manager & Social Media specialist. Manages Twitter/X, Instagram, Facebook, and Telegram with advanced content creation, publishing, analytics, scheduling, and audience engagement capabilities across all channels.',
   role: 'specialist',
   model: 'openrouter:x-ai/grok-4-fast',
   temperature: 0.7,
@@ -52,6 +52,12 @@ export const JENN_AGENT: AgentConfig = {
     'facebookGetRecentPosts',
     'facebookGetPageInfo',
 
+    // Telegram — channel broadcasting & announcements
+    'telegramPublishMessage',
+    'telegramPublishPhoto',
+    'telegramPublishVideo',
+    'telegramGetChannelInfo',
+
     // Content Creation & Documentation
     'createGoogleDoc',
     'updateGoogleDoc',
@@ -79,8 +85,8 @@ export const JENN_AGENT: AgentConfig = {
     // Task completion
     'complete_task'
   ],
-  tags: ['community', 'social-media', 'content-strategy', 'engagement', 'twitter', 'instagram', 'facebook', 'trends', 'analytics', 'coordination'],
-  prompt: `You are Jenn, the Community & Social Media Manager. You own multi-platform social media end‑to‑end: strategy → content creation → publishing → analytics → optimization across Twitter/X, Instagram, and Facebook.
+  tags: ['community', 'social-media', 'content-strategy', 'engagement', 'twitter', 'instagram', 'facebook', 'telegram', 'trends', 'analytics', 'coordination'],
+  prompt: `You are Jenn, the Community & Social Media Manager. You own multi-platform social media end‑to‑end: strategy → content creation → publishing → analytics → optimization across Twitter/X, Instagram, Facebook, and Telegram.
 
 Core competencies:
 - Cross-platform editorial strategy with tailored content for each channel
@@ -110,6 +116,14 @@ FACEBOOK:
 - Schedule posts (10 min to 75 days ahead)
 - Track Page insights (impressions, engagement, followers)
 - Monitor post performance and audience growth
+
+TELEGRAM:
+- Broadcast messages to Telegram channels (text, photos, videos)
+- Markdown/HTML formatting for rich content (bold, italic, links, code)
+- Instant reach to all channel subscribers (no per-user setup required)
+- Perfect for announcements, updates, news alerts, daily specials
+- Bot must be admin of channel with "Post Messages" permission
+- Use @channelname or numeric chat_id for targeting
 
 Analytics & reporting:
 - Maintain unified dashboard tracking all platforms

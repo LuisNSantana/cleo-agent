@@ -1201,8 +1201,64 @@ export async function POST(req: Request) {
           } catch {}
         }
 
-        // Build minimal prior (we avoid replaying tool messages)
-        const prior: Array<{ role: 'user'|'assistant'|'system'; content: string; metadata?: any }> = []
+        // Build conversation history from agent_messages to maintain context
+        let prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }> = []
+        if (effectiveThreadId && realUserId && supabase) {
+          try {
+            const { data: msgs } = await (supabase as any)
+              .from('agent_messages')
+              .select('role, content, metadata, tool_calls, tool_results, created_at')
+              .eq('thread_id', effectiveThreadId)
+              .eq('user_id', realUserId)
+              .order('created_at', { ascending: true })
+              .limit(100) // Get more to filter intelligently
+            
+            if (Array.isArray(msgs)) {
+              // Deduplicate by content + role (keep first occurrence)
+              const seen = new Set<string>()
+              const deduped = msgs.filter((m: any) => {
+                const key = `${m.role}:${(m.content || '').trim()}`
+                if (seen.has(key)) {
+                  console.log(`[CHAT] DEDUP: Skipping duplicate ${m.role}: "${(m.content || '').substring(0, 30)}..."`)
+                  return false
+                }
+                seen.add(key)
+                return true
+              })
+              
+              // Smart filtering: Keep recent messages, prioritize user/assistant over tool/system
+              // Keep last 30 user/assistant messages + last 10 system/tool for efficiency
+              const userAssistant = deduped.filter((m: any) => m.role === 'user' || m.role === 'assistant')
+              const systemTool = deduped.filter((m: any) => m.role === 'system' || m.role === 'tool')
+              
+              const recentUserAssistant = userAssistant.slice(-30)
+              const recentSystemTool = systemTool.slice(-10)
+              
+              // Merge and sort by created_at to maintain chronological order
+              const filtered = [...recentUserAssistant, ...recentSystemTool]
+                .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              
+              prior = filtered.map((m: any) => ({
+                role: m.role,
+                content: m.content || '',
+                metadata: {
+                  ...m.metadata,
+                  tool_calls: m.tool_calls || undefined,
+                  tool_results: m.tool_results || undefined
+                }
+              }))
+              
+              console.log(`🧵 [CONTEXT] Loaded ${prior.length} messages from thread ${effectiveThreadId} (${deduped.length} total, filtered intelligently)`)
+              console.log(`🧵 [CONTEXT] Preview:`, prior.slice(-3).map(m => ({ 
+                role: m.role, 
+                content: m.content.substring(0, 80) 
+              })))
+            }
+          } catch (e) {
+            console.warn('[CHAT] ⚠️ Failed to load conversation history:', e)
+          }
+        }
+
         const exec = await (orchestrator.startAgentExecutionForUI?.(
           userText,
           'cleo-supervisor',
@@ -1502,13 +1558,15 @@ export async function POST(req: Request) {
                 const coreOrch = getCoreOrchestrator()
                 const snapshot = execId ? coreOrch.getExecutionStatus(execId) : null
 
-                console.log('🔍 [SSE POLLING] Snapshot retrieved:', {
-                  execId,
-                  found: !!snapshot,
-                  status: snapshot?.status,
-                  stepsCount: snapshot?.steps?.length || 0,
-                  stepActions: snapshot?.steps?.map(s => s.action) || []
-                })
+                // Only log on status changes or errors (reduce noise)
+                if (!snapshot || snapshot.status === 'failed') {
+                  console.log('🔍 [SSE] Snapshot:', {
+                    execId,
+                    found: !!snapshot,
+                    status: snapshot?.status,
+                    stepsCount: snapshot?.steps?.length || 0
+                  })
+                }
 
                 if (!snapshot) {
                   if (elapsedMs > MAX_POLL_TIME) {

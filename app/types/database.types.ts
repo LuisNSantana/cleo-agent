@@ -1068,6 +1068,50 @@ export type Database = {
           },
         ]
       }
+      telegram_channels: {
+        Row: {
+          id: string
+          user_id: string
+          channel_username: string
+          channel_name: string
+          chat_id: string | null
+          member_count: number | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          channel_username: string
+          channel_name: string
+          chat_id?: string | null
+          member_count?: number | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          channel_username?: string
+          channel_name?: string
+          chat_id?: string | null
+          member_count?: number | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_channels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       analytics_daily_summary: {

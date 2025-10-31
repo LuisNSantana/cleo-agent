@@ -120,6 +120,9 @@ import { instagramTools } from './instagram-advanced'
 // Facebook Tools
 import { facebookTools } from './facebook-advanced'
 
+// Telegram Tools
+import { telegramChannelTools } from './telegram-channel'
+
 // Delegation tools (static predefined + dynamic generator)
 import { delegationTools } from './delegation'
 
@@ -423,6 +426,9 @@ export const tools = {
 	
 	// Facebook Tools
 	...facebookTools,
+	
+	// Telegram Tools
+	...telegramChannelTools,
 	
 	// Notion tools (explicit keys)
 	'get-notion-page': getNotionPageTool,

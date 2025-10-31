@@ -362,8 +362,6 @@ export class GraphBuilder {
   }
 
   private async prepareModel(agentConfig: AgentConfig, state: GraphState, filteredMessages: BaseMessage[]) {
-    const agentDisplayName = getAgentDisplayName(agentConfig.id) // Get friendly name for logs
-    console.log(`🚨🚨🚨 [CRITICAL DEBUG] prepareModel called for agent: ${agentDisplayName} 🚨🚨🚨`)
     let enhancedConfig = agentConfig
 
     try {
@@ -398,14 +396,9 @@ export class GraphBuilder {
 
     const toolRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
     
-    // DEBUG: Log available tools
-    const prepareDisplayName = getAgentDisplayName(enhancedConfig.id) // Get friendly name for logs
-    console.log(`🛠️ [PREPARE-MODEL] ${prepareDisplayName} tools bound:`, toolRuntime.names)
-    console.log(`🛠️ [PREPARE-MODEL] ${prepareDisplayName} total tools: ${toolRuntime.lcTools.length}`)
-    if (enhancedConfig.id === 'astra-email') {
-      console.log(`🛠️ [PREPARE-MODEL] Astra tools list:`, toolRuntime.names.join(', '))
-      console.log(`🛠️ [PREPARE-MODEL] Has sendGmailMessage?`, toolRuntime.names.includes('sendGmailMessage'))
-    }
+    // Only log tool counts, not full lists (reduce noise)
+    const displayName = getAgentDisplayName(enhancedConfig.id)
+    logger.debug(`🛠️ ${displayName}: ${toolRuntime.lcTools.length} tools bound`)
     
     const model = typeof (baseModel as any).bindTools === 'function'
       ? (baseModel as any).bindTools(toolRuntime.lcTools)

@@ -10,7 +10,8 @@ type HeuristicInput = {
 }
 
 const NOTION_KEYWORDS = [
-  'notion', 'página', 'page', 'database', 'base de datos', 'bloque', 'block', 'workspace', 'tabla', 'property', 'propiedad'
+  'notion workspace', 'notion page', 'notion database', 'create notion', 'update notion', 
+  'search notion', 'notion block', 'notion propiedad', 'workspace notion', 'tabla notion'
 ]
 
 const ALWAYS_ALLOW = new Set<string>([
@@ -29,7 +30,9 @@ function containsNotionIntent(messages: any[]): boolean {
     .map(m => (typeof m?.content === 'string' ? m.content : ''))
     .join(' \n ')
     .toLowerCase()
-  return NOTION_KEYWORDS.some(k => text.includes(k))
+  
+  // Require explicit Notion mention or compound keywords
+  return text.includes('notion') || NOTION_KEYWORDS.some(k => text.includes(k))
 }
 
 function isDelegationTool(name: string): boolean {
