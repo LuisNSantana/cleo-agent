@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { exchangeTwitterCode, getTwitterUserInfo } from "@/lib/twitter/oauth-helpers"
+import { 
+  exchangeInstagramCode, 
+  exchangeInstagramForLongLivedToken,
+  getInstagramUserInfo 
+} from "@/lib/instagram/oauth-helpers"
+import { 
+  exchangeFacebookCode, 
+  exchangeFacebookForLongLivedToken,
+  getFacebookUserInfo 
+} from "@/lib/facebook/oauth-helpers"
 
 export async function GET(
   request: NextRequest,
@@ -146,6 +156,89 @@ export async function GET(
         
         console.log('🐦 [Twitter OAuth] ✅ Twitter OAuth completed successfully')
         // Clear the code verifier cookie after successful exchange
+        break
+      case "instagram":
+        console.log(`📸 [Instagram OAuth] Processing Instagram OAuth`)
+        
+        const instagramClientId = process.env.INSTAGRAM_APP_ID
+        const instagramClientSecret = process.env.INSTAGRAM_APP_SECRET
+        
+        if (!instagramClientId || !instagramClientSecret) {
+          console.error('📸 [Instagram OAuth] ❌ Missing Instagram credentials in environment')
+          return NextResponse.redirect(`${returnTo}?error=instagram_config_missing`)
+        }
+        
+        const instagramRedirectUri = `${baseUrl}/api/connections/${service}/callback`
+        console.log(`📸 [Instagram OAuth] Redirect URI: ${instagramRedirectUri}`)
+        
+        try {
+          console.log(`📸 [Instagram OAuth] Exchanging code for short-lived access token...`)
+          const shortLivedToken = await exchangeInstagramCode({
+            code,
+            clientId: instagramClientId,
+            clientSecret: instagramClientSecret,
+            redirectUri: instagramRedirectUri
+          })
+          console.log('📸 [Instagram OAuth] ✅ Short-lived token obtained')
+          
+          console.log('📸 [Instagram OAuth] Exchanging for long-lived token (60 days)...')
+          tokenData = await exchangeInstagramForLongLivedToken({
+            accessToken: shortLivedToken.access_token,
+            clientSecret: instagramClientSecret
+          })
+          console.log('📸 [Instagram OAuth] ✅ Long-lived token obtained')
+          
+          console.log('📸 [Instagram OAuth] Fetching user info...')
+          accountInfo = await getInstagramUserInfo(tokenData.access_token)
+          console.log(`📸 [Instagram OAuth] ✅ User info retrieved: @${accountInfo?.username || 'unknown'}`)
+        } catch (instagramError) {
+          console.error('📸 [Instagram OAuth] ❌ Instagram OAuth failed:', instagramError)
+          throw instagramError
+        }
+        
+        console.log('📸 [Instagram OAuth] ✅ Instagram OAuth completed successfully')
+        break
+      case "facebook":
+        console.log(`📘 [Facebook OAuth] Processing Facebook OAuth`)
+        
+        const facebookClientId = process.env.FACEBOOK_APP_ID
+        const facebookClientSecret = process.env.FACEBOOK_APP_SECRET
+        
+        if (!facebookClientId || !facebookClientSecret) {
+          console.error('📘 [Facebook OAuth] ❌ Missing Facebook credentials in environment')
+          return NextResponse.redirect(`${returnTo}?error=facebook_config_missing`)
+        }
+        
+        const facebookRedirectUri = `${baseUrl}/api/connections/${service}/callback`
+        console.log(`📘 [Facebook OAuth] Redirect URI: ${facebookRedirectUri}`)
+        
+        try {
+          console.log(`📘 [Facebook OAuth] Exchanging code for short-lived access token...`)
+          const shortLivedFbToken = await exchangeFacebookCode({
+            code,
+            clientId: facebookClientId,
+            clientSecret: facebookClientSecret,
+            redirectUri: facebookRedirectUri
+          })
+          console.log('📘 [Facebook OAuth] ✅ Short-lived token obtained')
+          
+          console.log('📘 [Facebook OAuth] Exchanging for long-lived token (60 days)...')
+          tokenData = await exchangeFacebookForLongLivedToken({
+            accessToken: shortLivedFbToken.access_token,
+            clientId: facebookClientId,
+            clientSecret: facebookClientSecret
+          })
+          console.log('📘 [Facebook OAuth] ✅ Long-lived token obtained')
+          
+          console.log('📘 [Facebook OAuth] Fetching user info...')
+          accountInfo = await getFacebookUserInfo(tokenData.access_token)
+          console.log(`📘 [Facebook OAuth] ✅ User info retrieved: ${accountInfo?.name || 'unknown'}`)
+        } catch (facebookError) {
+          console.error('📘 [Facebook OAuth] ❌ Facebook OAuth failed:', facebookError)
+          throw facebookError
+        }
+        
+        console.log('📘 [Facebook OAuth] ✅ Facebook OAuth completed successfully')
         break
       case "notion":
         tokenData = await exchangeNotionCode(code, baseUrl)

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateTwitterOAuthUrl, generateCodeVerifier, generateCodeChallenge } from "@/lib/twitter/oauth-helpers"
 import { generateNotionOAuthUrl } from "@/lib/notion/oauth-helpers"
+import { generateInstagramOAuthUrl } from "@/lib/instagram/oauth-helpers"
+import { generateFacebookOAuthUrl } from "@/lib/facebook/oauth-helpers"
 import { randomBytes } from "crypto"
 
 export async function GET(
@@ -134,6 +136,30 @@ export async function GET(
           clientId: process.env.NOTION_CLIENT_ID || "",
           redirectUri,
           state: statePayload
+        })
+        return NextResponse.redirect(authUrl)
+        
+      case "instagram":
+        authUrl = generateInstagramOAuthUrl({
+          clientId: process.env.INSTAGRAM_APP_ID || "",
+          redirectUri,
+          state: statePayload,
+          scopes: [
+            "instagram_business_basic",
+            "instagram_business_manage_messages",
+            "instagram_business_manage_comments",
+            "instagram_business_content_publish",
+            "instagram_business_manage_insights"
+          ]
+        })
+        return NextResponse.redirect(authUrl)
+        
+      case "facebook":
+        authUrl = generateFacebookOAuthUrl({
+          clientId: process.env.FACEBOOK_APP_ID || "",
+          redirectUri,
+          state: statePayload,
+          scopes: ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_read_user_content"]
         })
         return NextResponse.redirect(authUrl)
         
