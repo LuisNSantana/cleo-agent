@@ -50,7 +50,13 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'jenn-community': [ // ✅ FIX: Added Jenn for social/community management
     'comunidad','community','engagement','social strategy','campaña','followers','audiencia','redes sociales',
     'tweet','twitter','x.com','post','publicar','social media','contenido social','analytics social',
-    'schedule post','programar publicación'
+    'schedule post','programar publicación',
+    // Instagram keywords
+    'instagram','ig','insta','post instagram','carousel','carrusel','reel','reels','stories','historia',
+    'insights instagram','instagram analytics','publicar instagram','foto instagram','image post',
+    // Facebook keywords
+    'facebook','fb','página facebook','facebook page','post facebook','programar facebook','schedule facebook',
+    'facebook insights','page insights','facebook analytics','publicación programada'
   ],
   'iris-insights': [
     { k: 'insight', w: 2 }, { k: 'insights', w: 2 }, 'resumen ejecutivo','hallazgos','recomendaciones','riesgos','tendencias',

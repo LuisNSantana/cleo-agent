@@ -114,6 +114,12 @@ import {
 	createTwitterThreadTool
 } from './twitter-advanced'
 
+// Instagram Tools
+import { instagramTools } from './instagram-advanced'
+
+// Facebook Tools
+import { facebookTools } from './facebook-advanced'
+
 // Delegation tools (static predefined + dynamic generator)
 import { delegationTools } from './delegation'
 
@@ -411,6 +417,13 @@ export const tools = {
 	// Twitter Advanced
 	postTweetWithMedia: postTweetWithMediaTool,
 	createTwitterThread: createTwitterThreadTool,
+	
+	// Instagram Tools
+	...instagramTools,
+	
+	// Facebook Tools
+	...facebookTools,
+	
 	// Notion tools (explicit keys)
 	'get-notion-page': getNotionPageTool,
 	'create-notion-page': createNotionPageTool,
