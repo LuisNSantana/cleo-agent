@@ -1552,6 +1552,7 @@ export async function POST(req: Request) {
                       id: step?.id,
                       action: step?.action,
                       agent: step?.agent,
+                      agentName: step?.agentName, // ✅ Log agentName to verify it's present
                       content: step?.content?.slice(0, 100),
                       metadata: step?.metadata
                     })
@@ -1630,13 +1631,33 @@ export async function POST(req: Request) {
                       generatedSteps.add(delegationKey)
                       
                       const target = step.metadata.delegatedTo
-                      const targetName = target === 'ami-creative' ? 'Ami' : (target || 'Agent')
+                      // Extract TARGET agent name from content "Source delegating to TARGET: ..."
+                      let targetName = 'Agent' // fallback
+                      if (step.content) {
+                        const contentMatch = step.content.match(/delegating to ([^:]+):/i)
+                        if (contentMatch && contentMatch[1]) {
+                          const extractedName = contentMatch[1].trim()
+                          // Only use if it doesn't look like a UUID
+                          if (!extractedName.includes('-') || extractedName.length < 20) {
+                            targetName = extractedName
+                          }
+                        }
+                      }
+                      
+                      console.log('🔍 [LIVE STEP DEBUG]', { 
+                        target, 
+                        extractedName: targetName,
+                        stepContent: step.content?.substring(0, 100),
+                        stepAgent: step.agent,
+                        stepAgentName: step.agentName 
+                      })
                       
                       // Send a simple live update step that will evolve
                       const liveStep = {
                         id: `live-${delegationKey}-${Date.now()}`,
                         timestamp: new Date().toISOString(),
                         agent: target,
+                        agentName: targetName, // ✅ TARGET agent friendly name
                         action: 'analyzing' as const,
                         content: `${targetName} processing delegation...`,
                         metadata: { 
@@ -1649,7 +1670,7 @@ export async function POST(req: Request) {
                       send({ type: 'execution-step', step: liveStep })
                       try { persistedParts.push({ type: 'execution-step', step: liveStep }) } catch {}
                       
-                      console.log('✅ [PIPELINE DEBUG] Live delegation step sent')
+                      console.log('✅ [PIPELINE DEBUG] Live delegation step sent with agentName:', targetName)
                     }
                   }
                   lastStepCount = steps.length

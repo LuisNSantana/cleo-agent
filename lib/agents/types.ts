@@ -122,6 +122,7 @@ export interface ConversationContext {
 export interface AgentExecution {
   id: string
   agentId: string
+  agentName?: string  // Friendly display name for UI
   threadId: string
   userId: string
   status: 'running' | 'completed' | 'failed'

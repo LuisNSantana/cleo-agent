@@ -9,6 +9,7 @@ export type PipelineStep = {
   id: string
   timestamp: string | Date
   agent: string
+  agentName?: string  // ✅ Friendly name for custom agents
   action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing' | 'delegation'
   content: string
   progress?: number
@@ -76,7 +77,7 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
             <AnimatePresence mode="popLayout">
               {activeSteps.map((step, index) => {
                 // Use agentName from step if available (from server), otherwise fallback to metadata lookup
-                const displayName = (step as any).agentName || getAgentMetadata(step.agent).name
+                const displayName = step.agentName || getAgentMetadata(step.agent).name
                 const meta = getAgentMetadata(step.agent)
                 const isLatest = index === 0
                 

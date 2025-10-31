@@ -62,6 +62,7 @@ export function Conversation({
             id: stepId,
             timestamp: ts,
             agent: raw.agent,
+            agentName: (raw as any).agentName,
             action: raw.action,
             content: raw.content,
             progress: raw.progress,

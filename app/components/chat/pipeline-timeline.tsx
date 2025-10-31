@@ -10,6 +10,7 @@ export type PipelineStep = {
   id: string
   timestamp: string | Date
   agent: string
+  agentName?: string  // ✅ Friendly name for custom agents
   action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing' | 'delegation'
   content: string
   progress?: number
@@ -151,7 +152,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                 <AgentAvatar agentId={latestStep.agent} />
                 <div className="min-w-0">
                   <div className="text-foreground/90 truncate font-medium">
-                    {actionLabel(latestStep.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={latestStep.agent} /></span>
+                    {actionLabel(latestStep.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={latestStep.agent} agentName={latestStep.agentName} /></span>
                   </div>
                   {latestStep.content ? (
                     <div className="text-muted-foreground/90 mt-0.5 line-clamp-1 whitespace-pre-wrap">
@@ -182,7 +183,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                 <AgentAvatar agentId={s.agent} />
                 <div className="min-w-0">
                   <div className="text-foreground/90 truncate font-medium">
-                    {actionLabel(s.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={s.agent} /></span>
+                    {actionLabel(s.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={s.agent} agentName={s.agentName} /></span>
                   </div>
                   {s.content ? (
                     <div className="text-muted-foreground/90 mt-0.5 line-clamp-2 whitespace-pre-wrap">
@@ -255,7 +256,11 @@ function AgentAvatar({ agentId }: { agentId: string }) {
   )
 }
 
-function AgentName({ agentId }: { agentId: string }) {
+function AgentName({ agentId, agentName }: { agentId: string; agentName?: string }) {
+  // Prioritize agentName from step data (for custom agents), fallback to metadata lookup
+  if (agentName) {
+    return <span>{agentName}</span>
+  }
   const meta = getAgentMetadata(agentId)
   return <span>{meta.name || agentId.replace(/-/g, ' ')}</span>
 }

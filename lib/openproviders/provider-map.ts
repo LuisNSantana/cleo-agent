@@ -1,9 +1,9 @@
 import type { Provider, SupportedModel } from "./types"
 
 // Decide the default provider for Grok-4-Fast at load time.
-// Default remains OpenRouter unless explicitly enabled via env to avoid breaking tests.
+// Using xAI directly for better performance and lower latency
 const GROK_DEFAULT_PROVIDER: Provider =
-  process.env.XAI_DIRECT_FOR_GROK === 'true' ? 'xai' : 'openrouter'
+  process.env.XAI_DIRECT_FOR_GROK === 'false' ? 'openrouter' : 'xai'
 
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
