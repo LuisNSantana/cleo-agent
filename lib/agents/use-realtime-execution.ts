@@ -120,7 +120,21 @@ export function useRealTimeExecution() {
 
   // Get agent activity status
   const getAgentStatus = useCallback(() => {
-    const agentIds = ['cleo-supervisor', 'toby-technical', 'ami-creative', 'peter-google']
+    // All predefined agent IDs
+    const agentIds = [
+      'cleo-supervisor',    // Supervisor
+      'wex-intelligence',   // Intelligence Specialist
+      'toby-technical',     // Technical Developer
+      'ami-creative',       // Creative & Content
+      'peter-financial',    // Financial Advisor
+      'emma-ecommerce',     // E-commerce Specialist
+      'apu-support',        // Customer Support
+      'astra-email',        // Email Specialist
+      'iris-insights',      // Data Insights
+      'notion-agent',       // Notion Integration
+      'nora-medical',       // Medical Knowledge
+      'jenn-community'      // Community Manager
+    ]
     
     return agentIds.map(agentId => {
       const agentExecutions = executions.filter(e => e.agentId === agentId)

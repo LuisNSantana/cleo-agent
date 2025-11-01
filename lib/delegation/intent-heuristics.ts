@@ -23,7 +23,7 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'notion-agent': [
     'notion','workspace','página','page','database','db','tabla','base de datos','propiedad','properties','block'
   ],
-  'peter-google': [
+  'peter-financial': [
     'google doc','documento','docs','sheet','hoja de cálculo','spreadsheet','slides','presentación','drive','archivo drive'
   ],
   'apu-support': [

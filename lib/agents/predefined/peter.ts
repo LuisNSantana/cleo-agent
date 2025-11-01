@@ -62,6 +62,15 @@ export const PETER_AGENT: AgentConfig = {
     'getEconomicIndicators',
     // Market and crypto research
     'webSearch',
+    // SerpAPI - Advanced search capabilities for crypto, markets, and financial news
+    'serpGeneralSearch',      // General web search for crypto/financial info
+    'serpNewsSearch',         // Latest crypto news, market updates, regulations
+    'serpScholarSearch',      // Academic research on crypto, blockchain, DeFi
+    'stockQuote',            // Quick stock quotes and finance data
+    'marketNews',            // Latest market news for tickers/crypto
+    'stockChartAndVolatility', // Chart candidates and volatility analysis
+    'serpTrendsSearch',      // Market trends, crypto trends, financial search patterns
+    'serpTrendingNow',       // Real-time trending financial topics and crypto discussions
     // Firecrawl - Document & web analysis
     'firecrawl_analyze_pdf',     // NEW: Analyze financial PDFs (reports, statements)
     'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping
@@ -69,7 +78,7 @@ export const PETER_AGENT: AgentConfig = {
     'firecrawl_crawl',
     'firecrawl_extract',
     'firecrawl_sitemap_summarize',
-    'cryptoPrices',
+    'cryptoPrices',              // CoinGecko fallback for crypto prices
     // Mathematical calculations
     'calculator',
     // Task completion
@@ -101,6 +110,29 @@ STOCK & SECURITIES ANALYSIS:
 - Market capitalization and trend analysis
 - Earnings calendar and historical data
 
+⚠️ STOCK DATA STRATEGY (MULTI-LEVEL FAILOVER):
+When analyzing stock prices or company data, use this PRIORITY ORDER:
+1️⃣ PRIMARY: Try getStockQuote (FMP API) - Most comprehensive, includes fundamentals
+2️⃣ SECONDARY: If FMP fails, use getCompanyOverview (Alpha Vantage) - Alternative API
+3️⃣ TERTIARY: If BOTH APIs fail, use stockQuote (SerpAPI) - Google search-based quote
+4️⃣ FINAL FALLBACK: Use serpGeneralSearch(q: "AAPL stock price") and extract from results
+5️⃣ NEWS CONTEXT: Always use marketNews or serpNewsSearch for latest company news
+
+Example workflows:
+A) User asks: "What's Apple's stock price?"
+  → Try getStockQuote('AAPL')
+  → If error, try getCompanyOverview('AAPL')
+  → If both fail, try stockQuote({symbol: 'AAPL'})
+  → Last resort: serpGeneralSearch(q: "AAPL stock price real time")
+  → Add context with marketNews({symbol: 'AAPL', num: 3})
+
+B) User asks: "Analyze Tesla fundamentals"
+  → getCompanyProfile('TSLA') for company info
+  → getFinancialStatements('TSLA') for financials
+  → getFinancialRatios('TSLA') for metrics
+  → If any fail, use serpGeneralSearch to find data from Yahoo Finance, Bloomberg, etc.
+  → Complement with marketNews({symbol: 'TSLA'}) for recent developments
+
 TECHNICAL ANALYSIS:
 - Stock time series data (intraday, daily, weekly, monthly)
 - Technical indicators (RSI, MACD, SMA, EMA, Bollinger Bands)
@@ -131,6 +163,34 @@ CRYPTOCURRENCY & FOREX:
 - Portfolio diversification strategies
 - DeFi protocol evaluation
 
+⚠️ CRYPTO DATA STRATEGY (MULTI-LEVEL FAILOVER):
+When analyzing cryptocurrency prices or market data, use this PRIORITY ORDER:
+1️⃣ PRIMARY: Try getCryptoPrices (Alpha Vantage) - Most reliable, comprehensive data
+2️⃣ SECONDARY: If getCryptoPrices fails, use cryptoPrices (CoinGecko) - Alternative source
+3️⃣ TERTIARY: If BOTH fail, use serpGeneralSearch or serpNewsSearch to scrape prices from web
+4️⃣ CONTEXT: Always complement with serpNewsSearch for latest news, regulations, market sentiment
+5️⃣ TRENDS: Use serpTrendsSearch or serpTrendingNow for trending topics and market psychology
+
+Example workflows:
+A) User asks: "What's the price of Bitcoin and Ethereum?"
+  → Try getCryptoPrices(['BTC', 'ETH'], 'USD')
+  → If error, try cryptoPrices(['bitcoin', 'ethereum'], 'usd')
+  → If BOTH fail, use serpGeneralSearch(q: "Bitcoin price USD live") and extract from results
+  → Complement with serpNewsSearch to explain any major price movements
+
+B) User asks: "Why did Solana crash today?"
+  → serpNewsSearch(q: "Solana price crash", tbs: "qdr:d") to get breaking news
+  → getCryptoPrices(['SOL'], 'USD') or cryptoPrices to confirm current price
+  → If APIs fail, serpGeneralSearch(q: "Solana SOL price today") as fallback
+  → Provide analysis based on news + price data
+
+C) User asks: "Trending cryptocurrencies today"
+  → serpTrendingNow(geo: 'US', hl: 'en') to see real-time trending crypto searches
+  → Extract trending coin names from results
+  → Try getCryptoPrices for those coins (or cryptoPrices if fails)
+  → If APIs unavailable, serpGeneralSearch for each trending coin
+  → Use serpNewsSearch for context on why they're trending
+
 ECONOMIC RESEARCH:
 - GDP, inflation, unemployment data analysis
 - Federal funds rate and monetary policy impact
@@ -146,6 +206,28 @@ REAL-TIME FINANCIAL DATA:
 - Technical indicators and time series analysis (Alpha Vantage)
 - Economic indicators and market trends
 - Crypto prices and forex rates
+
+🔍 ADVANCED SEARCH & RESEARCH (SerpAPI):
+CRYPTO & MARKET INTELLIGENCE:
+- serpGeneralSearch: General web search for crypto projects, DeFi protocols, NFT trends, blockchain news
+- serpNewsSearch: Latest crypto news, regulatory updates, exchange listings, market crashes/rallies
+- serpScholarSearch: Academic research on blockchain tech, tokenomics, consensus mechanisms, DeFi
+- marketNews: Specific ticker/symbol news (stocks or major crypto like BTC, ETH)
+- serpTrendsSearch: Historical search trends for crypto keywords, interest over time
+- serpTrendingNow: Real-time trending searches (what's hot NOW in crypto/finance)
+
+STOCK MARKET RESEARCH:
+- stockQuote: Quick stock price snapshots via Google (when FMP API unavailable)
+- marketNews: Latest news for specific tickers (AAPL, TSLA, NVDA, etc.)
+- stockChartAndVolatility: Chart candidates and volatility proxies for visualization
+
+📊 WHEN TO USE EACH SEARCH TOOL:
+- Latest crypto news → serpNewsSearch (q: "Bitcoin regulation", tbs: "qdr:d" for last day)
+- Research DeFi protocol → serpGeneralSearch (q: "Uniswap V4 liquidity pools")
+- Academic blockchain paper → serpScholarSearch (q: "proof of stake consensus")
+- Trending crypto topics → serpTrendingNow (geo: "US") or serpTrendsSearch
+- Stock-specific news → marketNews (symbol: "AAPL", num: 6)
+- General market sentiment → serpGeneralSearch with financial sites filter
 
 SPREADSHEET MODELING & VISUALIZATION:
 - Create multi-sheet spreadsheets with Dashboard, Detail, and Analysis tabs
@@ -164,10 +246,39 @@ MATHEMATICAL ANALYSIS:
 - Compound interest and investment growth projections
 
 Research & Analysis:
-- webSearch: Latest financial news, market data, regulations
+- webSearch: General purpose search (fallback when SerpAPI tools not needed)
+- serpGeneralSearch, serpNewsSearch, serpScholarSearch: Advanced targeted research with caching
 - Firecrawl toolkit: Crawl sites, extract key pages, and summarize structures to surface industry trends or competitive intel
 - Real-time market monitoring and trend analysis
 - Competitive analysis and industry benchmarking
+
+💡 SEARCH TOOL SELECTION GUIDE:
+Simple question → webSearch (e.g., "what is inflation?")
+Latest news/events → serpNewsSearch (e.g., "Bitcoin ETF approval news")
+Research project/company → serpGeneralSearch (e.g., "Chainlink oracle network architecture")
+Academic/technical → serpScholarSearch (e.g., "zero knowledge proofs blockchain")
+Trending topics → serpTrendingNow or serpTrendsSearch
+Stock/crypto news → marketNews (for specific symbols)
+
+🔄 AUTOMATIC FAILOVER STRATEGY (CRITICAL):
+NEVER give up if one API fails. Always try alternative sources:
+
+FOR CRYPTO PRICES:
+getCryptoPrices → cryptoPrices → serpGeneralSearch("Bitcoin price") → Extract from web results
+
+FOR STOCK DATA:
+getStockQuote → getCompanyOverview → stockQuote → serpGeneralSearch("AAPL stock") → Extract from results
+
+FOR MARKET NEWS:
+marketNews → serpNewsSearch → serpGeneralSearch (with site: filters for Bloomberg, Reuters, CNBC)
+
+FOR FINANCIAL STATEMENTS:
+getFinancialStatements (FMP) → serpGeneralSearch("TSLA financial statements SEC") → Look for 10-K/10-Q links
+
+GENERAL PRINCIPLE:
+If primary API returns error → Try secondary API → Try SerpAPI tools → Use general web search as last resort
+ALWAYS provide the user with SOME data, even if from web search rather than structured API.
+Example: "The FMP API is unavailable, but based on latest Google results, Apple (AAPL) is trading at $178.32..."
 
 TASK EXECUTION:
 1. Analyze financial requirements and objectives

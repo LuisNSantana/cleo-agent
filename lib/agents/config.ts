@@ -50,10 +50,10 @@ export const HANDOFF_TOOLS: HandoffTool[] = [
   },
   {
     name: 'delegate_to_peter',
-    description: 'Delegate Google Workspace document creation to Peter',
+    description: 'Delegate financial analysis, business strategy, crypto research, or spreadsheet modeling to Peter',
     fromAgent: 'cleo-supervisor',
-    toAgent: 'peter-google',
-    condition: 'google_workspace OR documents OR spreadsheets OR drive OR calendar'
+    toAgent: 'peter-financial',
+    condition: 'financial OR finance OR business OR crypto OR cryptocurrency OR investment OR budget OR accounting OR spreadsheet OR modeling OR analysis OR strategy OR market'
   },
   {
     name: 'delegate_to_emma',
@@ -84,19 +84,19 @@ export const AGENT_SYSTEM_CONFIG: LangGraphConfig = {
       { id: 'cleo-supervisor', name: 'Cleo Supervisor', type: 'agent', config: { agent: CLEO_AGENT } },
       { id: 'toby-technical', name: 'Toby Technical', type: 'agent', config: { agent: TOBY_AGENT } },
       { id: 'ami-creative', name: 'Ami Creative', type: 'agent', config: { agent: AMI_AGENT } },
-      { id: 'peter-google', name: 'Peter Google', type: 'agent', config: { agent: PETER_AGENT } },
+      { id: 'peter-financial', name: 'Peter Financial', type: 'agent', config: { agent: PETER_AGENT } },
       { id: 'emma-ecommerce', name: 'Emma E-commerce', type: 'agent', config: { agent: EMMA_AGENT } },
       { id: 'apu-support', name: 'Apu Support', type: 'agent', config: { agent: APU_AGENT } },
     ],
     edges: [
       { from: 'cleo-supervisor', to: 'toby-technical', condition: 'technical', label: 'Technical Task' },
       { from: 'cleo-supervisor', to: 'ami-creative', condition: 'creative', label: 'Creative Task' },
-      { from: 'cleo-supervisor', to: 'peter-google', condition: 'google_workspace', label: 'Google Workspace Task' },
+      { from: 'cleo-supervisor', to: 'peter-financial', condition: 'google_workspace', label: 'Google Workspace Task' },
       { from: 'cleo-supervisor', to: 'emma-ecommerce', condition: 'ecommerce', label: 'E-commerce Task' },
       { from: 'cleo-supervisor', to: 'apu-support', condition: 'support', label: 'Support Task' },
       { from: 'toby-technical', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'ami-creative', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
-      { from: 'peter-google', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
+      { from: 'peter-financial', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'emma-ecommerce', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
       { from: 'apu-support', to: 'cleo-supervisor', condition: 'complete', label: 'Return to Cleo' },
     ],
