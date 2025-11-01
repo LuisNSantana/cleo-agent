@@ -367,9 +367,12 @@ const telegramGetChannelInfo = tool({
 /**
  * Export all Telegram channel tools with request context
  */
-export const telegramChannelTools = ensureToolsHaveRequestContext([
-  telegramPublishMessage,
-  telegramPublishPhoto,
-  telegramPublishVideo,
-  telegramGetChannelInfo,
-]);
+import { telegramPublishTool } from './telegram-publish'
+
+export const telegramChannelTools = {
+  telegramPublishMessage: ensureToolsHaveRequestContext([telegramPublishMessage])[0],
+  telegramPublishPhoto: ensureToolsHaveRequestContext([telegramPublishPhoto])[0],
+  telegramPublishVideo: ensureToolsHaveRequestContext([telegramPublishVideo])[0],
+  telegramGetChannelInfo: ensureToolsHaveRequestContext([telegramGetChannelInfo])[0],
+  publish_to_telegram: telegramPublishTool,
+};

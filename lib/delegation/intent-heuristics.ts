@@ -18,7 +18,7 @@ export interface DelegationIntentResult {
 const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> = {
   'ami-creative': [
     'agenda','agendar','calendario','calendar','schedule','scheduling','meeting','reunión','recordatorio','reminder',
-    'email','correo','inbox','resumen correo','organiza','organización','follow up','minutes'
+    'organiza','organización','follow up','minutes','acta'
   ],
   'notion-agent': [
     'notion','workspace','página','page','database','db','tabla','base de datos','propiedad','properties','block'
@@ -41,25 +41,48 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     { k: 'docker compose', w: 2 }, { k: 'fix', w: 2 }, { k: 'failing', w: 2 }
   ],
   'astra-email': [
-    'enviar correo','compose email','draft email','responder correo','firma','inbox zero'
+    // Específico para EMAIL/CORREO (no genérico "mensaje")
+    { k: 'email', w: 2 }, { k: 'correo', w: 2 }, { k: 'gmail', w: 2 },
+    { k: 'enviar correo', w: 3 }, { k: 'enviar email', w: 3 },
+    'compose email','draft email','responder correo','reply email','firma email',
+    'inbox','bandeja entrada','resumen correo','resumen email','correos','emails',
+    'asunto','subject line','destinatario','cc','bcc','adjunto','attachment'
   ],
   'nora-medical': [ // ✅ FIX: Corrected from nora-community to nora-medical
     'salud','health','medicina','medical','diagnóstico','síntomas','tratamiento','receta','prescription',
     'doctor','hospital','consulta médica','enfermedad','disease','wellness','bienestar'
   ],
-  'jenn-community': [ // ✅ FIX: Added Jenn for social/community management
-    'comunidad','community','engagement','social strategy','campaña','followers','audiencia','redes sociales',
-    'tweet','twitter','x.com','post','publicar','social media','contenido social','analytics social',
-    'schedule post','programar publicación',
-    // Instagram keywords
-    'instagram','ig','insta','post instagram','carousel','carrusel','reel','reels','stories','historia',
-    'insights instagram','instagram analytics','publicar instagram','foto instagram','image post',
-    // Facebook keywords
-    'facebook','fb','página facebook','facebook page','post facebook','programar facebook','schedule facebook',
-    'facebook insights','page insights','facebook analytics','publicación programada',
-    // Telegram keywords
-    'telegram','canal telegram','channel telegram','publicar telegram','telegram channel','telegram broadcast',
-    'telegram message','mensaje telegram','anuncio telegram','telegram announcement'
+  'jenn-community': [ // Social media & community management (NO email)
+    // General social media (NO incluir "mensaje" genérico - confunde con email)
+    'comunidad','community','engagement','social strategy','campaña','followers','audiencia',
+    { k: 'redes sociales', w: 2 }, { k: 'social media', w: 2 },
+    'contenido social','analytics social','schedule post','programar publicación',
+    
+    // Twitter/X - Alta prioridad
+    { k: 'tweet', w: 3 }, { k: 'twitter', w: 3 }, { k: 'x.com', w: 3 },
+    { k: 'publicar tweet', w: 3 }, { k: 'post tweet', w: 3 },
+    'hilo twitter','thread','trending','hashtag',
+    
+    // Instagram - Alta prioridad
+    { k: 'instagram', w: 3 }, { k: 'ig', w: 2 }, { k: 'insta', w: 2 },
+    { k: 'post instagram', w: 3 }, { k: 'publicar instagram', w: 3 },
+    'carousel','carrusel','reel','reels','stories','historia','ig post',
+    'insights instagram','instagram analytics','foto instagram','image post',
+    
+    // Facebook - Alta prioridad
+    { k: 'facebook', w: 3 }, { k: 'fb', w: 2 },
+    { k: 'página facebook', w: 3 }, { k: 'facebook page', w: 3 },
+    { k: 'post facebook', w: 3 }, { k: 'publicar facebook', w: 3 },
+    'programar facebook','schedule facebook','facebook insights','page insights',
+    
+    // Telegram - MUY ALTA PRIORIDAD (evitar confusión con email)
+    { k: 'telegram', w: 4 }, { k: '@', w: 1 }, // @ indica canal de Telegram
+    { k: 'canal telegram', w: 4 }, { k: 'channel telegram', w: 4 },
+    { k: 'publicar telegram', w: 4 }, { k: 'enviar telegram', w: 4 },
+    { k: 'broadcast telegram', w: 4 }, { k: 'mensaje telegram', w: 4 },
+    { k: 'anuncio telegram', w: 3 }, { k: 'telegram announcement', w: 3 },
+    { k: 'telegram channel', w: 4 }, { k: 'telegram broadcast', w: 4 },
+    { k: 'telegram message', w: 4 }, { k: 'post telegram', w: 4 }
   ],
   'iris-insights': [
     { k: 'insight', w: 2 }, { k: 'insights', w: 2 }, 'resumen ejecutivo','hallazgos','recomendaciones','riesgos','tendencias',

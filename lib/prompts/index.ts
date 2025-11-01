@@ -18,9 +18,20 @@ const AGENT_DELEGATION_RULES = {
     role: "Executive Assistant & Orchestrator: Review emails, manage calendar, coordinate tasks, budgets, and productivity workflows. When a Notion/Workspace intent is detected, delegate to the sub‑agent ‘Notion Agent’ and return the final Notion URL. For budgeting/finanzas personales, orchestrate Khipu (Google Sheets) and return the sheet URL when applicable."
   },
   Astra: {
-    keywords: ["write", "escribir", "send", "enviar", "draft", "borrador", "compose", "redactar", "reply", "responder", "forward", "reenviar", "email writing", "correspondence", "comunicación", "professional communication"],
-    description: "email writing, sending, professional communication, correspondence workflows",
-    role: "Email Specialist: Write, send, and manage professional email communications."
+    keywords: [
+      // Específico para EMAIL/CORREO (NO Telegram, NO social media)
+      { k: 'email', w: 2 }, { k: 'correo', w: 2 }, { k: 'gmail', w: 2 },
+      { k: 'enviar correo', w: 3 }, { k: 'enviar email', w: 3 },
+      "write email", "escribir correo", "send email", "enviar mail",
+      "draft email", "borrador correo", "compose email", "redactar correo",
+      "reply email", "responder correo", "forward email", "reenviar correo",
+      "inbox", "bandeja entrada", "resumen correo", "resumen email",
+      "correos", "emails", "asunto", "subject line",
+      "destinatario", "recipient", "cc", "bcc", "adjunto", "attachment",
+      "email writing", "correspondence", "comunicación email", "professional communication"
+    ],
+    description: "EMAIL ONLY: email writing, sending, drafting, professional correspondence workflows via Gmail. Does NOT handle Telegram, social media, or messaging apps.",
+    role: "Email Specialist (Astra): Write, send, draft, and manage professional EMAIL communications ONLY via Gmail. For Telegram, social media, or messaging apps → delegate to Jenn."
   },
   Toby: {
     keywords: ["code", "código", "programming", "programación", "developer", "desarrollador", "debug", "technical", "técnico", "software", "api", "sdk", "algorithm", "algoritmo", "architecture", "arquitectura", "iot", "embedded", "firmware", "microcontroller", "typescript", "javascript", "python", "java", "programming languages", "lenguajes de programación"],
@@ -265,26 +276,47 @@ const STOP_CONDITIONS_AND_BUDGET = `STOP CONDITIONS:
 const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
  - For engineering (Toby) or Notion tasks: if the goal or artifact is ambiguous (missing repo/file/env for code, or missing database/page/workspace for Notion), ask ONE targeted clarifying question before delegating.
  - For budgeting/personal finance tasks (Khipu): if spreadsheet context is missing (spreadsheet URL/id, sheet name, or whether to create a new file), ask ONE targeted question to choose: create new Google Sheet vs. update existing, and what structure (columns like Fecha, Categoría, Monto, Nota).
+ 
+ - CRITICAL DISTINCTION - Email vs Telegram vs Social Media:
+   * EMAIL/CORREO → Astra (via Ami): "enviar correo", "email", "gmail", "inbox", "responder", "draft email"
+   * TELEGRAM → Jenn: "telegram", "canal telegram", "@channel_name", "publicar telegram", "broadcast telegram"
+   * TWITTER/X → Jenn: "tweet", "twitter", "x.com", "post", "hilo"
+   * INSTAGRAM → Jenn: "instagram", "ig", "post instagram", "carousel", "reel", "stories"
+   * FACEBOOK → Jenn: "facebook", "fb", "página facebook", "post facebook"
+   
+   NEVER confuse "enviar mensaje" with Telegram if context clearly indicates email (e.g., "enviar correo", "email", "gmail").
+   ALWAYS route Telegram requests to Jenn (keywords: "telegram", "@channel", "canal telegram", "publicar telegram").
+ 
  - For social media via Jenn: complete multi-platform community management (Twitter/X, Instagram, Facebook, Telegram) including content creation, publishing, analytics, scheduling, and engagement. Jenn handles all social media tasks directly with integrated tools for all platforms.
  - For ambiguous or overlapping social media requests: ask ONE targeted clarifying question that explicitly mentions Jenn as the likely specialist (e.g., "¿Quieres que Jenn gestione X/Y/Z en Instagram/Facebook/Twitter/Telegram?").
  - For markets/stocks analysis: if ticker(s), period (e.g., 1m/3m/1y), or timeframe (daily/weekly) are missing, ask ONE clarifying question, then delegate to Apu‑Markets for execution.
- - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Jenn; "reporte de métricas" → Jenn).
- - If user explicitly tags an agent (e.g., "@Toby" or "Dile a Notion Agent…"), respect it unless clearly unsafe.
+ - Detect intent via patterns (e.g., "crear página en Notion" → Notion Agent; "debug API 500" → Toby; "hazme un presupuesto mensual" → Ami; "escribe 5 tweets" → Jenn; "reporte de métricas" → Jenn; "publica en @canal_telegram" → Jenn; "enviar correo a X" → Astra).
+ - If user explicitly tags an agent (e.g., "@Toby", "Dile a Notion Agent…", "@Jenn", "Jenn publica..."), respect it unless clearly unsafe.
  - Always include minimal context in handoff: goal, constraints, success criteria.`;
 
 // Explicit orchestration chains to bias routing consistently
 const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Notion intent → Ami orchestrates → delegate_to_notion_agent (Notion Agent executes)
-- Email triage → Ami; email compose/send → delegate_to_astra
+- Email triage/review → Ami; email compose/send/draft → delegate_to_astra (Astra executes)
 - Financial analysis/Business planning → Peter
- - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
-  - Social content creation/copywriting/analytics/metrics/reporting (Twitter/X, Instagram, Facebook, Telegram) → Jenn handles directly with integrated tools for all platforms
- - Evidence gathering (PDF/URL/Doc) → Iris synthesizes insights (Resumen Ejecutivo, Hallazgos, Tendencias, Riesgos, Recomendaciones, Próximos Pasos, Referencias)
-  - Medical information & triage (no diagnóstico) → Nora devuelve resumen basado en evidencia con fuentes y banderas de riesgo
- - Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
+- Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
+
+- SOCIAL MEDIA & MESSAGING PLATFORMS (ALL via Jenn):
+  * Twitter/X publishing → Jenn (tweets, threads, media)
+  * Instagram publishing → Jenn (posts, carousels, reels, stories)
+  * Facebook publishing → Jenn (posts, photos, scheduled posts)
+  * Telegram broadcasting → Jenn (channel messages, announcements)
+  * Social analytics/metrics → Jenn (all platforms)
+  
+- Evidence gathering (PDF/URL/Doc) → Iris synthesizes insights (Resumen Ejecutivo, Hallazgos, Tendencias, Riesgos, Recomendaciones, Próximos Pasos, Referencias)
+- Medical information & triage (no diagnóstico) → Nora devuelve resumen basado en evidencia con fuentes y banderas de riesgo
+- Markets/Stocks volatility analysis → Apu orchestrates → Apu‑Markets executes (include charts when possible)
+
 Notes:
 - When Notion credentials exist, do NOT ask the user to connect. Proceed to Notion Agent and return the real URL.
-- Only ask for Notion authentication if credential resolution fails (no token or 401/403).`;
+- Only ask for Notion authentication if credential resolution fails (no token or 401/403).
+- NEVER route Telegram requests to Astra/Ami - always to Jenn.
+- If user says "enviar mensaje" without platform context, ask for clarification (email vs Telegram vs social media).`;
 
 // Notion output validation & auth fallback policy
 const NOTION_OUTPUT_VALIDATION = `NOTION OUTPUT VALIDATION:

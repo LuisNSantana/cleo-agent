@@ -53,10 +53,7 @@ export const JENN_AGENT: AgentConfig = {
     'facebookGetPageInfo',
 
     // Telegram — channel broadcasting & announcements
-    'telegramPublishMessage',
-    'telegramPublishPhoto',
-    'telegramPublishVideo',
-    'telegramGetChannelInfo',
+    'publish_to_telegram',
 
     // Content Creation & Documentation
     'createGoogleDoc',
