@@ -33,6 +33,7 @@ import {
   Unplug,
   Loader2
 } from "lucide-react"
+import { TelegramChannelManager } from "@/components/integrations/telegram-channel-manager"
 
 // Tipos de integración disponibles
 type IntegrationType = 'google-workspace' | 'twitter' | 'notion' | 'shopify' | 'instagram' | 'facebook' | 'wordpress' | 'telegram'
@@ -196,6 +197,7 @@ export default function IntegrationsPage() {
     'wordpress': 'disconnected',
     'telegram': 'disconnected'
   })
+  const [expandedIntegration, setExpandedIntegration] = useState<IntegrationType | null>(null)
 
   // Handler for OAuth-based connections
   const handleOAuthConnect = (service: IntegrationType) => {
@@ -724,6 +726,32 @@ export default function IntegrationsPage() {
                           <div className="flex items-center space-x-2">
                             <Settings className="w-4 h-4" />
                             <span>Connect Account</span>
+                          </div>
+                        </Button>
+                      )}
+                    </div>
+                  ) : integration.id === 'telegram' ? (
+                    // Telegram custom UI (non-OAuth)
+                    <div className="space-y-3">
+                      {expandedIntegration === 'telegram' ? (
+                        <div className="space-y-4">
+                          <Button
+                            variant="ghost"
+                            onClick={() => setExpandedIntegration(null)}
+                            className="w-full text-sm"
+                          >
+                            ← Back
+                          </Button>
+                          <TelegramChannelManager />
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => setExpandedIntegration('telegram')}
+                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Manage Channels</span>
                           </div>
                         </Button>
                       )}
