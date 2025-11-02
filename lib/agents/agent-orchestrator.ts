@@ -88,7 +88,11 @@ async function createAndRunExecution(
 		userId: finalUserId,
 		agentId: targetId,
 		messageHistory,
-		metadata: { source: 'legacy-orchestrator', executionId: undefined }
+		metadata: { 
+			source: 'legacy-orchestrator', 
+			executionId: undefined,
+			threadId: threadId || null // ✅ CRITICAL: Pass thread for RAG isolation in graph state
+		}
 	}
 	
 	logger.debug(`🔍 [LEGACY WRAPPER] Delegating to CoreOrchestrator:`, {

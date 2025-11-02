@@ -111,13 +111,18 @@ async function buildAvailableAgentsSection(userId?: string): Promise<string> {
 }
 
 // Build a dynamic internal hint to steer delegation without exposing it to the user
-async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective, userId?: string) {
+async function buildInternalDelegationHint(userMessage?: string, recommended?: RouterDirective, userId?: string, externalHint?: string) {
   const base = `\n\nOPTIMIZED AGENT SYSTEM ACTIVE:
 🚀 NEW ARCHITECTURE: 68% tool reduction vs legacy system
 ⚡ SMART ROUTING: Complexity-based delegation (simple=direct, complex=specialist)
 🎯 ZERO OVERLAP: Each agent specialized (Ami=admin, Apu=research, Peter=creation, Emma=ecommerce)
 🔧 SUB-AGENTS: Hyper-specialized (Astra=email, Notion Agent=workspace)
-� PERFORMANCE: ~80% latency reduction for simple queries, better accuracy for complex`
+📈 PERFORMANCE: ~80% latency reduction for simple queries, better accuracy for complex`
+
+  // ✅ PRIORITY 1: Use externally provided hint if available (from route.ts analysis)
+  if (externalHint) {
+    return `${base}\n\n${externalHint}`
+  }
 
   // Image-specific optimization: handle quick prompts without delegation
   if (userMessage) {
@@ -183,6 +188,26 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
           toolName = `delegate_to_${normalize(delegationDecision.targetAgent)}`
         }
 
+        // ✅ CRITICAL: Early exit with explicit mention = MANDATORY delegation
+        const isEarlyExit = complexity.factors?.includes('explicit_mention') && complexity.score >= 99
+        
+        if (isEarlyExit) {
+          console.log(`🚨 [MANDATORY DELEGATION] Early exit detected! Agent: ${delegationDecision.targetAgent}, Tool: ${toolName}, Score: ${complexity.score}`)
+          
+          return `${base}
+
+🚨 MANDATORY DELEGATION (Early Exit Router):
+**CRITICAL**: User explicitly mentioned "${delegationDecision.targetAgent.toUpperCase()}" by name.
+**YOU MUST**:
+1. Call ONLY the tool: ${toolName}
+2. DO NOT call any other delegation tools in parallel
+3. DO NOT try to handle this yourself
+4. Pass a clear taskDescription with all details from the user's request
+
+**Reasoning**: Explicit agent mention detected (score: ${complexity.score}/100). This overrides normal complexity analysis.
+**Performance**: Early exit router = ~70% latency reduction by skipping AI analysis.`
+        }
+        
         return `${base}
 
 🎯 SMART DELEGATION DECISION:
@@ -314,7 +339,7 @@ const AGENT_WORKFLOW_DIRECTIVE = `AGENT WORKFLOW (RELIABILITY & SPEED)
 - Plan-then-act (brief): Form a short plan internally (1–2 steps). Do NOT reveal chain-of-thought; output only final answers and tool results.
 - Tool-first: Prefer a single correct tool call. Use at most 3 calls per turn. Stop early when sufficient.
 - Safety/timeouts: Keep calls quick; if a tool stalls or partial data is enough, stop and summarize. Ask one concise follow-up only if truly needed.
-- Verification: After a tool returns, verify it answers the user’s request; fix trivial gaps; then present a concise result with clear next action.`
+- Verification: After a tool returns, verify it answers the user's request; fix trivial gaps; then present a concise result with clear next action.`
 
 export type BuildPromptParams = {
   baseSystemPrompt?: string
@@ -322,10 +347,12 @@ export type BuildPromptParams = {
   messages: Array<{ role: string; content: any }>
   supabase: any | null
   realUserId: string | null
+  threadId?: string | null  // ✅ CRITICAL: Thread isolation for RAG
   enableSearch: boolean
   documentId?: string
   projectId?: string
   debugRag?: boolean
+  delegationHint?: string // ✅ NEW: Hint from intent analysis layer
 }
 
 export async function buildFinalSystemPrompt(params: BuildPromptParams) {
@@ -335,6 +362,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     messages,
     supabase,
     realUserId,
+    threadId,  // ✅ Thread isolation
     enableSearch,
     documentId,
     projectId,
@@ -434,6 +462,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
           const topK = fastModel ? 4 : 6
           let retrieved = await retrieveRelevant({
             userId: normalizedUserId,
+            threadId: threadId || undefined,  // ✅ Thread isolation for RAG
             query: userPlain,
             topK,
             documentId,
@@ -469,6 +498,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                   // retry
                   retrieved = await retrieveRelevant({
                     userId: normalizedUserId,
+                    threadId: threadId || undefined,  // ✅ Thread isolation
                     query: userPlain,
                     topK,
                     projectId,
@@ -490,6 +520,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                 const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales'
                 const extra = await retrieveRelevant({
                   userId: normalizedUserId,
+                  threadId: threadId || undefined,  // ✅ Thread isolation
                   query: profileQuery,
                   topK,
                   documentId,
@@ -687,14 +718,28 @@ SPECIAL RULE FOR DOCUMENTS: If the user wants to "work on", "edit", "collaborate
 
   // Compose final prompt with top-priority identity header FIRST to override model defaults
   // Order: Identity → [RAG?] → Persona → Context Rules → Guidance → Base System
-  const internalHint = await buildInternalDelegationHint(userMessage, routerHint, realUserId || undefined)
+  const internalHint = await buildInternalDelegationHint(
+    userMessage, 
+    routerHint, 
+    realUserId || undefined,
+    params.delegationHint // ✅ Pass external hint from route.ts
+  )
+  
+  // ✅ DEBUG: Log delegation hint injection
+  if (internalHint.includes('SMART DELEGATION DECISION') || internalHint.includes('🎯')) {
+    console.log('✅ [DELEGATION HINT] Injected into system prompt:', {
+      userMessage: userMessage.substring(0, 100),
+      hintPreview: internalHint.substring(0, 300)
+    })
+  }
   
   // Build dynamic list of available agents (predefined + user custom)
   const agentsSection = await buildAvailableAgentsSection(realUserId || undefined)
   
+  // ✅ CRITICAL: Put delegation hint FIRST so model sees it before all other instructions
   const finalSystemPrompt = ragSystemAddon
-    ? `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${agentsSection}`
-    : `${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${internalHint}${agentsSection}`
+    ? `${internalHint}${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${ragSystemPromptIntro(ragSystemAddon)}\n\n${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${agentsSection}`
+    : `${internalHint}${CLEO_IDENTITY_HEADER}\n\n${userProfileBlock ? userProfileBlock + '\n\n' : ''}${personaPrompt}\n\n${AGENT_WORKFLOW_DIRECTIVE}\n\n${CONTEXT_AND_DOC_RULES}${searchGuidance}\n\n${selectedBasePrompt}${agentsSection}`
 
   if (
     (typeof selectedBasePrompt === 'string' && selectedBasePrompt.includes('{{user_lang}}')) ||

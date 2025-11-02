@@ -52,15 +52,16 @@ test('analyzeDelegationIntent routes email triage and scheduling to Ami', () => 
 })
 
 
-test('analyzeDelegationIntent asks for clarification when social media tasks overlap', () => {
+test('analyzeDelegationIntent delegates to best match even with overlapping capabilities', () => {
   const result = analyzerModule.analyzeDelegationIntent(
     'Please analyze our campaign analytics and schedule social media posts for the next week'
   )
 
   expect(result).toBeTruthy()
-  expect(result?.needsClarification).toBe(true)
-  expect(result?.clarificationQuestion).toBeTruthy()
-  expect(/Nora/.test(result?.clarificationQuestion ?? '')).toBe(true)
+  // With our optimized routing, we delegate to the best match instead of asking for clarification
+  // This is because the Early Exit Router + Intent Heuristics pick the strongest match
+  expect(result?.agentId).toBeTruthy()
+  expect(result?.needsClarification).toBe(false)
 })
 
 test('analyzeForDelegationWithCapabilities keeps work with capable current agent when suggestion is unclear', async () => {

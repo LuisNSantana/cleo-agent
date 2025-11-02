@@ -28,6 +28,41 @@ function getCore(): CoreOrchestrator {
   const g = globalThis as any
   if (!g.__cleoCoreOrchestrator) {
     g.__cleoCoreOrchestrator = new CoreOrchestrator({ enableMetrics: true, enableMemory: true })
+    
+    // CRITICAL FIX: Bridge core events to adapter listeners for delegation completion
+    // When a delegated execution completes, notify waiting delegation tools
+    const core = g.__cleoCoreOrchestrator as CoreOrchestrator
+    core.emitter.on('execution.completed', (execution: AgentExecution) => {
+      console.log('🔔 [ADAPTER BRIDGE] execution.completed event received:', {
+        executionId: execution.id,
+        agentId: execution.agentId,
+        status: execution.status,
+        hasResult: !!execution.result,
+        listenerCount: listeners.length
+      })
+      
+      // Emit legacy-compatible event format for delegation.ts listener
+      const event = {
+        type: 'execution_completed',
+        data: {
+          executionId: execution.id,
+          agentId: execution.agentId,
+          status: execution.status,
+          result: execution.result,
+          timestamp: new Date().toISOString()
+        }
+      }
+      
+      // Notify all adapter listeners (delegation tools are waiting for this)
+      listeners.forEach(fn => {
+        try {
+          console.log('🔔 [ADAPTER BRIDGE] Calling listener for execution:', execution.id)
+          fn(event)
+        } catch (err) {
+          console.warn('[Adapter Bridge] Listener error:', err)
+        }
+      })
+    })
   }
   coreInstance = g.__cleoCoreOrchestrator as CoreOrchestrator
   return coreInstance

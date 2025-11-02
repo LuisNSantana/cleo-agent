@@ -13,6 +13,13 @@ import { executeWithRetry, RETRY_PRESETS } from '@/lib/agents/retry-policy'
 let globalEventController: ReadableStreamDefaultController<Uint8Array> | null = null
 let globalEventEncoder: TextEncoder | null = null
 
+// Global delegation resolvers map for direct callback pattern
+// This allows orchestrator to resolve delegation promises immediately when child completes
+// Format: Map<delegationKey, { resolve: (result) => void, reject: (error) => void }>
+if (!(globalThis as any).__delegationResolvers) {
+  (globalThis as any).__delegationResolvers = new Map()
+}
+
 // Set the event controller for pipeline streaming
 export function setPipelineEventController(controller: ReadableStreamDefaultController<Uint8Array>, encoder: TextEncoder) {
   globalEventController = controller
@@ -44,33 +51,48 @@ export function emitPipelineEventExternal(event: any) {
 
 // Display names now resolved via shared helper
 
-// Delegation tool schema
+// ✅ TASK DESCRIPTION PATTERN (LangGraph Best Practice)
+// Instead of passing full message history, supervisor formulates explicit task description
+// This reduces context contamination and gives delegated agent clear instructions
 const delegationSchema = z.object({
-  task: z.string().describe('The specific task to delegate to the specialist agent'),
-  context: z.string().optional().describe('Additional context for the delegated task'),
-  // Accept medium/urgent from models and normalize to valid enum to avoid provider schema failures
+  taskDescription: z.string().describe(
+    'Clear, explicit description of what the specialist agent should do. ' +
+    'Include all necessary details: who, what, where, when. ' +
+    'Example: "Publish the message \'Team standup at 3pm\' to the Telegram channel @team-updates"'
+  ),
+  context: z.string().optional().describe('Additional background context if needed'),
   priority: z
     .enum(['low', 'normal', 'high', 'medium', 'urgent'])
     .optional()
     .default('normal')
     .transform((v) => (v === 'medium' ? 'normal' : v === 'urgent' ? 'high' : v))
     .describe('Task priority level'),
-  requirements: z.string().optional().describe('Specific requirements or constraints for the task'),
+  requirements: z.string().optional().describe('Specific requirements or constraints'),
   userId: z.string().optional().describe('Explicit userId for context propagation (internal use)')
 });
 
 // Individual delegation tools for each specialist agent
 
-// Shared helper to perform a blocking handoff to the orchestrator and return the final result
+// ✅ Shared helper to perform blocking handoff with explicit task description
+// Following LangGraph supervisor pattern: https://langchain-ai.github.io/langgraph/tutorials/multi_agent/agent_supervisor/
 async function runDelegation(params: {
   agentId: string
-  task: string
+  taskDescription: string  // ✅ Changed from 'task' to align with LangGraph pattern
   context?: string
   priority?: 'low'|'normal'|'high'|'medium'|'urgent'
   requirements?: string
   userId?: string
 }) {
-  const { agentId: rawAgentId, task, context, priority, requirements } = params
+  // CRITICAL DEBUG: Log entry immediately
+  logger.info('🎬 [DELEGATION_ENTRY]', {
+    rawAgentId: params.agentId,
+    taskPreview: params.taskDescription?.slice(0, 80),
+    hasContext: !!params.context,
+    priority: params.priority,
+    userId: params.userId
+  })
+
+  const { agentId: rawAgentId, taskDescription, context, priority, requirements } = params
 
   const agentId = await resolveAgentCanonicalKey(rawAgentId)
   // Normalize to valid set used by orchestrator/tools
@@ -89,7 +111,6 @@ async function runDelegation(params: {
       const globalUser = (globalThis as any).__activeUserId || (globalThis as any).__lastAuthenticatedUserId
       if (globalUser && typeof globalUser === 'string' && /[0-9a-fA-F-]{36}/.test(globalUser)) {
         userId = globalUser
-        logger.debug('🛠️ [DELEGATION] Recovered userId from global fallback', { userId })
       }
     }
   } catch {}
@@ -115,11 +136,11 @@ async function runDelegation(params: {
     target_agent: agentId,
     context_user_id: userId,
     priority: normPriority,
-    task_preview: task.slice(0, 120)
+    task_preview: taskDescription.slice(0, 120)
   })
 
   const input = [
-    `Tarea: ${task}`,
+    `Tarea: ${taskDescription}`,
     context ? `Contexto: ${context}` : null,
     requirements ? `Requisitos: ${requirements}` : null,
   normPriority ? `Prioridad: ${normPriority}` : null,
@@ -128,7 +149,7 @@ async function runDelegation(params: {
   // Create snapshot for this delegation action
   const snapshot = actionSnapshotStore.create('delegation', {
     meta: { userId, agentId, delegationTarget: agentId },
-    input: redactInput({ task, context, priority: normPriority, requirements })
+    input: redactInput({ taskDescription, context, priority: normPriority, requirements })
   })
   const actionId = snapshot.id
   ActionLifecycle.start(actionId)
@@ -137,7 +158,7 @@ async function runDelegation(params: {
     type: 'delegation-start', // legacy event for current UI
     agentId,
     agentName: getAgentDisplayName(agentId),
-    task,
+    task: taskDescription,  // ✅ Legacy UI expects 'task' field
     actionId,
     timestamp: new Date().toISOString()
   })
@@ -166,19 +187,72 @@ async function runDelegation(params: {
         .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime())[0]
       if (match?.id) {
         execId = match.id
-        console.log('🔍 [DELEGATION DEBUG] Recovered execId from active executions:', { execId })
       }
     } catch {}
   }
   
-  // DEBUG: Log delegation execution details
-  console.log('🔍 [DELEGATION DEBUG] Started execution:', {
-    targetAgentId: agentId,
-    execId,
-    executionStatus: exec?.status,
-    userId,
-    inputPreview: input.slice(0, 100)
-  })
+  // CRITICAL FIX: Register direct resolver for this delegation
+  // This allows orchestrator to resolve the delegation immediately when child completes
+  // Format: parentExecId:sourceAgent:canonicalTargetAgent
+  let delegationKey: string | null = null
+  let directResolverPromise: Promise<any> | null = null
+  let parentExecId: string | undefined = undefined
+  try {
+    // Prefer a direct parent execution id from orchestrator, else search active executions
+    let parentExecId = orchestrator.getCurrentExecutionId?.()
+
+  if (!parentExecId) {
+      try {
+        const active = orchestrator.getActiveExecutions?.() || []
+        // Find the most recent supervisor execution for this user
+        const candidate = (active as any[])
+          .filter(e => e?.agentId === 'cleo-supervisor' && (!e?.userId || e?.userId === userId) && e?.status === 'running')
+          .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime())[0]
+        if (candidate?.id) parentExecId = candidate.id
+      } catch (err) {
+        logger.warn('⚠️ [DELEGATION] Failed to lookup parent execution id from active executions:', err)
+      }
+    }
+
+    // Use canonical agent id already resolved to `agentId` above
+    if (parentExecId && execId) {
+      delegationKey = `${parentExecId}:cleo-supervisor:${agentId}`
+      logger.info('🔑 [DELEGATION] Registering direct resolver', {
+        delegationKey,
+        parentExecId,
+        childExecId: execId,
+        agentId
+      })
+
+      directResolverPromise = new Promise((resolve, reject) => {
+        const resolvers = (globalThis as any).__delegationResolvers
+        if (resolvers instanceof Map) {
+          resolvers.set(delegationKey, { resolve, reject })
+          // Also register a fallback under the raw agent id in case canonicalization mismatches
+          try {
+            if (rawAgentId && rawAgentId !== agentId) {
+              const fallbackKey = `${parentExecId}:cleo-supervisor:${rawAgentId}`
+              resolvers.set(fallbackKey, { resolve, reject })
+              logger.debug('🔁 [DELEGATION] Registered fallback resolver key for raw agent id', { fallbackKey })
+            }
+          } catch (err) {}
+
+          logger.info('✅ [DELEGATION] Direct resolver registered successfully', { delegationKey })
+        } else {
+          logger.warn('⚠️ [DELEGATION] Resolvers map not initialized')
+          resolve(null) // Fallback to polling
+        }
+      })
+    } else {
+      logger.warn('⚠️ [DELEGATION] Cannot create delegation key:', {
+        hasParentExecId: !!parentExecId,
+        hasChildExecId: !!execId,
+        attemptedAgent: agentId
+      })
+    }
+  } catch (err) {
+    logger.warn('⚠️ [DELEGATION] Failed to register direct resolver:', err)
+  }
   
   const startedAt = Date.now()
   const { getRuntimeConfig } = await import('../agents/runtime-config')
@@ -196,13 +270,6 @@ async function runDelegation(params: {
   let timeoutMs = isScheduledTask ? 600_000 : runtime.delegationTimeoutMs
   const POLL_MS = runtime.delegationPollMs
   let lastProgressAt = startedAt
-  
-  logger.debug('🔁 [DELEGATION] Timeout configuration', {
-    isScheduledTask,
-    timeoutMs,
-    timeoutMinutes: timeoutMs / 60_000,
-    requestId: requestContext?.requestId
-  })
 
   // Emit initial processing as progress (detail only)
   ActionLifecycle.progress(actionId, 0, 'starting')
@@ -237,18 +304,23 @@ async function runDelegation(params: {
     try {
       const legacy = (globalThis as any).__cleoOrchestrator
       if (legacy && typeof legacy.onEvent === 'function' && execId) {
+        console.log('🎧 [DELEGATION] Registering completion listener for execution:', execId)
         const handler = (event: any) => {
+          console.log('🎧 [DELEGATION] Event received:', {
+            eventType: event.type,
+            eventExecutionId: event.data?.executionId,
+            targetExecutionId: execId,
+            matches: event.type === 'execution_completed' && event.data?.executionId === execId
+          })
+          
           if (event.type === 'execution_completed' && event.data?.executionId === execId) {
-            console.log('🔍 [DELEGATION DEBUG] Received completion event:', {
-              eventExecutionId: event.data?.executionId,
-              targetExecutionId: execId,
-              agentId: event.agentId
-            })
+            console.log('✅ [DELEGATION] Completion event matched! Resolving promise...')
             // Get final result from the completed execution (may need a brief drain window)
             let result = ''
             try {
               const snapshot = orchestrator.getExecution?.(execId)
               result = String(snapshot?.result || snapshot?.messages?.slice(-1)?.[0]?.content || '')
+              console.log('✅ [DELEGATION] Extracted result:', result?.slice(0, 100))
             } catch {}
             resolve(result)
           }
@@ -258,31 +330,52 @@ async function runDelegation(params: {
         detachListener = () => {
           try { legacy.offEvent?.(handler) } catch {}
         }
-        console.log('🔍 [DELEGATION DEBUG] Added completion event listener for:', execId)
+        console.log('✅ [DELEGATION] Listener registered successfully')
       } else {
+        console.log('⚠️ [DELEGATION] Cannot register listener:', {
+          hasLegacy: !!legacy,
+          hasOnEvent: typeof legacy?.onEvent === 'function',
+          hasExecId: !!execId
+        })
         resolve(null) // Fallback to polling only
       }
     } catch (err) {
-      console.warn('🔍 [DELEGATION DEBUG] Failed to add completion listener:', err)
+      logger.warn('⚠️ [DELEGATION] Failed to add completion listener:', err)
       resolve(null) // Fallback to polling only
     }
   })
   
   while (Date.now() - startedAt < timeoutMs) {
-    // Small delay OR wait for completion event
+    // Small delay OR wait for completion event OR direct resolver callback
     const pollPromise = new Promise(r => setTimeout(r, POLL_MS))
     
-    // Race between polling delay and completion event
-    const eventResult = await Promise.race([
+    // Race between polling delay, legacy event listener, and direct resolver callback
+    const racePromises = [
       pollPromise.then(() => null),
       completionPromise
-    ])
+    ]
     
-    // If we got a completion event, use that result
-    if (eventResult !== null) {
-      // We got a completion event; sometimes messages aren't synced yet. Try a quick drain loop to fetch final text.
+    if (directResolverPromise) {
+      racePromises.push(directResolverPromise)
+    }
+    
+    const eventResult = await Promise.race(racePromises)
+    
+    // If we got a completion event or direct callback, use that result
+    if (eventResult !== null && typeof eventResult === 'object' && 'success' in eventResult) {
+      // Direct resolver callback (new pattern)
+      logger.info('✅ [DELEGATION] Direct resolver fired!', {
+        hasResult: !!(eventResult as any).result,
+        delegationKey
+      })
       status = 'completed'
-      let resolvedText = eventResult || ''
+      finalResult = (eventResult as any).result || ''
+      break
+    } else if (eventResult !== null) {
+      // Legacy event listener
+      logger.info('✅ [DELEGATION] Legacy event listener fired')
+      status = 'completed'
+      let resolvedText = String(eventResult || '')
       if ((!resolvedText || resolvedText.length === 0) && execId) {
         for (let i = 0; i < 5; i++) {
           await new Promise(r => setTimeout(r, 120))
@@ -294,11 +387,6 @@ async function runDelegation(params: {
         }
       }
       finalResult = resolvedText
-      console.log('🔍 [DELEGATION DEBUG] Completion detected via event:', {
-        execId,
-        resultLength: finalResult?.length,
-        agentId
-      })
       break
     }
 
@@ -317,7 +405,7 @@ async function runDelegation(params: {
           hasActiveInterrupt = !!(interruptState && interruptState.status === 'pending')
           
           if (hasActiveInterrupt) {
-            console.log('⏸️ [DELEGATION] Child execution has active interrupt, waiting for user response:', {
+            logger.info('⏸️ [DELEGATION] Child execution has active interrupt, waiting for user response', {
               execId,
               interruptStatus: interruptState?.status,
               agentId
@@ -327,25 +415,8 @@ async function runDelegation(params: {
             lastProgressAt = Date.now() // Reset progress timer
           }
         } catch (err) {
-          console.warn('⚠️ [DELEGATION] Failed to check interrupt status:', err)
+          logger.warn('⚠️ [DELEGATION] Failed to check interrupt status:', err)
         }
-      }
-      
-      // DEBUG: Log detailed execution status every 10 seconds to reduce noise
-      // Only log when elapsed time is a multiple of 10 seconds
-      const elapsed = Date.now() - startedAt
-      const shouldLog = Math.floor(elapsed / 10000) !== Math.floor((elapsed - POLL_MS) / 10000)
-      
-      if (shouldLog) {
-        console.log('🔍 [DELEGATION DEBUG] Polling execution:', {
-          execId,
-          snapshotStatus: snapshot?.status,
-          snapshotResult: snapshot?.result ? 'present' : 'missing',
-          snapshotMessages: snapshot?.messages?.length || 0,
-          currentStatus: status,
-          hasActiveInterrupt,
-          elapsed
-        })
       }
       
       // Emit progress events when status changes
@@ -505,14 +576,51 @@ async function runDelegation(params: {
     })
   }
 
+  // CLEANUP: Remove direct resolver if still present
+  if (delegationKey) {
+    try {
+      const resolvers = (globalThis as any).__delegationResolvers
+      if (resolvers instanceof Map) {
+        if (resolvers.has(delegationKey)) {
+          resolvers.delete(delegationKey)
+          logger.debug('🧹 [DELEGATION] Cleaned up direct resolver:', delegationKey)
+        }
+        try {
+          if (parentExecId && rawAgentId && rawAgentId !== agentId) {
+            const fallbackKey = `${parentExecId}:cleo-supervisor:${rawAgentId}`
+            if (resolvers.has(fallbackKey)) {
+              resolvers.delete(fallbackKey)
+              logger.debug('🧹 [DELEGATION] Cleaned up fallback resolver:', fallbackKey)
+            }
+          }
+        } catch (err) {
+          logger.warn('⚠️ [DELEGATION] Failed to clean up fallback resolver key:', err)
+        }
+      }
+    } catch (err) {
+      logger.warn('⚠️ [DELEGATION] Failed to clean up resolver:', err)
+    }
+  }
+
+  // CLEANUP: Detach legacy event listener if registered
+  try {
+    const cleanup = detachListener as (() => void) | null
+    if (cleanup && typeof cleanup === 'function') {
+      cleanup()
+      logger.debug('🧹 [DELEGATION] Detached legacy event listener')
+    }
+  } catch (err) {
+    logger.warn('⚠️ [DELEGATION] Failed to detach listener:', err)
+  }
+
   return {
     status: 'delegated',
     targetAgent: agentId,
-    delegatedTask: task,
+    delegatedTask: taskDescription,
     context: context || '',
   priority: normPriority,
     requirements: requirements || '',
-    handoffMessage: `Task delegated to ${agentId}: ${task}${context ? ` - Context: ${context}` : ''}`,
+    handoffMessage: `Task delegated to ${agentId}: ${taskDescription}${context ? ` - Context: ${context}` : ''}`,
     nextAction: 'handoff_to_agent',
     agentId,
     result: finalResult,
@@ -524,39 +632,39 @@ async function runDelegation(params: {
 export const delegateToTobyTool = tool({
   description: 'Delegate software/programming and IoT tasks to Toby: coding, debugging, architecture, APIs, databases, DevOps, and embedded/IoT (ESP32, Arduino, Raspberry Pi, MQTT, BLE). Use this for any technical question or implementation request related to software systems.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'toby-technical', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'toby-technical', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToAmiTool = tool({
   description: 'Delegate executive assistant, organization, productivity, research, calendar, email management, or creative tasks to Ami specialist. Ami handles: scheduling, email triage, research, organization, productivity workflows, creative projects, and general assistance tasks. Use for anything requiring coordination, planning, or general assistant work.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'ami-creative', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'ami-creative', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToPeterTool = tool({
   description: 'Delegate financial analysis and business strategy tasks to Peter, your financial advisor. ONLY use for: financial modeling, business plans, budgeting, investment analysis, crypto research, accounting support, tax planning, ROI calculations. Peter has tools: createGoogleSheet, readGoogleSheet, updateGoogleSheet, appendGoogleSheet, webSearch, cryptoPrices. DO NOT delegate general document creation, email, calendar, or non-financial tasks.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'peter-financial', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'peter-financial', taskDescription, context, priority, requirements, userId })
   }
 });
 export const delegateToEmmaTool = tool({
   description: 'Delegate e-commerce and Shopify management tasks to Emma specialist. Use for online store operations, e-commerce sales analytics, Shopify product management, inventory optimization, or business operations related to online retail.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'emma-ecommerce', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'emma-ecommerce', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToApuTool = tool({
   description: 'Delegate web research, data gathering, news monitoring, and academic search tasks to Apu specialist. Use for collecting raw data, news articles, academic papers, company information, trend data, and structured findings. For strategic analysis or business insights synthesis, use delegate_to_wex instead.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'apu-support', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'apu-support', taskDescription, context, priority, requirements, userId })
   }
 });
 
@@ -565,48 +673,48 @@ export const delegateToApuTool = tool({
 export const delegateToWexTool = tool({
   description: 'Delegate strategic market analysis, competitive intelligence, and actionable business insights synthesis to Wex specialist. Use for strategic analysis, market insights ("insights accionables"), executive summaries, SWOT analysis, competitive positioning, business frameworks (Porter Forces, opportunity matrices), and synthesis of complex market research into actionable recommendations.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'wex-intelligence', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'wex-intelligence', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToAstraTool = tool({
   description: 'Delegate email management, composition, and communication tasks to Astra email specialist. Use for sending emails, drafting messages, managing inbox, email automation, and correspondence handling.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'astra-email', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'astra-email', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToNotionTool = tool({
   description: 'Delegate Notion workspace management, page creation, database operations, and knowledge organization tasks to Notion specialist. Use for creating pages, managing databases, organizing content, and workspace administration.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'notion-agent', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'notion-agent', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToNoraTool = tool({
   description: 'Delegate medical information & triage requests to Nora (non-diagnostic). Use for evidence-informed guidance, risk flags, structured summaries with sources; not for emergencies or prescriptions.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'nora-medical', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'nora-medical', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToJennTool = tool({
   description: 'Delegate community management, social media strategy, and Twitter/X operations to Jenn. Use for content calendars, thread drafts, publishing, analytics reporting, and social engagement workflows.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'jenn-community', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'jenn-community', taskDescription, context, priority, requirements, userId })
   }
 });
 
 export const delegateToIrisTool = tool({
   description: 'Delegate insight synthesis and analysis to Iris. ONLY use for: analyzing documents/PDFs/attachments, generating executive summaries, identifying trends and patterns, risk assessment with severity/probability/confidence, evidence-based recommendations. Iris excels at turning messy inputs into structured insights with traceability. Use when user provides attachments or needs deep analysis of documents.',
   inputSchema: delegationSchema,
-  execute: async ({ task, context, priority, requirements, userId }) => {
-    return runDelegation({ agentId: 'iris-insights', task, context, priority, requirements, userId })
+  execute: async ({ taskDescription, context, priority, requirements, userId }) => {
+    return runDelegation({ agentId: 'iris-insights', taskDescription, context, priority, requirements, userId })
   }
 });
 

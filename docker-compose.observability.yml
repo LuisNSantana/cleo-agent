@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Jaeger - Distributed Tracing UI
+  # Ver trazas de agentes en: http://localhost:16686
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: cleo-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"  # UI Web (abrir en navegador)
+      - "4318:4318"    # OTLP HTTP (endpoint para OpenTelemetry)
+      - "14268:14268"  # Jaeger collector
+    restart: unless-stopped
+    networks:
+      - cleo-observability
+
+  # PostgreSQL (para inspeccionar checkpoints si quieres GUI)
+  # Opcional: Puedes usar TablePlus/Postico para ver datos
+  postgres-admin:
+    image: dpage/pgadmin4:latest
+    container_name: cleo-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@cleo.local
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+    ports:
+      - "5050:80"  # PgAdmin UI en http://localhost:5050
+    restart: unless-stopped
+    networks:
+      - cleo-observability
+    depends_on:
+      - jaeger
+
+networks:
+  cleo-observability:
+    driver: bridge

@@ -15,18 +15,24 @@ import { leadResearchTool } from './lead-research'
 // Task management
 // Inline completeTaskTool (no separate file found)
 export const completeTaskTool = tool({
-	description: 'Signal task completion and return control to supervisor',
+	description: 'ONLY use AFTER executing all required tools successfully. Signal task completion with proof of execution (message_id, API response, etc.). DO NOT use as first/only action - must call actual work tools first (publish_to_telegram, postTweet, etc.)',
 	inputSchema: z.object({
-		summary: z.string().describe('Brief summary of completed work'),
+		summary: z.string().describe('Brief summary of completed work with PROOF (e.g., "Published to Telegram, message_id: 12345")'),
 		status: z.enum(['completed', 'ready', 'done']).default('completed'),
-		nextSteps: z.string().optional().describe('Suggested next steps')
+		nextSteps: z.string().optional().describe('Suggested next steps'),
+		toolsExecuted: z.array(z.string()).optional().describe('List of tools called BEFORE this (e.g., ["publish_to_telegram", "postTweet"])')
 	}),
-	execute: async ({ summary, status, nextSteps }) => {
+	execute: async ({ summary, status, nextSteps, toolsExecuted }) => {
+		// Validation: Ensure this isn't being used as an escape hatch
+		if (!toolsExecuted || toolsExecuted.length === 0) {
+			console.warn('[COMPLETE_TASK] ⚠️ Called without any tools executed - possible agent escape hatch abuse')
+		}
 		return {
 			taskCompleted: true,
 			status,
 			summary,
 			nextSteps: nextSteps || null,
+			toolsExecuted: toolsExecuted || [],
 			timestamp: new Date().toISOString(),
 			message: `Task ${status}: ${summary}`
 		}

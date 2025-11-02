@@ -248,6 +248,7 @@ export class GroqAgent extends BaseAgent {
         try {
           const chunks = await retrieveRelevant({
             userId: input.metadata.userId,
+            threadId: input.metadata.threadId,  // ✅ Thread isolation
             query: input.content,
             documentId: input.metadata.documentId,
             projectId: input.metadata.projectId,
@@ -417,6 +418,7 @@ export class OpenAIAgent extends BaseAgent {
         try {
           const chunks = await retrieveRelevant({
             userId: input.metadata.userId,
+            threadId: input.metadata.threadId,  // ✅ Thread isolation
             query: userContent,
             documentId: input.metadata.documentId,
             projectId: input.metadata.projectId,

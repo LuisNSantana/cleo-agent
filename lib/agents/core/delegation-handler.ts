@@ -13,6 +13,13 @@ import { logger } from '@/lib/logger'
 import { EventEmitter } from './event-emitter'
 import { ExecutionManager } from './execution-manager'
 import { InterruptManager } from './interrupt-manager'
+import { 
+  registerResolver, 
+  getResolver, 
+  deleteResolver,
+  type DelegationResolver 
+} from './delegation-context'
+import { LRUCache } from 'lru-cache'
 
 export interface DelegationRequest {
   sourceAgent: string
@@ -42,14 +49,34 @@ export interface DelegationResult {
  * multiple executions.
  */
 export class DelegationHandler {
-  private activeDelegations = new Map<string, Promise<DelegationResult>>()
-  private delegationHistory = new Map<string, DelegationResult>()
+  private activeDelegations: LRUCache<string, Promise<DelegationResult>>
+  private delegationHistory: LRUCache<string, DelegationResult>
   // Track child execution IDs for each delegation key so we can clean up interrupts on timeout
   private delegationExecutions = new Map<string, string>()
   private eventEmitter: EventEmitter
 
   constructor(eventEmitter: EventEmitter) {
     this.eventEmitter = eventEmitter
+    
+    // LRU cache for active delegations (max 50, TTL 2min)
+    this.activeDelegations = new LRUCache<string, Promise<DelegationResult>>({
+      max: 50,
+      ttl: 1000 * 60 * 2, // 2 minutes (delegations should complete faster)
+      updateAgeOnGet: true,
+      dispose: (promise, key) => {
+        logger.debug('[DELEGATION]', `🧹 LRU evicted active delegation: ${key}`)
+      }
+    })
+    
+    // LRU cache for delegation history (max 200, TTL 10min)
+    this.delegationHistory = new LRUCache<string, DelegationResult>({
+      max: 200,
+      ttl: 1000 * 60 * 10, // 10 minutes
+      updateAgeOnGet: false,
+      dispose: (result, key) => {
+        logger.debug('[DELEGATION]', `🧹 LRU evicted delegation history: ${key}`)
+      }
+    })
     
     // Listen for child execution start events to track execution IDs
     this.eventEmitter.on('delegation.execution.started', (data: { delegationKey: string; executionId: string }) => {
@@ -165,13 +192,34 @@ export class DelegationHandler {
   }
 
   /**
-   * Wait for delegation.completed event
+   * Wait for delegation.completed event or direct resolver
    */
   private waitForDelegationCompletion(
     delegationKey: string,
     timeoutMs: number
   ): Promise<DelegationResult> {
     return new Promise((resolve, reject) => {
+      // Register resolver in request-scoped context (AsyncLocalStorage)
+      registerResolver(delegationKey, { 
+        resolve: (result: any) => {
+          logger.debug('DELEGATION', `✅ Direct resolver fired for ${delegationKey}`)
+          cleanup()
+          this.delegationExecutions.delete(delegationKey)
+          resolve({
+            success: true,
+            result: result.result,
+            targetAgent: result.targetAgent,
+            continuationHint: result.continuationHint
+          })
+        },
+        reject: (error: Error) => {
+          logger.error('DELEGATION', `❌ Resolver rejected for ${delegationKey}:`, error)
+          cleanup()
+          this.delegationExecutions.delete(delegationKey)
+          reject(error)
+        }
+      })
+
       const timeout = setTimeout(() => {
         cleanup()
         
@@ -223,6 +271,7 @@ export class DelegationHandler {
       const cleanup = () => {
         clearTimeout(timeout)
         this.eventEmitter.off('delegation.completed', completionHandler)
+        deleteResolver(delegationKey)
       }
 
       this.eventEmitter.on('delegation.completed', completionHandler)

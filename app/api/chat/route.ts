@@ -286,6 +286,9 @@ export async function POST(req: Request) {
   // Delegation heuristic debug flag (can be toggled via query param in future)
   const debugDelegation = process.env.DEBUG_DELEGATION_INTENT === 'true'
 
+  // Thread ID for RAG isolation - use chatId as the thread identifier
+  let effectiveThreadId: string | null = chatId || null
+
   // Normalize model ID early and also keep original with prefix
   const originalModel = model
   let normalizedModel = normalizeModelId(model)
@@ -775,6 +778,9 @@ export async function POST(req: Request) {
   ;(globalThis as any).__currentUserId = realUserId
   ;(globalThis as any).__currentModel = normalizedModel
 
+  // ✅ DEBUG: Verify thread ID is set before RAG calls
+  console.log(`🧵 [ROUTE] effectiveThreadId before buildFinalSystemPrompt: ${effectiveThreadId || 'NULL (will use GLOBAL)'}`)
+
       // Build final system prompt using centralized prompt builder (handles RAG, personalization, and search guidance)
   const promptBuild = await buildFinalSystemPrompt({
         baseSystemPrompt: effectiveSystemPrompt,
@@ -782,6 +788,7 @@ export async function POST(req: Request) {
         messages,
         supabase,
         realUserId,
+        threadId: effectiveThreadId,  // ✅ CRITICAL: Pass thread for RAG isolation
     enableSearch: effectiveEnableSearch,
         documentId,
         projectId,
@@ -1167,7 +1174,6 @@ export async function POST(req: Request) {
         }
 
         // Ensure a thread for Cleo-supervisor (supervised)
-        let effectiveThreadId: string | null = null
         if (supabase && realUserId) {
           try {
             const compositeAgentKey = `cleo-supervisor_supervised`
@@ -1219,20 +1225,22 @@ export async function POST(req: Request) {
               const deduped = msgs.filter((m: any) => {
                 const key = `${m.role}:${(m.content || '').trim()}`
                 if (seen.has(key)) {
-                  console.log(`[CHAT] DEDUP: Skipping duplicate ${m.role}: "${(m.content || '').substring(0, 30)}..."`)
+                  // Don't log duplicates to reduce noise
                   return false
                 }
                 seen.add(key)
                 return true
               })
               
-              // Smart filtering: Keep recent messages, prioritize user/assistant over tool/system
-              // Keep last 30 user/assistant messages + last 10 system/tool for efficiency
+              // ✅ IMPROVED FILTERING: Focus on recent context to avoid historical contamination
+              // Strategy: Take only the last 10 user/assistant exchanges (20 messages max)
+              // This prevents ancient context (meetings, events from weeks ago) from polluting the current task
               const userAssistant = deduped.filter((m: any) => m.role === 'user' || m.role === 'assistant')
               const systemTool = deduped.filter((m: any) => m.role === 'system' || m.role === 'tool')
               
-              const recentUserAssistant = userAssistant.slice(-30)
-              const recentSystemTool = systemTool.slice(-10)
+              // Take last 10 messages instead of 30 to keep context fresh and relevant
+              const recentUserAssistant = userAssistant.slice(-10)
+              const recentSystemTool = systemTool.slice(-5)
               
               // Merge and sort by created_at to maintain chronological order
               const filtered = [...recentUserAssistant, ...recentSystemTool]

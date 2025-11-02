@@ -76,6 +76,12 @@ async function getChannelIdentifier(channelUsername: string): Promise<string> {
 /**
  * Tool 1: Publish text message to Telegram channel
  */
+/**
+ * Tool 1: Publish message to Telegram channel
+ * DEPRECATED: Use publish_to_telegram from telegram-publish.ts instead
+ * Kept for reference but not exported
+ */
+/*
 const telegramPublishMessage = tool({
   description: `Publish a text message to a Telegram channel. 
   
@@ -141,6 +147,7 @@ const telegramPublishMessage = tool({
     }
   },
 });
+*/
 
 /**
  * Tool 2: Publish photo to Telegram channel
@@ -370,9 +377,9 @@ const telegramGetChannelInfo = tool({
 import { telegramPublishTool } from './telegram-publish'
 
 export const telegramChannelTools = {
-  telegramPublishMessage: ensureToolsHaveRequestContext([telegramPublishMessage])[0],
+  // REMOVED: telegramPublishMessage (duplicated with publish_to_telegram)
   telegramPublishPhoto: ensureToolsHaveRequestContext([telegramPublishPhoto])[0],
   telegramPublishVideo: ensureToolsHaveRequestContext([telegramPublishVideo])[0],
   telegramGetChannelInfo: ensureToolsHaveRequestContext([telegramGetChannelInfo])[0],
-  publish_to_telegram: telegramPublishTool,
+  publish_to_telegram: ensureToolsHaveRequestContext([telegramPublishTool])[0], // ✅ Primary text publishing tool
 };

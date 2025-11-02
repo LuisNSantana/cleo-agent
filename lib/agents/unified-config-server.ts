@@ -7,6 +7,7 @@ import { getAgentByIdForUser, getAllAgentsForUser } from './unified-service'
 import { ALL_PREDEFINED_AGENTS, getPredefinedAgentById } from './predefined'
 import type { AgentConfig } from './types'
 import type { UnifiedAgent } from './unified-types'
+import logger from '@/lib/utils/logger'
 
 /**
  * Transform UnifiedAgent to AgentConfig for backward compatibility
@@ -40,33 +41,30 @@ export async function getAgentById(id: string, userId?: string): Promise<AgentCo
       const { getCurrentUserId } = await import('@/lib/server/request-context')
       const recovered = getCurrentUserId()
       if (recovered) {
-        console.warn('🔁 [unified-config-server] Recovered userId from request context for getAgentById', recovered)
         effectiveUserId = recovered
       } else {
-        console.warn('🔍 No userId provided for getAgentById, using NIL UUID')
+        logger.debug('[unified-config-server] No userId provided for getAgentById, using NIL UUID')
         effectiveUserId = '00000000-0000-0000-0000-000000000000'
       }
     }
 
-    console.log('🔍 Looking for agent:', id, 'for user:', effectiveUserId)
     // First check predefined agents (immutable system agents)
-    console.log('🔍 Checking predefined agents for:', id)
     const predefinedAgent = getPredefinedAgentById(id)
     if (predefinedAgent) {
-      console.log('🔍 Found predefined agent:', predefinedAgent.name)
       return predefinedAgent
     }
+    
     // Then check user's custom agents in database
     const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
     const unifiedAgent = isUUID(effectiveUserId) ? await getAgentByIdForUser(id, effectiveUserId) : undefined
     if (unifiedAgent) {
-      console.log('🔍 Found user agent in database:', unifiedAgent.name)
       return transformToAgentConfig(unifiedAgent)
     }
-    console.warn(`🔍 Agent not found: ${id}`)
+    
+    logger.warn(`Agent not found: ${id}`)
     return undefined
   } catch (error) {
-    console.error('🔍 Error getting agent by ID:', error)
+    logger.error('Error getting agent by ID:', error)
     return undefined
   }
 }
@@ -82,29 +80,31 @@ export async function getAllAgents(userId?: string): Promise<AgentConfig[]> {
       const { getCurrentUserId } = await import('@/lib/server/request-context')
       const recovered = getCurrentUserId()
       if (recovered) {
-        console.warn('🔁 [unified-config-server] Recovered userId from request context for getAllAgents', recovered)
         effectiveUserId = recovered
       } else {
-        console.warn('🔍 No userId provided for getAllAgents, using NIL UUID')
+        logger.debug('[unified-config-server] No userId provided for getAllAgents, using NIL UUID')
         effectiveUserId = '00000000-0000-0000-0000-000000000000'
       }
     }
-    console.log('🔍 Getting all agents for user:', effectiveUserId)
+    
     // If userId is not a UUID, skip DB fetch to avoid errors in server logs
     const isUUID = (v: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
+    
     // Start with all predefined agents (immutable system agents)
     const predefinedAgents: AgentConfig[] = [...ALL_PREDEFINED_AGENTS]
-    console.log(`🔍 Found ${predefinedAgents.length} predefined agents`)
+    
     // Get user's custom agents from database
     const unifiedAgents = isUUID(effectiveUserId) ? await getAllAgentsForUser(effectiveUserId) : []
     const userAgents = unifiedAgents.map(transformToAgentConfig)
-    console.log(`🔍 Found ${userAgents.length} user custom agents`)
+    
     // Combine both lists
     const allAgents = [...predefinedAgents, ...userAgents]
-    console.log(`🔍 Total agents for user ${effectiveUserId}: ${allAgents.length}`)
+    
+    logger.debug(`Retrieved ${allAgents.length} agents (${predefinedAgents.length} predefined + ${userAgents.length} custom)`)
+    
     return allAgents
   } catch (error) {
-    console.error('🔍 Error getting all agents:', error)
+    logger.error('Error getting all agents:', error)
     // Fallback to predefined agents only
     return [...ALL_PREDEFINED_AGENTS]
   }

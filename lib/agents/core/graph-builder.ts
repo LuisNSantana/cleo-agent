@@ -30,6 +30,9 @@ import {
   convertMessagesToPromptFormat
 } from './message-processor'
 import logger from '@/lib/utils/logger'
+import { withSpan, getTracer } from '@/lib/tracing/otel-setup'
+import { SupabaseCheckpointSaver } from './checkpoint-manager'
+import { StreamManager, StreamMode } from './stream-modes'
 
 const TOOL_TIMEOUT_MS = 60_000
 const SUPERVISOR_TOOL_LOOP_LIMIT = 5
@@ -73,6 +76,8 @@ export class GraphBuilder {
   private executionManager: ExecutionManager
   private runtime: RuntimeConfig
   private delegationHandler: DelegationHandler
+  private checkpointSaver: SupabaseCheckpointSaver | null = null
+  private streamManager: StreamManager
 
   constructor(config: GraphBuilderConfig) {
     this.modelFactory = config.modelFactory
@@ -80,6 +85,88 @@ export class GraphBuilder {
     this.executionManager = config.executionManager
     this.runtime = getRuntimeConfig()
     this.delegationHandler = new DelegationHandler(this.eventEmitter)
+    this.streamManager = new StreamManager(['updates', 'checkpoints', 'tasks'])
+    
+    // Initialize checkpoint saver asynchronously
+    this.initializeCheckpointSaver().catch(err => {
+      logger.error('Failed to initialize checkpoint saver:', err)
+    })
+  }
+
+  private async initializeCheckpointSaver() {
+    try {
+      const { createClient } = await import('@/lib/supabase/server')
+      const supabase = await createClient()
+      if (supabase) {
+        this.checkpointSaver = new SupabaseCheckpointSaver(supabase)
+        logger.debug('✅ Checkpoint saver initialized')
+      } else {
+        logger.warn('Supabase not available, checkpoints disabled')
+      }
+    } catch (error) {
+      logger.warn('Checkpoint saver initialization failed, checkpoints disabled:', error)
+    }
+  }
+
+  /**
+   * Save checkpoint after state update (if enabled)
+   */
+  private async saveCheckpoint(
+    prevState: GraphState,
+    newState: Partial<GraphState>,
+    nodeId: string,
+    executionId: string
+  ) {
+    if (!this.checkpointSaver) return
+
+    try {
+      const threadId = prevState.metadata?.threadId || executionId
+      const checkpointId = `cp_${Date.now()}`
+      const step = (prevState.metadata?.step || 0) + 1
+
+      await this.checkpointSaver.putTuple(
+        {
+          configurable: {
+            thread_id: threadId,
+            checkpoint_ns: nodeId,
+            checkpoint_id: checkpointId
+          }
+        },
+        {
+          v: 1,
+          id: checkpointId,
+          ts: new Date().toISOString(),
+          channel_values: {
+            messages: newState.messages || prevState.messages,
+            userId: prevState.userId,
+            metadata: { ...prevState.metadata, ...newState.metadata }
+          },
+          channel_versions: {},
+          versions_seen: {}
+        },
+        {
+          source: 'loop',
+          step,
+          writes: newState,
+          parents: {}
+        }
+      )
+
+      // Emit checkpoint event to stream
+      this.streamManager.emitCheckpoint({
+        thread_id: threadId,
+        checkpoint_id: checkpointId,
+        node: nodeId,
+        step
+      }, {
+        executionId,
+        timestamp: new Date().toISOString()
+      })
+
+      logger.debug('💾 Checkpoint saved', { threadId, checkpointId, nodeId, step })
+    } catch (error) {
+      logger.warn('Failed to save checkpoint:', error)
+    }
   }
 
   async buildDualModeGraph(config: DualModeGraphConfig): Promise<StateGraph<any>> {
@@ -137,82 +224,88 @@ export class GraphBuilder {
    */
   private async createToolNode(agentConfig: AgentConfig) {
     return async (state: GraphState) => {
-      const lastMessage = state.messages[state.messages.length - 1]
-      
-      if (!(lastMessage instanceof AIMessage) || !lastMessage.tool_calls || lastMessage.tool_calls.length === 0) {
-        logger.warn('🔧 [TOOL-NODE] No tool calls found, this should not happen (conditional edge failed)', { 
-          agent: agentConfig.id 
-        })
-        // Return empty update - don't add any messages
-        return {}
-      }
-
-      const toolCalls = lastMessage.tool_calls
-      logger.info('🔧 [TOOL-NODE] Executing tools', {
-        agent: agentConfig.id,
-        toolCount: toolCalls.length,
-        tools: toolCalls.map(tc => tc.name)
-      })
-
-      // Get tool runtime from state metadata (passed from agent node)
-      // CRITICAL FIX: Metadata may lose functions during serialization
-      // Rebuild toolRuntime if it's missing the .run() method
-      let toolRuntime = state.metadata?.toolRuntime
-      
-      if (!toolRuntime || typeof toolRuntime.run !== 'function') {
-        logger.warn('🔧 [TOOL-NODE] toolRuntime missing or invalid, rebuilding from agent config')
+      return withSpan(`tools.${agentConfig.id}.execute`, async (span) => {
+        const lastMessage = state.messages[state.messages.length - 1]
         
-        // Rebuild tool runtime for this agent
-        const selectedTools = agentConfig.tools || []
-        toolRuntime = buildToolRuntime(selectedTools, agentConfig.model)
-        
-        logger.info('🔧 [TOOL-NODE] Rebuilt toolRuntime', {
-          hasRun: typeof toolRuntime.run === 'function',
-          toolCount: toolRuntime.lcTools?.length,
-          toolNames: toolRuntime.names?.join(', ')
-        })
-      }
-
-      const timeoutManager = new TimeoutManager(this.getExecutionBudget(agentConfig))
-
-      // Filter delegation vs regular tools
-      const delegationCalls = toolCalls.filter((call: any) => this.isDelegationTool(call.name))
-      const regularCalls = toolCalls.filter((call: any) => !this.isDelegationTool(call.name))
-
-      const resultMessages: BaseMessage[] = []
-
-      // Execute regular tools in parallel
-      if (regularCalls.length > 0) {
-        const executionResults = await executeToolsInParallel(
-          regularCalls,
-          toolRuntime,
-          {
-            agentId: agentConfig.id,
-            maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
-            toolTimeoutMs: 60000
-          },
-          this.eventEmitter as unknown as any
-        )
-
-        for (const result of executionResults) {
-          timeoutManager.recordToolCall()
-          resultMessages.push(result.toolMessage)
+        if (!(lastMessage instanceof AIMessage) || !lastMessage.tool_calls || lastMessage.tool_calls.length === 0) {
+          logger.warn('🔧 [TOOL-NODE] No tool calls found, this should not happen (conditional edge failed)', { 
+            agent: agentConfig.id 
+          })
+          // Return empty update - don't add any messages
+          return {}
         }
-      }
 
-      // Execute delegation tools sequentially
-      for (const call of delegationCalls) {
-        timeoutManager.recordToolCall()
-        const delegationMessage = await this.handleDelegationCall(call, agentConfig, state)
-        resultMessages.push(delegationMessage)
-      }
+        const toolCalls = lastMessage.tool_calls
+        span.setAttribute('tool_calls.count', toolCalls.length)
+        span.setAttribute('agent.id', agentConfig.id)
 
-      logger.info('✅ [TOOL-NODE] Tool execution complete', {
-        agent: agentConfig.id,
-        resultCount: resultMessages.length
+        // Get tool runtime from state metadata (passed from agent node)
+        // CRITICAL FIX: Metadata may lose functions during serialization
+        // Rebuild toolRuntime if it's missing the .run() method
+        let toolRuntime = state.metadata?.toolRuntime
+        
+        if (!toolRuntime || typeof toolRuntime.run !== 'function') {
+          logger.warn('🔧 [TOOL-NODE] toolRuntime missing or invalid, rebuilding from agent config')
+          
+          // Rebuild tool runtime for this agent
+          const selectedTools = agentConfig.tools || []
+          toolRuntime = buildToolRuntime(selectedTools, agentConfig.model)
+        }
+
+        const timeoutManager = new TimeoutManager(this.getExecutionBudget(agentConfig))
+
+        // Filter delegation vs regular tools
+        const delegationCalls = toolCalls.filter((call: any) => this.isDelegationTool(call.name))
+        const regularCalls = toolCalls.filter((call: any) => !this.isDelegationTool(call.name))
+
+        span.setAttributes({
+          'tool_calls.delegation': delegationCalls.length,
+          'tool_calls.regular': regularCalls.length
+        })
+
+        const resultMessages: BaseMessage[] = []
+
+        // Execute regular tools in parallel
+        if (regularCalls.length > 0) {
+          const executionResults = await executeToolsInParallel(
+            regularCalls,
+            toolRuntime,
+            {
+              agentId: agentConfig.id,
+              maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
+              toolTimeoutMs: 60000
+            },
+            this.eventEmitter as unknown as any
+          )
+
+          for (const result of executionResults) {
+            timeoutManager.recordToolCall()
+            resultMessages.push(result.toolMessage)
+          }
+        }
+
+        // Execute delegation tools sequentially
+        for (const call of delegationCalls) {
+          timeoutManager.recordToolCall()
+          const delegationMessage = await this.handleDelegationCall(call, agentConfig, state)
+          resultMessages.push(delegationMessage)
+        }
+
+        span.setAttribute('results.count', resultMessages.length)
+
+        // Emit node update
+        this.streamManager.emitNodeUpdate('tools', {
+          toolCalls: toolCalls.map((tc: any) => tc.name),
+          resultCount: resultMessages.length
+        })
+
+        const newState = { messages: resultMessages }
+
+        // Save checkpoint after tool execution
+        await this.saveCheckpoint(state, newState, 'tools', state.metadata?.executionId || 'unknown')
+
+        return newState
       })
-
-      return { messages: resultMessages }
     }
   }
 
@@ -295,69 +388,97 @@ export class GraphBuilder {
    */
   private async createAgentNode(agentConfig: AgentConfig) {
     return async (state: GraphState) => {
-      const initialMessages = Array.isArray(state.messages) ? state.messages : []
-      const filteredMessages = filterStaleToolMessages(initialMessages)
-      const executionId = state.metadata?.executionId || ExecutionManager.getCurrentExecutionId()
+      return withSpan(`agent.${agentConfig.id}.invoke`, async (span) => {
+        const initialMessages = Array.isArray(state.messages) ? state.messages : []
+        const filteredMessages = filterStaleToolMessages(initialMessages)
+        const executionId = state.metadata?.executionId || ExecutionManager.getCurrentExecutionId()
 
-      this.eventEmitter.emit('node.entered', {
-        nodeId: agentConfig.id,
-        agentId: agentConfig.id,
-        executionId
-      })
+        span.setAttributes({
+          'agent.id': agentConfig.id,
+          'agent.role': agentConfig.role || 'unknown',
+          'messages.count': filteredMessages.length,
+          'execution.id': executionId
+        })
 
-      const budget = this.getExecutionBudget(agentConfig)
-      const timeoutManager = new TimeoutManager(budget)
-
-      // Prepare model with tools bound
-      const { model, toolRuntime, enhancedAgent } = await this.prepareModel(agentConfig, state, filteredMessages)
-      agentConfig = enhancedAgent
-
-      // Build message stack with system prompt
-      const workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
-      
-      // Invoke model ONCE - no internal loop
-      const response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
-
-      // Convert to AIMessage if needed
-      const aiMessage = response instanceof AIMessage 
-        ? response 
-        : new AIMessage(response.content || '', {
-            tool_calls: response.tool_calls || [],
-            additional_kwargs: response.additional_kwargs || {}
-          })
-
-      // DEBUG: Log tool calls for debugging
-      const toolCalls = (aiMessage as any).tool_calls || []
-      const agentDisplayName = getAgentDisplayName(agentConfig.id) // Get friendly name for logs
-      console.log(`🔧 [AGENT-NODE] ${agentDisplayName} generated ${toolCalls.length} tool call(s)`)
-      if (toolCalls.length > 0) {
-        console.log(`🔧 [AGENT-NODE] Tool calls:`, toolCalls.map((tc: any) => ({
-          name: tc.name,
-          id: tc.id,
-          argsPreview: JSON.stringify(tc.args).slice(0, 100)
-        })))
-      } else {
-        console.log(`🔧 [AGENT-NODE] ${agentDisplayName} response (no tools):`, aiMessage.content.slice(0, 200))
-      }
-
-      this.eventEmitter.emit('node.completed', {
-        nodeId: agentConfig.id,
-        agentId: agentConfig.id,
-        executionId,
-        response: aiMessage.content
-      })
-
-      // MessagesAnnotation has a built-in reducer that APPENDS messages
-      // So we only need to return the NEW message, not the full history
-      return {
-        messages: [aiMessage],
-        metadata: {
-          ...state.metadata,
-          toolRuntime, // CRITICAL: Pass toolRuntime to next nodes
+        this.eventEmitter.emit('node.entered', {
+          nodeId: agentConfig.id,
           agentId: agentConfig.id,
           executionId
+        })
+
+        // Emit task start event
+        const taskId = `task_${agentConfig.id}_${Date.now()}`
+        const taskStartTime = Date.now()
+        this.streamManager.emitTaskStart(taskId, `agent_${agentConfig.id}`, {
+          messageCount: filteredMessages.length
+        })
+
+        try {
+          const budget = this.getExecutionBudget(agentConfig)
+          const timeoutManager = new TimeoutManager(budget)
+
+          // Prepare model with tools bound
+          const { model, toolRuntime, enhancedAgent } = await this.prepareModel(agentConfig, state, filteredMessages)
+          agentConfig = enhancedAgent
+
+          // Build message stack with system prompt
+          const workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
+          
+          // Invoke model ONCE - no internal loop
+          const response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+
+          // Convert to AIMessage if needed
+          const aiMessage = response instanceof AIMessage 
+            ? response 
+            : new AIMessage(response.content || '', {
+                tool_calls: response.tool_calls || [],
+                additional_kwargs: response.additional_kwargs || {}
+              })
+
+          const toolCalls = (aiMessage as any).tool_calls || []
+          span.setAttribute('tool_calls.count', toolCalls.length)
+
+          this.eventEmitter.emit('node.completed', {
+            nodeId: agentConfig.id,
+            agentId: agentConfig.id,
+            executionId,
+            response: aiMessage.content
+          })
+
+          // Emit task completion
+          this.streamManager.emitTaskComplete(taskId, `agent_${agentConfig.id}`, {
+            toolCallCount: toolCalls.length,
+            responseLength: aiMessage.content.length
+          }, Date.now() - taskStartTime)
+
+          // Emit node update for stream
+          this.streamManager.emitNodeUpdate(agentConfig.id, {
+            messages: [aiMessage],
+            toolCalls: toolCalls.length
+          })
+
+          // MessagesAnnotation has a built-in reducer that APPENDS messages
+          // So we only need to return the NEW message, not the full history
+          const newState = {
+            messages: [aiMessage],
+            metadata: {
+              ...state.metadata,
+              toolRuntime, // CRITICAL: Pass toolRuntime to next nodes
+              agentId: agentConfig.id,
+              executionId
+            }
+          }
+
+          // Save checkpoint after state update
+          await this.saveCheckpoint(state, newState, agentConfig.id, executionId)
+
+          return newState
+        } catch (error) {
+          span.recordException(error as Error)
+          this.streamManager.emitTaskError(taskId, `agent_${agentConfig.id}`, error as Error)
+          throw error
         }
-      }
+      })
     }
   }
 
@@ -411,16 +532,6 @@ export class GraphBuilder {
     const systemMessage = await this.buildSystemMessage(agentConfig, filteredMessages, state)
     const combined = [systemMessage, ...filteredMessages.filter((msg) => msg.constructor.name !== 'SystemMessage')]
     
-    // DEBUG: Log message stack for Astra
-    if (agentConfig.id === 'astra-email') {
-      console.log(`📨 [MESSAGE-STACK] Astra receiving ${combined.length} messages`)
-      combined.forEach((msg, idx) => {
-        const role = msg.constructor.name.replace('Message', '').toLowerCase()
-        const preview = (msg as any).content?.slice(0, 150) || ''
-        console.log(`📨 [MESSAGE-STACK] ${idx}: ${role} - ${preview}`)
-      })
-    }
-    
     return normalizeSystemFirst(combined)
   }
 
@@ -449,6 +560,7 @@ export class GraphBuilder {
           messages: promptMessages,
           supabase: await createClient(),
           realUserId: state.userId ?? null,
+          threadId: state.metadata?.threadId ?? null, // ✅ CRITICAL: Pass thread for RAG isolation
           enableSearch: true,
           debugRag: false
         })

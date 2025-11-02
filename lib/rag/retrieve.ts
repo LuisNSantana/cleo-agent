@@ -9,6 +9,7 @@ import { redisEnabled, hashKey as redisHashKey, redisGetJSON, redisSetJSON } fro
 
 export interface RetrieveOptions {
   userId: string
+  threadId?: string  // ✅ CRITICAL: Isolate RAG context per conversation thread
   query: string
   documentId?: string
   projectId?: string
@@ -41,6 +42,7 @@ export interface RetrievedChunk {
 export async function retrieveRelevant(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
   const { 
     userId, 
+    threadId,  // ✅ Thread isolation
     query, 
     documentId, 
     projectId, 
@@ -53,6 +55,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   
   if (!query.trim()) return []
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
+  const normalizedThreadId = typeof threadId === 'string' ? threadId.trim() : ''  // ✅ Normalize thread
   if (!normalizedUserId) {
     console.warn('[RAG] retrieveRelevant called without a valid userId. Skipping search to avoid RPC errors.')
     return []
@@ -72,6 +75,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
   const hash = (s: string) => createHash('sha256').update(s).digest('hex')
   const cacheKey = hash([
     `u:${normalizedUserId}`,
+    `t:${normalizedThreadId || 'global'}`,  // ✅ Thread-specific cache
     `q:${query}`,
     documentId ? `d:${documentId}` : 'd:-',
     projectId ? `p:${projectId}` : 'p:-',
@@ -96,6 +100,7 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
     try {
       l2Key = `rag:v1:${redisHashKey([
         'u', normalizedUserId,
+        't', normalizedThreadId || 'global',  // ✅ Thread-specific L2 cache
         'q', query,
         'd', documentId || '-',
         'p', projectId || '-',
@@ -174,8 +179,13 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
       const qEmbedding = queryEmbeddings[i]
       const callBudget = Math.max(150, timeLeft() - 100) // leave a tiny buffer
       if (callBudget <= 0) break
+      
+      // ✅ DEBUG: Verify thread isolation is active
+      console.log(`🧵 [RAG THREAD ISOLATION] Calling hybrid_search with thread: ${normalizedThreadId || 'GLOBAL (no isolation)'}`)
+      
       const rpcPromise = (supabase as any).rpc('hybrid_search_document_chunks', {
         p_user_id: normalizedUserId,
+        p_thread_id: normalizedThreadId || null,  // ✅ Thread filter for RPC
         p_query_embedding: qEmbedding,
         p_query_text: q,
         p_match_count: perQueryMatch,
@@ -289,8 +299,9 @@ export async function retrieveRelevant(opts: RetrieveOptions): Promise<Retrieved
 
 // Fallback function for vector-only search
 async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
-  const { userId, query, documentId, projectId, topK = 15, minSimilarity = 0 } = opts // Ajustado para 1M context
+  const { userId, threadId, query, documentId, projectId, topK = 15, minSimilarity = 0 } = opts // Ajustado para 1M context
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
+  const normalizedThreadId = typeof threadId === 'string' ? threadId.trim() : ''  // ✅ Thread isolation
   if (!normalizedUserId) {
     console.warn('[RAG] retrieveVectorOnly called without a valid userId. Returning empty results.')
     return []
@@ -301,8 +312,12 @@ async function retrieveVectorOnly(opts: RetrieveOptions): Promise<RetrievedChunk
   const embedding = (await defaultEmbeddingProvider.embed([query]))[0]
   if (!embedding) return []
   
+  // ✅ DEBUG: Verify thread isolation is active
+  console.log(`🧵 [RAG THREAD ISOLATION] Calling match_document_chunks with thread: ${normalizedThreadId || 'GLOBAL (no isolation)'}`)
+  
   const vectorRpc = (supabase as any).rpc('match_document_chunks', {
     p_user_id: normalizedUserId,
+    p_thread_id: normalizedThreadId || null,  // ✅ Thread filter for vector search
     p_query_embedding: embedding,
     p_match_count: topK,
     p_document_id: documentId || null,

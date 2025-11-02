@@ -579,13 +579,6 @@ export const useClientAgentStore = create<ClientAgentStore>()(
           if (response.ok) {
             const data = await response.json()
             if (data.execution) {
-              console.log(`📊 [POLL-${attempt}] Execution ${executionId}:`, {
-                status: data.execution.status,
-                messages: data.execution.messages?.length || 0,
-                steps: data.execution.steps?.length || 0,
-                nextPollIn: `${backoffDelay}ms`
-              })
-              
               // Process delegation steps from execution to update delegation state
               if (data.execution.steps && data.execution.steps.length > 0) {
                 const delegationSteps = data.execution.steps.filter((step: any) => step.action === 'delegating')
@@ -610,8 +603,6 @@ export const useClientAgentStore = create<ClientAgentStore>()(
 
               // Stop polling if execution is complete
               if (data.execution.status !== 'running') {
-                console.log(`✅ [POLL-COMPLETE] Execution ${executionId}: ${data.execution.status} (stopped after ${attempt} attempts)`)
-                
                 // Force final state update to ensure UI shows completion
                 set((state) => ({
                   ...state,
@@ -636,13 +627,12 @@ export const useClientAgentStore = create<ClientAgentStore>()(
                 setTimeout(poll, backoffDelay)
                 backoffDelay = Math.min(backoffDelay * 1.5, maxDelay) // OPTIMIZADO: 1.5x instead of 2x
               } else {
-                console.log(`⏰ [POLL-TIMEOUT] Max attempts (${maxAttempts}) reached for ${executionId}`)
+                console.warn(`Polling timeout after ${maxAttempts} attempts for execution ${executionId}`)
                 try { 
                   await get().finalizeExecutionFromThread(executionId) 
                 } catch {}
               }
             } else {
-              console.warn(`⚠️ [POLL-${attempt}] No execution data found for ${executionId}`)
               // OPTIMIZADO: Solo intentar fallback después de más intentos
               if (attempt > 5) {
                 try { 

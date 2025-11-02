@@ -32,7 +32,7 @@ describe('Delegación - Flujos críticos', () => {
 
     // Import tools after mocks are set
     const { delegationTools } = await import('@/lib/tools/delegation')
-    const res = await (delegationTools as any).delegate_to_toby.execute({ task: 'Build and test the project' }, {})
+    const res = await (delegationTools as any).delegate_to_toby.execute({ taskDescription: 'Build and test the project' }, {})
     expect(res.status).toBe('delegated')
     expect(res.executionId).toBe(execId)
     expect(res.result).toContain('OK from sub-agent')
@@ -62,9 +62,10 @@ describe('Delegación - Flujos críticos', () => {
   process.env.NO_PROGRESS_NO_EXTEND_MS = '0'
 
     const { delegationTools: toolsReloaded } = await import('@/lib/tools/delegation')
-    const res = await (toolsReloaded as any).delegate_to_toby.execute({ task: 'Never finishes' }, {})
+    const res = await (toolsReloaded as any).delegate_to_toby.execute({ taskDescription: 'Never finishes' }, {})
     expect(res.status).toBe('delegated')
     expect(res.executionId).toBe(execId)
-    expect(String(res.result)).toMatch(/timed out/i)
+    // Updated: The timeout message changed to "did not respond" instead of "timed out"
+    expect(String(res.result)).toMatch(/did not respond|timed out/i)
   })
 })

@@ -89,6 +89,23 @@ const RESEARCH_KEYWORDS = [
   'mercado', 'competidor', 'competencia', 'industria', 'sector', 'noticias sobre'
 ]
 
+// Social Media & Community Management keywords (Jenn)
+const SOCIAL_MEDIA_KEYWORDS = [
+  // Telegram - MÁXIMA PRIORIDAD
+  'telegram', 'canal telegram', 'channel telegram', 'publicar telegram', 'enviar telegram',
+  'broadcast telegram', 'mensaje telegram', 'anuncio telegram', 'telegram channel',
+  'telegram broadcast', 'telegram message', 'post telegram', '@cleo', 'chat_id',
+  // Twitter/X
+  'tweet', 'twitter', 'x.com', 'publicar tweet', 'post tweet', 'hilo twitter', 'thread',
+  // Instagram
+  'instagram', 'ig', 'insta', 'post instagram', 'publicar instagram', 'reel', 'stories',
+  // Facebook
+  'facebook', 'fb', 'página facebook', 'facebook page', 'post facebook', 'publicar facebook',
+  // General social media
+  'redes sociales', 'social media', 'comunidad', 'community', 'engagement', 'publicar',
+  'post', 'share', 'compartir', 'audiencia', 'followers', 'seguidores'
+]
+
 // Automation keywords (Wex)
 const AUTOMATION_KEYWORDS = [
   // English
@@ -282,7 +299,21 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
     }
   }
 
-  // 7) Web Automation → Wex
+  // 7) Social Media & Community Management → Jenn (ANTES de Wex para evitar confusión con automation)
+  if (includesAny(text, SOCIAL_MEDIA_KEYWORDS)) {
+    return {
+      source: 'early',
+      action: 'delegate',
+      toolName: 'delegate_to_jenn',
+      agentId: 'jenn-community',
+      agentName: 'Jenn (Community Manager)',
+      leafTool: 'publish_to_telegram',
+      reasons: ['social media/telegram intent detected', 'delegate to Jenn for community management'],
+      confidence: 0.93,
+    }
+  }
+
+  // 8) Web Automation → Wex
   if (includesAny(text, AUTOMATION_KEYWORDS)) {
     return {
       source: 'early',
@@ -296,7 +327,7 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
     }
   }
 
-  // 8) E-commerce → Emma (only if Shopify mentioned or clear store context)
+  // 9) E-commerce → Emma (only if Shopify mentioned or clear store context)
   if (includesAny(text, ECOMMERCE_KEYWORDS) && (text.includes('shopify') || text.includes('store') || text.includes('tienda'))) {
     return {
       source: 'early',
@@ -310,7 +341,7 @@ export function detectEarlyIntent(userText: string): RouterDirective | undefined
     }
   }
 
-  // 9) Google Workspace Creation → Peter (only for creation intents)
+  // 10) Google Workspace Creation → Peter (only for creation intents)
   if (includesAny(text, WORKSPACE_CREATION_KEYWORDS)) {
     return {
       source: 'early',
