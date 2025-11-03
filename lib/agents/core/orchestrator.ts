@@ -749,13 +749,13 @@ export class AgentOrchestrator {
 
     // CRITICAL FIX: LangGraph Orchestrator-Worker Pattern
     // According to LangGraph documentation, after a worker (specialist) completes,
-    // the orchestrator should ONLY synthesize the worker's output with the CURRENT request,
-    // NOT process the entire thread history as new tasks.
+    // the orchestrator should synthesize the worker's output with the CURRENT request.
     // 
-    // Filter out historical messages that were already handled in previous turns.
-    // Keep only: system message + current user request + delegation results (if any)
-    //
-    // This prevents Cleo from treating old resolved requests as new pending tasks.
+    // HOWEVER: For conversational context, we need the FULL thread history so Cleo
+    // can answer questions about previous messages (e.g., "what was my first message?").
+    // 
+    // Smart loader already optimizes context (token-aware), so we use ALL messages.
+    // Only reduce context if there are ACTIVE delegation results (worker pattern).
     const currentUserMessage = processedContext.messageHistory[processedContext.messageHistory.length - 1]
     const systemMessage = processedContext.messageHistory.find(m => m._getType() === 'system')
     
@@ -770,14 +770,22 @@ export class AgentOrchestrator {
     const hasMultimodalContent = Array.isArray(lastMessageContent) 
       && lastMessageContent.some((p: any) => p?.type === 'image_url')
     
-    // Build focused context: system + recent delegations + current user request
-    // IMPORTANT: Use the actual last message from processedContext.messageHistory to preserve multimodal content
-    const actualLastMessage = processedContext.messageHistory[processedContext.messageHistory.length - 1]
-    const focusedHistory = [
-      ...(systemMessage ? [systemMessage] : []),
-      ...recentDelegationResults,
-      actualLastMessage
-    ].filter(Boolean)
+    // Build context: Use FULL history UNLESS we just completed a delegation
+    // (in which case, focus on delegation result + current request)
+    const hasDelegationResults = recentDelegationResults.length > 0
+    
+    let focusedHistory: BaseMessage[]
+    if (hasDelegationResults) {
+      // Worker pattern: Focus on delegation result + current request
+      focusedHistory = [
+        ...(systemMessage ? [systemMessage] : []),
+        ...recentDelegationResults,
+        currentUserMessage
+      ].filter(Boolean)
+    } else {
+      // Conversational mode: Use FULL context from smart loader
+      focusedHistory = processedContext.messageHistory
+    }
     
     logger.info('🎯 [SUPERVISOR] Focused context for orchestrator', {
       originalHistoryLength: processedContext.messageHistory.length,
@@ -786,7 +794,8 @@ export class AgentOrchestrator {
       hasMultimodalContent,
       lastMessageImageCount: hasMultimodalContent 
         ? lastMessageContent.filter((p: any) => p?.type === 'image_url').length 
-        : 0
+        : 0,
+      mode: hasDelegationResults ? 'worker-synthesis' : 'full-context'
     })
     
     processedContext = {

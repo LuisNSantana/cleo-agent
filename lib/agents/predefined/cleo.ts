@@ -37,14 +37,14 @@ export const CLEO_AGENT: AgentConfig = {
   name: 'Cleo',
   description: 'Advanced emotional intelligence supervisor with multi-agent coordination and empathetic user interaction capabilities.',
   role: 'supervisor',
-  model: 'gpt-4o-mini',
+  model: 'grok-4-fast-reasoning',
   temperature: 0.5,
-  maxTokens: 16384,
+  maxTokens: 131072, // Grok-4 supports 131k output tokens
   // Tools will be dynamically updated at runtime
   tools: [...BASE_TOOLS, ...LEGACY_DELEGATION_TOOLS],
   tags: ['supervisor', 'empathy', 'coordination', 'emotional-intelligence', 'delegation', 'dynamic'],
   // Prompt will be dynamically enhanced with discovered agents
-  prompt: getCleoPrompt(sanitizeModelName('gpt-4o-mini'), 'default'),
+  prompt: getCleoPrompt(sanitizeModelName('grok-4-fast-reasoning'), 'default'),
   color: '#FF6B6B',
   icon: '❤️',
   immutable: true,

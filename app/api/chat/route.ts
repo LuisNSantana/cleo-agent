@@ -41,6 +41,8 @@ import { generateObject } from 'ai'
 import { dailyLimits } from "@/lib/daily-limits"
 import { createClient } from '@/lib/supabase/server'
 import { MODELS } from '@/lib/models'
+import { loadThreadContext } from '@/lib/context/smart-loader'
+import type { LoadContextResult } from '@/lib/context/smart-loader'
 
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
 export const runtime = "nodejs"
@@ -1173,97 +1175,100 @@ export async function POST(req: Request) {
           console.log('[Orchestrator] Attachments detected for supervised run:', { count: attachedFilenames.length, names: attachedFilenames })
         }
 
-        // Ensure a thread for Cleo-supervisor (supervised)
-        if (supabase && realUserId) {
+        // CRITICAL FIX: Use chatId as thread_id for proper conversation isolation
+        // Each chat = unique thread_id. DO NOT reuse old threads across different chats.
+        // 
+        // Previous bug: Code was overwriting effectiveThreadId with the most recent
+        // agent_threads entry, causing all new chats to merge into one thread.
+        //
+        // New behavior: chatId (from URL /c/[id]) = thread_id
+        // - Ensures each conversation has isolated context
+        // - Prevents cross-contamination between different chats
+        // - Scales properly (1 chat = 1 thread, not 1 user = 1 global thread)
+        
+        // effectiveThreadId already set from chatId at line 292
+        // DO NOT override it with agent_threads lookup
+        
+        // CRITICAL: Save the user message to agent_messages BEFORE loading context
+        // This ensures the smart loader includes the current message in the context
+        if (effectiveThreadId && realUserId && userText && supabase) {
           try {
-            const compositeAgentKey = `cleo-supervisor_supervised`
-            const { data } = await (supabase as any)
-              .from('agent_threads')
-              .select('id')
-              .eq('user_id', realUserId)
-              .eq('agent_key', compositeAgentKey)
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-            effectiveThreadId = data?.id || null
-            if (!effectiveThreadId) {
-              const created = await (supabase as any)
-                .from('agent_threads')
-                .insert({ user_id: realUserId, agent_key: compositeAgentKey, agent_name: 'Cleo', title: 'Cleo (Supervised Chat)' })
-                .select('id')
-                .single()
-              effectiveThreadId = created?.data?.id || null
-            }
-            // Save the user message (including attachment-derived text when present)
-            if (effectiveThreadId && userText) {
-              await (supabase as any).from('agent_messages').insert({
-                thread_id: effectiveThreadId,
+            console.log(`💾 [CONTEXT] Saving user message to agent_messages for thread ${effectiveThreadId}`)
+            
+            // Use .select() to force immediate read and confirm insertion
+            const { data: insertedMessage, error: insertError } = await (supabase as any)
+              .from('agent_messages')
+              .insert({
+                thread_id: effectiveThreadId, // Use chatId as thread_id
                 user_id: realUserId,
                 role: 'user',
                 content: userText,
-                metadata: { conversation_mode: 'supervised', source: 'global-chat' }
+                metadata: { conversation_mode: 'chat', source: 'chat-ui', chat_id: chatId }
               })
+              .select() // Force immediate SELECT to confirm insertion
+              .single();
+
+            if (insertError) {
+              console.error('❌ [CONTEXT] Insert error:', insertError);
+            } else {
+              console.log(`✅ [CONTEXT] User message saved (id: ${insertedMessage?.id})`);
+              // Small delay to ensure PostgreSQL transaction commit completes
+              await new Promise(resolve => setTimeout(resolve, 50));
             }
-          } catch {}
+          } catch (err) {
+            console.error('❌ [CONTEXT] Failed to save user message to agent_messages:', err)
+          }
         }
 
         // Build conversation history from agent_messages to maintain context
+        // ✅ USING SMART TOKEN-AWARE LOADING (no hard limits!)
         let prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }> = []
         if (effectiveThreadId && realUserId && supabase) {
           try {
-            const { data: msgs } = await (supabase as any)
-              .from('agent_messages')
-              .select('role, content, metadata, tool_calls, tool_results, created_at')
-              .eq('thread_id', effectiveThreadId)
-              .eq('user_id', realUserId)
-              .order('created_at', { ascending: true })
-              .limit(100) // Get more to filter intelligently
+            // 🚀 Load thread context with intelligent token management
+            const contextResult: LoadContextResult = await loadThreadContext({
+              threadId: effectiveThreadId,
+              userId: realUserId,
+              model: normalizedModel || originalModel, // Use the normalized model ID
+              includeSystemPrompt: true,
+            });
+
+            // Map messages to expected format
+            prior = contextResult.messages.map((m: any) => ({
+              role: m.role,
+              content: m.content || '',
+              metadata: {
+                ...m.metadata,
+                tool_calls: m.tool_calls || undefined,
+                tool_results: m.tool_results || undefined
+              }
+            }));
+
+            console.log(`🧵 [CONTEXT] Smart loader results for thread ${effectiveThreadId}:`);
+            console.log(`   📊 Total messages in DB: ${contextResult.totalMessages}`);
+            console.log(`   ✅ Loaded into context: ${contextResult.includedMessages}`);
+            console.log(`   ❌ Dropped (old): ${contextResult.droppedMessages}`);
+            console.log(`   🎯 Token usage: ${contextResult.tokenCount.toLocaleString()} / ${contextResult.contextWindow.toLocaleString()}`);
+            console.log(`   ⚠️  Truncated: ${contextResult.truncated ? 'YES' : 'NO'}`);
+            console.log(`   ⏱️  Load time: ${contextResult.performance.loadTimeMs}ms`);
             
-            if (Array.isArray(msgs)) {
-              // Deduplicate by content + role (keep first occurrence)
-              const seen = new Set<string>()
-              const deduped = msgs.filter((m: any) => {
-                const key = `${m.role}:${(m.content || '').trim()}`
-                if (seen.has(key)) {
-                  // Don't log duplicates to reduce noise
-                  return false
-                }
-                seen.add(key)
-                return true
-              })
-              
-              // ✅ IMPROVED FILTERING: Focus on recent context to avoid historical contamination
-              // Strategy: Take only the last 10 user/assistant exchanges (20 messages max)
-              // This prevents ancient context (meetings, events from weeks ago) from polluting the current task
-              const userAssistant = deduped.filter((m: any) => m.role === 'user' || m.role === 'assistant')
-              const systemTool = deduped.filter((m: any) => m.role === 'system' || m.role === 'tool')
-              
-              // Take last 10 messages instead of 30 to keep context fresh and relevant
-              const recentUserAssistant = userAssistant.slice(-10)
-              const recentSystemTool = systemTool.slice(-5)
-              
-              // Merge and sort by created_at to maintain chronological order
-              const filtered = [...recentUserAssistant, ...recentSystemTool]
-                .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-              
-              prior = filtered.map((m: any) => ({
-                role: m.role,
-                content: m.content || '',
-                metadata: {
-                  ...m.metadata,
-                  tool_calls: m.tool_calls || undefined,
-                  tool_results: m.tool_results || undefined
-                }
-              }))
-              
-              console.log(`🧵 [CONTEXT] Loaded ${prior.length} messages from thread ${effectiveThreadId} (${deduped.length} total, filtered intelligently)`)
-              console.log(`🧵 [CONTEXT] Preview:`, prior.slice(-3).map(m => ({ 
+            // Preview last 3 messages for debugging
+            if (prior.length > 0) {
+              console.log(`🧵 [CONTEXT] Preview (last 3):`, prior.slice(-3).map(m => ({ 
                 role: m.role, 
-                content: m.content.substring(0, 80) 
-              })))
+                content: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : '')
+              })));
             }
-          } catch (e) {
-            console.warn('[CHAT] ⚠️ Failed to load conversation history:', e)
+
+            // ⚠️  Alert if we're truncating context (Phase 2 improvement opportunity)
+            if (contextResult.truncated) {
+              console.warn(`💡 [CONTEXT] Thread has ${contextResult.totalMessages} messages but only ${contextResult.includedMessages} fit in context.`);
+              console.warn(`   Consider implementing message summarization or increasing context window.`);
+            }
+          } catch (err) {
+            console.error('❌ [CONTEXT] Error loading smart context:', err);
+            // Fallback to empty context rather than failing
+            prior = [];
           }
         }
 

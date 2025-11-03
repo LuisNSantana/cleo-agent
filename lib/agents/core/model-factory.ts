@@ -331,19 +331,24 @@ export class ModelFactory {
       return model
     }
 
-    // xAI models (Grok) - including grok-4-fast-reasoning -> grok-4-fast
+    // xAI models (Grok) - use full model names for API
     if (cleanModelName.startsWith('grok-') || cleanModelName.includes('xai/')) {
-      // Normalize grok-4-fast-reasoning → grok-4-fast (reasoning is a runtime flag)
+      // Map UI model IDs to actual xAI API model names
       let actualModelName = cleanModelName
-      if (cleanModelName === 'grok-4-fast-reasoning' || cleanModelName === 'xai/grok-4-fast-reasoning') {
-        actualModelName = 'grok-4-fast'
-        logger.warn(`[ModelFactory] Mapping ${cleanModelName} → grok-4-fast (reasoning is not a separate model)`)
+      
+      // Map grok-4-fast (UI) → grok-4-fast-reasoning (xAI API)
+      if (cleanModelName === 'grok-4-fast' || cleanModelName === 'xai/grok-4-fast') {
+        actualModelName = 'grok-4-fast-reasoning'
+        logger.info(`[ModelFactory] Mapping ${cleanModelName} → grok-4-fast-reasoning (xAI API model)`)
+      } else if (cleanModelName === 'grok-4-fast-reasoning' || cleanModelName === 'xai/grok-4-fast-reasoning') {
+        actualModelName = 'grok-4-fast-reasoning'
+        logger.info(`[ModelFactory] Using ${cleanModelName} directly (xAI API model)`)
       }
 
       const hasXaiKey = !!(process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0)
       if (!hasXaiKey) {
-        // Do NOT use OpenRouter anymore. Fall back to our default OpenAI model to keep system alive.
-        logger.error('[ModelFactory] XAI_API_KEY missing but grok-* was requested. Falling back to gpt-4o-mini. Set XAI_API_KEY to use grok-4-fast via xAI.')
+        // Fall back to gpt-4o-mini if no XAI key
+        logger.error('[ModelFactory] XAI_API_KEY missing but grok-* was requested. Falling back to gpt-4o-mini. Set XAI_API_KEY to use grok models via xAI.')
         const fallback = new ChatOpenAI({
           modelName: 'gpt-4o-mini',
           temperature,

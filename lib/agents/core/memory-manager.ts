@@ -30,8 +30,10 @@ export class MemoryManager {
 
   constructor(config: MemoryConfig = {}) {
     this.config = {
-      maxThreadMessages: config.maxThreadMessages || 100,
-      maxContextTokens: config.maxContextTokens || 8000,
+      // INCREASED LIMIT: Smart loader handles token-aware optimization
+      // This is now a safety net, not the primary limiter
+      maxThreadMessages: config.maxThreadMessages || 1000, // Was 100
+      maxContextTokens: config.maxContextTokens || 128000, // Increased for modern models
       compressionThreshold: config.compressionThreshold || 0.8
     }
   }
@@ -44,12 +46,29 @@ export class MemoryManager {
     this.messageCache.set(threadId, messages)
     this.metrics.totalMessages = messages.length
 
-    // If under limits, return as-is
+    // CRITICAL FIX: Messages from smart loader are already optimized
+    // Smart loader uses token-aware loading and respects model limits
+    // MemoryManager should NOT compress further - just pass through
+    // 
+    // Legacy behavior (kept for backward compatibility):
+    // If messages exceed maxThreadMessages, assume they came from legacy code
+    // and apply compression. But in practice, smart loader prevents this.
+    
     if (messages.length <= this.config.maxThreadMessages) {
+      // Already optimized - return as-is
+      this.metrics.compressedMessages = messages.length
+      this.metrics.compressionRatio = 1.0
       return messages
     }
 
-    // Simple optimization: keep most recent messages
+    // Fallback compression (should rarely trigger with smart loader)
+    console.warn('⚠️ [MEMORY-MANAGER] Message count exceeds limit, applying compression', {
+      threadId,
+      messageCount: messages.length,
+      limit: this.config.maxThreadMessages,
+      note: 'Smart loader should prevent this - check configuration'
+    })
+
     const recentMessages = messages.slice(-this.config.maxThreadMessages)
     
     // Keep first message if it's a system message

@@ -43,12 +43,11 @@ export const FREE_MODELS_IDS = [
   "gpt-4o-mini",
 ]
 
-// Default authenticated model: Grok 4 Fast via OpenRouter
-// Nuevo modelo por defecto (solo texto): grok-4-fast (alias interno)
+// Default authenticated model: Grok 4 Fast (internamente usa grok-4-fast-reasoning en la API)
+// El modelo "grok-4-fast" en la UI mapea a "grok-4-fast-reasoning" en xAI vía apiSdk
 export const MODEL_DEFAULT = "grok-4-fast"
 
-// MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (mejor rendimiento y herramientas soportadas)
-// Guest también usa el nuevo faster por defecto
+// MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (con reasoning activado internamente)
 export const MODEL_DEFAULT_GUEST = "grok-4-fast"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)

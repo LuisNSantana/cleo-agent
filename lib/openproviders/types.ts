@@ -108,6 +108,8 @@ export type AnthropicModel =
 
 export type XaiModel =
   | "grok-4"
+  | "grok-4-fast-reasoning"  // ✅ Official reasoning variant with 2M context
+  | "grok-4-fast-non-reasoning"  // ✅ Fast variant without reasoning tokens
   | "grok-3"
   | "grok-3-latest"
   | "grok-3-fast"
