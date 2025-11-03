@@ -25,14 +25,7 @@ import { emitExecutionEvent } from '@/lib/agents/logging-events'
 import { withDelegationContext } from './delegation-context'
 import { ExecutionRegistry } from './execution-registry'
 import { DelegationCoordinator } from './delegation-coordinator'
-
-// Helper function to emit browser events for UI updates
-function emitBrowserEvent(eventName: string, detail: any) {
-  if (typeof window !== 'undefined') {
-    const event = new CustomEvent(eventName, { detail })
-    window.dispatchEvent(event)
-  }
-}
+import { emitBrowserEvent } from '@/lib/utils/browser-events'
 
 // Global counter for unique ID generation
 let orchestratorMessageIdCounter = 0
@@ -771,17 +764,29 @@ export class AgentOrchestrator {
       .filter(m => m._getType() === 'tool')
       .slice(-5) // Keep last 5 tool results max (usually 1-2 delegations)
     
+    // CRITICAL: Check if currentUserMessage has multimodal content (images)
+    // If so, use the FULL message from processedContext, not just extracted reference
+    const lastMessageContent = (currentUserMessage as any)?.content
+    const hasMultimodalContent = Array.isArray(lastMessageContent) 
+      && lastMessageContent.some((p: any) => p?.type === 'image_url')
+    
     // Build focused context: system + recent delegations + current user request
+    // IMPORTANT: Use the actual last message from processedContext.messageHistory to preserve multimodal content
+    const actualLastMessage = processedContext.messageHistory[processedContext.messageHistory.length - 1]
     const focusedHistory = [
       ...(systemMessage ? [systemMessage] : []),
       ...recentDelegationResults,
-      currentUserMessage
+      actualLastMessage
     ].filter(Boolean)
     
     logger.info('🎯 [SUPERVISOR] Focused context for orchestrator', {
       originalHistoryLength: processedContext.messageHistory.length,
       focusedHistoryLength: focusedHistory.length,
-      hasDelegationResults: recentDelegationResults.length > 0
+      hasDelegationResults: recentDelegationResults.length > 0,
+      hasMultimodalContent,
+      lastMessageImageCount: hasMultimodalContent 
+        ? lastMessageContent.filter((p: any) => p?.type === 'image_url').length 
+        : 0
     })
     
     processedContext = {
@@ -1237,8 +1242,10 @@ export class AgentOrchestrator {
 
   private addDelegationProgressStep(progressData: any) {
     // Add delegation progress as execution step for client tracking
-    if (progressData.sourceExecutionId) {
-      const sourceExecution = this.executionRegistry.get(progressData.sourceExecutionId)
+    // Fallback: infer executionId if missing (tolerant normalization)
+    const inferredExecId = progressData.sourceExecutionId || ExecutionManager.getCurrentExecutionId()
+    if (inferredExecId) {
+      const sourceExecution = this.executionRegistry.get(inferredExecId)
       if (sourceExecution) {
         if (!sourceExecution.steps) sourceExecution.steps = []
         const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
@@ -1271,14 +1278,19 @@ export class AgentOrchestrator {
           logger.debug('📝 [DELEGATION] Progress step added:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
         }
       } else {
-  logger.warn('❌ [ORCHESTRATOR] Could not find source execution or steps array:', {
-          sourceExecutionId: progressData.sourceExecutionId,
+        logger.debug('⚠️ [ORCHESTRATOR] Could not find source execution or steps array for delegation progress:', {
+          sourceExecutionId: inferredExecId,
           executionFound: !!sourceExecution,
           hasStepsArray: Boolean(sourceExecution && (sourceExecution as any).steps)
         })
       }
     } else {
-  logger.warn('❌ [ORCHESTRATOR] No sourceExecutionId in progress data:', progressData)
+      // Lower severity and avoid noise; many progress events are emitted from child contexts
+      logger.debug('⚠️ [ORCHESTRATOR] No executionId available for delegation progress (skipping step):', {
+        stage: progressData?.stage,
+        status: progressData?.status,
+        targetAgent: progressData?.targetAgent
+      })
     }
   }
 

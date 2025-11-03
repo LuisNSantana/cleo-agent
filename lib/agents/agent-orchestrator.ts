@@ -27,12 +27,12 @@ const listeners = g.__cleoOrchListeners as Array<(event: any) => void>
 // ----------------------------------------------------------------------------
 // Utilities
 // ----------------------------------------------------------------------------
-function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>): BaseMessage[] {
+function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>): BaseMessage[] {
 	return (prior || []).flatMap(m => {
 		switch (m.role) {
-			case 'user': return [new HumanMessage(m.content)]
-			case 'assistant': return [new AIMessage(m.content)]
-			case 'system': return [new SystemMessage(m.content)]
+			case 'user': return [new HumanMessage(m.content as any)]
+			case 'assistant': return [new AIMessage(m.content as any)]
+			case 'system': return [new SystemMessage(m.content as any)]
 			case 'tool': {
 				// Convert stale tool messages to system notes (avoid LangChain errors)
 				const note = `[tool:${m?.metadata?.name || m?.metadata?.tool_name || 'unknown'}] ${String(m.content).slice(0, 400)}`
@@ -49,9 +49,10 @@ function toBaseMessages(prior: Array<{ role: 'user'|'assistant'|'system'|'tool';
 async function createAndRunExecution(
 	input: string,
 	agentId: string | undefined,
-	prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
+	prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
 	threadId?: string,
-	userId?: string
+	userId?: string,
+	lastUserParts?: any[]
 ): Promise<AgentExecution> {
 	const core = getGlobalOrchestrator()
 	
@@ -73,15 +74,101 @@ async function createAndRunExecution(
 	// Create execution context
 	const baseMessages = toBaseMessages(prior || [])
 	
-	// Check if input is already in history (avoid duplication)
-	const lastPriorMessage = (prior || []).slice(-1)[0]
-	const inputAlreadyInHistory = lastPriorMessage && 
-		lastPriorMessage.role === 'user' && 
-		lastPriorMessage.content.trim() === input.trim()
+	// CRITICAL: If we have lastUserParts (multimodal content), always use it.
+	// This ensures images reach the model. Duplication check is simpler.
+	let messageHistory: BaseMessage[]
 	
-	const messageHistory = inputAlreadyInHistory 
-		? baseMessages
-		: [...baseMessages, new HumanMessage(input)]
+	if (Array.isArray(lastUserParts) && lastUserParts.length > 0) {
+		// Convert AI SDK format to LangChain format
+		// AI SDK: { type: "image", image: "url" }
+		// LangChain: { type: "image_url", image_url: { url: "..." } }
+		const { convertAiSdkPartsToLangChain } = await import('@/lib/chat/ai-sdk-to-langchain')
+		const langchainParts = convertAiSdkPartsToLangChain(lastUserParts)
+		
+		console.log('[MULTIMODAL CONVERSION] AI SDK → LangChain:', {
+			originalPartsCount: lastUserParts.length,
+			convertedPartsCount: langchainParts.length,
+			originalTypes: lastUserParts.map((p: any) => p?.type),
+			convertedTypes: langchainParts.map((p: any) => p?.type),
+			hasImages: langchainParts.some((p: any) => p?.type === 'image_url')
+		})
+		// We have multimodal parts (text + images). Use them directly.
+		// Check if the last prior message is a user message with matching text to avoid duplication.
+		const lastPriorMessage = (prior || []).slice(-1)[0] as any
+		let isDuplicate = false
+		
+		if (lastPriorMessage && lastPriorMessage.role === 'user') {
+			const c = lastPriorMessage.content
+			// Extract text from langchainParts for comparison
+			const partsText = langchainParts
+				.filter((p: any) => p && p.type === 'text' && typeof p.text === 'string')
+				.map((p: any) => p.text)
+				.join('\n')
+				.trim()
+			
+			if (typeof c === 'string') {
+				isDuplicate = c.trim() === partsText
+			} else if (Array.isArray(c)) {
+				const existingText = c
+					.filter((p: any) => p && p.type === 'text' && typeof p.text === 'string')
+					.map((p: any) => p.text)
+					.join('\n')
+					.trim()
+				isDuplicate = existingText === partsText
+			}
+		}
+		
+		if (isDuplicate) {
+			// Replace the last message with the multimodal version to ensure images are present
+			const copy = [...baseMessages]
+			// CRITICAL: HumanMessage expects { content: [...] } not just the array
+			const newMsg = new HumanMessage({ content: langchainParts } as any)
+			copy[copy.length - 1] = newMsg
+			messageHistory = copy
+			
+			const imageCount = langchainParts.filter((p: any) => p?.type === 'image_url').length
+			console.log('[MULTIMODAL] Replaced duplicate message with parts:', {
+				imageCount,
+				totalParts: langchainParts.length,
+				contentPreview: langchainParts.slice(0, 2)
+			})
+			
+			// DEBUG: Verify what's actually in the HumanMessage after creation
+			const actualContent = (newMsg as any).content
+			console.log('[MULTIMODAL DEBUG] HumanMessage actual content:', {
+				contentType: typeof actualContent,
+				isArray: Array.isArray(actualContent),
+				length: Array.isArray(actualContent) ? actualContent.length : 0,
+				firstItem: Array.isArray(actualContent) ? actualContent[0] : null,
+				imageCount: Array.isArray(actualContent) 
+					? actualContent.filter((p: any) => p?.type === 'image_url').length 
+					: 0
+			})
+		} else {
+			// Append new multimodal message
+			// CRITICAL: HumanMessage expects { content: [...] } not just the array
+			const newMsg = new HumanMessage({ content: langchainParts } as any)
+			messageHistory = [...baseMessages, newMsg]
+			
+			const imageCount = langchainParts.filter((p: any) => p?.type === 'image_url').length
+			console.log('[MULTIMODAL] Appended new message with parts:', {
+				imageCount,
+				totalParts: langchainParts.length,
+				contentPreview: langchainParts.slice(0, 2)
+			})
+		}
+	} else {
+		// No multimodal parts; fall back to simple text deduplication
+		const lastPriorMessage = (prior || []).slice(-1)[0] as any
+		const inputAlreadyInHistory = lastPriorMessage 
+			&& lastPriorMessage.role === 'user'
+			&& typeof lastPriorMessage.content === 'string'
+			&& lastPriorMessage.content.trim() === (input || '').trim()
+		
+		messageHistory = inputAlreadyInHistory
+			? baseMessages
+			: [...baseMessages, new HumanMessage(input as any)]
+	}
 	
 	const ctx: ExecutionContext = {
 		threadId: threadId || `thread_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -99,7 +186,10 @@ async function createAndRunExecution(
 		agentId: targetId,
 		userId: finalUserId,
 		threadId: ctx.threadId,
-		messageCount: messageHistory.length
+		messageCount: messageHistory.length,
+		imagesInLastMessage: Array.isArray((messageHistory[messageHistory.length - 1] as any)?.content)
+			? ((messageHistory[messageHistory.length - 1] as any).content.filter((p: any) => p?.type === 'image_url').length)
+			: 0
 	})
 	
 	// CRITICAL FIX: Don't await executeAgent! Return the execution immediately
@@ -194,9 +284,10 @@ export function getAgentOrchestrator() {
 		startAgentExecutionWithHistory(
 			input: string,
 			agentId: string | undefined,
-			prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>
+			prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
+			lastUserParts?: any[]
 		) {
-			return createAndRunExecution(input, agentId, prior)
+			return createAndRunExecution(input, agentId, prior, undefined, undefined, lastUserParts)
 		},
 
 		// Dual-mode execution for UI with enhanced context
@@ -205,10 +296,11 @@ export function getAgentOrchestrator() {
 			agentId?: string, 
 			threadId?: string, 
 			userId?: string, 
-			prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
-			forceSupervised?: boolean
+			prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
+			forceSupervised?: boolean,
+			lastUserParts?: any[]
 		) {
-			return createAndRunExecution(input, agentId, prior || [], threadId, userId)
+			return createAndRunExecution(input, agentId, prior || [], threadId, userId, lastUserParts)
 		},
 
 		// Execution getters - delegate to CoreOrchestrator (single source of truth)

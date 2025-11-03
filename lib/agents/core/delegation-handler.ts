@@ -140,13 +140,14 @@ export class DelegationHandler {
         conversationHistory: request.conversationHistory || []
       })
 
-      // Emit progress: starting
+      // Emit progress: starting (normalized payload)
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'starting',
         message: `Delegating to ${request.targetAgent}...`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sourceExecutionId: request.sourceExecutionId
       })
 
       // Wait for delegation.completed event (timeout after 5 minutes)
@@ -155,13 +156,14 @@ export class DelegationHandler {
       // Store in history
       this.delegationHistory.set(delegationKey, result)
 
-      // Emit progress: completed
+      // Emit progress: completed (normalized payload)
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'completed',
         message: `${request.targetAgent} completed the task`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sourceExecutionId: request.sourceExecutionId
       })
 
       logger.info('DELEGATION', `Delegation succeeded: ${delegationKey}`)
@@ -170,13 +172,14 @@ export class DelegationHandler {
     } catch (error) {
       logger.error('DELEGATION', `Delegation failed: ${delegationKey}`, error)
 
-      // Emit progress: failed
+      // Emit progress: failed (normalized payload)
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'failed',
         message: `${request.targetAgent} failed: ${error instanceof Error ? error.message : String(error)}`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sourceExecutionId: request.sourceExecutionId
       })
 
       const failureResult: DelegationResult = {

@@ -46,40 +46,116 @@ class AISdkChatModel extends BaseChatModel {
   }
 
   async _generate(messages: any[], options?: any): Promise<any> {
-    // Convert LangChain messages to AI SDK format and ensure system-first ordering
-      const convertedMessagesRaw = messages.map((msg: any) => {
-        const t = typeof msg._getType === 'function' ? msg._getType() : undefined
-        if (t === 'human') {
-          return { role: 'user', content: msg.content }
+    // Convert LangChain messages → AI SDK ModelMessage[] (strict)
+    // - Allowed roles: system | user | assistant
+    // - content: string | Array<TextPart|ImagePart>
+    // - Strip tool_calls and any unknown keys to satisfy zod validators
+    
+    // CRITICAL: Convert LangChain image_url format → AI SDK image format
+    const convertLangChainToAiSdk = (content: any): any => {
+      if (typeof content === 'string') return content
+      if (!Array.isArray(content)) return content
+      
+      return content.map((part: any) => {
+        // Text parts: passthrough
+        if (part?.type === 'text') {
+          return { type: 'text', text: part.text }
         }
-        if (t === 'ai') {
-          // Preserve tool_calls if present on assistant messages
-          const tool_calls = (msg as any)?.additional_kwargs?.tool_calls
-          return tool_calls
-            ? { role: 'assistant', content: msg.content ?? '', tool_calls }
-            : { role: 'assistant', content: msg.content ?? '' }
+        // LangChain image_url → AI SDK image
+        if (part?.type === 'image_url') {
+          const url = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url
+          return { type: 'image', image: url }
         }
-        if (t === 'tool') {
-          // Map ToolMessage correctly to 'tool' role with tool_call_id
-          return {
-            role: 'tool',
-            content: String(msg.content ?? ''),
-            tool_call_id: (msg as any)?.tool_call_id || (msg as any)?.additional_kwargs?.tool_call_id || undefined,
-          }
+        // AI SDK image: already correct format
+        if (part?.type === 'image') {
+          return part
         }
-        // Default to system for explicit system messages only
-        return { role: 'system', content: msg.content ?? '' }
+        // Unknown part: convert to text
+        return { type: 'text', text: JSON.stringify(part) }
       })
+    }
+    
+    const toSafeText = (v: any): string => {
+      if (v == null) return ''
+      if (typeof v === 'string') return v
+      if (Array.isArray(v)) {
+        return v.map((p: any) => {
+          if (p?.type === 'text' && typeof p.text === 'string') return p.text
+          if (p?.type === 'image' && (p.image || p.url)) return `[image:${p.image || p.url}]`
+          if (p?.type === 'image_url') return `[image:${typeof p.image_url === 'string' ? p.image_url : p.image_url?.url || 'url'}]`
+          return typeof p === 'string' ? p : ''
+        }).join('\n\n')
+      }
+      if (typeof v === 'object' && v.text) return String(v.text)
+      return String(v)
+    }
 
-    // Remove duplicate or mid-stream system messages; keep only the first system at the beginning if present
-    const systemMsgs = convertedMessagesRaw.filter(m => m.role === 'system')
-    let convertedMessages = convertedMessagesRaw.filter(m => m.role !== 'system')
-    if (systemMsgs.length > 0) {
-      // Keep only the first system message
-      convertedMessages = [systemMsgs[0], ...convertedMessages]
+    const convertedMessagesRaw = messages.map((msg: any) => {
+      const t = typeof msg._getType === 'function' ? msg._getType() : undefined
+      if (t === 'human') {
+        // Convert LangChain image_url → AI SDK image format
+        const c = msg.content
+        const content = convertLangChainToAiSdk(c)
+        return { role: 'user' as const, content }
+      }
+      if (t === 'ai') {
+        // Drop tool_calls metadata; pass only content
+        const c = msg.content
+        const content = Array.isArray(c) ? convertLangChainToAiSdk(c) : toSafeText(c)
+        return { role: 'assistant' as const, content }
+      }
+      if (t === 'tool') {
+        // Convert ToolMessage to assistant text (providers often reject role: 'tool')
+        const toolId = (msg as any)?.tool_call_id || (msg as any)?.additional_kwargs?.tool_call_id || 'tool'
+        const text = `[tool:${toolId}] ${toSafeText(msg.content).slice(0, 1000)}`
+        return { role: 'assistant' as const, content: text }
+      }
+      // Default to system
+      const c = msg?.content
+      const content = typeof c === 'string' ? c : toSafeText(c)
+      return { role: 'system' as const, content }
+    })
+
+    // Ensure first message is at most one system; keep only the first system at the beginning
+    const firstSystem = convertedMessagesRaw.find(m => m.role === 'system')
+    const rest = convertedMessagesRaw.filter((m, i) => !(m.role === 'system' && m !== firstSystem))
+    const convertedMessages = firstSystem ? [firstSystem, ...rest.filter(m => m !== firstSystem)] : rest
+
+    // DEBUG: Log multimodal conversion
+    const hasMultimodal = convertedMessages.some(m => Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image'))
+    if (hasMultimodal) {
+      const imageMessage = convertedMessages.find(m => Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image'))
+      logger.info('[AI SDK] Multimodal message prepared for validation', {
+        messageCount: convertedMessages.length,
+        imageMessageRole: imageMessage?.role,
+        contentParts: Array.isArray(imageMessage?.content) ? imageMessage.content.map((p: any) => p?.type) : [],
+        sampleImage: imageMessage?.content?.find((p: any) => p?.type === 'image')?.image?.slice?.(0, 50)
+      })
     }
 
     try {
+      // Optional: validate ModelMessage[] using AI SDK schema; fallback to prompt if invalid
+      let useMessages: any = convertedMessages
+      try {
+        const { modelMessageSchema } = await import('ai') as any
+        if (modelMessageSchema && typeof (modelMessageSchema.array().safeParse) === 'function') {
+          const validation = modelMessageSchema.array().safeParse(convertedMessages)
+          if (!validation.success) {
+            logger.warn('[AI SDK] ModelMessage validation failed; will retry without validation', { 
+              issues: validation.error?.issues?.slice?.(0, 3),
+              messageCount: convertedMessages.length,
+              firstUserMessage: convertedMessages.find(m => m.role === 'user')?.content?.slice?.(0, 200)
+            })
+            // CRITICAL FIX: Don't use flattened fallback for multimodal - it destroys images
+            // Instead, proceed with converted messages and let the model API validate
+            // The conversion above already normalized LangChain → AI SDK format
+            logger.info('[AI SDK] Proceeding with converted messages despite validation warning (preserves multimodal)')
+          }
+        }
+      } catch (e) {
+        // If schema isn't available, continue without strict validation
+      }
+
       const safeMax = clampMaxOutputTokens(this.modelName, options?.maxTokens ?? this.maxTokens)
       
       // FIXED: Add 60s timeout to model calls to prevent hanging indefinitely
@@ -91,6 +167,9 @@ class AISdkChatModel extends BaseChatModel {
       // If a single model call takes >60s, it's likely hung or the API is down
       const MODEL_CALL_TIMEOUT_MS = 60_000 // 1 minute
       
+      // CRITICAL FIX: Always use messages format to preserve multimodal content
+      // Previous: Flattened fallback destroyed images by converting to text
+      // Now: Trust our LangChain→AI SDK conversion and let model API handle validation
       const modelCallPromise = generateText({
         model: this.model,
         messages: convertedMessages,
@@ -105,7 +184,7 @@ class AISdkChatModel extends BaseChatModel {
         }, MODEL_CALL_TIMEOUT_MS)
       })
       
-      const result = await Promise.race([modelCallPromise, timeoutPromise]) as any
+  const result = await Promise.race([modelCallPromise, timeoutPromise]) as any
 
       return {
         generations: [{
@@ -139,10 +218,8 @@ export class ModelFactory {
     }
 
     const normalized = normalizeModelId(modelName)
-    const INTERNAL_MODEL_MAP: Record<string,string> = {
-      'grok-4-fast': 'openrouter:x-ai/grok-4-fast',
-    }
-    const externalName = INTERNAL_MODEL_MAP[normalized] || normalized
+    // IMPORTANT: Do not map grok models to OpenRouter anymore. We use xAI SDK directly.
+    const externalName = normalized
     try {
       const model = await this.createModelWithFallback(externalName, config)
       logger.info(`[ModelFactory] Model created`, { modelName, cacheKey, modelClass: (model as any)?.constructor?.name })
@@ -254,63 +331,45 @@ export class ModelFactory {
       return model
     }
 
-    // xAI models (Grok) - including grok-3-mini-fallback -> grok-3-mini
+    // xAI models (Grok) - including grok-4-fast-reasoning -> grok-4-fast
     if (cleanModelName.startsWith('grok-') || cleanModelName.includes('xai/')) {
-      // CRITICAL FIX: grok-4-fast-reasoning is NOT a real xAI model
-      // xAI only has grok-4-fast (reasoning is a runtime parameter, not a model variant)
-      // Map grok-4-fast-reasoning → grok-4-fast to prevent API hanging
+      // Normalize grok-4-fast-reasoning → grok-4-fast (reasoning is a runtime flag)
       let actualModelName = cleanModelName
       if (cleanModelName === 'grok-4-fast-reasoning' || cleanModelName === 'xai/grok-4-fast-reasoning') {
         actualModelName = 'grok-4-fast'
         logger.warn(`[ModelFactory] Mapping ${cleanModelName} → grok-4-fast (reasoning is not a separate model)`)
       }
-      
-      // FIXED: Check if XAI_API_KEY is configured before attempting xAI
-      // If not configured, fall back to OpenRouter proxy (more reliable)
-      const hasXaiKey = process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0
-      
+
+      const hasXaiKey = !!(process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0)
       if (!hasXaiKey) {
-        logger.warn(`[ModelFactory] XAI_API_KEY not configured, falling back to OpenRouter for ${actualModelName}`)
-        // Use OpenRouter as fallback (x-ai/grok-4-fast is available there)
-        const openrouterModel = actualModelName.replace('grok-', 'x-ai/grok-').replace('xai/', 'x-ai/')
-        
-        return new ChatOpenAI({
-          apiKey: process.env.OPENROUTER_API_KEY,
-          modelName: openrouterModel,
+        // Do NOT use OpenRouter anymore. Fall back to our default OpenAI model to keep system alive.
+        logger.error('[ModelFactory] XAI_API_KEY missing but grok-* was requested. Falling back to gpt-4o-mini. Set XAI_API_KEY to use grok-4-fast via xAI.')
+        const fallback = new ChatOpenAI({
+          modelName: 'gpt-4o-mini',
           temperature,
           maxTokens: safeMax,
           streaming,
-          cache: ModelFactory.llmCache,
-          configuration: {
-            baseURL: 'https://openrouter.ai/api/v1',
-          } as any,
+          cache: ModelFactory.llmCache
         })
+        return fallback
       }
-      
+
       try {
-        const xai = createXai({
-          apiKey: process.env.XAI_API_KEY
-        })
-        
+        const xai = createXai({ apiKey: process.env.XAI_API_KEY })
         const model = xai(actualModelName.replace('xai/', ''))
         logger.info(`[ModelFactory] Instantiating xAI/AISDK model`, { requestedModel: cleanModelName, actualModel: actualModelName })
         return new AISdkChatModel(model, actualModelName, temperature, safeMax)
       } catch (xaiError) {
-        logger.error(`[ModelFactory] xAI model failed, falling back to OpenRouter`, { cleanModelName, error: xaiError })
-        // Fallback to OpenRouter on xAI failure
-        const openrouterModel = actualModelName.replace('grok-', 'x-ai/grok-').replace('xai/', 'x-ai/')
-        
-        return new ChatOpenAI({
-          apiKey: process.env.OPENROUTER_API_KEY,
-          modelName: openrouterModel,
+        logger.error(`[ModelFactory] xAI model failed`, { cleanModelName, error: xaiError })
+        // Final fallback stays internal; do not call OpenRouter
+        const fallback = new ChatOpenAI({
+          modelName: 'gpt-4o-mini',
           temperature,
           maxTokens: safeMax,
           streaming,
-          cache: ModelFactory.llmCache,
-          configuration: {
-            baseURL: 'https://openrouter.ai/api/v1',
-          } as any,
+          cache: ModelFactory.llmCache
         })
+        return fallback
       }
     }
 

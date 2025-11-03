@@ -425,7 +425,10 @@ export class GraphBuilder {
           const workingMessages = await this.initialiseMessageStack(agentConfig, filteredMessages, state)
           
           // Invoke model ONCE - no internal loop
-          const response = await this.invokeModel(model, workingMessages, timeoutManager, agentConfig)
+          // Normalize multimodal parts for provider-specific schemas (e.g., OpenAI image_url)
+          const { normalizeMultimodalForProvider } = await import('./message-processor')
+          const providerAdjustedMessages = normalizeMultimodalForProvider(workingMessages, model)
+          const response = await this.invokeModel(model, providerAdjustedMessages, timeoutManager, agentConfig)
 
           // Convert to AIMessage if needed
           const aiMessage = response instanceof AIMessage 
@@ -589,7 +592,44 @@ export class GraphBuilder {
 
     try {
       return await model.invoke(messages)
-    } catch (error) {
+    } catch (error: any) {
+      // Defensive fallback for providers that don't accept structured multimodal parts
+      const msg = (error && (error.message || String(error))) as string
+      const looksLikeContentMappingIssue = /cannot read (properties of )?undefined \(reading 'map'\)/i.test(msg)
+      if (looksLikeContentMappingIssue) {
+        try {
+          logger.warn('⚠️ Provider rejected structured parts; retrying with flattened text content', {
+            agent: agentConfig.id,
+            reason: msg
+          })
+          const flattened = messages.map((m: any) => {
+            const t = typeof m?._getType === 'function' ? m._getType() : undefined
+            const c = m?.content
+            const toFlatText = (content: any): string => {
+              if (typeof content === 'string') return content
+              if (Array.isArray(content)) {
+                return content.map((p: any) => {
+                  if (p?.type === 'text' && typeof p.text === 'string') return p.text
+                  if (p?.type === 'image' && (p.image || p.url)) return `[Imagen: ${p.image || p.url}]`
+                  if (p?.type === 'image_url' && p.image_url) return `[Imagen: ${typeof p.image_url === 'string' ? p.image_url : (p.image_url?.url || 'url')}]`
+                  return typeof p === 'string' ? p : ''
+                }).join('\n\n')
+              }
+              if (c?.text) return String(c.text)
+              return String(content || '')
+            }
+            const flat = toFlatText(c)
+            if (t === 'human') return new HumanMessage(flat)
+            if (t === 'ai') return new AIMessage(flat)
+            if (t === 'system') return new SystemMessage(flat)
+            return m
+          })
+          return await model.invoke(flattened)
+        } catch (retryErr) {
+          logger.error('💥 Model invocation failed after fallback', { agent: agentConfig.id, error: retryErr })
+          throw retryErr
+        }
+      }
       logger.error('💥 Model invocation failed', { agent: agentConfig.id, error })
       throw error
     }

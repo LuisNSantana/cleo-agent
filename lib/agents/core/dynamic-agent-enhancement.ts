@@ -9,6 +9,10 @@ import { getAgentDiscoveryService } from '../dynamic/agent-discovery'
 import { EventEmitter } from './event-emitter'
 import logger from '@/lib/utils/logger'
 
+// Simple per-user debounce to avoid duplicate registration bursts within short windows
+const lastRegistrationByUser = new Map<string, number>()
+const REGISTRATION_DEBOUNCE_MS = 60_000 // 60s window
+
 /**
  * Enhance an agent configuration with dynamically discovered tools
  */
@@ -71,6 +75,16 @@ export async function enhanceAgentWithDynamicTools(
  */
 export async function registerDynamicTools(userId?: string): Promise<void> {
   try {
+    // Idempotency guard: skip if we recently registered for this user
+    const key = userId || 'anonymous'
+    const now = Date.now()
+    const last = lastRegistrationByUser.get(key) || 0
+    if (now - last < REGISTRATION_DEBOUNCE_MS) {
+      logger.debug('[DynamicEnhancement] Skipping dynamic tool registration (recently registered)', { userId: key, msSinceLast: now - last })
+      return
+    }
+    lastRegistrationByUser.set(key, now)
+
     logger.info('[DynamicEnhancement] Registering dynamic tools globally')
     
     // Initialize discovery service
@@ -84,15 +98,17 @@ export async function registerDynamicTools(userId?: string): Promise<void> {
     // Import the global tools registry
     const { tools: appTools } = await import('@/lib/tools')
     
-    // Register each tool
+    // Register each tool (count only newly added for accurate logging)
+    let newlyRegistered = 0
     for (const [toolName, toolImpl] of Object.entries(tools)) {
       if (!(appTools as any)[toolName]) {
         (appTools as any)[toolName] = toolImpl
         logger.info(`[DynamicEnhancement] Registered tool: ${toolName}`)
+        newlyRegistered++
       }
     }
     
-    logger.info(`[DynamicEnhancement] Registered ${Object.keys(tools).length} dynamic tools`)
+    logger.info(`[DynamicEnhancement] Registration summary: discovered=${Object.keys(tools).length}, added=${newlyRegistered}, skipped=${Object.keys(tools).length - newlyRegistered}`)
     
   } catch (error) {
     logger.error('[DynamicEnhancement] Error registering dynamic tools:', error)

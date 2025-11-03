@@ -1267,13 +1267,44 @@ export async function POST(req: Request) {
           }
         }
 
+        // Extract multimodal parts (images/text) for the last user message from convertedMessages
+        let lastUserParts: any[] | undefined
+        try {
+          const { ensureImageAnalysisHint } = await import('@/lib/chat/image-hint')
+          const { orderTextBeforeImages } = await import('@/lib/chat/parts-order')
+          const lastConvertedUser = [...(convertedMessages || [])].reverse().find((m: any) => m?.role === 'user') as any
+          if (lastConvertedUser && Array.isArray(lastConvertedUser.content)) {
+            // Keep only provider-supported parts (text | image)
+            const parts = lastConvertedUser.content.filter((p: any) => p && (p.type === 'text' || p.type === 'image'))
+            // 1) Ensure image-only gets a text hint
+            let ensured = ensureImageAnalysisHint(parts)
+            // 2) Always prefer text before images to guide models reliably
+            lastUserParts = orderTextBeforeImages(ensured)
+            if (lastUserParts !== parts) {
+              const injected = ensured !== parts
+              const reordered = ensured !== lastUserParts
+              if (injected) console.log('[IMAGE PROMPT] Injected analysis hint for image-only user message')
+              if (reordered) console.log('[IMAGE ORDER] Reordered parts to place text before images')
+            }
+          }
+        } catch {}
+
+        // Ensure the very last message we pass to the orchestrator contains the multimodal parts
+        // even if DB ordering or focus trimming would otherwise drop them.
+        if (Array.isArray(lastUserParts) && lastUserParts.length > 0) {
+          // Push a synthetic user message with parts at the end of prior so downstream always sees it.
+          prior = [...prior, { role: 'user', content: lastUserParts as any, metadata: { synthetic: true, reason: 'ensure_multimodal_delivery' } }]
+          console.log('[MM OVERRIDE] Appended synthetic user message with parts to prior')
+        }
+
         const exec = await (orchestrator.startAgentExecutionForUI?.(
           userText,
           'cleo-supervisor',
           effectiveThreadId || undefined,
           realUserId || undefined,
           prior,
-          true
+          true,
+          lastUserParts
         ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor'))
 
   const execId: string | undefined = exec?.id

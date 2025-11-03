@@ -25,14 +25,7 @@ import type { AgentConfig, ExecutionResult } from '../types'
 import type { SubAgent } from './sub-agent-manager'
 import type { SubAgentManager } from './sub-agent-manager'
 import type { ExecutionContext } from './orchestrator'
-
-// Helper function to emit browser events for UI updates
-function emitBrowserEvent(eventName: string, detail: any) {
-  if (typeof window !== 'undefined') {
-    const event = new CustomEvent(eventName, { detail })
-    window.dispatchEvent(event)
-  }
-}
+import { emitBrowserEvent } from '@/lib/utils/browser-events'
 
 // Global counter for unique ID generation
 let delegationMessageIdCounter = 0
@@ -519,7 +512,8 @@ export class DelegationCoordinator {
           status: 'in_progress',
           message: `Sub-agente ejecutando herramientas especializadas`,
           agentName: targetAgentName,
-          progress: 70
+          progress: 70,
+          sourceExecutionId: delegationData.sourceExecutionId
         })
         emitBrowserEvent('delegation-progress', {
           sourceAgent: delegationData.sourceAgent,

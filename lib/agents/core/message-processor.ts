@@ -178,3 +178,55 @@ export function convertMessagesToPromptFormat(messages: BaseMessage[]): Array<{ 
     content: msg.content
   }))
 }
+
+/**
+ * Normalize multimodal message parts to provider-specific formats when needed.
+ * - OpenAI-compatible (ChatOpenAI): expects image parts as { type: 'image_url', image_url: { url } }
+ * - Groq (ChatGroq): uses OpenAI-compatible JSON schema as well.
+ * Other providers are left unchanged.
+ */
+export function normalizeMultimodalForProvider(messages: BaseMessage[], model: any): BaseMessage[] {
+  try {
+    const ctor = model?.constructor?.name || ''
+    const isOpenAICompat = ctor === 'ChatOpenAI' || ctor === 'ChatGroq'
+    if (!isOpenAICompat) return messages
+
+    const mapParts = (content: any): any => {
+      if (!Array.isArray(content)) return content
+      return content.map((p: any) => {
+        if (p?.type === 'image' && (p.image || p.url)) {
+          const url = p.image || p.url
+          // Some providers (or proxies) accept image_url as a plain string; prefer string for broader compatibility
+          return { type: 'image_url', image_url: url }
+        }
+        if (p?.type === 'text' && typeof p.text === 'string') {
+          return { type: 'text', text: p.text }
+        }
+        // Fallback: stringify unknown parts to text
+        if (typeof p === 'string') return { type: 'text', text: p }
+        const text = (p?.content || p?.name || '').toString()
+        return { type: 'text', text }
+      })
+    }
+
+    return messages.map((m) => {
+      const t = (m as any)?._getType ? (m as any)._getType() : undefined
+      if (t === 'human' || t === 'ai' || t === 'system') {
+        const content = (m as any).content
+        const normalized = mapParts(content)
+        if (normalized === content) return m
+        // Recreate message preserving type
+        if (t === 'human') {
+          return new HumanMessage(normalized as any)
+        } else if (t === 'ai') {
+          return new AIMessage(normalized as any)
+        } else {
+          return new SystemMessage(normalized as any)
+        }
+      }
+      return m
+    })
+  } catch {
+    return messages
+  }
+}

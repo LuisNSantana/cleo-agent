@@ -469,7 +469,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
             projectId,
             useHybrid: true,
             useReranking: true,
-            timeoutMs: 5000,
+            timeoutMs: 6000,
             cacheTtlMs: 120000,
           })
 
@@ -504,7 +504,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                     projectId,
                     useHybrid: true,
                     useReranking: true,
-                    timeoutMs: 5000,
+                    timeoutMs: 6000,
                     cacheTtlMs: 120000,
                   })
                   if (retrieved.length) ragSystemAddon = buildContextBlock(retrieved)
