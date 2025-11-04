@@ -460,6 +460,51 @@ export class GraphBuilder {
             toolCalls: toolCalls.length
           })
 
+          // ✅ EXTRACT AND EMIT REASONING for UI transparency
+          try {
+            const { extractReasoning, createReasoningStep, hasExtractableReasoning } = await import('../reasoning-extractor')
+            
+            if (hasExtractableReasoning(aiMessage)) {
+              const reasoningBlocks = extractReasoning(aiMessage, agentConfig.id)
+              
+              logger.debug('💭 [REASONING] Extracted blocks', {
+                agent: agentConfig.id,
+                blockCount: reasoningBlocks.length,
+                types: reasoningBlocks.map(b => b.type)
+              })
+              
+              // Emit each reasoning block as a separate event for real-time UI updates
+              reasoningBlocks.forEach((block, index) => {
+                const step = createReasoningStep(block, agentConfig.id, executionId)
+                
+                // Emit to event emitter for SSE streaming
+                this.eventEmitter.emit('execution.reasoning', {
+                  executionId,
+                  agentId: agentConfig.id,
+                  step,
+                  blockIndex: index,
+                  totalBlocks: reasoningBlocks.length
+                })
+                
+                logger.debug(`💭 [REASONING] Emitted step ${index + 1}/${reasoningBlocks.length}`, {
+                  type: block.type,
+                  content: step.content.slice(0, 80)
+                })
+              })
+            } else {
+              logger.debug('💭 [REASONING] No extractable reasoning found', {
+                agent: agentConfig.id,
+                hasContent: !!aiMessage.content,
+                hasToolCalls: toolCalls.length > 0
+              })
+            }
+          } catch (error) {
+            logger.error('❌ [REASONING] Extraction failed', {
+              agent: agentConfig.id,
+              error
+            })
+          }
+
           // MessagesAnnotation has a built-in reducer that APPENDS messages
           // So we only need to return the NEW message, not the full history
           const newState = {
@@ -524,8 +569,10 @@ export class GraphBuilder {
     const displayName = getAgentDisplayName(enhancedConfig.id)
     logger.debug(`🛠️ ${displayName}: ${toolRuntime.lcTools.length} tools bound`)
     
+    // CRITICAL: Force tool usage with tool_choice for models that support it
+    // This prevents models from returning XML <function_call> instead of native tool calls
     const model = typeof (baseModel as any).bindTools === 'function'
-      ? (baseModel as any).bindTools(toolRuntime.lcTools)
+      ? (baseModel as any).bindTools(toolRuntime.lcTools, { tool_choice: 'auto' })
       : baseModel
 
     return { model, toolRuntime, enhancedAgent: enhancedConfig }

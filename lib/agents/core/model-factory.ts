@@ -7,6 +7,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { ChatGroq } from '@langchain/groq'
 import { ChatOllama } from '@langchain/community/chat_models/ollama'
 import { ChatAnthropic } from '@langchain/anthropic'
+import { ChatXAI } from '@langchain/xai'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { InMemoryCache } from '@langchain/core/caches'
 import { getFallbackModel, getModelWithFallback } from '@/lib/models/fallback-system'
@@ -331,7 +332,7 @@ export class ModelFactory {
       return model
     }
 
-    // xAI models (Grok) - use full model names for API
+    // xAI models (Grok) - use ChatXAI from @langchain/xai for native tool calling support
     if (cleanModelName.startsWith('grok-') || cleanModelName.includes('xai/')) {
       // Map UI model IDs to actual xAI API model names
       let actualModelName = cleanModelName
@@ -360,12 +361,23 @@ export class ModelFactory {
       }
 
       try {
-        const xai = createXai({ apiKey: process.env.XAI_API_KEY })
-        const model = xai(actualModelName.replace('xai/', ''))
-        logger.info(`[ModelFactory] Instantiating xAI/AISDK model`, { requestedModel: cleanModelName, actualModel: actualModelName })
-        return new AISdkChatModel(model, actualModelName, temperature, safeMax)
+        // Use official ChatXAI from @langchain/xai for native tool calling support
+        const model = new ChatXAI({
+          model: actualModelName.replace('xai/', ''),
+          apiKey: process.env.XAI_API_KEY,
+          temperature,
+          maxTokens: safeMax,
+          streaming,
+          cache: ModelFactory.llmCache
+        })
+        logger.info(`[ModelFactory] Instantiating ChatXAI model with native tool calling`, { 
+          requestedModel: cleanModelName, 
+          actualModel: actualModelName,
+          hasCache: !!ModelFactory.llmCache
+        })
+        return model
       } catch (xaiError) {
-        logger.error(`[ModelFactory] xAI model failed`, { cleanModelName, error: xaiError })
+        logger.error(`[ModelFactory] ChatXAI model failed`, { cleanModelName, error: xaiError })
         // Final fallback stays internal; do not call OpenRouter
         const fallback = new ChatOpenAI({
           modelName: 'gpt-4o-mini',

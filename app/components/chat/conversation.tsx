@@ -272,9 +272,10 @@ function ConversationContent({
                       steps={currentMessageSteps} 
                       mode={optimizationData?.directResponse ? 'direct' : 'delegated'}
                     />
-                    {optimizationData && (
+                    {/* DISABLED: System Optimizations widget to reduce UI clutter */}
+                    {/* {optimizationData && (
                       <OptimizationInsights pipeline={optimizationData} />
-                    )}
+                    )} */}
                   </div>
                 )}
 

@@ -3,7 +3,7 @@ import { getXAIModel } from "../../xai"
 import { openproviders } from "@/lib/openproviders"
 
 /**
- * Cleo Agent - Powered by Grok-3 Mini (Faster)
+ * Cleo Agent - Powered by Grok 4 Fast with Reasoning
  * 
  * Cleo is an intelligent AI agent designed to:
  * - Analyze and create documents with deep understanding

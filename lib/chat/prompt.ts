@@ -339,7 +339,8 @@ const AGENT_WORKFLOW_DIRECTIVE = `AGENT WORKFLOW (RELIABILITY & SPEED)
 - Plan-then-act (brief): Form a short plan internally (1–2 steps). Do NOT reveal chain-of-thought; output only final answers and tool results.
 - Tool-first: Prefer a single correct tool call. Use at most 3 calls per turn. Stop early when sufficient.
 - Safety/timeouts: Keep calls quick; if a tool stalls or partial data is enough, stop and summarize. Ask one concise follow-up only if truly needed.
-- Verification: After a tool returns, verify it answers the user's request; fix trivial gaps; then present a concise result with clear next action.`
+- Verification: After a tool returns, verify it answers the user's request; fix trivial gaps; then present a concise result with clear next action.
+- Tool execution: When you need to use a tool, call it immediately using the framework's native mechanism. Do not describe what tool you will use - execute it directly.`
 
 export type BuildPromptParams = {
   baseSystemPrompt?: string

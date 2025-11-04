@@ -1,265 +1,67 @@
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
-// RAG prompt construction is now centralized in lib/chat/prompt
-import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
-import { getAllModels } from "@/lib/models"
-import { NextRequest, NextResponse } from 'next/server'
+// Core dependencies
+import type { CoreMessage } from 'ai'
+import { randomUUID } from 'crypto'
 import '@/lib/suppress-warnings'
+
+// Configuration and prompts
+import { SYSTEM_PROMPT_DEFAULT } from '@/lib/config'
+import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
+
+// Models and providers
+import { getAllModels, MODELS } from '@/lib/models'
 import { resolveModelFromList } from '@/lib/models/resolve'
-import { getProviderForModel, normalizeModelId } from "@/lib/openproviders/provider-map"
-import { tools, ensureDelegationToolForAgent } from "@/lib/tools"
-import { scoreDelegationIntent } from '@/lib/delegation/intent-heuristics'
-import { filterImagesForModel, MODEL_IMAGE_LIMITS } from "@/lib/image-management"
-import type { ProviderWithoutOllama } from "@/lib/user-keys"
-import { stepCountIs, streamText } from "ai"
-import type { CoreMessage } from "ai"
-import { z } from "zod"
-import { withRequestContext } from "@/lib/server/request-context"
+import { getProviderForModel, normalizeModelId } from '@/lib/openproviders/provider-map'
+import type { ProviderWithoutOllama } from '@/lib/user-keys'
+
+// Chat processing utilities
+import { convertUserMultimodalMessages } from '@/lib/chat/convert-messages'
+import { filterImagesByModelLimit } from '@/lib/chat/image-filter'
+import { MODEL_IMAGE_LIMITS } from '@/lib/image-management'
+import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
+
+// Tools and delegation
+import { tools, ensureDelegationToolForAgent } from '@/lib/tools'
+import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
+
+// Agent orchestration
+import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
+import { getGlobalOrchestrator as getCoreOrchestrator } from '@/lib/agents/core/orchestrator'
+import { getRuntimeConfig } from '@/lib/agents/runtime-config'
+
+// Image generation
+import { isImageGenerationModel } from '@/lib/image-generation/models'
+
+// Context and storage
+import { loadThreadContext } from '@/lib/context/smart-loader'
+import type { LoadContextResult } from '@/lib/context/smart-loader'
+import { createClient } from '@/lib/supabase/server'
+import { dailyLimits } from '@/lib/daily-limits'
+import { withRequestContext } from '@/lib/server/request-context'
+
+// API utilities
 import {
   incrementMessageCount,
   logUserMessage,
   storeAssistantMessage,
   validateAndTrackUsage,
-} from "./api"
-import { createErrorResponse } from "./utils"
-import { ChatRequest, ChatRequestSchema } from "./schema"
-import { randomUUID } from 'crypto'
-import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
-import { convertUserMultimodalMessages } from "@/lib/chat/convert-messages"
-import { filterImagesByModelLimit } from "@/lib/chat/image-filter"
-import { makeStreamHandlers } from "@/lib/chat/stream-handlers"
-import { clampMaxOutputTokens } from '@/lib/chat/token-limits'
-import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
-import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
-import { getGlobalOrchestrator as getCoreOrchestrator } from '@/lib/agents/core/orchestrator'
-import { getRuntimeConfig } from '@/lib/agents/runtime-config'
-import { getAllAgents as getAllAgentsUnified } from '@/lib/agents/unified-config'
-import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
-import { detectImageGenerationIntent } from '@/lib/image-generation/intent-detection'
-import { isImageGenerationModel } from '@/lib/image-generation/models'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateObject } from 'ai'
-import { dailyLimits } from "@/lib/daily-limits"
-import { createClient } from '@/lib/supabase/server'
-import { MODELS } from '@/lib/models'
-import { loadThreadContext } from '@/lib/context/smart-loader'
-import type { LoadContextResult } from '@/lib/context/smart-loader'
+} from './api'
+import { createErrorResponse } from './utils'
+import { ChatRequest, ChatRequestSchema } from './schema'
+
+// ✅ Refactored services
+import {
+  chatLogger,
+  imageGenerationService,
+  authValidationService,
+  delegationDetectionService,
+  messageProcessorService,
+} from '@/lib/chat/services'
 
 // Ensure Node.js runtime so server env vars (e.g., GROQ_API_KEY) are available
-export const runtime = "nodejs"
+export const runtime = 'nodejs'
 
 // Increase max duration to avoid Vercel 60s timeouts during delegation, RAG, and tool-use
 export const maxDuration = 300
-
-// Direct image generation function using Google AI SDK
-async function generateImageDirectWithGoogle(prompt: string, userId?: string) {
-  try {
-    console.log('🎨 [GOOGLE SDK] Starting image generation with prompt:', prompt)
-    
-    // Get user from Supabase if userId provided
-    let user = null
-    if (userId) {
-      const supabase = await createClient()
-      if (supabase) {
-        const { data: userData } = await supabase.auth.getUser()
-        user = userData.user
-      }
-    }
-
-  // Preferimos el ID directo (Google) porque la variante OpenRouter puede filtrarse del listado UI.
-  // Aceptamos alias legacy 'openrouter:google/gemini-2.5-flash-image-preview'.
-  const preferredId = 'gemini-2.5-flash-image-preview'
-  const legacyId = 'openrouter:google/gemini-2.5-flash-image-preview'
-  const modelId = MODELS.find(m => m.id === preferredId) ? preferredId : legacyId
-    
-    // Get the actual model configuration
-    const modelConfig = MODELS.find((m) => m.id === modelId)
-    if (!modelConfig) {
-      throw new Error("Image generation model not found")
-    }
-
-    // Check daily limits for authenticated users
-    if (user?.id) {
-      const limitCheck = await dailyLimits.canUseModel(user.id, modelId, modelConfig)
-      
-      if (!limitCheck.canUse) {
-        throw new Error(`Daily limit reached for image generation. You have used all ${limitCheck.limit} images for today. Try again tomorrow.`)
-      }
-    }
-
-  console.log('🎨 [IMAGE] Using Gemini 2.5 Flash Image Preview for image generation via', modelId === preferredId ? 'direct Google' : 'OpenRouter proxy')
-    
-    try {
-      // Try OpenRouter FLUX.1 first (best value), then fallback to others
-      const openrouterApiKey = process.env.OPENROUTER_API_KEY
-      if (!openrouterApiKey) {
-        throw new Error("OpenRouter API key not configured")
-      }
-
-      // Use OpenRouter API for FLUX.1 image generation
-  const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openrouterApiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-          'X-Title': 'Cleo Agent'
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview', // OpenRouter internal model slug
-          messages: [{
-            role: 'user',
-            content: `Generate a high-quality image: ${prompt}`
-          }],
-          modalities: ['image', 'text'],
-          max_tokens: 1000
-        })
-      })
-
-      if (!openrouterResponse.ok) {
-        const errorData = await openrouterResponse.text()
-        throw new Error(`OpenRouter API error: ${openrouterResponse.status} - ${errorData}`)
-      }
-
-      const openrouterData = await openrouterResponse.json()
-      const imageData = openrouterData.choices?.[0]?.message?.images?.[0]
-
-      if (imageData && imageData.image_url?.url) {
-        const realResult = {
-          imageUrl: imageData.image_url.url,
-          title: `Generated Image: ${prompt.slice(0, 50)}`,
-          description: `AI-generated image using Gemini 2.5 Flash Image Preview: "${prompt}"`,
-          style: "Gemini 2.5 Flash",
-          dimensions: {
-            width: 1024,
-            height: 1024
-          }
-        }
-
-        console.log('🎨 [OPENROUTER] FLUX.1 image generated successfully')
-
-        // Record usage if user is authenticated
-        if (user?.id) {
-          try {
-            await dailyLimits.recordUsage(user.id, modelId)
-            console.log('🎨 [OPENROUTER] Usage recorded for user:', user.id)
-          } catch (error) {
-            console.error('Failed to record image generation usage:', error)
-          }
-        }
-
-        return {
-          success: true,
-          result: realResult,
-          model: modelId
-        }
-      } else {
-        // If FLUX fails, try DALL-E 3 fallback
-        console.log('🎨 [DALL-E FALLBACK] FLUX failed, trying DALL-E 3...')
-        
-        const openaiApiKey = process.env.OPENAI_API_KEY
-        if (!openaiApiKey) {
-          throw new Error("OpenAI API key not configured for fallback")
-        }
-
-        const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'dall-e-3',
-            prompt: prompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'standard'
-          })
-        })
-
-        if (!openaiResponse.ok) {
-          const errorData = await openaiResponse.text()
-          throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorData}`)
-        }
-
-        const openaiData = await openaiResponse.json()
-        const imageUrl = openaiData.data[0]?.url
-
-        if (!imageUrl) {
-          throw new Error("No image URL received from OpenAI")
-        }
-
-        const realResult = {
-          imageUrl,
-          title: `Generated Image: ${prompt.slice(0, 50)}`,
-          description: `AI-generated image using DALL-E 3: "${prompt}"`,
-          style: "DALL-E 3",
-          dimensions: {
-            width: 1024,
-            height: 1024
-          }
-        }
-
-        console.log('🎨 [DALL-E FALLBACK] DALL-E 3 image generated successfully')
-
-        // Record usage if user is authenticated
-        if (user?.id) {
-          try {
-            await dailyLimits.recordUsage(user.id, modelId)
-            console.log('🎨 [DALL-E FALLBACK] Usage recorded for user:', user.id)
-          } catch (error) {
-            console.error('Failed to record image generation usage:', error)
-          }
-        }
-
-        return {
-          success: true,
-          result: realResult,
-          model: 'dall-e-3-fallback'
-        }
-      }
-    } catch (sdkError) {
-      console.error('🎨 [IMAGE GENERATION] All providers failed:', sdkError)
-      
-      // Fallback to mock for now
-      const mockResult = {
-        imageUrl: `https://via.placeholder.com/1024x1024/4F46E5/FFFFFF?text=${encodeURIComponent(prompt.slice(0, 50))}`,
-        title: `Generated Image: ${prompt.slice(0, 50)}`,
-        description: `AI-generated image based on: "${prompt}"`,
-        style: "Digital Art",
-        dimensions: {
-          width: 1024,
-          height: 1024
-        }
-      }
-
-      console.log('🎨 [MOCK FALLBACK] All providers failed, using placeholder image')
-
-      // Record usage if user is authenticated
-      if (user?.id) {
-        try {
-          await dailyLimits.recordUsage(user.id, modelId)
-          console.log('🎨 [MOCK FALLBACK] Usage recorded for user:', user.id)
-        } catch (error) {
-          console.error('Failed to record image generation usage:', error)
-        }
-      }
-
-      return {
-        success: true,
-        result: mockResult,
-        model: modelId
-      }
-    }
-
-  } catch (error) {
-    console.error('🎨 [IMAGE GENERATION] Error:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      model: 'openrouter:google/gemini-2.5-flash-image-preview'
-    }
-  }
-}
 
 export async function POST(req: Request) {
   try {
@@ -294,12 +96,13 @@ export async function POST(req: Request) {
   // Normalize model ID early and also keep original with prefix
   const originalModel = model
   let normalizedModel = normalizeModelId(model)
-  console.log('[ChatAPI] Incoming model:', originalModel, 'normalized:', normalizedModel, 'isAuthenticated:', isAuthenticated)
-
-  // Smart RAG: prefer speed. Only enable retrieval when explicitly requested or intent signals it
-  // We will compute an effective flag later once we have the last user message
-  const autoRagEnabled = false
-  let retrievalRequested = enableSearch || !!documentId || autoRagEnabled
+  
+  chatLogger.setContext({ userId, chatId, model: normalizedModel })
+  chatLogger.debug('Processing chat request', { 
+    originalModel, 
+    normalizedModel, 
+    isAuthenticated 
+  })
 
     if (!messages || !chatId || !userId) {
       return new Response(
@@ -322,49 +125,24 @@ export async function POST(req: Request) {
     // Resolve authenticated user early and enforce authorization (prevents spoofed userId)
     let realUserId: string = userId
     if (supabase && isAuthenticated) {
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser()
-        if (authErr || !authData?.user) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-        }
-        if (authData.user.id !== userId) {
-          console.warn('[ChatAPI] userId mismatch; using authenticated id', { provided: userId, auth: authData.user.id })
-        }
-        realUserId = authData.user.id
-      } catch (e) {
-        console.error('[ChatAPI] Failed to resolve authenticated user', e)
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+      const authResult = await authValidationService.validateUser(userId, isAuthenticated, supabase)
+      
+      if (!authResult.success) {
+        return new Response(JSON.stringify({ error: authResult.error || 'Unauthorized' }), { 
+          status: 401 
+        })
       }
+      
+      realUserId = authResult.userId
+      chatLogger.setContext({ userId: realUserId })
     }
 
   const userMessage = messages[messages.length - 1]
 
     // Extract text content from user message for image generation detection
-    let userMessageText = ""
-    if (userMessage?.role === "user") {
-      // Handle AI SDK v5 structure (parts) or legacy structure (content)
-      if ((userMessage as any).parts && Array.isArray((userMessage as any).parts)) {
-        // AI SDK v5 structure with parts
-        const textParts = (userMessage as any).parts
-          .filter((part: any) => part.type === "text")
-          .map((part: any) => part.text || "")
-          .join(" ")
-        userMessageText = textParts
-      } else if ((userMessage as any).content) {
-        // Legacy structure with content
-        const content = (userMessage as any).content
-        if (typeof content === "string") {
-          userMessageText = content
-        } else if (Array.isArray(content)) {
-          // Extract text from multimodal content
-          const textParts = content
-            .filter((part: any) => part.type === "text")
-            .map((part: any) => part.text || part.content || "")
-            .join(" ")
-          userMessageText = textParts
-        }
-      }
-    }
+    const userMessageText = userMessage?.role === "user" 
+      ? messageProcessorService.extractUserText(userMessage)
+      : ""
 
   // 🎨 IMAGE GENERATION DETECTION
   const isImageModel = isImageGenerationModel(originalModel)
@@ -376,25 +154,31 @@ export async function POST(req: Request) {
       const pdfAtt = atts?.find((a: any) => typeof a?.url === 'string' && (a?.contentType?.includes('pdf') || a?.url?.startsWith('http')))
       if (pdfAtt && typeof pdfAtt.url === 'string') {
         ;(globalThis as any).__lastAttachmentUrl = pdfAtt.url
-        console.log('[ChatAPI] Attachment-present hint added for Iris preference')
+        chatLogger.debug('PDF attachment detected for Iris preference')
       } else {
         // Also scan multimodal parts for data URLs
         if (Array.isArray((anyUser as any)?.parts)) {
           const partPdf = (anyUser as any).parts.find((p: any) => p?.type === 'file' && (p?.mediaType?.includes('pdf') || (typeof p?.url === 'string' && p.url.startsWith('http'))))
           if (partPdf?.url) {
             ;(globalThis as any).__lastAttachmentUrl = partPdf.url
-            console.log('[ChatAPI] Attachment-present hint added for Iris preference')
+            chatLogger.debug('PDF attachment detected in parts for Iris preference')
           }
         }
       }
     } catch {}
     
     if (userMessageText && isImageModel) {
-      console.log('🎨 [IMAGE GENERATION] Image generation model detected, generating image for:', userMessageText)
+      chatLogger.info('Image generation model detected', { 
+        prompt: userMessageText.slice(0, 50) 
+      })
 
       try {
-        // Call OpenRouter FLUX image generation function
-        const imageResult = await generateImageDirectWithGoogle(userMessageText, isAuthenticated ? userId : undefined)
+        // Call image generation service
+        const imageResult = await imageGenerationService.generateImage(
+          userMessageText, 
+          isAuthenticated ? userId : undefined,
+          isAuthenticated
+        )
 
         if (imageResult.success && imageResult.result) {
           // Store a successful assistant message with the image result
@@ -432,7 +216,9 @@ export async function POST(req: Request) {
               }
             })
           } else {
-            console.error('🎨 [IMAGE GENERATION] Failed:', imageResult.error || 'Unknown error')
+            chatLogger.error('Image generation failed', { 
+              error: imageResult.error 
+            })
             // Fall through to normal chat processing with error message
             const errorMessage = `I couldn't generate the image: ${imageResult.error || 'Unknown error'}. I'll try to help you in another way.`
             
@@ -468,7 +254,7 @@ export async function POST(req: Request) {
             })
           }
         } catch (error) {
-          console.error('🎨 [IMAGE GENERATION] Error calling endpoint:', error)
+          chatLogger.error('Image generation endpoint call failed', { error })
           // Fall through to normal chat processing
         }
     }
@@ -486,81 +272,13 @@ export async function POST(req: Request) {
     let modelConfig: any
     let apiKey: string | undefined
     const globalCtxRun = async () => {
-      console.log('[ChatAPI] 🔐 Global request context established', { userId: realUserId, requestId: outerRequestId })
+      chatLogger.debug('Global request context established', { 
+        userId: realUserId, 
+        requestId: outerRequestId 
+      })
 
     if (supabase && userMessage?.role === "user") {
-      // Process the content to create a clean summary for database storage
-      let contentForDB = ""
-
-      // Handle AI SDK v5 structure (parts) or legacy structure (content)
-      if ((userMessage as any).parts && Array.isArray((userMessage as any).parts)) {
-        // AI SDK v5 structure with parts
-        const parts = (userMessage as any).parts
-          .map((part: any) => {
-            if (part.type === "text") {
-              return part.text || ""
-            } else if (part.type === "file") {
-              const fileName = part.name || "archivo"
-              const fileType = part.mimeType || part.mediaType || "unknown"
-
-              if (fileType.startsWith("image/")) {
-                return `[IMAGEN ADJUNTA: ${fileName}]`
-              } else if (fileType === "application/pdf") {
-                return `[PDF ADJUNTO: ${fileName}]`
-              } else {
-                return `[ARCHIVO ADJUNTO: ${fileName} (${fileType})]`
-              }
-            }
-            return ""
-          })
-          .filter((part: string) => part !== "")
-          .join("\n\n")
-        
-        contentForDB = parts || "Mensaje del usuario"
-      } else if ((userMessage as any).content) {
-        // Legacy structure with content
-        const content = (userMessage as any).content
-        
-        if (typeof content === "string") {
-          contentForDB = content
-        } else if (Array.isArray(content)) {
-          // Process multimodal content to create a summary without base64 data
-          const parts = content
-            .map((part: unknown) => {
-              const typedPart = part as {
-                type: string
-                name?: string
-                mediaType?: string
-                text?: string
-                content?: string
-              }
-
-              if (typedPart.type === "text") {
-                return typedPart.text || typedPart.content || ""
-              } else if (typedPart.type === "file") {
-                const fileName = typedPart.name || "archivo"
-                const fileType = typedPart.mediaType || "unknown"
-
-                if (typedPart.mediaType?.startsWith("image/")) {
-                  return `[IMAGEN ADJUNTA: ${fileName}]`
-                } else if (typedPart.mediaType === "application/pdf") {
-                  return `[PDF ADJUNTO: ${fileName}]`
-                } else {
-                  return `[ARCHIVO ADJUNTO: ${fileName} (${fileType})]`
-                }
-              }
-              return ""
-            })
-            .filter((part) => part !== "")
-            .join("\n\n")
-
-          contentForDB = parts
-        } else {
-          contentForDB = JSON.stringify(content)
-        }
-      } else {
-        contentForDB = "Mensaje del usuario"
-      }
+      const contentForDB = messageProcessorService.createCleanContentForDB(userMessage)
 
       await logUserMessage({
         supabase,
@@ -578,7 +296,10 @@ export async function POST(req: Request) {
   const allModels = await getAllModels()
   const resolution = resolveModelFromList(originalModel, allModels)
   if (resolution.usedFallback) {
-    console.warn(`[ChatAPI] Model ${originalModel} not found in registry; using fallback ${resolution.normalizedModel}`)
+    chatLogger.warn('Model not found in registry, using fallback', {
+      requested: originalModel,
+      fallback: resolution.normalizedModel
+    })
   }
   modelConfig = resolution.modelConfig
   normalizedModel = resolution.normalizedModel
@@ -592,7 +313,11 @@ export async function POST(req: Request) {
       
       if (!limitCheck.canUse) {
         const errorMsg = `Has alcanzado el límite diario de ${limitCheck.limit} mensajes para el modelo ${modelConfig.name}. Intenta mañana o usa el modelo "Faster".`
-        console.warn(`[DAILY LIMIT] User ${userId} exceeded limit for ${normalizedModel}`)
+        chatLogger.warn('Daily limit exceeded', { 
+          userId, 
+          model: normalizedModel,
+          limit: limitCheck.limit 
+        })
         
         return createErrorResponse({
           code: 'DAILY_LIMIT_REACHED',
@@ -601,102 +326,47 @@ export async function POST(req: Request) {
         })
       }
       
-      console.log(`[DAILY LIMIT] User ${userId} can use ${normalizedModel}: ${limitCheck.remaining}/${limitCheck.limit} remaining`)
+      chatLogger.debug('Daily limit check passed', {
+        userId,
+        model: normalizedModel,
+        remaining: limitCheck.remaining,
+        limit: limitCheck.limit
+      })
     }
 
   // --- Delegation Intent Heuristics (Optimized) ---
-    // FAST PATH: Only evaluate if message suggests delegation keywords
-    // This avoids expensive scoring for simple conversational queries
-    let delegationIntent: ReturnType<typeof scoreDelegationIntent> | null = null
-  const quickDelegationCheck = /\b(delega|delegate|ask|pregunta|call|llama|usa|use|pídele|with|encárgalo|handoff|sub[- ]?agent|agente)\b/i
-  let quickDelegationFlag = false
-  
-  // CRITICAL: Load agents EARLY if delegation is likely
-  // This ensures keywords are enriched BEFORE intent scoring
-  let availableAgents: any[] = []
+    // Use delegation detection service
+    const delegationIntent = await delegationDetectionService.detectIntent(
+      messages,
+      realUserId,
+      process.env.DEBUG_DELEGATION_INTENT === 'true'
+    )
     
-    try {
-      const lastUser = [...messages].reverse().find(m => m.role === 'user')
-      let lastUserPlain = ''
-      if (lastUser) {
-        if (typeof (lastUser as any).content === 'string') lastUserPlain = (lastUser as any).content
-        else if (Array.isArray((lastUser as any).content)) {
-          lastUserPlain = (lastUser as any).content
-            .filter((p: any) => p?.type === 'text')
-            .map((p: any) => p.text || p.content || '')
-            .join('\n')
-        } else if (Array.isArray((lastUser as any).parts)) {
-          lastUserPlain = (lastUser as any).parts
-            .filter((p: any) => p?.type === 'text')
-            .map((p: any) => p.text || p.content || '')
-            .join('\n')
-        }
-      }
-      
-      // OPTIMIZATION: Only run expensive heuristics if delegation keywords present
-      quickDelegationFlag = !!(lastUserPlain.trim() && quickDelegationCheck.test(lastUserPlain))
-      if (quickDelegationFlag) {
-        // EARLY AGENT LOADING: Load agents BEFORE intent scoring so keywords are enriched
-        const { agentLoader } = await import('@/lib/agents/agent-loader')
-        availableAgents = await agentLoader.loadAgents({ userId: realUserId })
-        
-        // Enrich intent heuristics with user's custom agents
-        const { enrichKeywordsWithAgents } = await import('@/lib/delegation/intent-heuristics')
-        enrichKeywordsWithAgents(availableAgents.map(a => ({
-          id: a.id,
-          name: a.name,
-          tags: a.tags,
-          description: a.description
-        })))
-        
-        console.log(`[ChatAPI] 🔄 Loaded ${availableAgents.length} agents and enriched keywords BEFORE intent scoring`)
-        
-        const availableAgentIds = availableAgents
-          .filter(a => a.role !== 'supervisor')
-          .map(a => a.id)
-        
-        delegationIntent = scoreDelegationIntent(lastUserPlain, { 
-          debug: debugDelegation,
-          availableAgents: availableAgentIds 
-        })
-        
-        if (delegationIntent?.score && delegationIntent.score > 0) {
-          console.log('[DelegationIntent] Detected:', delegationIntent.target, 'score:', delegationIntent.score)
-        }
-      }
-    } catch (e) {
-      console.warn('[DelegationIntent] heuristic failed', e)
-    }
+    const quickDelegationFlag = delegationIntent.quickCheck
 
     // Use reasoning-optimized prompt for GPT-5 models when no custom prompt
     let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
     if (normalizedModel.startsWith('gpt-5') && !systemPrompt) {
       const { getCleoPrompt } = await import("@/lib/prompts")
       baseSystemPrompt = getCleoPrompt(normalizedModel, 'reasoning')
-      console.log(`[GPT-5] Using reasoning-optimized prompt for ${normalizedModel}`)
+      chatLogger.debug('Using reasoning-optimized prompt for GPT-5')
     }
-  // If strong delegation intent (score >= 0.55) add lightweight internal system hint.
-  // Avoid mentioning scores to the model; just nudge tool selection.
-  if (delegationIntent?.target && delegationIntent.score >= 0.55) {
-    const agentKey = delegationIntent.target
-    // Derive tool name from agent key pattern delegate_to_<normalized_name>
-    const normalized = agentKey.replace(/[^a-z0-9]+/g, '_')
-    const toolName = `delegate_to_${normalized}`
-    baseSystemPrompt += `\n\nINTERNAL DELEGATION HINT: The user's request likely maps to specialist agent '${agentKey}'. Consider calling tool ${toolName} if it would provide unique capabilities or faster resolution. If you delegate, briefly explain why.`
-  }
-  const effectiveSystemPrompt = baseSystemPrompt
+    
+  // Add delegation hint if strong intent detected
+  const delegationHint = delegationDetectionService.createDelegationHint(delegationIntent)
+  const effectiveSystemPrompt = baseSystemPrompt + delegationHint
 
     // Attempt to parse personality type from system prompt for observability
     try {
       const match = effectiveSystemPrompt.match(/Type:\s*(empathetic|playful|professional|creative|analytical|friendly)/i)
       const inferredPersonality = match?.[1]?.toLowerCase()
       if (inferredPersonality) {
-        console.log('[ChatAPI] Active personality', { userId, chatId, personalityType: inferredPersonality })
-      } else {
-        console.log('[ChatAPI] No personality marker found in system prompt; using default or custom prompt', { userId, chatId })
+        chatLogger.debug('Active personality detected', { 
+          personalityType: inferredPersonality 
+        })
       }
     } catch (e) {
-      console.log('[ChatAPI] Personality parse failed')
+      // Silent fail for personality detection
     }
 
   // Decide effective search flag based on quick intent and explicit request
@@ -713,7 +383,11 @@ export async function POST(req: Request) {
     }
     return acc
   }, 0)
-  console.log(`[IMAGE MGMT] Before conversion: ${imagesBeforeConversion} images detected in ${messages.length} messages`)
+  
+  chatLogger.debug('Processing multimodal content', {
+    totalMessages: messages.length,
+    imagesBefore: imagesBeforeConversion
+  })
 
   // Convert multimodal messages to correct format for the model
     convertedMessages = await convertUserMultimodalMessages(
@@ -729,7 +403,9 @@ export async function POST(req: Request) {
       convertedMessages = convertedMessages.filter((m: any) => m?.role !== 'system') as any
       const after = convertedMessages.length
       if (before !== after) {
-        console.log(`[ChatAPI] Removed ${before - after} system messages from payload to satisfy provider constraints`)
+        chatLogger.debug('Removed system messages from payload', {
+          removed: before - after
+        })
       }
     }
 
@@ -746,10 +422,18 @@ export async function POST(req: Request) {
       (acc: number, m: any) => acc + (Array.isArray(m.content) ? m.content.filter((p: any) => p.type === 'image').length : 0),
       0
     )
-  console.log(`[IMAGE MGMT] Model ${normalizedModel}: ${totalImages} images found, limit: ${imageLimit}`)
+    
+  chatLogger.debug('Image limit check', {
+    model: normalizedModel,
+    totalImages,
+    limit: imageLimit
+  })
+  
     if (totalImages > imageLimit) {
   convertedMessages = filterImagesByModelLimit(convertedMessages, normalizedModel) as any
-      console.log(`[IMAGE MGMT] Filtered to ${imageLimit} images with intelligent prioritization`)
+      chatLogger.info('Applied image limit filter', { 
+        limit: imageLimit 
+      })
     }
 
     if (convertedMultimodal.length > 0) {
@@ -881,15 +565,14 @@ export async function POST(req: Request) {
 
     // Ensure all delegation tools are present only when delegation is likely
     // This reduces cold start time for simple Q&A
-    // OPTIMIZATION: Reuse agents already loaded during intent scoring
     if (quickDelegationFlag) {
       try {
-        // If agents were already loaded, reuse them; otherwise load now
-        if (availableAgents.length === 0) {
-          const { agentLoader } = await import('@/lib/agents/agent-loader')
-          availableAgents = await agentLoader.loadAgents({ userId: realUserId })
-          console.log(`[ChatAPI] 🔄 Late-loading ${availableAgents.length} agents for tools`)
-        }
+        const { agentLoader } = await import('@/lib/agents/agent-loader')
+        const availableAgents = await agentLoader.loadAgents({ userId: realUserId })
+        
+        chatLogger.debug('Loading agents for delegation tools', {
+          count: availableAgents.length
+        })
         
         for (const a of availableAgents) {
           if (a.role !== 'supervisor') {
@@ -898,10 +581,8 @@ export async function POST(req: Request) {
         }
         // After ensuring, refresh registry reference (tools is mutated inside helper)
     toolsForRun = tools as typeof tools
-        
-        console.log(`[ChatAPI] ✅ Ensured delegation tools for ${availableAgents.length} agents`)
       } catch (e) {
-        console.warn('[ChatAPI] Failed to ensure delegation tools', e)
+        chatLogger.error('Failed to ensure delegation tools', { error: e })
       }
     }
 
@@ -911,20 +592,16 @@ export async function POST(req: Request) {
       if (provider === 'google' || originalModel.includes('gemini')) {
   toolsForRun = sanitizeGeminiTools(toolsForRun as any) as any
   activeTools = Object.keys(toolsForRun)
-        console.log('[ChatAPI] Gemini tool names sanitized for function_declarations')
+        chatLogger.debug('Gemini tool names sanitized')
       }
     } catch {}
 
     // Optional delegation-only toolset for general chat
     // When CHAT_DELEGATION_ONLY=true, expose only delegate_to_* tools (+ minimal helpers)
-    // OPTIMIZED: Use already-loaded agents to avoid redundant DB calls
     try {
       if (process.env.CHAT_DELEGATION_ONLY === 'true' && quickDelegationFlag) {
-        // Reuse agents already loaded
-        if (availableAgents.length === 0) {
-          const { agentLoader } = await import('@/lib/agents/agent-loader')
-          availableAgents = await agentLoader.loadAgents({ userId: realUserId })
-        }
+        const { agentLoader } = await import('@/lib/agents/agent-loader')
+        const availableAgents = await agentLoader.loadAgents({ userId: realUserId })
         
         // Ensure delegation tools exist for all specialist agents
         const delegateToolNames: string[] = []
@@ -950,7 +627,7 @@ export async function POST(req: Request) {
   activeTools = Object.keys(toolsForRun)
       }
     } catch (e) {
-      console.warn('[ChatAPI] Delegation-only tools setup failed:', e)
+      chatLogger.error('Delegation-only tools setup failed', { error: e })
     }
 
     // If the selected model is not tool-capable, disable tools to avoid provider errors
@@ -958,7 +635,9 @@ export async function POST(req: Request) {
       if (modelConfig && modelConfig.tools === false) {
   const hadTools = Object.keys(toolsForRun || {}).length > 0
         if (hadTools) {
-          console.warn(`[ChatAPI] Model ${normalizedModel} does not support tools; disabling tools for this run`)
+          chatLogger.warn('Model does not support tools, disabling', {
+            model: normalizedModel
+          })
         }
   toolsForRun = {} as any
         activeTools = []
@@ -1195,6 +874,19 @@ export async function POST(req: Request) {
           try {
             console.log(`💾 [CONTEXT] Saving user message to agent_messages for thread ${effectiveThreadId}`)
             
+            // Extract multimodal parts for storage (if any)
+            let messageContent: string | any = userText;
+            try {
+              const lastConvertedUser = [...(convertedMessages || [])].reverse().find((m: any) => m?.role === 'user') as any;
+              if (lastConvertedUser && Array.isArray(lastConvertedUser.content)) {
+                // Store the multimodal parts array for proper reconstruction
+                messageContent = lastConvertedUser.content;
+                console.log(`📎 [CONTEXT] Storing multimodal message with ${lastConvertedUser.content.length} parts`);
+              }
+            } catch (e) {
+              console.error('⚠️ [CONTEXT] Failed to extract multimodal parts, using text fallback:', e);
+            }
+            
             // Use .select() to force immediate read and confirm insertion
             const { data: insertedMessage, error: insertError } = await (supabase as any)
               .from('agent_messages')
@@ -1202,8 +894,13 @@ export async function POST(req: Request) {
                 thread_id: effectiveThreadId, // Use chatId as thread_id
                 user_id: realUserId,
                 role: 'user',
-                content: userText,
-                metadata: { conversation_mode: 'chat', source: 'chat-ui', chat_id: chatId }
+                content: typeof messageContent === 'string' ? messageContent : JSON.stringify(messageContent),
+                metadata: { 
+                  conversation_mode: 'chat', 
+                  source: 'chat-ui', 
+                  chat_id: chatId,
+                  has_multimodal_parts: Array.isArray(messageContent)
+                }
               })
               .select() // Force immediate SELECT to confirm insertion
               .single();
@@ -1252,12 +949,20 @@ export async function POST(req: Request) {
             console.log(`   ⚠️  Truncated: ${contextResult.truncated ? 'YES' : 'NO'}`);
             console.log(`   ⏱️  Load time: ${contextResult.performance.loadTimeMs}ms`);
             
-            // Preview last 3 messages for debugging
+            // Preview last 5 messages for debugging (show full text for better diagnosis)
             if (prior.length > 0) {
-              console.log(`🧵 [CONTEXT] Preview (last 3):`, prior.slice(-3).map(m => ({ 
-                role: m.role, 
-                content: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : '')
-              })));
+              console.log(`🧵 [CONTEXT] Preview (last 5 messages):`);
+              prior.slice(-5).forEach((m: any, idx: number) => {
+                let contentPreview: string;
+                if (typeof m.content === 'string') {
+                  contentPreview = m.content.substring(0, 200);
+                } else if (Array.isArray(m.content)) {
+                  contentPreview = `[${m.content.length} parts: ${m.content.map((p: any) => p.type).join(', ')}]`;
+                } else {
+                  contentPreview = JSON.stringify(m.content).substring(0, 200);
+                }
+                console.log(`   [${prior.length - 5 + idx}] ${m.role}: ${contentPreview}${contentPreview.length === 200 ? '...' : ''}`);
+              });
             }
 
             // ⚠️  Alert if we're truncating context (Phase 2 improvement opportunity)
@@ -1297,9 +1002,30 @@ export async function POST(req: Request) {
         // Ensure the very last message we pass to the orchestrator contains the multimodal parts
         // even if DB ordering or focus trimming would otherwise drop them.
         if (Array.isArray(lastUserParts) && lastUserParts.length > 0) {
-          // Push a synthetic user message with parts at the end of prior so downstream always sees it.
-          prior = [...prior, { role: 'user', content: lastUserParts as any, metadata: { synthetic: true, reason: 'ensure_multimodal_delivery' } }]
-          console.log('[MM OVERRIDE] Appended synthetic user message with parts to prior')
+          // Check if the last message in prior is already a user message
+          const lastPriorMsg = prior[prior.length - 1];
+          
+          if (lastPriorMsg && lastPriorMsg.role === 'user') {
+            // Only update if the content is different (not already multimodal)
+            const isAlreadyMultimodal = Array.isArray(lastPriorMsg.content) && 
+              lastPriorMsg.content.some((p: any) => p.type === 'image' || p.type === 'text');
+            
+            if (!isAlreadyMultimodal) {
+              // Update the existing last user message with multimodal parts
+              lastPriorMsg.content = lastUserParts as any;
+              if (!lastPriorMsg.metadata) {
+                lastPriorMsg.metadata = {};
+              }
+              lastPriorMsg.metadata.multimodal_parts_injected = true;
+              console.log('[MM OVERRIDE] Updated last user message with multimodal parts (avoiding duplicate)');
+            } else {
+              console.log('[MM OVERRIDE] Skipped update - last message already has multimodal parts');
+            }
+          } else {
+            // No user message at the end, append a synthetic one
+            prior = [...prior, { role: 'user', content: lastUserParts as any, metadata: { synthetic: true, reason: 'ensure_multimodal_delivery' } }]
+            console.log('[MM OVERRIDE] Appended synthetic user message with parts to prior')
+          }
         }
 
         const exec = await (orchestrator.startAgentExecutionForUI?.(
@@ -1324,6 +1050,7 @@ export async function POST(req: Request) {
         let pollInterval: ReturnType<typeof setInterval> | null = null
         let streamClosed = false
         let interruptListener: ((data: any) => void) | null = null
+        let reasoningListener: ((data: any) => void) | null = null
         
         const stopPolling = () => {
           if (pollInterval) {
@@ -1334,6 +1061,12 @@ export async function POST(req: Request) {
           if (interruptListener) {
             orchestrator.eventEmitter?.off('execution.interrupted', interruptListener)
             interruptListener = null
+          }
+          // Clean up reasoning listener
+          if (reasoningListener) {
+            orchestrator.eventEmitter?.off('execution.reasoning', reasoningListener)
+            reasoningListener = null
+            console.log('🧹 [REASONING] Listener cleaned up')
           }
         }
         
@@ -1384,6 +1117,37 @@ export async function POST(req: Request) {
             // This ensures we catch interrupts from delegated sub-agents (like ASTRA)
             console.log('📡 [CHAT SSE] Registering interrupt listener for execution:', execId)
             orchestrator.eventEmitter?.on('execution.interrupted', interruptListener)
+            
+            // ✅ REASONING LISTENER: Stream reasoning steps to UI for transparency
+            reasoningListener = (reasoningData: any) => {
+              console.log('💭 [REASONING LISTENER] Reasoning event received:', {
+                executionId: reasoningData.executionId,
+                agentId: reasoningData.agentId,
+                type: reasoningData.step?.action,
+                content: reasoningData.step?.content?.slice(0, 100)
+              })
+              
+              // Send reasoning step to frontend immediately for real-time updates
+              send({
+                type: 'execution-step',
+                step: reasoningData.step
+              })
+              
+              // Persist for historical record
+              persistedParts.push({
+                type: 'execution-step',
+                step: reasoningData.step
+              })
+              
+              console.log('✅ [REASONING] Step emitted to UI:', {
+                stepId: reasoningData.step?.id,
+                action: reasoningData.step?.action
+              })
+            }
+            
+            // Register reasoning listener
+            console.log('📡 [CHAT SSE] Registering reasoning listener for execution:', execId)
+            orchestrator.eventEmitter?.on('execution.reasoning', reasoningListener)
             
             // Signal start
             send({ type: 'start', executionId: execId })

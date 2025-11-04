@@ -2,9 +2,10 @@
 
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react"
+import { enrichStepWithContextualMessage, getProgressMessage } from "@/lib/agents/ui-messaging"
 
 export type PipelineStep = {
   id: string
@@ -28,17 +29,64 @@ function formatTime(ts: string | Date) {
 
 function actionLabel(action: PipelineStep['action']) {
   switch (action) {
-    case 'routing': return '🎯 Smart Routing'
-    case 'analyzing': return '🔍 Analyzing Query'
-    case 'thinking': return '🧠 Processing'
+    case 'routing': return '🎯 Routing'
+    case 'analyzing': return '🔍 Analyzing'
+    case 'thinking': return '🧠 Thinking'
     case 'delegating': return '📋 Delegating'
-    case 'delegation': return '⚡ Specialized Task'
+    case 'delegation': return '⚡ Working'
     case 'responding': return '💬 Responding'
-    case 'completing': return '✅ Finalizing'
-    case 'reviewing': return '👁️ Supervising'
-    case 'executing': return '🔧 Using Tool'
+    case 'completing': return '✅ Completing'
+    case 'reviewing': return '👁️ Reviewing'
+    case 'executing': return '🔧 Executing'
     default: return String(action).charAt(0).toUpperCase() + String(action).slice(1)
   }
+}
+
+/**
+ * Componente de Step individual con typing effect para reasoning
+ */
+function StepContent({ step }: { step: PipelineStep }) {
+  const [displayedContent, setDisplayedContent] = useState(step.content)
+  const [isTyping, setIsTyping] = useState(false)
+  
+  useEffect(() => {
+    // Solo aplicar typing effect si es un reasoning step reciente
+    const isReasoningStep = step.metadata?.reasoning === true
+    const isRecent = Date.now() - new Date(step.timestamp).getTime() < 5000 // 5 segundos
+    
+    if (isReasoningStep && isRecent && step.content.length > 20) {
+      setIsTyping(true)
+      setDisplayedContent('')
+      
+      let currentIndex = 0
+      const typingSpeed = Math.max(10, Math.min(30, step.content.length / 100)) // Velocidad adaptativa
+      
+      const interval = setInterval(() => {
+        if (currentIndex < step.content.length) {
+          setDisplayedContent(step.content.slice(0, currentIndex + 1))
+          currentIndex++
+        } else {
+          setIsTyping(false)
+          clearInterval(interval)
+        }
+      }, typingSpeed)
+      
+      return () => clearInterval(interval)
+    } else {
+      setDisplayedContent(step.content)
+      setIsTyping(false)
+    }
+  }, [step.content, step.metadata?.reasoning, step.timestamp])
+  
+  return (
+    <div className={cn(
+      "text-muted-foreground/90 mt-0.5 whitespace-pre-wrap",
+      isTyping && "animate-pulse"
+    )}>
+      {displayedContent}
+      {isTyping && <span className="text-primary animate-pulse ml-0.5">▊</span>}
+    </div>
+  )
 }
 
 export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; className?: string }) {
@@ -68,11 +116,19 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
         }
       }
       
-      return {
+      const mappedStep = {
         ...s,
         action: mappedAction as PipelineStep['action'],
         timestamp: typeof s.timestamp === 'string' ? s.timestamp : s.timestamp.toISOString()
       }
+      
+      // ✅ Enriquecer con mensajes contextuales (solo si no es reasoning)
+      // Los reasoning steps ya vienen con contenido humanizado del extractor
+      if (!s.metadata?.reasoning) {
+        return enrichStepWithContextualMessage(mappedStep)
+      }
+      
+      return mappedStep
     })
   }, [steps])
 
@@ -97,6 +153,31 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     }
     return latest
   }, [normalized])
+  
+  // ✅ Progressive message based on elapsed time for long-running steps
+  const [progressiveContent, setProgressiveContent] = useState<Record<string, string>>({})
+  
+  useEffect(() => {
+    if (!latestStep) return
+    
+    const startTime = new Date(latestStep.timestamp).getTime()
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      if (elapsed > 5000 && !latestStep.metadata?.reasoning) { // Solo para steps genéricos
+        const progressMsg = getProgressMessage(
+          latestStep.action,
+          elapsed,
+          latestStep.agentName
+        )
+        setProgressiveContent(prev => ({
+          ...prev,
+          [latestStep.id]: progressMsg
+        }))
+      }
+    }, 5000) // Check cada 5 segundos
+    
+    return () => clearInterval(interval)
+  }, [latestStep])
 
   // Show all unique steps when expanded; when collapsed show just the latest live step
   const hasSteps = uniqueSteps.length > 0
@@ -154,9 +235,12 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                   <div className="text-foreground/90 truncate font-medium">
                     {actionLabel(latestStep.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={latestStep.agent} agentName={latestStep.agentName} /></span>
                   </div>
-                  {latestStep.content ? (
-                    <div className="text-muted-foreground/90 mt-0.5 line-clamp-1 whitespace-pre-wrap">
-                      {latestStep.content}
+                  {(progressiveContent[latestStep.id] || latestStep.content) ? (
+                    <div className="line-clamp-1">
+                      <StepContent step={{
+                        ...latestStep,
+                        content: progressiveContent[latestStep.id] || latestStep.content
+                      }} />
                     </div>
                   ) : null}
                 </div>
@@ -186,13 +270,13 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     {actionLabel(s.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={s.agent} agentName={s.agentName} /></span>
                   </div>
                   {s.content ? (
-                    <div className="text-muted-foreground/90 mt-0.5 line-clamp-2 whitespace-pre-wrap">
-                      {s.content}
+                    <div className="line-clamp-2">
+                      <StepContent step={s} />
                     </div>
                   ) : null}
                   {typeof s.progress === 'number' ? (
                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="bg-primary h-full" style={{ width: `${Math.min(100, Math.max(0, s.progress))}%` }} />
+                      <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(100, Math.max(0, s.progress))}%` }} />
                     </div>
                   ) : null}
                 </div>

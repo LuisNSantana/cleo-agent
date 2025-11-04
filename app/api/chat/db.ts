@@ -105,17 +105,51 @@ export async function saveFinalAssistantMessage(
           const { error: adminErr } = await (admin as SupabaseClient<Database>).from('messages').insert(row)
           if (!adminErr) {
             console.log('Assistant message saved via admin client (RLS fallback).')
-            return
+          } else {
+            console.error('Admin fallback insert failed:', adminErr)
           }
-          console.error('Admin fallback insert failed:', adminErr)
         }
       } catch (e) {
         console.error('Admin fallback exception:', e)
       }
+    } else {
+      console.error("Error saving final assistant message:", error)
+      throw new Error(`Failed to save assistant message: ${error.message}`)
     }
-    console.error("Error saving final assistant message:", error)
-    throw new Error(`Failed to save assistant message: ${error.message}`)
   } else {
     console.log("Assistant message saved successfully (merged).")
+  }
+
+  // CRITICAL: Also save to agent_messages for context loading
+  // This ensures the smart-loader can reconstruct the conversation history
+  if (userId && chatId && finalPlainText) {
+    try {
+      const { error: agentMsgError } = await supabase
+        .from('agent_messages')
+        .insert({
+          thread_id: chatId, // Use chatId as thread_id for consistency
+          user_id: userId,
+          role: 'assistant',
+          content: finalPlainText,
+          metadata: {
+            conversation_mode: 'chat',
+            source: 'chat-response',
+            chat_id: chatId,
+            model: model ? normalizeModelId(model) : undefined,
+            has_parts: parts.length > 0,
+            input_tokens: opts?.inputTokens,
+            output_tokens: opts?.outputTokens,
+            response_time_ms: opts?.responseTimeMs,
+          }
+        });
+
+      if (agentMsgError) {
+        console.error('❌ [CONTEXT] Failed to save assistant message to agent_messages:', agentMsgError);
+      } else {
+        console.log('✅ [CONTEXT] Assistant message saved to agent_messages for thread:', chatId);
+      }
+    } catch (err) {
+      console.error('❌ [CONTEXT] Exception saving to agent_messages:', err);
+    }
   }
 }

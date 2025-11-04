@@ -18,6 +18,11 @@ import { OpenDocumentToolDisplay } from "@/components/chat/open-document-tool-di
 import { GmailMessages, type GmailListItem } from "@/app/components/chat/gmail-messages"
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 import dynamic from "next/dynamic"
+import { 
+  DelegationDisplay, 
+  isDelegationToolInvocation, 
+  extractDelegationInfo 
+} from "@/app/components/chat/delegation-display"
 
 const StockChartViewer = dynamic(() => import("@/components/markets/stock-chart-viewer"), { ssr: false })
 
@@ -331,6 +336,33 @@ function SingleToolCard({
   const renderResults = () => {
     if (!parsedResult) return "No result data available"
 
+    // Special-case: Delegation tools → render DelegationDisplay component
+    if (isDelegationToolInvocation(toolName, args)) {
+      const delegationInfo = extractDelegationInfo(args, delegationAgentId || undefined)
+      if (delegationInfo) {
+        // Extract result text from parsedResult if available
+        let resultText: string | undefined
+        if (typeof parsedResult === 'string') {
+          resultText = parsedResult
+        } else if (parsedResult && typeof parsedResult === 'object' && 'content' in parsedResult) {
+          resultText = String((parsedResult as any).content || '')
+        } else if (parsedResult && typeof parsedResult === 'object' && 'result' in parsedResult) {
+          resultText = String((parsedResult as any).result || '')
+        }
+
+        return (
+          <DelegationDisplay
+            targetAgent={delegationInfo.targetAgent}
+            task={delegationInfo.task}
+            context={delegationInfo.context}
+            outputFormat={delegationInfo.outputFormat}
+            result={resultText}
+            isCompleted={isCompleted}
+          />
+        )
+      }
+    }
+
     // Special-case: stockChartAndVolatility → render chart viewer
     if (toolName === "stockChartAndVolatility" && parsedResult && typeof parsedResult === 'object') {
       const pr: any = parsedResult
@@ -578,8 +610,8 @@ function SingleToolCard({
             className="overflow-hidden"
           >
             <div className="space-y-3 px-3 pt-3 pb-3">
-              {/* Arguments section */}
-              {args && Object.keys(args).length > 0 && (
+              {/* Arguments section - Hide for delegations (shown in DelegationDisplay) */}
+              {args && Object.keys(args).length > 0 && !isDelegationToolInvocation(toolName, args) && (
                 <div>
                   <div className="text-muted-foreground mb-1 text-xs font-medium">
                     Arguments

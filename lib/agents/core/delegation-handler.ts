@@ -19,6 +19,7 @@ import {
   deleteResolver,
   type DelegationResolver 
 } from './delegation-context'
+import { canonicalizeAgentId } from '../id-canonicalization'
 import { LRUCache } from 'lru-cache'
 
 export interface DelegationRequest {
@@ -283,14 +284,20 @@ export class DelegationHandler {
 
   /**
    * Create unique key for delegation
-   * Format: sourceAgent:targetAgent:taskHash
+   * Format: sourceExecutionId:sourceAgent:targetAgent
+   * CRITICAL: Canonicalizes targetAgent to ensure consistent key matching
+   * (e.g., 'ami' → 'ami-creative', 'peter' → 'peter-financial')
    */
   private createDelegationKey(request: Partial<DelegationRequest>): string {
     const executionId = request.sourceExecutionId || ExecutionManager.getCurrentExecutionId() || 'unknown'
     const source = request.sourceAgent || 'unknown'
     const target = request.targetAgent || 'unknown'
     
-    return `${executionId}:${source}:${target}`
+    // CRITICAL: Canonicalize target agent ID to ensure key consistency
+    // This ensures 'ami' and 'ami-creative' resolve to the same key
+    const canonicalTarget = canonicalizeAgentId(target)
+    
+    return `${executionId}:${source}:${canonicalTarget}`
   }
 
   /**

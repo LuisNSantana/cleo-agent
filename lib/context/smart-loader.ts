@@ -120,9 +120,22 @@ export async function loadThreadContext(
     console.log(`🔄 [CONTEXT_LOADER] Deduplication: ${allMessages.length} → ${dedupedMessages.length} messages`);
   }
 
-  // 🏷️ STEP 4: Separate system messages from conversation
+  // 🏷️ STEP 4: Separate system messages from conversation and parse multimodal content
   const systemMessages = dedupedMessages.filter((m: any) => m.role === 'system');
-  const conversationMessages = dedupedMessages.filter((m: any) => m.role !== 'system');
+  const conversationMessages = dedupedMessages.filter((m: any) => m.role !== 'system').map((msg: any) => {
+    // Parse multimodal parts if stored as JSON string
+    if (msg.metadata?.has_multimodal_parts && typeof msg.content === 'string') {
+      try {
+        const parsedContent = JSON.parse(msg.content);
+        if (Array.isArray(parsedContent)) {
+          return { ...msg, content: parsedContent };
+        }
+      } catch (e) {
+        console.warn(`⚠️ [CONTEXT_LOADER] Failed to parse multimodal parts for message ${msg.id}:`, e);
+      }
+    }
+    return msg;
+  });
 
   // 🧮 STEP 5: Always include system prompt (if enabled)
   let currentTokens = 0;

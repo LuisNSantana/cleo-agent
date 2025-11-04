@@ -1,9 +1,10 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { useMemo } from "react"
+import { useMemo, useEffect, useState } from "react"
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
-import { CheckCircle, Lightning } from "@phosphor-icons/react"
+import { CheckCircle, Lightning, Brain, MagnifyingGlass, ChatCircleDots, ArrowRight } from "@phosphor-icons/react"
+import { getProgressMessage, enrichStepWithContextualMessage } from "@/lib/agents/ui-messaging"
 
 export type PipelineStep = {
   id: string
@@ -21,7 +22,20 @@ interface AgentExecutionFlowProps {
   mode?: 'direct' | 'delegated'
 }
 
+function getActionIcon(action: PipelineStep['action']) {
+  switch (action) {
+    case 'thinking': return <Brain className="w-3.5 h-3.5" weight="fill" />
+    case 'analyzing': return <MagnifyingGlass className="w-3.5 h-3.5" weight="fill" />
+    case 'responding': return <ChatCircleDots className="w-3.5 h-3.5" weight="fill" />
+    case 'delegating': return <ArrowRight className="w-3.5 h-3.5" weight="fill" />
+    case 'executing': return <Lightning className="w-3.5 h-3.5" weight="fill" />
+    default: return <Lightning className="w-3.5 h-3.5" weight="fill" />
+  }
+}
+
 export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlowProps) {
+  const [progressMessages, setProgressMessages] = useState<Record<string, string>>({})
+  
   // Get the latest 3 active steps to show
   const activeSteps = useMemo(() => {
     const sorted = [...steps].sort((a, b) => {
@@ -29,10 +43,42 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
       const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : b.timestamp.getTime()
       return timeB - timeA
     })
-    return sorted.slice(0, 3)
+    // Enrich steps with contextual messages if not already reasoning
+    return sorted.slice(0, 3).map(s => {
+      if (!s.metadata?.reasoning) {
+        return enrichStepWithContextualMessage(s)
+      }
+      return s
+    })
   }, [steps])
 
   const latestStep = activeSteps[0]
+  
+  // Update progressive messages for long-running steps
+  useEffect(() => {
+    if (!latestStep) return
+    
+    const startTime = typeof latestStep.timestamp === 'string' 
+      ? new Date(latestStep.timestamp).getTime() 
+      : latestStep.timestamp.getTime()
+    
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      if (elapsed > 5000 && !latestStep.metadata?.reasoning) {
+        const msg = getProgressMessage(
+          latestStep.action,
+          elapsed,
+          latestStep.agentName
+        )
+        setProgressMessages(prev => ({
+          ...prev,
+          [latestStep.id]: msg
+        }))
+      }
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [latestStep])
 
   if (!latestStep) return null
 
@@ -142,7 +188,7 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
                                 animate={{ opacity: 1, scale: 1 }}
                                 className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary"
                               >
-                                <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                                {getActionIcon(step.action)}
                                 <span className="text-[10px] font-medium uppercase tracking-wide">
                                   {getActionLabel(step.action)}
                                 </span>
@@ -150,10 +196,16 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
                             )}
                           </div>
                           
-                          {step.content && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                              {step.content}
-                            </p>
+                          {/* Show progressive message if available, otherwise step content */}
+                          {(progressMessages[step.id] || step.content) && (
+                            <motion.p 
+                              key={progressMessages[step.id] || step.content}
+                              initial={{ opacity: 0, y: 2 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-xs text-muted-foreground line-clamp-2 leading-relaxed"
+                            >
+                              {progressMessages[step.id] || step.content}
+                            </motion.p>
                           )}
                           
                           {/* Progress bar for latest step */}
