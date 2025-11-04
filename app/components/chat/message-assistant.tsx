@@ -34,6 +34,7 @@ type MessageAssistantProps = {
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   userMessage?: string // Añadido para detección de archivos
+  model?: string // Optional model id for UI badges
 }
 
 // Removed extra inline "Editar en Canvas" action to keep the actions row clean.
@@ -49,6 +50,7 @@ export function MessageAssistant({
   status,
   className,
   userMessage,
+  model,
 }: MessageAssistantProps) {
   const [copied, setCopied] = useState(false) // Local state
   const { preferences } = useUserPreferences()
@@ -276,6 +278,15 @@ export function MessageAssistant({
       )}
     >
       <div className={cn("flex min-w-full flex-col gap-3", isLast && "pb-8")}>
+        {/* Model badge (quick win): show resolved model when available */}
+        {model ? (
+          <div className="-mt-2 mb-1 flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-card/60 px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+              {model}
+            </span>
+          </div>
+        ) : null}
         {/* Show reasoning when available (prefer parts, else <thinking>) or while streaming */}
         {(effectiveReasoningText || status === "streaming") && (
           <Reasoning

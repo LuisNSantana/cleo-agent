@@ -17,6 +17,8 @@ const AGENT_ID_ALIASES: Record<string, string> = {
   'peter': 'peter-financial',
   'ami': 'ami-creative',
   'apu': 'apu-support',
+  // Legacy DB canonical that drifted from code; normalize to current canonical
+  'apu-research': 'apu-support',
   'nora': 'nora-medical', // ✅ FIX: Was nora-community, should be nora-medical
   'nora-community': 'nora-medical', // ✅ FIX: Legacy alias
   'astra': 'astra-email',

@@ -21,6 +21,7 @@ type MessageProps = {
   className?: string
   userMessage?: string // Para detección de archivos
   userId?: string // For image generation
+  model?: string // Optional model id for badges
 }
 
 export function Message({
@@ -37,6 +38,7 @@ export function Message({
   status,
   className,
   userId,
+  model,
 }: MessageProps) {
   // Remove copied state from here - let each component handle it locally
   const copyToClipboard = useCallback(() => {
@@ -73,6 +75,7 @@ export function Message({
         parts={parts}
         status={status}
         className={className}
+        model={model}
       >
         {children}
       </MessageAssistant>

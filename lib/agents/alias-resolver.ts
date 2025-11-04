@@ -29,7 +29,9 @@ export async function resolveAgentCanonicalKey(input: string): Promise<string> {
           .maybeSingle()
 
         if (!error && data && (data as any).is_active) {
-          const canonical = (data as any).canonical_key as string
+          // Post-normalize DB canonical via static mapping to avoid drift
+          const dbCanonical = (data as any).canonical_key as string
+          const canonical = canonicalizeAgentId(dbCanonical)
           cache.set(key, { value: canonical, expiresAt: now + TTL_MS })
           return canonical
         }

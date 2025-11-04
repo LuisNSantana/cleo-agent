@@ -151,14 +151,14 @@ export function extractDelegationInfo(args: any, targetAgentFromToolName?: strin
   const shortNameMap: Record<string, string> = {
     ami: 'ami-creative',
     toby: 'toby-technical',
-    peter: 'peter-google',
+    peter: 'peter-financial',
     emma: 'emma-ecommerce',
     apu: 'apu-support',
-    nora: 'nora-notion',
-    jenn: 'jenn-insights',
-    astra: 'astra-search',
-    insights: 'insights-analyst',
-    wex: 'wex-weather',
+    nora: 'nora-medical',
+    jenn: 'jenn-community',
+    astra: 'astra-email',
+    insights: 'iris-insights',
+    wex: 'wex-intelligence',
   }
 
   if (shortNameMap[targetAgent]) {

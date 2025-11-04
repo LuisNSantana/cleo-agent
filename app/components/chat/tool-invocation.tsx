@@ -5,6 +5,7 @@ import {
   CaretDownIcon,
   CheckCircleIcon,
   CodeIcon,
+  CopyIcon,
   LinkIcon,
   NutIcon,
   SpinnerIcon,
@@ -151,6 +152,54 @@ export function ToolInvocation({
   )
 }
 
+function ResultBlock({
+  parseError,
+  renderResults,
+}: {
+  parseError: string | null
+  renderResults: () => React.ReactNode
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const content = (
+    <div className="bg-background rounded border p-2 text-sm">
+      {parseError ? (
+        <div className="text-red-500">{parseError}</div>
+      ) : (
+        renderResults()
+      )}
+    </div>
+  )
+  return (
+    <div className="group/result relative">
+      <div className={cn("max-h-60 overflow-auto", !expanded && "max-h-40")}>{content}</div>
+      <div className="mt-1 flex items-center gap-2">
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <CaretDownIcon className={cn("h-3 w-3 transition-transform", expanded ? "rotate-180" : "")} />
+          {expanded ? "Show less" : "Show more"}
+        </button>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs"
+          onClick={(e) => {
+            try {
+              const root = (e.currentTarget as HTMLElement).closest('.group\\/result') as HTMLElement | null
+              const node = root?.querySelector('.bg-background') as HTMLElement | null
+              const text = node ? (node.innerText || node.textContent || '') : ''
+              if (text) navigator.clipboard.writeText(text)
+            } catch {}
+          }}
+        >
+          <CopyIcon className="h-3 w-3" /> Copy
+        </button>
+      </div>
+    </div>
+  )
+}
+
 type SingleToolViewProps = {
   toolInvocations: ToolInvocationUIPart[]
   defaultOpen?: boolean
@@ -239,6 +288,35 @@ function SingleToolCard({
   const isCompleted = state === "result"
   const result = isCompleted ? toolInvocation.result : undefined
 
+  // Try to compute a duration from common fields in result payloads
+  const durationLabel: string | null = useMemo(() => {
+    try {
+      const candidates: Array<number | undefined> = []
+      const res = result as any
+      if (!res) return null
+      // Direct numeric fields
+      candidates.push(res.durationMs, res.elapsedMs, res.tookMs, res.timeMs)
+      // Nested metadata
+      if (res.metadata) {
+        candidates.push(res.metadata.durationMs, res.metadata.elapsedMs)
+      }
+      // AI SDK style text content that might be JSON
+      if (res.content && Array.isArray(res.content)) {
+        const textItem = res.content.find((i: any) => i?.type === 'text')
+        if (textItem?.text) {
+          try {
+            const parsed = JSON.parse(textItem.text)
+            candidates.push(parsed?.durationMs, parsed?.elapsedMs)
+          } catch {}
+        }
+      }
+      const ms = candidates.find((v) => typeof v === 'number' && isFinite(v!) && v! > 0)
+      if (!ms) return null
+      const n = Math.round(ms as number)
+      return n < 1000 ? `${n}ms` : `${(n / 1000).toFixed(1)}s`
+    } catch { return null }
+  }, [result])
+
   // Try to resolve delegation target agent for nicer UI
   const delegationAgentId: string | null = useMemo(() => {
     try {
@@ -266,9 +344,11 @@ function SingleToolCard({
         const shortMap: Record<string, string> = {
           ami: 'ami-creative',
           toby: 'toby-technical',
-          peter: 'peter-google',
+          peter: 'peter-financial',
           emma: 'emma-ecommerce',
           apu: 'apu-support',
+          nora: 'nora-medical',
+          jenn: 'jenn-community',
         }
         if (shortMap[base]) return shortMap[base]
         // Convert underscores back to hyphens
@@ -591,6 +671,11 @@ function SingleToolCard({
               </motion.div>
             )}
           </AnimatePresence>
+          {durationLabel && (
+            <span className="ml-1 inline-flex items-center rounded-full border border-border/60 bg-card/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              {durationLabel}
+            </span>
+          )}
         </div>
         <CaretDownIcon
           className={cn(
@@ -628,13 +713,10 @@ function SingleToolCard({
                   <div className="text-muted-foreground mb-1 text-xs font-medium">
                     Result
                   </div>
-                  <div className="bg-background max-h-60 overflow-auto rounded border p-2 text-sm">
-                    {parseError ? (
-                      <div className="text-red-500">{parseError}</div>
-                    ) : (
-                      renderResults()
-                    )}
-                  </div>
+                  <ResultBlock
+                    parseError={parseError}
+                    renderResults={renderResults}
+                  />
                 </div>
               )}
 

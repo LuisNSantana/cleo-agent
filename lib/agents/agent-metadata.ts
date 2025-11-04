@@ -69,12 +69,19 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     color: '#6366F1',
     emoji: '🕸️'
   },
-  'nora-community': {
-    id: 'nora-community',
-    name: 'Nora',
-    avatar: '/img/agents/nora4.png',
+  'jenn-community': {
+    id: 'jenn-community',
+    name: 'Jenn',
+    avatar: '/img/agents/nora4.png', // Placeholder avatar
     color: '#E879F9',
     emoji: '💬'
+  },
+  'nora-medical': {
+    id: 'nora-medical',
+    name: 'Nora',
+    avatar: '/img/agents/nora4.png',
+    color: '#0EA5E9',
+    emoji: '🩺'
   },
   'luna-content': {
     id: 'luna-content',
@@ -125,14 +132,15 @@ function normalizeAgentId(agentId: string): string {
     'emma': 'emma-ecommerce',
     'toby': 'toby-technical',
     'ami': 'ami-creative',
-  'peter': 'peter-financial',
-  'peter-workspace': 'peter-financial',
-  'peter-google': 'peter-financial',
-  'peter-advisor': 'peter-financial',
-  'peter-finance': 'peter-financial',
-  'wex': 'wex-intelligence',
+    'peter': 'peter-financial',
+    'peter-workspace': 'peter-financial',
+    'peter-google': 'peter-financial',
+    'peter-advisor': 'peter-financial',
+    'peter-finance': 'peter-financial',
+    'wex': 'wex-intelligence',
     'skyvern': 'skyvern-agent',
-    'nora': 'nora-community',
+    'nora': 'nora-medical',
+    'jenn': 'jenn-community',
   'luna': 'luna-content',
   'luna-content-creator': 'luna-content',
   'zara': 'zara-analytics',
@@ -140,7 +148,9 @@ function normalizeAgentId(agentId: string): string {
   'viktor': 'viktor-publisher',
   'viktor-publishing-specialist': 'viktor-publisher',
   'apu-support': 'apu-support',
-  'nora-community': 'nora-community',
+  'nora-community': 'jenn-community',
+  'jenn-community': 'jenn-community',
+  'nora-medical': 'nora-medical',
   'ami-creative': 'ami-creative',
   'emma-ecommerce': 'emma-ecommerce',
   'toby-technical': 'toby-technical',

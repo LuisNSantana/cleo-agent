@@ -430,8 +430,8 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
   // Determine if clarification is needed
   let needsClarification = confidence < CONFIDENCE.medium || (secondBest && (score - secondBest[1].score) < 2)
 
-  // Special case: social media overlap (now only Nora handles all social media)
-  const socialMediaAgents = ['nora-community']
+  // Special case: social media overlap (Jenn handles social media)
+  const socialMediaAgents = ['jenn-community']
   // Find all social media agents in the top 3
   const topSocial = sortedAgents
     .slice(0, 3)
@@ -448,8 +448,8 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
 
   // Special handling: social media combo intent (analytics + scheduling)
   // When a single request mixes "analyze campaign analytics" and "schedule posts",
-  // we ask ONE targeted clarifying question mentioning Nora, to align with the technical test expectations.
-  if (bestAgentId === 'nora-community') {
+  // we ask ONE targeted clarifying question mentioning Jenn.
+  if (bestAgentId === 'jenn-community') {
     const hasAnalytics = /\b(analytics?|analitica|analítica|analyze|analizar|metrics?|kpi|engagement|performance|rendimiento|métricas|metricas)\b/i.test(fullText)
     const hasScheduling = /\b(schedule|scheduling|program|programar|programación|calendarizar|calendar)\b/i.test(fullText)
     if (hasAnalytics && hasScheduling) {
@@ -467,9 +467,9 @@ export function analyzeDelegationIntent(userText: string, context?: string): Del
       const names = relevantSocial.map(([id]) => getAgentMetadata(id).name).join(', ')
       clarificationQuestion = `Should this go to ${names}? Please clarify which social media specialist is best for this task.`
     } else {
-      // Nora-specific mention when social combo is detected
-      if (bestAgentId === 'nora-community') {
-        clarificationQuestion = 'Do you want Nora to handle both the campaign analytics and the social scheduling for next week?'
+      // Jenn-specific mention when social combo is detected
+      if (bestAgentId === 'jenn-community') {
+        clarificationQuestion = 'Do you want Jenn to handle both the campaign analytics and the social scheduling for next week?'
       } else {
         clarificationQuestion = generateClarificationQuestion(bestAgentId, secondBest?.[0])
       }

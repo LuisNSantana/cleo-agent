@@ -194,6 +194,16 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
                                 </span>
                               </motion.div>
                             )}
+                            {isLatest && step.action === 'delegating' && step.metadata?.delegatedTo && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -2 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300"
+                              >
+                                <ArrowRight className="w-3 h-3" weight="bold" />
+                                <span>Delegated to {step.metadata.delegatedTo}</span>
+                              </motion.div>
+                            )}
                           </div>
                           
                           {/* Show progressive message if available, otherwise step content */}

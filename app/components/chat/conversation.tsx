@@ -293,6 +293,7 @@ function ConversationContent({
                   status={status}
                   userMessage={userMessage} // Pasar contexto del usuario
                   userId={userId} // For image generation
+                  model={(message as any)?.model}
                 >
                   {messageText}
                 </Message>
