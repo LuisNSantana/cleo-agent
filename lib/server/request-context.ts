@@ -6,6 +6,7 @@ export type RequestContext = {
   userId?: string
   model?: string
   requestId?: string
+  locale?: 'en' | 'es' | 'fr' | 'de' // User's preferred language (browser-detected)
 }
 
 const isServer = typeof globalThis === 'object' && !('window' in globalThis)
@@ -105,4 +106,16 @@ export function getCurrentRequestId(): string | undefined {
     } catch {}
   }
   return rid
+}
+
+export function getCurrentUserLocale(): 'en' | 'es' | 'fr' | 'de' | undefined {
+  const context = (storage as ALS<RequestContext>).getStore()
+  let locale = context?.locale
+  if (!locale) {
+    try {
+      const g: any = globalThis as any
+      locale = g.__currentLocale || locale
+    } catch {}
+  }
+  return locale
 }

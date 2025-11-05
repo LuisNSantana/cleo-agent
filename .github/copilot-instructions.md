@@ -9,7 +9,8 @@
 **Chat entry points**:
 - `app/api/chat/route.ts`: Main SSE endpoint (Vercel AI SDK). Sets `runtime = "nodejs"` and `maxDuration = 300` for delegation-heavy flows.
 - `app/api/multi-model-chat/route.ts`: Multi-model routing + RAG controls (optional LangChain alternative).
-- All API routes handling long operations MUST export `runtime = "nodejs"` and appropriate `maxDuration` (e.g., `300` for delegation, `10` for quick ops).
+- **All API routes handling long operations MUST export `runtime = "nodejs"` and appropriate `maxDuration`** (e.g., `300` for delegation, `10` for quick ops).
+  - Edge runtime lacks AsyncLocalStorage, crypto, and other Node.js APIs critical to request context and security.
 
 **Agent orchestration** (LangGraph-based):
 - Core engine: `lib/agents/core/` (`graph-builder.ts`, `execution-manager.ts`, `event-emitter.ts`, `timeout-manager.ts`, `tool-executor.ts`).
@@ -21,12 +22,13 @@
 - Predefined specialists: `lib/agents/predefined/` (Emma, Peter, Apu, Toby, Ami, Nora, Jenn, Astra, Insights, Wex, Notion—all in `ALL_PREDEFINED_AGENTS`).
 - Unified loader: `lib/agents/unified-config.ts` (async `getAllAgents`, `getAgentById`). **Sync variants are `@deprecated`**—migrate orchestrators to async.
 - Cleo (supervisor) is **protected**: cannot be deleted, always available as `cleo-supervisor`.
-- Delegation scoring (3 layers): 1) Intent heuristics (`lib/delegation/intent-heuristics.ts`), 2) Router patterns (early-exit), 3) Model decision (GPT-4o-mini). Layers 1-2 suggest, model decides.
+- Delegation scoring (3 layers): 1) Intent heuristics (`lib/delegation/intent-heuristics.ts`), 2) Router patterns (early-exit), 3) Model decision (GPT-4o-mini). Layers 1-2 **suggest**, model **decides**.
 
 **Tool ecosystem**:
 - Registry: `lib/tools/index.ts` (Zod-validated). **Critical**: New tools MUST call `ensureToolsHaveRequestContext(tools)` at export to inject user metadata.
 - Context wrapper: `lib/tools/context-wrapper.ts` wraps execute functions with `withRequestContext` from `lib/server/request-context.ts` (AsyncLocalStorage-based).
 - Supabase/tool calls inherit `userId`, `requestId`, `model` for logging and rate limiting. Use `getCurrentUserId()` to read context anywhere.
+- Request context survives async boundaries by promoting to `globalThis.__currentUserId`, `__currentModel`, `__requestId` when AsyncLocalStorage unavailable.
 
 **RAG pipeline**:
 - Retrieval: `lib/rag/retrieve.ts` (`retrieveRelevant`, `buildContextBlock`). Dual-layer cache: L1 in-memory (2min TTL), L2 Redis (configurable).
@@ -47,13 +49,31 @@
 
 **Request context**: Wrap Supabase calls and tools with `withRequestContext({ userId, model, requestId }, async () => ...)` so metadata flows through AsyncLocalStorage. Functions like `getCurrentUserId()` read from this context.
 
+
+**Interrupt persistence**: Dual-layer (L1 in-memory, L2 Supabase `agent_interrupts` table) survives serverless recycling during HITL approvals (10-300s).
+
+**Global state pattern**: Critical runtime state uses `globalThis` prefixed with `__cleo*` to survive Next.js route handler reloads (e.g., `__cleoExecRegistry`, `__cleoRuntimeAgents`, `__currentUserId`). This is intentional for serverless durability—not a code smell.
+
+---
+
+## Data layer (Supabase)
+
+**Client creation**:
+- Server: `lib/supabase/server.ts` (`createClient` async, respects cookies/auth).
+- Client: `lib/supabase/client.ts` (browser bundle).
+- Admin: `lib/supabase/admin.ts` (service role, bypasses RLS—**use sparingly**).
+
+**Migrations**: `/migrations` (timestamped SQL). Baseline: `supabase_schema.sql`; append deltas in dated files (`20251028_agent_interrupts.sql`, etc.). Update analytics views (`20250910_orchestrator_chat_pipeline_analytics.sql`, `2025-10-05_dashboard_agent_analytics.sql`) when execution schema changes.
+
+**Request context**: Wrap Supabase calls and tools with `withRequestContext({ userId, model, requestId }, async () => ...)` so metadata flows through AsyncLocalStorage. Functions like `getCurrentUserId()` read from this context.
+
 **Interrupt persistence**: Dual-layer (L1 in-memory, L2 Supabase `agent_interrupts` table) survives serverless recycling during HITL approvals (10-300s).
 
 ---
 
 ## Development workflows
 
-**Package manager**: `pnpm@10.14.0` (pinned in `package.json`). Always use `pnpm` commands.
+**Package manager**: `pnpm@10.14.0` (pinned in `package.json`). **Always use `pnpm` commands—never npm/yarn**.
 
 **Local dev**:
 ```bash
@@ -79,6 +99,8 @@ pnpm docker:clean       # Prune volumes/containers
 
 **Environment**: See `.env.example`. **Required**: Supabase keys, `OPENAI_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `CSRF_SECRET`, `ENCRYPTION_KEY`. **Optional**: `OLLAMA_BASE_URL` for local models (set to `http://localhost:11434` for Ollama).
 
+**Voice proxy**: Real-time WebSocket voice requires separate proxy server (`server/websocket-proxy.js`). Run with `pnpm voice:proxy` or `pnpm dev:voice` for parallel dev (app + proxy). See `server/README.md` for deployment.
+
 ---
 
 ## Implementation patterns
@@ -91,9 +113,11 @@ pnpm docker:clean       # Prune volumes/containers
 
 **Human-in-the-loop confirmations**: Tools return `{ needsConfirmation: true, preview, confirmationId, pendingAction }` objects (see `lib/confirmation/wrapper.ts`). Wrap critical tools with `withConfirmation()`. Stored in `globalThis.__pendingConfirmations` + Supabase L2 for durability. Respond via `app/api/interrupt/respond/route.ts`.
 
-**Agent delegation**: Tools like `delegate_to_emma` call `getAgentOrchestrator().startAgentExecutionForUI(...)`. Adapter emits progress events (`execution.started`, `execution.completed`) via EventEmitter; UI subscribes for real-time updates.
+**Agent delegation**: Tools like `delegate_to_emma` call `getAgentOrchestrator().startAgentExecutionForUI(...)`. Adapter emits progress events (`execution.started`, `execution.completed`) via EventEmitter; UI subscribes for real-time updates. Bridge pattern in `orchestrator-adapter.ts` ensures core events propagate to legacy listeners.
 
 **Model resolution**: `lib/models/resolve.ts` (`resolveModelFromList`) normalizes model IDs, handles aliases (e.g., `grok-4-fast-reasoning`), auto-detects Ollama vs cloud providers. Fallback: `grok-4-fast-reasoning`.
+
+**CSRF protection pattern**: All state-changing routes validate double-submit tokens via `middleware.ts`. Client must send `x-csrf-token` header matching `csrf_token` cookie. Skip for Next.js internals (paths starting with `/_next/`, etc.).
 
 ---
 
@@ -105,7 +129,9 @@ pnpm docker:clean       # Prune volumes/containers
 
 **Styling**: Tailwind v4 utility classes + `tailwind-merge` for conditional classNames (`cn()` helper).
 
-**Path aliasing**: Use `@/` prefix for all imports (mapped to project root in `tsconfig.json`). Never use relative paths like `../../`.
+**Path aliasing**: Use `@/` prefix for all imports (mapped to project root in `tsconfig.json`). **Never use relative paths like `../../`**—always use `@/` to maintain consistency and avoid refactoring issues.
+
+**Component patterns**: Prefer server components by default. Mark client components with `'use client'` only when needed (hooks, browser APIs, interactivity). Keep server/client boundary clear to optimize bundle size.
 
 ---
 
@@ -119,6 +145,8 @@ pnpm docker:clean       # Prune volumes/containers
 
 **Timeline debugging**: If chips disappear after refresh, verify: 1) `messages.parts` JSONB is populated, 2) execution events are emitting, 3) materialized views are up to date.
 
+**Redis diagnostics**: Use `pnpm diagnose:redis` and `pnpm test:redis-cache-hit` scripts to verify L2 cache connectivity and performance.
+
 ---
 
 ## Security & middleware
@@ -128,6 +156,8 @@ pnpm docker:clean       # Prune volumes/containers
 **CSP headers**: Content-Security-Policy varies by env (dev allows `unsafe-eval`, prod restricts). Configured in `middleware.ts`.
 
 **RLS**: Supabase Row Level Security enforced on all tables. Admin client bypasses (use sparingly). Request context propagates `userId` for proper isolation.
+
+**Runtime configuration**: Middleware exports `runtime = "nodejs"` to ensure Node.js APIs available. Never use `edge` runtime for middleware.
 
 ---
 

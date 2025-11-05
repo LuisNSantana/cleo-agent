@@ -197,9 +197,9 @@ async function tavilySearch({ query, language, count, use_summarizer }: { query:
 }
 
 export const webSearchTool = tool({
-  description: 'Advanced web search with automatic fallback: Primary Tavily (default), if no results fallback to Brave (or vice versa if Brave primary). Optimized for potency: Supports operators, freshness, AI summarizer, Goggles (Brave), clustered insights, extended snippets, favicons. Default English queries for comprehensive results (auto-translate es). Use for fresh news, technical docs. Prioritize current info.',
+  description: 'Advanced web search with automatic fallback. ⚠️ CRITICAL: Use ONLY 1-2 searches maximum per user question to avoid rate limits. Primary Tavily (default), fallback to Brave if no results. Optimized for potency: Supports operators, freshness, AI summarizer, Goggles (Brave), clustered insights, extended snippets, favicons. Default English queries for comprehensive results (auto-translate es). Use for fresh news, technical docs. ONE targeted search is preferred - only make a second search if first results are insufficient.',
   inputSchema: z.object({
-    query: z.string().min(1).max(400).describe('Search query in English by default (auto-translated if es). Supports: site:domain.com, filetype:pdf, "phrase", -exclude, intitle:term.'),
+    query: z.string().min(1).max(400).describe('Search query in English by default (auto-translated if es). Supports: site:domain.com, filetype:pdf, "phrase", -exclude, intitle:term. Be specific and comprehensive to get good results in ONE search.'),
     count: z.number().min(1).max(50).optional().default(15).describe('Number of results (max 50).'),
     freshness: z.enum(['d', 'w', 'm', 'y', 'pd', 'pw', 'pm', 'py']).optional().describe('Recency: d=day, w=week, etc.'),
     language: z.enum(['es', 'en']).optional().default('en').describe('Language (en for more info).'),
@@ -239,17 +239,23 @@ export const webSearchTool = tool({
       const key = `${normalized}::${count}::${language}::${use_summarizer}`
       const now = Date.now()
       const cachedPre = searchCache.get(key)
+      
+      // ✅ OPTIMIZATION: Stricter duplicate detection - return cached result immediately
       if (entry.queries.has(normalized)) {
         if (cachedPre && cachedPre.expiry > now) {
+          console.log('[WebSearch] 🔄 Duplicate query detected, returning cached result')
           return { ...cachedPre.data, note: (cachedPre.data.note || '') + (language === 'es' ? ' (repetida; caché)' : ' (repeated; cache)') }
         }
-        // Duplicate but no cache: proceed anyway to allow fallback and fresh fetch
-        console.log('[WebSearch] Duplicate query without cache; proceeding to fetch to allow fallback.')
+        console.log('[WebSearch] ⚠️  Duplicate query without cache - allowing ONE fresh fetch')
       }
+      
       const newsLike = /(news|noticias|esta\s+semana|hoy|últimas|latest|this\s+week|today)/i.test(normalized) || !!freshness || !!goggles_id
-      const maxPerRequest = newsLike ? 5 : 3
+      // ✅ OPTIMIZATION: Reduced from 3/5 to 2/3 following Tavily best practices
+      const maxPerRequest = newsLike ? 3 : 2
       let throttled = false
+      
       if (entry.count >= maxPerRequest) {
+        console.log(`[WebSearch] ⛔ Rate limit reached (${entry.count}/${maxPerRequest})`)
         if (cachedPre && cachedPre.expiry > now) {
           return { ...cachedPre.data, note: (cachedPre.data.note || '') + (language === 'es' ? ' (límite; caché)' : ' (limit; cache)') }
         }
@@ -257,10 +263,12 @@ export const webSearchTool = tool({
         throttled = true
         use_summarizer = false
         count = Math.min(count, 5)
-        console.log('[WebSearch] Limit reached for request; proceeding with reduced parameters to fetch at least one result.')
+        console.log('[WebSearch] ⚠️  Limit reached, proceeding with reduced parameters')
       }
+      
       entry.count++
       entry.queries.add(normalized)
+      console.log(`[WebSearch] 📊 Request count: ${entry.count}/${maxPerRequest} | Queries tracked: ${entry.queries.size}`)
 
       searchCache.evictExpired()
   const cached = searchCache.get(key)

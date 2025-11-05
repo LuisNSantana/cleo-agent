@@ -263,6 +263,10 @@ export async function POST(req: Request) {
     // GLOBAL REQUEST CONTEXT (AsyncLocalStorage) - must wrap the remainder
     // ------------------------------------------------------------------
     const outerRequestId = randomUUID()
+    
+    // Detect user locale from middleware-set header (browser Accept-Language)
+    const userLocale = (req.headers.get('x-user-locale') as 'en' | 'es' | 'fr' | 'de') || 'es'
+    
     // Hoisted variables that will be populated inside globalCtxRun and used later
   let finalSystemPrompt: string = ''
     let convertedMessages: any
@@ -460,9 +464,10 @@ export async function POST(req: Request) {
       }
     }
 
-  // Inject userId and model into request-scoped context (already resolved earlier as realUserId)
+  // Inject userId, model, and locale into request-scoped context (already resolved earlier as realUserId)
   ;(globalThis as any).__currentUserId = realUserId
   ;(globalThis as any).__currentModel = normalizedModel
+  ;(globalThis as any).__currentLocale = userLocale
 
   // ✅ DEBUG: Verify thread ID is set before RAG calls
   console.log(`🧵 [ROUTE] effectiveThreadId before buildFinalSystemPrompt: ${effectiveThreadId || 'NULL (will use GLOBAL)'}`)
@@ -1695,12 +1700,18 @@ export async function POST(req: Request) {
   } // end globalCtxRun body
 
   // Execute orchestrator flow within request context
-  const result = await withRequestContext({ userId: realUserId, model: normalizedModel, requestId: outerRequestId }, globalCtxRun)
+  const result = await withRequestContext({ 
+    userId: realUserId, 
+    model: normalizedModel, 
+    requestId: outerRequestId,
+    locale: userLocale 
+  }, globalCtxRun)
   return result as any
   } catch (err: unknown) {
     // Clean up global context on exception
     delete (globalThis as any).__currentUserId
     delete (globalThis as any).__currentModel
+    delete (globalThis as any).__currentLocale
     
     console.error("Error in /api/chat:", err)
     const error = err as {

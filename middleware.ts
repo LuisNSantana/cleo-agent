@@ -15,6 +15,31 @@ export async function middleware(request: NextRequest) {
 
   const response = await updateSession(request)
 
+  // Detect browser locale from Accept-Language header
+  const acceptLanguage = request.headers.get("accept-language")
+  let detectedLocale: 'en' | 'es' | 'fr' | 'de' = 'es' // Default fallback
+  
+  if (acceptLanguage) {
+    // Parse Accept-Language: "en-US,en;q=0.9,es;q=0.8" → extract first matching language
+    const languageCodes = acceptLanguage
+      .split(',')
+      .map(lang => lang.split(';')[0].trim().toLowerCase())
+    
+    // Priority: fr > de > en > es (fallback)
+    if (languageCodes.some(code => code.startsWith('fr'))) {
+      detectedLocale = 'fr'
+    } else if (languageCodes.some(code => code.startsWith('de'))) {
+      detectedLocale = 'de'
+    } else if (languageCodes.some(code => code.startsWith('en'))) {
+      detectedLocale = 'en'
+    } else if (languageCodes.some(code => code.startsWith('es'))) {
+      detectedLocale = 'es'
+    }
+  }
+  
+  // Set locale as custom header for downstream consumption
+  response.headers.set('x-user-locale', detectedLocale)
+
   // CSRF protection for state-changing requests (skip Next.js/Vercel internals and static assets)
   const path = request.nextUrl.pathname
   const isInternal =

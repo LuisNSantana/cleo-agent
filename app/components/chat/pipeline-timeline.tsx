@@ -122,7 +122,12 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
         timestamp: typeof s.timestamp === 'string' ? s.timestamp : s.timestamp.toISOString()
       }
       
-      // ✅ Enriquecer con mensajes contextuales (solo si no es reasoning)
+      // ✅ PHASE 1: Skip re-enrichment for canonical steps (already humanized by step-builder)
+      if (s.metadata?.canonical) {
+        return mappedStep // Use as-is, already has humanized message
+      }
+      
+      // ✅ Enriquecer con mensajes contextuales (solo si no es reasoning y no es canonical)
       // Los reasoning steps ya vienen con contenido humanizado del extractor
       if (!s.metadata?.reasoning) {
         return enrichStepWithContextualMessage(mappedStep)

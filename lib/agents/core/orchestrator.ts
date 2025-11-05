@@ -26,6 +26,7 @@ import { withDelegationContext } from './delegation-context'
 import { ExecutionRegistry } from './execution-registry'
 import { DelegationCoordinator } from './delegation-coordinator'
 import { emitBrowserEvent } from '@/lib/utils/browser-events'
+import { buildNodeEnteredStep, buildNodeCompletedStep } from './step-builder'
 
 // Global counter for unique ID generation
 let orchestratorMessageIdCounter = 0
@@ -325,17 +326,15 @@ export class AgentOrchestrator {
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        const action: any = data?.nodeId === 'router' ? 'routing' : 'analyzing'
-        exec.steps.push({
-          id: `node_enter_${data?.nodeId || 'unknown'}_${Date.now()}`,
-          timestamp: new Date(),
-          agent: data?.agentId || exec.agentId,
+        
+        // ✅ Use step-builder to create humanized step (no more English technical messages)
+        const humanizedStep = buildNodeEnteredStep({
+          agentId: data?.agentId || exec.agentId,
           agentName: exec.agentName,
-          action,
-          content: `Entered node ${String(data?.nodeId || 'unknown')}`,
-          progress: 0,
           metadata: { nodeId: data?.nodeId, stage: 'entered' }
-        } as any)
+        })
+        
+        exec.steps.push(humanizedStep as any)
 
         // Mirror step to parent execution if present (quick exec UI watches parent)
         const parentId = data?.state?.metadata?.parentExecutionId
@@ -343,16 +342,17 @@ export class AgentOrchestrator {
           const parentExec = this.executionRegistry.get(parentId)
           if (parentExec) {
             if (!parentExec.steps) parentExec.steps = []
-            parentExec.steps.push({
-              id: `node_enter_mirror_${data?.nodeId || 'unknown'}_${Date.now()}`,
-              timestamp: new Date(),
-              agent: data?.agentId || exec.agentId,
+            const mirroredStep = buildNodeEnteredStep({
+              agentId: data?.agentId || exec.agentId,
               agentName: exec.agentName,
-              action,
-              content: `(${exec.agentId}) entered ${String(data?.nodeId || 'unknown')}`,
-              progress: 0,
-              metadata: { nodeId: data?.nodeId, stage: 'entered', mirroredFrom: execId }
-            } as any)
+              metadata: { 
+                nodeId: data?.nodeId, 
+                stage: 'entered', 
+                mirroredFrom: execId,
+                isChildStep: true 
+              }
+            })
+            parentExec.steps.push(mirroredStep as any)
           }
         }
       } catch {}
@@ -365,18 +365,15 @@ export class AgentOrchestrator {
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        const isFinalize = data?.nodeId === 'finalize'
-        const action: any = isFinalize ? 'completing' : 'responding'
-        exec.steps.push({
-          id: `node_complete_${data?.nodeId || 'unknown'}_${Date.now()}`,
-          timestamp: new Date(),
-          agent: data?.agentId || exec.agentId,
+        
+        // ✅ Use step-builder to create humanized completion step
+        const humanizedStep = buildNodeCompletedStep({
+          agentId: data?.agentId || exec.agentId,
           agentName: exec.agentName,
-          action,
-          content: `Completed node ${String(data?.nodeId || 'unknown')}`,
-          progress: isFinalize ? 100 : 75,
           metadata: { nodeId: data?.nodeId, stage: 'completed' }
-        } as any)
+        })
+        
+        exec.steps.push(humanizedStep as any)
 
         // Mirror to parent if applicable
         const parentId = data?.state?.metadata?.parentExecutionId
@@ -384,16 +381,17 @@ export class AgentOrchestrator {
           const parentExec = this.executionRegistry.get(parentId)
           if (parentExec) {
             if (!parentExec.steps) parentExec.steps = []
-            parentExec.steps.push({
-              id: `node_complete_mirror_${data?.nodeId || 'unknown'}_${Date.now()}`,
-              timestamp: new Date(),
-              agent: data?.agentId || exec.agentId,
+            const mirroredStep = buildNodeCompletedStep({
+              agentId: data?.agentId || exec.agentId,
               agentName: exec.agentName,
-              action,
-              content: `(${exec.agentId}) completed ${String(data?.nodeId || 'unknown')}`,
-              progress: isFinalize ? 100 : 75,
-              metadata: { nodeId: data?.nodeId, stage: 'completed', mirroredFrom: execId }
-            } as any)
+              metadata: { 
+                nodeId: data?.nodeId, 
+                stage: 'completed', 
+                mirroredFrom: execId,
+                isChildStep: true 
+              }
+            })
+            parentExec.steps.push(mirroredStep as any)
           }
         }
       } catch {}

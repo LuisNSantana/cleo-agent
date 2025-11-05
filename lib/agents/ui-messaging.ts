@@ -44,15 +44,17 @@ interface MessageTemplate {
  * Mapeo de expertise por agentId para mensajes más descriptivos
  */
 const AGENT_EXPERTISE: Record<string, string> = {
-  'ami': 'gestión de Notion y documentación',
-  'astra': 'investigación profunda y análisis web',
-  'iris': 'síntesis de insights y análisis de documentos',
-  'jenn': 'gestión de redes sociales y contenido',
-  'peter': 'comercio electrónico y Shopify',
-  'toby': 'organización de tareas y productividad',
-  'apu': 'Google Workspace y hojas de cálculo',
-  'nora': 'gestión de calendarios y reuniones',
-  'wex': 'análisis de datos web y competencia',
+  'ami-creative': 'asistencia ejecutiva y productividad',
+  'astra-email': 'gestión de email y comunicación profesional',
+  'iris-insights': 'análisis de insights y síntesis de información',
+  'jenn-community': 'gestión de redes sociales y comunidades',
+  'peter-financial': 'estrategia financiera y modelado',
+  'toby-technical': 'ingeniería de software e IoT',
+  'apu-support': 'soporte técnico y éxito del cliente',
+  'nora-medical': 'información médica y triage (no diagnóstico)',
+  'wex-intelligence': 'análisis de mercado e inteligencia competitiva',
+  'emma-ecommerce': 'comercio electrónico y optimización Shopify',
+  'notion-agent': 'gestión de workspace y bases de conocimiento Notion',
   'cleo-supervisor': 'coordinación y orquestación de equipos',
 }
 
