@@ -5,7 +5,7 @@
 
 import { StateGraph, StateGraphArgs } from '@langchain/langgraph'
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
-import { AgentConfig, AgentExecution, AgentState, ExecutionResult } from '../types'
+import { AgentConfig, AgentExecution, AgentState, ExecutionResult, ExecutionStep } from '../types'
 import { safeSetState } from '@/lib/agents/execution-state'
 import { GraphBuilder } from './graph-builder'
 import { ExecutionManager } from './execution-manager'
@@ -318,6 +318,115 @@ export class AgentOrchestrator {
       this.addDelegationProgressStep(progressData)
     })
 
+    // 🔧 Tool execution events - add tool steps to pipeline for visual transparency
+    this.eventEmitter.on('tool.start', (toolData: any) => {
+      try {
+        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        if (!execId) return
+        const exec = this.executionRegistry.get(execId)
+        if (!exec) return
+        if (!exec.steps) exec.steps = []
+        
+        // Build tool execution start step
+        const toolStep: ExecutionStep = {
+          id: `tool_start_${toolData.toolCallId || Date.now()}`,
+          action: 'executing' as any,
+          agent: toolData.agentId,
+          agentName: exec.agentName,
+          content: `🔧 Ejecutando: ${toolData.toolName}`,
+          timestamp: new Date(toolData.timestamp || Date.now()),
+          progress: 50, // Tool in progress
+          metadata: {
+            toolName: toolData.toolName,
+            toolCallId: toolData.toolCallId,
+            parameters: toolData.parameters,
+            stage: 'started' as const
+          }
+        }
+        
+        exec.steps.push(toolStep)
+        logger.debug('🔧 [ORCHESTRATOR] Tool start step added:', {
+          execId,
+          toolName: toolData.toolName,
+          stepsCount: exec.steps.length
+        })
+      } catch (error) {
+        logger.error('❌ [ORCHESTRATOR] Error handling tool.start event:', error)
+      }
+    })
+
+    this.eventEmitter.on('tool.result', (toolData: any) => {
+      try {
+        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        if (!execId) return
+        const exec = this.executionRegistry.get(execId)
+        if (!exec) return
+        if (!exec.steps) exec.steps = []
+        
+        // Build tool execution complete step
+        const toolStep: ExecutionStep = {
+          id: `tool_result_${toolData.toolCallId || Date.now()}`,
+          action: 'executing' as any,
+          agent: toolData.agentId,
+          agentName: exec.agentName,
+          content: `✅ Completado: ${toolData.toolName}`,
+          timestamp: new Date(toolData.timestamp || Date.now()),
+          progress: 100, // Tool completed
+          metadata: {
+            toolName: toolData.toolName,
+            toolCallId: toolData.toolCallId,
+            result: toolData.result,
+            stage: 'completed' as const
+          }
+        }
+        
+        exec.steps.push(toolStep)
+        logger.debug('✅ [ORCHESTRATOR] Tool result step added:', {
+          execId,
+          toolName: toolData.toolName,
+          stepsCount: exec.steps.length
+        })
+      } catch (error) {
+        logger.error('❌ [ORCHESTRATOR] Error handling tool.result event:', error)
+      }
+    })
+
+    this.eventEmitter.on('tool.error', (toolData: any) => {
+      try {
+        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        if (!execId) return
+        const exec = this.executionRegistry.get(execId)
+        if (!exec) return
+        if (!exec.steps) exec.steps = []
+        
+        // Build tool execution error step
+        const toolStep: ExecutionStep = {
+          id: `tool_error_${toolData.toolCallId || Date.now()}`,
+          action: 'executing' as any,
+          agent: toolData.agentId,
+          agentName: exec.agentName,
+          content: `❌ Error: ${toolData.toolName}`,
+          timestamp: new Date(toolData.timestamp || Date.now()),
+          progress: 0, // Tool failed
+          metadata: {
+            toolName: toolData.toolName,
+            toolCallId: toolData.toolCallId,
+            error: toolData.error,
+            stage: 'failed' as const
+          }
+        }
+        
+        exec.steps.push(toolStep)
+        logger.error('❌ [ORCHESTRATOR] Tool error step added:', {
+          execId,
+          toolName: toolData.toolName,
+          error: toolData.error
+        })
+      } catch (error) {
+        logger.error('❌ [ORCHESTRATOR] Error handling tool.error event:', error)
+      }
+    })
+
     // Graph node lifecycle -> execution steps for graph UI
     this.eventEmitter.on('node.entered', (data: any) => {
       try {
@@ -333,6 +442,32 @@ export class AgentOrchestrator {
           agentName: exec.agentName,
           metadata: { nodeId: data?.nodeId, stage: 'entered' }
         })
+        
+        // ✅ IMPROVED DEDUPLICATION: Check by uniqueId (UUID) if present
+        // This is the LangGraph recommended pattern for idempotent event handling
+        if (humanizedStep.uniqueId) {
+          const isDuplicate = exec.steps.some(
+            (s: any) => s.uniqueId === humanizedStep.uniqueId
+          )
+          if (isDuplicate) {
+            console.log(`🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${humanizedStep.uniqueId})`)
+            return
+          }
+        }
+        
+        // ✅ FALLBACK: Check by nodeId+stage for older steps without UUID
+        const nodeId = data?.nodeId || data?.agentId
+        const existingEnteredStep = exec.steps.find(
+          (s: any) => 
+            s.metadata?.nodeId === nodeId && 
+            s.metadata?.stage === 'entered' &&
+            !s.uniqueId // Only check legacy steps without UUID
+        )
+        
+        if (existingEnteredStep) {
+          console.log(`🚫 [ORCHESTRATOR] Skipping duplicate node.entered for ${nodeId} (legacy check)`)
+          return // Skip duplicate
+        }
         
         exec.steps.push(humanizedStep as any)
 
@@ -365,6 +500,39 @@ export class AgentOrchestrator {
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
+        
+        // ✅ Use step-builder to create completion step
+        const completionStep = buildNodeCompletedStep({
+          agentId: data?.agentId || exec.agentId,
+          agentName: exec.agentName,
+          metadata: { nodeId: data?.nodeId, stage: 'completed' }
+        })
+        
+        // ✅ IMPROVED DEDUPLICATION: Check by uniqueId (UUID) if present
+        if (completionStep.uniqueId) {
+          const isDuplicate = exec.steps.some(
+            (s: any) => s.uniqueId === completionStep.uniqueId
+          )
+          if (isDuplicate) {
+            console.log(`🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${completionStep.uniqueId})`)
+            return
+          }
+        }
+        
+        // ✅ FALLBACK: Check by nodeId+stage for older steps without UUID
+        const nodeId = data?.nodeId || data?.agentId
+        const existingCompletedStep = exec.steps.find(
+          (s: any) => 
+            s.metadata?.nodeId === nodeId && 
+            s.metadata?.stage === 'completed' &&
+            s.action === 'completing' &&
+            !s.uniqueId // Only check legacy steps
+        )
+        
+        if (existingCompletedStep) {
+          console.log(`🚫 [ORCHESTRATOR] Skipping duplicate node.completed for ${nodeId} (legacy check)`)
+          return // Skip duplicate
+        }
         
         // ✅ Use step-builder to create humanized completion step
         const humanizedStep = buildNodeCompletedStep({
@@ -542,32 +710,8 @@ export class AgentOrchestrator {
       data: { inputPreview: execution.input?.slice(0,200), mode: agentConfig.id === 'cleo-supervisor' ? 'supervisor' : 'direct' }
     })
 
-    // Ensure at least one step exists for polling UIs
-    try {
-      execution.steps!.push({
-        id: `core_start_${Date.now()}`,
-        timestamp: new Date(),
-        agent: execution.agentId,
-        agentName: agentConfig.name,
-        action: 'routing',
-        content: `Core execution started (${agentConfig.id})`,
-        progress: 0,
-        metadata: { mode: agentConfig.id === 'cleo-supervisor' ? 'supervisor' : 'direct' }
-      } as any)
-      emitExecutionEvent({
-        trace_id: execution.id,
-        execution_id: execution.id,
-        agent_id: execution.agentId,
-        user_id: execution.userId,
-        thread_id: execution.threadId,
-        state: execution.status,
-        event: 'step.append',
-        level: 'debug',
-        data: { stepId: execution.steps?.[0]?.id, action: 'routing' }
-      })
-    } catch (e) {
-      logger.warn('[CORE] Failed to create initial step', { executionId: execution.id, err: e instanceof Error ? e.message : e })
-    }
+    // ✅ REMOVED: Legacy core_start step - now using canonical steps from step-builder.ts
+    // The graph nodes will emit proper humanized steps via node.entered/node.completed events
 
     // Wrap entire execution in delegation context AND AsyncLocalStorage
     return withDelegationContext(context.userId, executionId, () =>

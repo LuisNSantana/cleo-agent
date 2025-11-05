@@ -162,6 +162,16 @@ function ensureParts(message: ChatMessage): void {
   }
 }
 
+/**
+ * CRITICAL: Immutable parts append - creates NEW array to trigger React re-render.
+ * React's useMemo compares by reference, so mutating arrays with push() doesn't
+ * trigger re-renders. This helper ensures all parts updates are immutable.
+ */
+function appendPart(message: ChatMessage, part: any): void {
+  ensureParts(message)
+  message.parts = [...message.parts, part]
+}
+
 // Extended message type with content property for AI SDK v5 compatibility
 export interface ChatMessage extends UIMessage {
   id: string
@@ -240,7 +250,8 @@ export function useChatCore({
   }>(null)
   // Track seen confirmation IDs to avoid duplicate UI prompts from repeated SSE events
   const seenConfirmationIdsRef = useRef<Set<string>>(new Set())
-  async function respondToToolConfirmation(accept: boolean) {
+  
+  async function respondToToolConfirmation(accept: boolean, editedArgs?: any) {
     if (!pendingToolConfirmation) return
     
     const { confirmationId, toolCallId, toolName } = pendingToolConfirmation
@@ -250,16 +261,18 @@ export function useChatCore({
       console.log('📤 [CHAT-CORE] Sending interrupt response:', {
         executionId: confirmationId,
         approved: accept,
-        toolName
+        toolName,
+        editedArgs: editedArgs || null
       })
       
-      // Call InterruptManager endpoint
+      // Call InterruptManager endpoint with optional editedArgs
       const res = await fetch('/api/interrupt/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           executionId: confirmationId, 
-          approved: accept 
+          approved: accept,
+          editedArgs // ✅ NEW: Pass edited tool arguments
         })
       })
       
@@ -790,10 +803,8 @@ export function useChatCore({
                   }
                   case "tool-input-start": {
                     // Add tool invocation part in partial-call state
-                    if (!assistantMessageObj.parts) {
-                      assistantMessageObj.parts = []
-                    }
-                    assistantMessageObj.parts.push({
+                    // CRITICAL: Use immutable append to trigger React re-render
+                    appendPart(assistantMessageObj, {
                       type: "tool-invocation",
                       toolInvocation: {
                         state: "partial-call",
@@ -856,7 +867,8 @@ export function useChatCore({
                           try { (toolPart.toolInvocation as any).resultSurfaced = true } catch {}
 
                           // Push as a text part so it appears in the assistant message directly
-                          assistantMessageObj.parts.push({
+                          // CRITICAL: Use immutable append to trigger React re-render
+                          appendPart(assistantMessageObj, {
                             type: 'text',
                             text: `${header}${docContent}`,
                           })
@@ -874,7 +886,8 @@ export function useChatCore({
 
                   case "text-start":
                     // Start text part
-                    assistantMessageObj.parts.push({
+                    // CRITICAL: Use immutable append to trigger React re-render
+                    appendPart(assistantMessageObj, {
                       type: "text",
                       text: "",
                     })
@@ -888,8 +901,8 @@ export function useChatCore({
                   case "execution-step": {
                     // Bridge for orchestrator-backed SSE: push execution step as a part
                     try {
-                      ensureParts(assistantMessageObj)
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step: (data as any).step,
                       } as any)
@@ -913,7 +926,8 @@ export function useChatCore({
                       })
 
                       // Add interrupt as a special part that UI can render
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'interrupt',
                         interrupt: interruptData,
                       } as any)
@@ -1035,7 +1049,8 @@ export function useChatCore({
 
                   case "reasoning-start":
                     // Start reasoning part
-                    assistantMessageObj.parts.push({
+                    // CRITICAL: Use immutable append to trigger React re-render
+                    appendPart(assistantMessageObj, {
                       type: "reasoning",
                       text: "",
                     })
@@ -1081,7 +1096,8 @@ export function useChatCore({
                       const finishText = typeof (data?.text) === 'string' ? (data.text as string) : ''
                       const hasAnyTextPart = assistantMessageObj.parts.some((p: any) => p.type === 'text' && (p.text || '').trim().length > 0)
                       if (finishText && !hasAnyTextPart) {
-                        assistantMessageObj.parts.push({ type: 'text', text: finishText })
+                        // CRITICAL: Use immutable append to trigger React re-render
+                        appendPart(assistantMessageObj, { type: 'text', text: finishText })
                         assistantMessageObj.content = finishText
                       }
                     } catch {}
@@ -1095,7 +1111,6 @@ export function useChatCore({
                   case "delegation-start":
                     // Convert delegation start to execution step
                     try {
-                      ensureParts(assistantMessageObj)
                       const step = {
                         id: `delegation-start-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -1108,7 +1123,8 @@ export function useChatCore({
                           task: data.task
                         }
                       }
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step,
                       } as any)
@@ -1118,7 +1134,6 @@ export function useChatCore({
                   case "delegation-processing":
                     // Convert delegation processing to execution step
                     try {
-                      ensureParts(assistantMessageObj)
                       const step = {
                         id: `delegation-processing-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -1131,7 +1146,8 @@ export function useChatCore({
                           status: data.status
                         }
                       }
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step,
                       } as any)
@@ -1141,7 +1157,6 @@ export function useChatCore({
                   case "delegation-progress":
                     // Update existing delegation step or create new one
                     try {
-                      ensureParts(assistantMessageObj)
                       const step = {
                         id: `delegation-progress-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -1155,7 +1170,8 @@ export function useChatCore({
                           progress: data.progress
                         }
                       }
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step,
                       } as any)
@@ -1165,7 +1181,6 @@ export function useChatCore({
                   case "delegation-complete":
                     // Convert delegation completion to execution step
                     try {
-                      ensureParts(assistantMessageObj)
                       const step = {
                         id: `delegation-complete-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -1179,7 +1194,8 @@ export function useChatCore({
                           status: 'completed'
                         }
                       }
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step,
                       } as any)
@@ -1189,7 +1205,6 @@ export function useChatCore({
                   case "delegation-error":
                     // Convert delegation error to execution step
                     try {
-                      ensureParts(assistantMessageObj)
                       const step = {
                         id: `delegation-error-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -1203,7 +1218,8 @@ export function useChatCore({
                           status: 'failed'
                         }
                       }
-                      assistantMessageObj.parts.push({
+                      // CRITICAL: Use immutable append to trigger React re-render
+                      appendPart(assistantMessageObj, {
                         type: 'execution-step',
                         step,
                       } as any)
@@ -1279,7 +1295,8 @@ export function useChatCore({
                   textPart.text += line.slice(6)
                   assistantMessageObj.content += line.slice(6)
                 } else {
-                  assistantMessageObj.parts.push({
+                  // CRITICAL: Use immutable append to trigger React re-render
+                  appendPart(assistantMessageObj, {
                     type: "text",
                     text: line.slice(6),
                   })
@@ -1747,7 +1764,7 @@ const getAction = useCallback((id: string) => actionMap.get(id), [actionMap])
     chatInputStatus, // Mapped status for ChatInput component (includes "streaming")
     hasSentFirstMessageRef,
     pendingToolConfirmation,
-    acceptToolConfirmation: () => respondToToolConfirmation(true),
+    acceptToolConfirmation: (editedArgs?: any) => respondToToolConfirmation(true, editedArgs),
     rejectToolConfirmation: () => respondToToolConfirmation(false),
     submit: () => handleSubmit({ preventDefault: () => {} }),
     handleSuggestion: (suggestion: string) => {

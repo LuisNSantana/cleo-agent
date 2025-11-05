@@ -267,20 +267,69 @@ export class GraphBuilder {
 
         // Execute regular tools in parallel
         if (regularCalls.length > 0) {
-          const executionResults = await executeToolsInParallel(
-            regularCalls,
-            toolRuntime,
-            {
+          // Setup tool execution listeners for pipeline visualization
+          const toolStartHandler = (data: any) => {
+            // Emit tool execution start event for pipeline
+            this.eventEmitter.emit('tool.start', {
               agentId: agentConfig.id,
-              maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
-              toolTimeoutMs: 60000
-            },
-            this.eventEmitter as unknown as any
-          )
+              executionId: state.metadata?.executionId,
+              toolName: data.toolName,
+              toolCallId: data.callId,
+              parameters: data.args,
+              timestamp: new Date().toISOString()
+            })
+          }
 
-          for (const result of executionResults) {
-            timeoutManager.recordToolCall()
-            resultMessages.push(result.toolMessage)
+          const toolCompleteHandler = (data: any) => {
+            // Emit tool execution complete event for pipeline  
+            this.eventEmitter.emit('tool.result', {
+              agentId: agentConfig.id,
+              executionId: state.metadata?.executionId,
+              toolName: data.toolName,
+              toolCallId: data.callId,
+              result: data.result,
+              timestamp: new Date().toISOString()
+            })
+          }
+
+          const toolFailHandler = (data: any) => {
+            // Emit tool execution error event for pipeline
+            this.eventEmitter.emit('tool.error', {
+              agentId: agentConfig.id,
+              executionId: state.metadata?.executionId,
+              toolName: data.toolName,
+              toolCallId: data.callId,
+              error: data.error?.message || 'Unknown error',
+              timestamp: new Date().toISOString()
+            })
+          }
+
+          // Register listeners
+          this.eventEmitter.on('tool.executing', toolStartHandler)
+          this.eventEmitter.on('tool.completed', toolCompleteHandler)
+          this.eventEmitter.on('tool.failed', toolFailHandler)
+
+          try {
+            const executionResults = await executeToolsInParallel(
+              regularCalls,
+              toolRuntime,
+              {
+                agentId: agentConfig.id,
+                maxToolCalls: timeoutManager.getStats().budget.maxToolCalls,
+                toolTimeoutMs: 60000
+              },
+              this.eventEmitter as unknown as any
+            )
+
+            for (const result of executionResults) {
+              timeoutManager.recordToolCall()
+              resultMessages.push(result.toolMessage)
+            }
+          } finally {
+            // Cleanup listeners
+            this.eventEmitter.off('tool.executing', toolStartHandler)
+            this.eventEmitter.off('tool.completed', toolCompleteHandler)
+            this.eventEmitter.off('tool.failed', toolFailHandler)
           }
         }
 

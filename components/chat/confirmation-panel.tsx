@@ -56,7 +56,7 @@ export interface ConfirmationItem {
 
 interface ConfirmationPanelProps {
   items: ConfirmationItem[]
-  onResolve: (id: string, approved: boolean) => Promise<void> | void
+  onResolve: (id: string, approved: boolean, editedData?: any) => Promise<void> | void
   loadingId?: string | null
   minimal?: boolean
 }
@@ -136,14 +136,30 @@ function ConfirmationItemCard({
   isLoading 
 }: { 
   item: ConfirmationItem
-  onResolve: (id: string, approved: boolean) => void
+  onResolve: (id: string, approved: boolean, editedData?: any) => void
   isLoading: boolean
 }) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const sensitivity = item.sensitivity || 'medium'
   const config = sensitivityConfig[sensitivity]
 
-  const handleApprove = useCallback(() => onResolve(item.id, true), [item.id, onResolve])
+  // ✅ EDITABLE EMAIL STATE
+  const [editedEmailData, setEditedEmailData] = useState<EmailData>({
+    to: item.preview?.emailData?.to || '',
+    subject: item.preview?.emailData?.subject || '',
+    body: item.preview?.emailData?.body || ''
+  })
+
+  const handleApprove = useCallback(() => {
+    // ✅ Pass edited email data to backend
+    if (item.preview?.emailData) {
+      console.log('📧 [CONFIRMATION] Sending edited email data:', editedEmailData)
+      onResolve(item.id, true, editedEmailData)
+    } else {
+      onResolve(item.id, true)
+    }
+  }, [item.id, onResolve, editedEmailData, item.preview])
+  
   const handleReject = useCallback(() => onResolve(item.id, false), [item.id, onResolve])
 
   // Keyboard shortcuts
@@ -197,44 +213,43 @@ function ConfirmationItemCard({
           </Badge>
         </div>
 
-        {/* Email Content - iOS Gmail Style */}
+        {/* Email Content - iOS Gmail Style with EDITABLE inputs */}
         {emailData ? (
           <div className="px-4 py-3 space-y-3">
-            {/* To Field - iOS style */}
+            {/* To Field - EDITABLE */}
             <div className="flex items-start gap-3 py-2 border-b border-slate-700/30">
-              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Para</span>
-              <div className="flex-1 flex flex-wrap gap-1.5">
-                {(Array.isArray(emailData.to) ? emailData.to : [emailData.to]).map((email, idx) => (
-                  <div key={idx} className="inline-flex items-center gap-1.5 bg-slate-700/50 hover:bg-slate-700 transition-colors rounded-full px-3 py-1">
-                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <span className="text-[10px] font-semibold text-blue-400">
-                        {email?.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <span className="text-sm text-slate-200 font-medium">{email}</span>
-                  </div>
-                ))}
-              </div>
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-2">Para</span>
+              <input
+                type="email"
+                value={Array.isArray(editedEmailData.to) ? editedEmailData.to.join(', ') : editedEmailData.to}
+                onChange={(e) => setEditedEmailData({ ...editedEmailData, to: e.target.value })}
+                className="flex-1 bg-slate-800/50 hover:bg-slate-800 focus:bg-slate-800 border border-slate-700/50 focus:border-blue-500/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition-colors outline-none"
+                placeholder="destinatario@ejemplo.com"
+              />
             </div>
 
-            {/* Subject Field - iOS style */}
+            {/* Subject Field - EDITABLE */}
             <div className="flex items-start gap-3 py-2 border-b border-slate-700/30">
-              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Asunto</span>
-              <div className="flex-1">
-                <p className="text-base font-semibold text-slate-100">{emailData.subject}</p>
-              </div>
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-2">Asunto</span>
+              <input
+                type="text"
+                value={editedEmailData.subject}
+                onChange={(e) => setEditedEmailData({ ...editedEmailData, subject: e.target.value })}
+                className="flex-1 bg-slate-800/50 hover:bg-slate-800 focus:bg-slate-800 border border-slate-700/50 focus:border-blue-500/50 rounded-lg px-3 py-2 text-sm font-semibold text-slate-100 placeholder-slate-500 transition-colors outline-none"
+                placeholder="Asunto del correo"
+              />
             </div>
 
-            {/* Body Field - iOS style */}
+            {/* Body Field - EDITABLE textarea */}
             <div className="flex items-start gap-3 py-2">
-              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-0.5">Mensaje</span>
-              <div className="flex-1">
-                <div className="bg-slate-800/50 rounded-lg p-4 max-h-[300px] overflow-y-auto">
-                  <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                    {emailData.body}
-                  </p>
-                </div>
-              </div>
+              <span className="text-xs text-slate-400 font-medium w-16 flex-shrink-0 pt-2">Mensaje</span>
+              <textarea
+                value={editedEmailData.body}
+                onChange={(e) => setEditedEmailData({ ...editedEmailData, body: e.target.value })}
+                rows={8}
+                className="flex-1 bg-slate-800/50 hover:bg-slate-800 focus:bg-slate-800 border border-slate-700/50 focus:border-blue-500/50 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder-slate-500 whitespace-pre-wrap leading-relaxed transition-colors outline-none resize-y min-h-[150px] max-h-[400px]"
+                placeholder="Escribe tu mensaje aquí..."
+              />
             </div>
           </div>
         ) : (

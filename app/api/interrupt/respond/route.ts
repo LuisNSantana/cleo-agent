@@ -18,11 +18,13 @@ export async function POST(request: NextRequest) {
     console.log('🔍🔍🔍 [INTERRUPT-RESPONSE] Endpoint hit, parsing body...')
     
     const body = await request.json()
-    const { executionId, approved } = body
+    const { executionId, approved, editedArgs } = body
 
     console.log('📥📥📥 [INTERRUPT-RESPONSE] Received user response:', {
       executionId,
       approved,
+      hasEditedArgs: !!editedArgs,
+      editedArgs,
       timestamp: new Date().toISOString(),
       bodyKeys: Object.keys(body)
     })
@@ -44,10 +46,12 @@ export async function POST(request: NextRequest) {
     })
 
     // Convert simple approved/rejected to HumanResponse format
-    const response: HumanResponse = {
-      type: approved ? 'accept' : 'ignore',
-      args: null
-    }
+    // If editedArgs provided, use 'edit' type, otherwise 'accept' or 'ignore'
+    const response: HumanResponse = approved
+      ? (editedArgs ? { type: 'edit', args: editedArgs } : { type: 'accept', args: null })
+      : { type: 'ignore', args: null }
+    
+    console.log('📧 [INTERRUPT-RESPONSE] Constructed HumanResponse:', response)
 
     // Update interrupt with user response
     const updated = await InterruptManager.updateInterruptResponse(

@@ -21,7 +21,8 @@ import { useMemo } from 'react'
 import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from '@/app/components/chat/optimization-insights'
 import { Loader } from '@/components/prompt-kit/loader'
-import { ApprovalMessage } from '@/app/components/chat/approval-message'
+// ❌ REMOVED: ApprovalMessage (duplicate form, using ConfirmationPanel instead)
+// import { ApprovalMessage } from '@/app/components/chat/approval-message'
 
 type MessageAssistantProps = {
   children: string
@@ -101,6 +102,7 @@ export function MessageAssistant({
         .filter((p: any) => p && p.type === 'execution-step' && p.step)
         .map((p: any) => p.step)
         .filter(Boolean)
+      
       return steps
     } catch (error) {
       console.error('Error extracting pipeline steps:', error)
@@ -295,7 +297,12 @@ export function MessageAssistant({
           />
         )}
 
-        {/* Pipeline timeline removed - now handled globally in conversation.tsx */}
+        {/* ✅ FASE 3: Pipeline Timeline with ExpandableStep components */}
+        {pipelineSteps && pipelineSteps.length > 0 && (
+          <div className="mb-3">
+            <PipelineTimeline steps={pipelineSteps} />
+          </div>
+        )}
 
         {toolInvocationParts &&
           toolInvocationParts.length > 0 &&
@@ -319,8 +326,10 @@ export function MessageAssistant({
           </div>
         ) : null}
 
-        {/* Human-in-the-loop interrupt approvals */}
-        {interruptParts && interruptParts.length > 0 && interruptParts.map((interrupt, idx) => (
+        {/* ❌ REMOVED: ApprovalMessage rendering (duplicate form gris claro)
+            ✅ KEPT: ConfirmationPanel in chat.tsx handles all approvals
+        */}
+        {/* {interruptParts && interruptParts.length > 0 && interruptParts.map((interrupt, idx) => (
           <div key={`interrupt-${interrupt.executionId}-${idx}`} className="mb-3">
             <ApprovalMessage 
               interrupt={interrupt as any}
@@ -332,7 +341,7 @@ export function MessageAssistant({
               }}
             />
           </div>
-        ))}
+        ))} */}
 
         {contentNullOrEmpty ? (
           status === 'streaming' && pipelineSteps.length === 0 ? (

@@ -11,7 +11,7 @@ export type PipelineStep = {
   timestamp: string | Date
   agent: string
   agentName?: string  // ✅ Friendly name for custom agents
-  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing' | 'delegation'
+  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'supervising' | 'executing' | 'delegation'
   content: string
   progress?: number
   metadata?: any

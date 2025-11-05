@@ -1567,7 +1567,7 @@ export async function POST(req: Request) {
                     id: `supervision-${Date.now()}`,
                     timestamp: new Date().toISOString(),
                     agent: 'cleo',
-                    action: 'reviewing' as const,
+                    action: 'supervising' as const,
                     content: 'Cleo reviewing and supervising final response for quality and accuracy',
                     metadata: { 
                       synthetic: true, 
@@ -1647,6 +1647,7 @@ export async function POST(req: Request) {
                         { type: 'text', text: finalText },
                         ...persistedParts
                       ]
+                      
                       await storeAssistantMessage({
                         supabase,
                         chatId,
@@ -1658,7 +1659,9 @@ export async function POST(req: Request) {
                         outputTokens: 0,
                         responseTimeMs: Math.max(0, Date.now() - startedAt)
                       })
-                    } catch {}
+                    } catch (err) {
+                      console.error('❌ Failed to persist assistant message:', err)
+                    }
                   }
 
                   closeStream()

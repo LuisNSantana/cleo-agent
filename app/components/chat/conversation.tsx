@@ -4,13 +4,16 @@ import { ScrollButton } from "@/components/prompt-kit/scroll-button"
 import { UIMessage as MessageType } from "ai"
 import { useRef, useMemo, Fragment, useEffect } from "react"
 import { Message } from "./message"
-import { AgentExecutionFlow, type PipelineStep } from './agent-execution-flow'
+// DISABLED: AgentExecutionFlow redundant with PipelineTimeline in message-assistant.tsx
+// import { AgentExecutionFlow } from './agent-execution-flow'
+import type { PipelineStep } from './pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from './optimization-insights'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { TypingIndicator } from "@/components/ui/typing-indicator"
 import { useStickToBottomContext } from "use-stick-to-bottom"
 import { useToolApprovals } from '@/hooks/use-tool-approvals'
-import { ApprovalMessage } from './approval-message'
+// ❌ REMOVED: ApprovalMessage (duplicate form, using ConfirmationPanel instead)
+// import { ApprovalMessage } from './approval-message'
 import type { InterruptState } from '@/lib/agents/types/interrupt'
 
 type ConversationProps = {
@@ -37,11 +40,11 @@ export function Conversation({
     chatId: userId // Use userId as chat context
   })
 
-  // Extract pipeline steps PER MESSAGE instead of globally
+  // Extract pipeline steps per message (from message.parts)
   const messagePipelineSteps = useMemo(() => {
-    const messageSteps: Map<string, PipelineStep[]> = new Map()
+    const map = new Map<string, PipelineStep[]>()
     
-    messages.forEach((msg, msgIndex) => {
+    messages.forEach((msg) => {
       if (!msg.parts || !Array.isArray(msg.parts)) return
       
       const steps: PipelineStep[] = []
@@ -60,6 +63,7 @@ export function Conversation({
 
           const step: PipelineStep = {
             id: stepId,
+            uniqueId: (raw as any).uniqueId, // ✅ UUID from backend
             timestamp: ts,
             agent: raw.agent,
             agentName: (raw as any).agentName,
@@ -72,24 +76,42 @@ export function Conversation({
         }
       })
 
-      // Sort by timestamp and keep steps in order; do not over-dedupe by agent/action (keeps majority of steps)
-      const uniqueSteps = steps
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        .filter((step, index, arr) => arr.findIndex(s => s.id === step.id) === index)
+      // Sort by timestamp and keep steps in order
+      const sortedSteps = steps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      
+      // ✅ IDEMPOTENT DEDUPLICATION (LangGraph Pattern)
+      // Use Set for O(1) lookup by uniqueId (UUID) - recommended by LangGraph docs
+      const seenIds = new Set<string>()
+      const uniqueSteps = sortedSteps.filter((step) => {
+        // Prefer uniqueId (UUID) for deduplication if available
+        const dedupeKey = step.uniqueId || step.id
+        
+        if (seenIds.has(dedupeKey)) {
+          console.log(`🔍 [DEDUP] Filtered duplicate: ${step.action} (${dedupeKey.substring(0, 20)}...)`)
+          return false // Skip duplicate
+        }
+        
+        seenIds.add(dedupeKey)
+        return true // Keep unique step
+      })
       
       if (uniqueSteps.length > 0) {
-        messageSteps.set(msg.id, uniqueSteps)
+        map.set(msg.id, uniqueSteps)
+        const dedupedCount = steps.length - uniqueSteps.length
+        if (dedupedCount > 0) {
+          console.log(`🧹 [PIPELINE] Filtered ${dedupedCount} duplicates (${steps.length} → ${uniqueSteps.length})`)
+        }
         console.log(`📊 [FRONTEND DEBUG] Message ${msg.id} has ${uniqueSteps.length} pipeline steps`)
       }
     })
     
-    return messageSteps
+    return map
   }, [messages])
 
   // Get all steps for global optimization status (backwards compatibility)
   const allActivePipelineSteps = useMemo(() => {
     const allSteps: PipelineStep[] = []
-    messagePipelineSteps.forEach(steps => allSteps.push(...steps))
+    messagePipelineSteps.forEach((steps: PipelineStep[]) => allSteps.push(...steps))
     return allSteps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [messagePipelineSteps])
 
@@ -265,19 +287,16 @@ function ConversationContent({
 
             return (
               <Fragment key={message.id}>
+                {/* DISABLED: AgentExecutionFlow redundant with PipelineTimeline in message-assistant.tsx */}
                 {/* Show pipeline BEFORE the final assistant response (only if we have steps) */}
-                {shouldShowPipelineBeforeThisMessage && (
+                {/* {shouldShowPipelineBeforeThisMessage && (
                   <div className="group flex w-full max-w-4xl flex-col items-start gap-3 px-6 pb-3">
                     <AgentExecutionFlow 
                       steps={currentMessageSteps} 
                       mode={optimizationData?.directResponse ? 'direct' : 'delegated'}
                     />
-                    {/* DISABLED: System Optimizations widget to reduce UI clutter */}
-                    {/* {optimizationData && (
-                      <OptimizationInsights pipeline={optimizationData} />
-                    )} */}
                   </div>
-                )}
+                )} */}
 
                 <Message
                   id={message.id}
@@ -301,31 +320,31 @@ function ConversationContent({
             )
           })}
 
+          {/* DISABLED: AgentExecutionFlow redundant with PipelineTimeline in message-assistant.tsx */}
           {/* Pipeline LIVE: Show when streaming OR waiting for response (no assistant message yet OR streaming) */}
           {(status === "submitted" || (status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "user")) && (
             <div className="group min-h-scroll-anchor flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
-              {currentMessageSteps.length > 0 ? (
-                <AgentExecutionFlow steps={currentMessageSteps} />
-              ) : (
-                <Loader />
-              )}
+              <Loader />
             </div>
           )}
 
+          {/* DISABLED: AgentExecutionFlow redundant with PipelineTimeline in message-assistant.tsx */}
           {/* Pipeline LIVE during streaming: Show when assistant message is streaming */}
-          {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length > 0 && (
+          {/* {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length > 0 && (
             <div className="group flex w-full max-w-4xl flex-col items-start gap-2 px-6 pb-3">
               <AgentExecutionFlow steps={currentMessageSteps} />
             </div>
-          )}
+          )} */}
 
           {/* Show TypingIndicator when streaming but no content yet */}
           {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length === 0 && (
             <TypingIndicator />
           )}
 
-          {/* Human-in-the-Loop: Show approval requests */}
-          {chatInterrupts.length > 0 && (
+          {/* ❌ REMOVED: ApprovalMessage (duplicate form gris claro)
+              ✅ KEPT: ConfirmationPanel (form oscuro con editable inputs) in chat.tsx
+          */}
+          {/* {chatInterrupts.length > 0 && (
             <div className="w-full max-w-4xl px-6 pb-3">
               {chatInterrupts.map(interrupt => (
                 <ApprovalMessage
@@ -340,7 +359,7 @@ function ConversationContent({
                 />
               ))}
             </div>
-          )}
+          )} */}
 
           {/* Simple In-Chat Confirmation */}
           {/* Removed legacy InChatConfirmation (now handled via pendingToolConfirmation modal) */}

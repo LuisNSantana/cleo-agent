@@ -8,7 +8,7 @@
 
 import type { PipelineStep } from '@/app/components/chat/agent-execution-flow'
 
-type Action = 'routing' | 'analyzing' | 'thinking' | 'delegating' | 'executing' | 'completing' | 'responding' | 'reviewing' | 'delegation'
+type Action = 'routing' | 'analyzing' | 'thinking' | 'delegating' | 'executing' | 'completing' | 'responding' | 'reviewing' | 'supervising' | 'delegation'
 
 interface MessageContext {
   // Contexto de la conversación
@@ -174,6 +174,16 @@ const ACTION_MESSAGES: Record<Action, MessageTemplate> = {
         return 'Verificando que la respuesta sea completa y precisa…'
       }
       return 'Haciendo una última verificación antes de responder…'
+    }
+  },
+  
+  supervising: {
+    default: 'Supervisando calidad…',
+    withContext: (ctx) => {
+      if (ctx.delegationCompleted) {
+        return 'Cleo supervisando la calidad de la respuesta final…'
+      }
+      return 'Verificando precisión y completitud de la respuesta…'
     }
   },
   
@@ -380,6 +390,7 @@ export function getProgressMessage(
       executing: 'Ejecutando, casi terminamos…',
       responding: 'Organizando la respuesta…',
       reviewing: 'Revisando los detalles finales…',
+      supervising: 'Supervisando calidad de la respuesta…',
       completing: 'Finalizando el proceso…'
     }
     return messages[action] || getContextualMessage(action)

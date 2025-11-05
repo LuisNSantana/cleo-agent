@@ -48,10 +48,11 @@ export type AgentRole =
 // Agent execution types
 export interface ExecutionStep {
   id: string
+  uniqueId?: string // ✅ UUID for idempotent deduplication (LangGraph pattern)
   timestamp: Date
   agent: string
   agentName?: string // ✅ Friendly name for UI (custom agents support)
-  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt'
+  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt' | 'executing'
   content: string
   progress: number
   metadata?: any

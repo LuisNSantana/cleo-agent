@@ -9,6 +9,33 @@
 import type { ExecutionStep } from '@/lib/agents/types'
 import { getCurrentUserLocale } from '@/lib/server/request-context'
 import { generateSemanticStepId, generateDelegationId } from './id-generator'
+import { createHash } from 'crypto'
+
+/**
+ * Genera un ID determinístico para deduplicación idempotente.
+ * Basado en: agentId + nodeType + metadata.nodeId + metadata.stage
+ * 
+ * Esto asegura que el mismo evento lógico siempre genere el mismo uniqueId,
+ * permitiendo deduplicación real sin falsos positivos.
+ */
+function generateDeterministicUniqueId(
+  agentId: string,
+  nodeType: string,
+  metadata?: Record<string, unknown>
+): string {
+  const parts = [
+    agentId,
+    nodeType,
+    metadata?.nodeId || 'default',
+    metadata?.stage || 'unknown',
+    // Incluir execId si está disponible para diferenciar entre ejecuciones
+    (metadata as any)?.executionId || 'global'
+  ]
+  
+  const combined = parts.join(':')
+  // Usar hash SHA-256 truncado a 16 caracteres para IDs compactos pero únicos
+  return createHash('sha256').update(combined).digest('hex').substring(0, 16)
+}
 
 export interface StepBuilderConfig {
   locale?: 'en' | 'es' | 'fr' | 'de' // User's preferred language (auto-detected from browser if not provided)
@@ -102,43 +129,51 @@ const AGENT_EXPERTISE: Record<string, { es: string; en: string; fr: string; de: 
 
 /**
  * Mensajes humanizados por tipo de nodo (español)
+ * ✅ UX Research: Mensajes más cálidos, contextuales y explicativos
  */
 const NODE_MESSAGES_ES: Record<string, (config: StepBuilderConfig) => string> = {
   router: () => {
-    return '🧭 Analizando tu solicitud para determinar el mejor enfoque…'
+    // ✅ Más humano: explicar QUÉ está pasando y POR QUÉ
+    const messages = [
+      '🎯 Entendiendo tu mensaje y planificando la mejor forma de ayudarte…',
+      '🧭 Analizando tu solicitud para elegir el especialista ideal…',
+      '💡 Revisando tu petición y preparando una respuesta personalizada…'
+    ]
+    // Rotar mensajes para variedad (basado en timestamp)
+    return messages[Date.now() % messages.length]
   },
   
   agent: (config) => {
     const agentName = config.agentName || config.agentId
     const expertise = AGENT_EXPERTISE[config.agentId]?.es
     if (expertise) {
-      return `🤖 ${agentName} procesando (experto en ${expertise})…`
+      return `🤖 ${agentName} trabajando en ${expertise}… Esto podría tomar unos segundos`
     }
-    return `🤖 ${agentName} procesando tu solicitud…`
+    return `🤖 ${agentName} procesando tu solicitud… Un momento`
   },
   
   delegationAgent: (config) => {
     const targetName = config.targetAgentName || config.targetAgentId || 'especialista'
     const expertise = config.targetAgentId ? AGENT_EXPERTISE[config.targetAgentId]?.es : null
     if (expertise) {
-      return `🤝 Delegando a ${targetName}, experto en ${expertise}…`
+      return `🤝 Identificando al miembro del equipo más apropiado para esta tarea…\nDelegando a ${targetName}, experto en ${expertise}`
     }
-    return `🤝 Delegando a ${targetName}…`
+    return `🤝 Transfiriendo a ${targetName} para mejor asistencia…`
   },
   
   tools: (config) => {
     if (config.toolName) {
-      return `🔧 Usando herramienta: ${humanizeToolName(config.toolName, 'es')}…`
+      return `🔧 Ejecutando: ${humanizeToolName(config.toolName, 'es')}… Dame un momento`
     }
     if (config.toolCount && config.toolCount > 1) {
-      return `🔧 Ejecutando ${config.toolCount} herramientas en paralelo…`
+      return `🔧 Ejecutando ${config.toolCount} operaciones en paralelo… Esto será rápido`
     }
-    return '🔧 Ejecutando herramientas necesarias…'
+    return '🔧 Realizando operaciones necesarias… Casi listo'
   },
   
   end: (config) => {
     const agentName = config.agentName || config.agentId
-    return `✅ ${agentName} completó su trabajo`
+    return `✅ ${agentName} completó su trabajo con éxito`
   },
   
   // Fallback for unknown node types
@@ -385,17 +420,25 @@ export function buildHumanizedStep(config: StepBuilderConfig): ExecutionStep {
   // Determine action type based on node type
   const action = mapNodeTypeToAction(config.nodeType)
   
+  // ✅ Calculate semantic progress based on action type (0-100)
+  const progress = calculateProgressForAction(action, config.metadata)
+  
   // Generate semantic ID (Phase 2)
   const stepId = generateSemanticStepId(config.agentId, config.nodeType)
   
+  // ✅ CRITICAL: Generate deterministic uniqueId for idempotent deduplication
+  // Same logical event = same uniqueId (prevents duplicates from LangGraph streaming)
+  const uniqueId = generateDeterministicUniqueId(config.agentId, config.nodeType, config.metadata)
+  
   return {
     id: stepId, // ✅ Phase 2: Semantic IDs (e.g., "cleo-supervisor:router:1762348250879")
+    uniqueId, // ✅ NEW: Deterministic ID for deduplication (e.g., "a4b3c2d1e5f6g7h8")
     timestamp: new Date(),
     agent: config.agentId,
     agentName: config.agentName,
     action,
     content: message,
-    progress: 0,
+    progress, // ✅ Real progress value (not hardcoded 0)
     metadata: {
       canonical: true, // ✅ Flag to prevent re-enrichment
       nodeType: config.nodeType,
@@ -410,16 +453,57 @@ export function buildHumanizedStep(config: StepBuilderConfig): ExecutionStep {
  */
 function mapNodeTypeToAction(
   nodeType: string
-): 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt' {
+): 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'interrupt' | 'executing' {
   const actionMap: Record<string, ExecutionStep['action']> = {
     router: 'routing',
     agent: 'analyzing',
     delegationAgent: 'delegating',
-    tools: 'analyzing',
+    tools: 'executing', // ✅ Changed from 'analyzing' to 'executing'
     end: 'completing',
   }
   
   return actionMap[nodeType] || 'analyzing'
+}
+
+/**
+ * Calculate semantic progress based on action type and stage.
+ * Returns value 0-100 representing completion percentage.
+ * 
+ * Progress tiers:
+ * - routing: 15-25% (initial routing phase)
+ * - analyzing: 30-50% (processing/thinking phase)
+ * - delegating: 55-75% (delegation/tool execution phase)
+ * - completing: 100% (done)
+ * 
+ * Substages (entered vs completed) add granularity within each tier.
+ */
+function calculateProgressForAction(
+  action: ExecutionStep['action'],
+  metadata?: any
+): number {
+  const stage = metadata?.stage // 'entered' or 'completed'
+  
+  // Base progress per action type
+  const progressMap: Record<string, { base: number; completed: number }> = {
+    routing: { base: 15, completed: 25 },
+    analyzing: { base: 30, completed: 50 },
+    thinking: { base: 35, completed: 55 },
+    delegating: { base: 55, completed: 75 },
+    executing: { base: 60, completed: 80 },
+    responding: { base: 85, completed: 95 },
+    completing: { base: 100, completed: 100 },
+    interrupt: { base: 0, completed: 0 }, // Special case
+  }
+  
+  const tier = progressMap[action] || { base: 20, completed: 40 }
+  
+  // If stage is 'completed', use higher progress value
+  if (stage === 'completed') {
+    return tier.completed
+  }
+  
+  // Otherwise use base (entered) progress
+  return tier.base
 }
 
 /**

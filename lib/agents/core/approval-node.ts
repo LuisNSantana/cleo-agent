@@ -50,6 +50,48 @@ function requiresApproval(toolName: string): boolean {
 }
 
 /**
+ * Normalize tool arguments from generic UI fields to tool-specific fields
+ * Example: UI uses 'body', but sendGmailMessage expects 'text'
+ */
+function normalizeToolArgs(toolName: string, args: any): any {
+  if (!args) return args
+  
+  // sendGmailMessage: body → text (and strip HTML if present)
+  if (toolName === 'sendGmailMessage' && args.body !== undefined) {
+    const { body, ...rest } = args
+    console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'text' for ${toolName}`)
+    
+    // Strip HTML tags if present (convert <p>text</p> → text)
+    let plainText = body
+    if (typeof body === 'string' && (body.includes('<') || body.includes('&lt;'))) {
+      // Unescape HTML entities first
+      plainText = body
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+      
+      // Remove HTML tags
+      plainText = plainText.replace(/<[^>]*>/g, '')
+      
+      // Clean up extra whitespace
+      plainText = plainText
+        .replace(/\n\s*\n/g, '\n\n')  // Multiple newlines → double newline
+        .trim()
+      
+      console.log(`🧹 [APPROVAL-NODE] Stripped HTML from email body`)
+    }
+    
+    return { ...rest, text: plainText }
+  }
+  
+  // Add more tool-specific mappings here as needed
+  
+  return args
+}
+
+/**
  * Tool Approval Node
  * 
  * This node is inserted between the agent and the tool execution node.
@@ -81,13 +123,20 @@ export function createToolApprovalNode() {
 
     const toolCalls = lastMessage.tool_calls
     
-    // CRITICAL FIX: Check if tool calls have already been approved
-    // When resuming from interrupt(), LangGraph re-executes this node with the same state
-    // We must detect if we're in a "post-approval resume" to avoid re-interrupting
-    const hasApprovedMetadata = toolCalls.some((tc: any) => tc.__approval_status === 'approved')
+    // CRITICAL FIX: Check if these specific tool calls have already been approved
+    // Use executionId + tool_call_ids to create a unique tracking key
+    const executionId = state.metadata?.executionId || 'unknown'
+    const toolCallIds = toolCalls.map((tc: any) => tc.id || 'no-id').join(',')
+    const approvalKey = `${executionId}:${toolCallIds}`
     
-    if (hasApprovedMetadata) {
-      console.log('✅ [APPROVAL-NODE] Tool calls already approved, proceeding to execution')
+    // Track approved tool calls in state metadata (survives LangGraph state updates)
+    if (!state.metadata) (state as any).metadata = {}
+    if (!state.metadata.__approvedToolCalls) (state.metadata as any).__approvedToolCalls = new Set<string>()
+    
+    const approvedSet = (state.metadata as any).__approvedToolCalls as Set<string>
+    
+    if (approvedSet.has(approvalKey)) {
+      console.log('✅ [APPROVAL-NODE] Tool calls already approved (key:', approvalKey, '), skipping re-approval')
       return state
     }
     
@@ -137,10 +186,24 @@ export function createToolApprovalNode() {
 
     // LangGraph interrupt() pauses the graph and waits for Command(resume=...)
     // The interrupt() function returns the value passed in Command(resume=...)
-    const response = interrupt(interruptPayload) as ToolApprovalResponse
+    // ExecutionManager passes HumanResponse, so we need to convert it
+    const humanResponse = interrupt(interruptPayload) as any
+    
+    // Convert HumanResponse to ToolApprovalResponse
+    const response: ToolApprovalResponse = {
+      action: humanResponse.type === 'accept' ? 'approve'
+        : humanResponse.type === 'ignore' ? 'reject'
+        : humanResponse.type === 'edit' ? 'edit'
+        : 'approve', // 'response' type defaults to approve
+      edits: humanResponse.type === 'edit' && humanResponse.args ? [{
+        id: toolCall.id || 'unknown',
+        args: normalizeToolArgs(toolCall.name, humanResponse.args)
+      }] : undefined,
+      reason: humanResponse.type === 'ignore' ? 'User rejected' : undefined
+    }
 
-    console.log(`▶️ [APPROVAL-NODE] Received approval response:`, response?.action)
-    logger.info('APPROVAL-NODE', 'Approval response received', { action: response?.action })
+    console.log(`▶️ [APPROVAL-NODE] Received approval response:`, response.action, 'with edits:', !!response.edits)
+    logger.info('APPROVAL-NODE', 'Approval response received', { action: response.action, hasEdits: !!response.edits })
 
     // Handle rejection
     if (response.action === 'reject') {
@@ -198,26 +261,11 @@ export function createToolApprovalNode() {
     console.log(`✅ [APPROVAL-NODE] User approved tool execution, continuing...`)
     logger.info('APPROVAL-NODE', 'Tool execution approved by user')
     
-    // CRITICAL FIX: Mark tool calls as approved to prevent re-interrupt on resume
-    // When LangGraph resumes after interrupt(), it re-executes this node
-    // We add metadata to signal "already approved, don't ask again"
-    const approvedToolCalls = toolCalls.map((tc: any) => ({
-      ...tc,
-      __approval_status: 'approved' // Internal marker for approval-node
-    }))
+    // CRITICAL FIX: Mark these tool calls as approved in state metadata
+    // This prevents re-approval when LangGraph re-executes this node after resume
+    approvedSet.add(approvalKey)
+    console.log(`✅ [APPROVAL-NODE] Marked tool calls as approved (key: ${approvalKey})`)
     
-    const messagesWithApprovalMarker = [...state.messages]
-    const lastMsgIndex = messagesWithApprovalMarker.length - 1
-    const approvedMessage = new AIMessage({
-      content: (lastMessage as AIMessage).content,
-      tool_calls: approvedToolCalls,
-      id: (lastMessage as AIMessage).id
-    })
-    messagesWithApprovalMarker[lastMsgIndex] = approvedMessage
-    
-    return {
-      ...state,
-      messages: messagesWithApprovalMarker
-    }
+    return state
   }
 }

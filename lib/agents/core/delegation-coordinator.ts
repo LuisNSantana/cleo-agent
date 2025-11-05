@@ -233,7 +233,8 @@ export class DelegationCoordinator {
       logger.debug(`🎯 [DELEGATION] Target agent type: ${isSubAgent ? 'Sub-Agent' : 'Main Agent'} (${(targetAgentConfig as any).name})`)
       const targetAgentName = (targetAgentConfig as any).name
 
-      // Track in parent execution steps
+      // ✅ CONSOLIDATED DELEGATION STEPS: Only 1 initial step instead of 7+
+      // Track in parent execution steps (ONLY ONE STEP for delegation start)
       if (delegationData.sourceExecutionId) {
         const sourceExecution = this.executionRegistry.get(delegationData.sourceExecutionId)
         if (sourceExecution) {
@@ -245,64 +246,23 @@ export class DelegationCoordinator {
             agent: delegationData.sourceAgent,
             agentName: sourceMetadata.name,
             action: 'delegating',
-            content: `${sourceMetadata.name} delegating to ${targetAgentName}: ${delegationData.task}`,
+            content: `${sourceMetadata.name} delegó tarea a ${targetAgentName}`,
             progress: 0,
             metadata: {
               sourceAgent: delegationData.sourceAgent,
               delegatedTo: delegationData.targetAgent,
               task: delegationData.task,
-              status: 'requested',
-              stage: 'initializing'
+              status: 'in_progress',
+              stage: 'processing'
             }
           })
         }
       }
 
-      // Progress events: initializing
-      this.eventEmitter.emit('delegation.progress', {
-        sourceAgent: delegationData.sourceAgent,
-        targetAgent: delegationData.targetAgent,
-        task: delegationData.task,
-        stage: 'initializing',
-        status: 'requested',
-        message: `Starting delegation to ${targetAgentName}`,
-        agentName: targetAgentName,
-        progress: 0,
-        sourceExecutionId: delegationData.sourceExecutionId
-      })
-      emitBrowserEvent('delegation-progress', {
-        sourceAgent: delegationData.sourceAgent,
-        targetAgent: delegationData.targetAgent,
-        task: delegationData.task,
-        stage: 'initializing',
-        status: 'requested',
-        message: `Starting delegation to ${delegationData.targetAgent}`,
-        progress: 0
-      })
-
-      // Accepted
-      if (delegationData.sourceExecutionId) {
-        const sourceExecution = this.executionRegistry.get(delegationData.sourceExecutionId)
-        if (sourceExecution && (sourceExecution as any).steps) {
-          ;(sourceExecution as any).steps.push({
-            id: `delegation_accepted_${Date.now()}`,
-            timestamp: new Date(),
-            agent: delegationData.targetAgent,
-            agentName: targetAgentName,
-            action: 'delegating',
-            content: `${targetAgentName} accepted the task`,
-            progress: 10,
-            metadata: {
-              sourceAgent: delegationData.sourceAgent,
-              delegatedTo: delegationData.targetAgent,
-              task: delegationData.task,
-              status: 'accepted',
-              stage: 'analyzing'
-            }
-          })
-        }
-      }
-
+      // ❌ REMOVED: Redundant "analyzing/accepted" progress emission
+      // This creates duplicate "Analyzing" steps that confuse users
+      // The initial delegation step (line ~244) is sufficient
+      /*
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
         targetAgent: delegationData.targetAgent,
@@ -323,6 +283,7 @@ export class DelegationCoordinator {
         message: `${targetAgentName} accepts the task`,
         progress: 10
       })
+      */
 
       // Build execution context for delegation
       const NIL_UUID = '00000000-0000-0000-0000-000000000000'
@@ -390,7 +351,9 @@ export class DelegationCoordinator {
 
       logger.info(`🚀 [DELEGATION] Executing ${targetAgentName} with delegated task`)
 
-      // Progress: processing
+      // ❌ REMOVED: Redundant "processing" progress emission
+      // User already knows task is in progress from initial step
+      /*
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
         targetAgent: delegationData.targetAgent,
@@ -411,6 +374,7 @@ export class DelegationCoordinator {
         message: `${targetAgentName} is processing the task`,
         progress: 25
       })
+      */
 
       let delegationResult: ExecutionResult
 
@@ -440,6 +404,9 @@ export class DelegationCoordinator {
           }
         }
 
+        // ❌ REMOVED: Redundant "researching/analyzing" progress for sub-agents
+        // The steps.push() above already added this info to the pipeline
+        /*
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
           targetAgent: delegationData.targetAgent,
@@ -460,6 +427,7 @@ export class DelegationCoordinator {
           message: `Sub-agent ${delegationData.targetAgent} analyzing context`,
           progress: 40
         })
+        */
 
         const sub = targetAgentConfig as SubAgent
         const subAgentConfig: AgentConfig = {
@@ -504,6 +472,9 @@ export class DelegationCoordinator {
           }
         }
 
+        // ❌ REMOVED: Redundant "synthesizing/executing" progress for sub-agents
+        // The steps.push() above already shows tool execution
+        /*
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
           targetAgent: delegationData.targetAgent,
@@ -524,6 +495,7 @@ export class DelegationCoordinator {
           message: `Sub-agent executing specialized tools`,
           progress: 70
         })
+        */
 
         const subAgentTimeoutConfig = this.runtime.maxExecutionMsSpecialist
         const SUBAGENT_TIMEOUT = Number.isFinite(subAgentTimeoutConfig) && subAgentTimeoutConfig > 0 ? subAgentTimeoutConfig : 0
@@ -577,6 +549,10 @@ export class DelegationCoordinator {
             })
           }
         }
+        
+        // ❌ REMOVED: Redundant "researching/executing tools" progress for main agents
+        // The steps.push() above already shows this
+        /*
         this.eventEmitter.emit('delegation.progress', {
           sourceAgent: delegationData.sourceAgent,
           targetAgent: delegationData.targetAgent,
@@ -597,6 +573,7 @@ export class DelegationCoordinator {
           message: `${targetAgentName} executing tools`,
           progress: 60
         })
+        */
 
         const delegationTimeoutConfig = this.runtime.delegationTimeoutMs
         const DELEGATION_TIMEOUT = Number.isFinite(delegationTimeoutConfig) && delegationTimeoutConfig > 0 ? delegationTimeoutConfig : 0
@@ -653,6 +630,11 @@ export class DelegationCoordinator {
           })
         }
       }
+      
+      // ❌ REMOVED: Redundant "finalizing" progress emission
+      // The completion event (delegation.completed) is sufficient
+      // No need for intermediate "finalizing" state
+      /*
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: delegationData.sourceAgent,
         targetAgent: delegationData.targetAgent,
@@ -673,6 +655,7 @@ export class DelegationCoordinator {
         message: `${targetAgentName} finalizing response`,
         progress: 90
       })
+      */
 
       if (delegationData.sourceExecutionId) {
         const sourceExecution = this.executionRegistry.get(delegationData.sourceExecutionId)

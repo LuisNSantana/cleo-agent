@@ -6,13 +6,19 @@ import { useMemo, useState, useEffect } from "react"
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react"
 import { enrichStepWithContextualMessage, getProgressMessage } from "@/lib/agents/ui-messaging"
+import { ExpandableStep } from "./expandable-step"
+import { ReasoningViewer, type ReasoningBlock } from "./reasoning-viewer"
+import { ToolDetails } from "./tool-details"
+
+export type Action = 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'supervising' | 'executing' | 'delegation'
 
 export type PipelineStep = {
   id: string
+  uniqueId?: string // ✅ UUID for idempotent deduplication
   timestamp: string | Date
   agent: string
   agentName?: string  // ✅ Friendly name for custom agents
-  action: 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'executing' | 'delegation'
+  action: Action
   content: string
   progress?: number
   metadata?: any
@@ -27,7 +33,7 @@ function formatTime(ts: string | Date) {
   }
 }
 
-function actionLabel(action: PipelineStep['action']) {
+function actionLabel(action: Action): string {
   switch (action) {
     case 'routing': return '🎯 Routing'
     case 'analyzing': return '🔍 Analyzing'
@@ -37,9 +43,64 @@ function actionLabel(action: PipelineStep['action']) {
     case 'responding': return '💬 Responding'
     case 'completing': return '✅ Completing'
     case 'reviewing': return '👁️ Reviewing'
+    case 'supervising': return '🔍 Supervising'
     case 'executing': return '🔧 Executing'
     default: return String(action).charAt(0).toUpperCase() + String(action).slice(1)
   }
+}
+
+/**
+ * Get semantic color for action type (subtle accent for visual distinction)
+ * ✨ UPDATED: Modern gradient accents inspired by Linear UI redesign
+ */
+function actionColor(action: Action): string {
+  switch (action) {
+    case 'routing': return 'border-l-blue-500/60 dark:border-l-blue-400/50'
+    case 'analyzing': return 'border-l-purple-500/60 dark:border-l-purple-400/50'
+    case 'thinking': return 'border-l-indigo-500/60 dark:border-l-indigo-400/50'
+    case 'delegating': return 'border-l-orange-500/60 dark:border-l-orange-400/50'
+    case 'delegation': return 'border-l-orange-400/60 dark:border-l-orange-300/50'
+    case 'responding': return 'border-l-green-500/60 dark:border-l-green-400/50'
+    case 'completing': return 'border-l-emerald-500/60 dark:border-l-emerald-400/50'
+    case 'reviewing': return 'border-l-yellow-500/60 dark:border-l-yellow-400/50'
+    case 'supervising': return 'border-l-cyan-500/60 dark:border-l-cyan-400/50'
+    case 'executing': return 'border-l-pink-500/60 dark:border-l-pink-400/50'
+    default: return 'border-l-foreground/30'
+  }
+}
+
+/**
+ * Check if a step is completed
+ */
+function isStepCompleted(step: PipelineStep): boolean {
+  return step.action === 'completing' || 
+         (typeof step.progress === 'number' && step.progress >= 100)
+}
+
+/**
+ * ✨ Typing Indicator Component - Modern 3-dot pulse animation
+ * Based on Fuselab Creative chatbot UX patterns
+ */
+function TypingIndicator() {
+  return (
+    <div className="flex gap-1 items-center px-3 py-2">
+      <motion.div
+        className="w-2 h-2 rounded-full bg-muted-foreground/40"
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 1.4, repeat: Infinity, delay: 0 }}
+      />
+      <motion.div
+        className="w-2 h-2 rounded-full bg-muted-foreground/40"
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 1.4, repeat: Infinity, delay: 0.2 }}
+      />
+      <motion.div
+        className="w-2 h-2 rounded-full bg-muted-foreground/40"
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 1.4, repeat: Infinity, delay: 0.4 }}
+      />
+    </div>
+  )
 }
 
 /**
@@ -90,10 +151,20 @@ function StepContent({ step }: { step: PipelineStep }) {
 }
 
 export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; className?: string }) {
-  const [isExpanded, setIsExpanded] = useState(false) // Default collapsed to reduce UI footprint
+  // ✅ Auto-expand si hay menos de 5 steps (mensajes recientes)
+  const [isExpanded, setIsExpanded] = useState((steps || []).length > 0 && (steps || []).length <= 5)
 
   const normalized = useMemo(() => {
-    return (steps || []).map(s => {
+    const filtered = (steps || [])
+      .filter(s => {
+        // ❌ Filter out "reviewing" phantom steps (legacy UI bug)
+        if (s.action === 'reviewing') {
+          return false
+        }
+        return true
+      })
+    
+    const mapped = filtered.map(s => {
       // Map stage metadata to proper actions for better visualization
       let mappedAction = s.action
       if (s.metadata?.stage) {
@@ -135,6 +206,8 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
       
       return mappedStep
     })
+    
+    return mapped
   }, [steps])
 
   // Keep majority of steps; only dedupe by exact id to avoid dropping stages
@@ -179,7 +252,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
           [latestStep.id]: progressMsg
         }))
       }
-    }, 5000) // Check cada 5 segundos
+    }, 5000) // Check every 5 seconds
     
     return () => clearInterval(interval)
   }, [latestStep])
@@ -201,8 +274,28 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
       <div className="bg-gradient-to-b from-background/60 to-transparent pointer-events-none absolute inset-0" />
       <div className="relative p-2 sm:p-3">
         <div className="flex items-center justify-between mb-1.5">
-          <div className="text-muted-foreground/80 text-[11px] uppercase tracking-wide font-medium">
-            ⛓️ Pipeline {isExpanded ? `(${uniqueSteps.length})` : `(collapsed)`}
+          <div className="text-muted-foreground/80 text-[11px] uppercase tracking-wide font-medium flex items-center gap-2">
+            {/* ✅ Subtle pulse on active steps */}
+            <motion.span
+              animate={latestStep && !isStepCompleted(latestStep) ? { 
+                opacity: [1, 0.5, 1] 
+              } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            >
+              ⛓️
+            </motion.span>
+            <span>Pipeline</span>
+            {/* ✅ Step counter like Pokee workflow UI */}
+            {uniqueSteps.length > 0 && (
+              <motion.span 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/40 text-[10px] font-mono"
+              >
+                <span className="text-foreground/70">{uniqueSteps.length}</span>
+                <span className="text-muted-foreground/60">pasos</span>
+              </motion.span>
+            )}
           </div>
           {hasSteps && (
             <button
@@ -226,70 +319,232 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
         {!isExpanded && latestStep && (
           <div aria-live="polite" aria-atomic="true">
             <AnimatePresence initial={false} mode="popLayout">
-              <motion.div
-                key={latestStep.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ type: 'spring', duration: 0.22, bounce: 0 }}
-                className="bg-card/30 border-border/60 group relative grid grid-cols-[auto_auto_1fr_auto] items-start gap-2 rounded-lg border p-2 pr-2.5 text-xs sm:text-sm"
-              >
-                <StatusDot action={latestStep.action} />
-                <AgentAvatar agentId={latestStep.agent} />
-                <div className="min-w-0">
-                  <div className="text-foreground/90 truncate font-medium">
-                    {actionLabel(latestStep.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={latestStep.agent} agentName={latestStep.agentName} /></span>
+              {(() => {
+                const meta = getAgentMetadata(latestStep.agent)
+                const reasoningBlocks: ReasoningBlock[] = latestStep.metadata?.reasoningBlocks || []
+                const toolName = latestStep.metadata?.toolName
+                const toolParameters = latestStep.metadata?.toolParameters
+                const toolResult = latestStep.metadata?.toolResult
+                const toolError = latestStep.metadata?.toolError
+                const toolStatus = latestStep.metadata?.toolStatus || (toolError ? 'error' : 'success')
+                
+                const otherMetadata = latestStep.metadata ? Object.fromEntries(
+                  Object.entries(latestStep.metadata).filter(([key]) => 
+                    !['reasoningBlocks', 'toolName', 'toolParameters', 'toolResult', 'toolError', 'toolStatus', 'reasoning', 'canonical', 'stage'].includes(key)
+                  )
+                ) : {}
+                
+                const stepChildren = (
+                  <div className="space-y-3 mt-2">
+                    {reasoningBlocks.length > 0 && (
+                      <ReasoningViewer blocks={reasoningBlocks} />
+                    )}
+                    
+                    {toolName && (
+                      <ToolDetails
+                        toolName={toolName}
+                        parameters={toolParameters}
+                        result={toolResult}
+                        error={toolError}
+                        status={toolStatus as any}
+                      />
+                    )}
                   </div>
-                  {(progressiveContent[latestStep.id] || latestStep.content) ? (
-                    <div className="line-clamp-1">
-                      <StepContent step={{
-                        ...latestStep,
-                        content: progressiveContent[latestStep.id] || latestStep.content
-                      }} />
-                    </div>
-                  ) : null}
-                </div>
-                <div className="text-muted-foreground/70 whitespace-nowrap pl-1 font-mono text-[10px] sm:text-xs">
-                  {formatTime(latestStep.timestamp)}
-                </div>
-              </motion.div>
+                )
+                
+                return (
+                  <ExpandableStep
+                    key={latestStep.id}
+                    id={latestStep.id}
+                    agentId={latestStep.agent}
+                    title={actionLabel(latestStep.action)}
+                    subtitle={meta.name || latestStep.agentName || latestStep.agent}
+                    timestamp={new Date(latestStep.timestamp)}
+                    isActive={true}
+                    isCompleted={isStepCompleted(latestStep)} // ✅ Show checkmark for completed steps
+                    accentColor={actionColor(latestStep.action)} // ✅ Visual distinction by action type
+                    metadata={{
+                      reasoning: latestStep.metadata?.reasoning,
+                      toolName: latestStep.metadata?.toolName,
+                      canonical: latestStep.metadata?.canonical,
+                    }}
+                    defaultExpanded={false} // Collapsed view should not auto-expand
+                  >
+                    {latestStep.content && (
+                      <div className="text-sm text-foreground/80 leading-relaxed mb-3">
+                        <StepContent step={{
+                          ...latestStep,
+                          content: progressiveContent[latestStep.id] || latestStep.content
+                        }} />
+                      </div>
+                    )}
+                    
+                    {/* ✅ Show typing indicator if step is active and not completed */}
+                    {!isStepCompleted(latestStep) && !latestStep.content && (
+                      <TypingIndicator />
+                    )}
+                    
+                    {/* ✅ Modern Progress bar (same shimmer effect as expanded view) */}
+                    {typeof latestStep.progress === 'number' && latestStep.progress < 100 && (
+                      <div className="mb-3 space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground/60">Progreso</span>
+                          <span className="text-foreground/70 font-mono tabular-nums">
+                            {Math.round(latestStep.progress)}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40 relative">
+                          {/* Shimmer effect */}
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-background/20 to-transparent"
+                            animate={{ x: ['-100%', '200%'] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          />
+                          {/* Progress bar */}
+                          <motion.div 
+                            className="bg-gradient-to-r from-primary/80 via-primary to-primary/80 h-full relative"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, Math.max(0, latestStep.progress))}%` }}
+                            transition={{ 
+                              duration: 0.8, 
+                              ease: [0.4, 0.0, 0.2, 1]
+                            }}
+                          >
+                            <div className="absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-primary-foreground/15 to-transparent" />
+                          </motion.div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {stepChildren}
+                  </ExpandableStep>
+                )
+              })()}
             </AnimatePresence>
           </div>
         )}
         {isExpanded && (
           <ul className="grid gap-1.5">
             <AnimatePresence initial={false}>
-              {visibleSteps.map((s) => (
-              <motion.li
-                key={s.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ type: 'spring', duration: 0.22, bounce: 0 }}
-                className="bg-card/30 border-border/60 hover:bg-card/50 group relative grid grid-cols-[auto_auto_1fr_auto] items-start gap-2 rounded-lg border p-2 pr-2.5 text-xs sm:text-sm transition-colors"
-              >
-                <StatusDot action={s.action} />
-                <AgentAvatar agentId={s.agent} />
-                <div className="min-w-0">
-                  <div className="text-foreground/90 truncate font-medium">
-                    {actionLabel(s.action)} <span className="text-muted-foreground/70">·</span> <span className="text-muted-foreground text-[13px] sm:text-sm font-semibold"><AgentName agentId={s.agent} agentName={s.agentName} /></span>
+              {visibleSteps.map((s, index) => {
+                console.log('🎨 [EXPANDABLE-STEP] Rendering step:', {
+                  id: s.id,
+                  action: s.action,
+                  hasMetadata: !!s.metadata,
+                  hasReasoningBlocks: !!s.metadata?.reasoningBlocks,
+                  hasToolName: !!s.metadata?.toolName,
+                  canonical: s.metadata?.canonical
+                })
+                
+                const meta = getAgentMetadata(s.agent)
+                const isActive = index === visibleSteps.length - 1 // Last step is active
+                
+                // Parse reasoning blocks if present
+                const reasoningBlocks: ReasoningBlock[] = s.metadata?.reasoningBlocks || []
+                
+                // Extract tool metadata
+                const toolName = s.metadata?.toolName
+                const toolParameters = s.metadata?.toolParameters
+                const toolResult = s.metadata?.toolResult
+                const toolError = s.metadata?.toolError
+                const toolStatus = s.metadata?.toolStatus || (toolError ? 'error' : 'success')
+                
+                // Generate ExpandableStep children
+                const stepChildren = (
+                  <div className="space-y-3 mt-2">
+                    {reasoningBlocks.length > 0 && (
+                      <ReasoningViewer blocks={reasoningBlocks} />
+                    )}
+                    
+                    {toolName && (
+                      <ToolDetails
+                        toolName={toolName}
+                        parameters={toolParameters}
+                        result={toolResult}
+                        error={toolError}
+                        status={toolStatus as any}
+                      />
+                    )}
                   </div>
-                  {s.content ? (
-                    <div className="line-clamp-2">
-                      <StepContent step={s} />
-                    </div>
-                  ) : null}
-                  {typeof s.progress === 'number' ? (
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(100, Math.max(0, s.progress))}%` }} />
-                    </div>
-                  ) : null}
-                </div>
-                <div className="text-muted-foreground/70 whitespace-nowrap pl-1 font-mono text-[10px] sm:text-xs">
-                  {formatTime(s.timestamp)}
-                </div>
-              </motion.li>
-              ))}
+                )
+                
+                return (
+                  <ExpandableStep
+                    key={s.id}
+                    id={s.id}
+                    agentId={s.agent}
+                    title={actionLabel(s.action)}
+                    subtitle={meta.name || s.agentName || s.agent}
+                    timestamp={new Date(s.timestamp)}
+                    isActive={isActive}
+                    isCompleted={isStepCompleted(s)} // ✅ Show checkmark for completed steps
+                    accentColor={actionColor(s.action)} // ✅ Visual distinction by action type
+                    metadata={{
+                      reasoning: s.metadata?.reasoning,
+                      toolName: s.metadata?.toolName,
+                      canonical: s.metadata?.canonical,
+                    }}
+                    defaultExpanded={isActive} // Auto-expand active step
+                  >
+                    {/* Main Content */}
+                    {s.content && (
+                      <div className="text-sm text-foreground/80 leading-relaxed mb-3">
+                        <StepContent step={s} />
+                      </div>
+                    )}
+                    
+                    {/* ✅ Modern Progress Bar: Shimmer gradient + percentage label
+                        Inspired by Linear UI and Stripe Dashboard loading states
+                     */}
+                    {typeof s.progress === 'number' && s.progress < 100 && (
+                      <div className="mb-3 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground/70 font-medium">Progreso</span>
+                          <motion.span 
+                            className="text-foreground/80 font-mono tabular-nums"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            key={s.progress}
+                          >
+                            {Math.round(s.progress)}%
+                          </motion.span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted/40 relative">
+                          {/* Background shimmer effect (runs continuously on active progress) */}
+                          {!isStepCompleted(s) && (
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-background/30 to-transparent"
+                              animate={{
+                                x: ['-100%', '200%']
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                              }}
+                            />
+                          )}
+                          {/* Actual progress bar with gradient */}
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-primary/80 via-primary to-primary/80 relative overflow-hidden"
+                            animate={{ width: `${Math.min(100, Math.max(0, s.progress))}%` }}
+                            transition={{ 
+                              duration: 0.8, 
+                              ease: [0.4, 0.0, 0.2, 1] // Material Design easing
+                            }}
+                          >
+                            {/* Subtle glow effect on the leading edge */}
+                            <div className="absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-primary-foreground/20 to-transparent" />
+                          </motion.div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Expandable Details */}
+                    {stepChildren}
+                  </ExpandableStep>
+                )
+              })}
             </AnimatePresence>
           </ul>
         )}

@@ -325,12 +325,16 @@ export function Chat() {
     }, [pendingToolConfirmation, inferCategory, inferSensitivity])
 
     const [confirmationLoadingId, setConfirmationLoadingId] = useState<string|null>(null)
-    const handleResolveConfirmation = useCallback(async (id: string, approved: boolean) => {
+    const handleResolveConfirmation = useCallback(async (id: string, approved: boolean, editedData?: any) => {
       if (!pendingToolConfirmation) return
       setConfirmationLoadingId(id)
       try {
-        if (approved) await acceptToolConfirmation()
-        else await rejectToolConfirmation()
+        if (approved) {
+          console.log('📧 [CHAT] Approving with edited data:', editedData)
+          await acceptToolConfirmation(editedData)
+        } else {
+          await rejectToolConfirmation()
+        }
       } finally {
         // Clear loading state slightly after hook clears pendingToolConfirmation to avoid flicker
         setTimeout(() => setConfirmationLoadingId(null), 120)
