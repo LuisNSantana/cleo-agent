@@ -239,7 +239,7 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
                   <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl" />
                   <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-600/10 backdrop-blur-sm flex items-center justify-center ring-4 ring-purple-500/20 overflow-hidden">
                     <img 
-                      src="/img/agents/logocleo4.png" 
+                      src="/img/kyliologo.png" 
                       alt="Cleo" 
                       className="w-20 h-20 object-contain"
                     />

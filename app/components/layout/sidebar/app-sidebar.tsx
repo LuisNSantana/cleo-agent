@@ -273,6 +273,7 @@ export function AppSidebar() {
           </span>
           <span className="text-sidebar-foreground/70 text-xs">Huminary Labs</span>
         </div>
+        {/* GitHub callout temporarily commented out per design request
         <a
           href="https://github.com/ibelick/zola"
           className="hover:bg-muted flex items-center gap-2 radius-md p-2"
@@ -291,6 +292,7 @@ export function AppSidebar() {
             </div>
           </div>
         </a>
+        */}
         
         {/* Legal Links */}
         <div className="flex items-center justify-center gap-3 pt-2 text-xs text-muted-foreground border-t border-border/40 mt-2">

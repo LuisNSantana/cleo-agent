@@ -38,7 +38,7 @@ export default async function Image() {
           {/* Logo */}
           { }
           <img
-            src={new URL("/img/agents/logocleo4.png", appUrl).toString()}
+            src={new URL("/img/kyliologo.png", appUrl).toString()}
             width={200}
             height={200}
             alt="Cleo logo"

@@ -73,71 +73,64 @@
 }
 
 :root {
-  /* ====================================================================
-     HUMAN-DIGITAL ESSENCE - Paleta Cleo 2025
-     Objetivo: Transmitir humanidad, inteligencia y cercanía emocional
-     Diferenciación: Estética pastel, cálida, moderna con trazos minimalistas
-     ==================================================================== */
+  /* ================================================================
+     KYLIO — Core palette (light mode)
+     Branded identity: confident violets + deep navy copy
+  ================================================================= */
+  --color-bg: #F9F6F2;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #E5E5E5;
+  --color-primary: #A38CFF;   /* Morado suave */
+  --color-secondary: #64D2FF; /* Cian de soporte */
+  --color-text: #1E255E;      /* Azul oscuro corporativo */
+  --color-text-muted: #49508A;
+  --color-success: #30D158;
+  --color-warning: #FFD60A;
+  --color-danger: #FF453A;
   
-  /* Light Mode: Pastel suave, cálido y emocionalmente cercano */
-  
-  /* === Colores base personalizados Cleo === */
-  --color-bg: #FAF9FF;          /* Fondo base general - pastel muy suave */
-  --color-surface: #FFFFFF;     /* Tarjetas, paneles, inputs */
-  --color-primary: #A9C7FF;     /* Botones principales, acentos - azul pastel */
-  --color-secondary: #FFC8D6;   /* Hover suaves, badges, detalles emocionales - rosa pastel */
-  --color-accent: #C3E5E0;      /* Resaltados suaves, bordes sutiles - menta pastel */
-  --color-text: #2D2A32;        /* Texto principal - oscuro suave */
-  --color-text-muted: #6E6A76;  /* Texto secundario - gris cálido */
-  --color-highlight: #B49CFF;   /* Íconos activos, microinteracciones - lila pastel */
-  --color-shadow: rgba(0, 0, 0, 0.05); /* Sombras suaves y difusas */
-  
-  /* === Mapeo a variables de Tailwind/shadcn === */
-  --background: #FAF9FF;
-  --foreground: #2D2A32;
+  --background: #F9F6F2;
+  --foreground: #1E255E;
   
   --card: #FFFFFF;
-  --card-foreground: #2D2A32;
+  --card-foreground: #1E255E;
   --popover: #FFFFFF;
-  --popover-foreground: #2D2A32;
+  --popover-foreground: #1E255E;
   
-  --primary: #A9C7FF;           /* Azul pastel principal */
-  --primary-foreground: #2D2A32; /* Texto oscuro para mejor contraste */
+  --primary: #A38CFF;
+  --primary-foreground: #0D0D0D;
   
-  --secondary: #FFC8D6;         /* Rosa pastel secundario */
-  --secondary-foreground: #4A2845; /* Texto oscuro morado para contraste sobre rosa */
+  --secondary: #64D2FF;
+  --secondary-foreground: #0D0D0D;
   
-  --muted: #F5F4F8;             /* Versión atenuada del background */
-  --muted-foreground: #6E6A76;
+  --muted: #F0ECE6;
+  --muted-foreground: #595F8C;
   
-  --accent: #C3E5E0;            /* Menta pastel para acentos */
-  --accent-foreground: #2D2A32;
+  --accent: #A38CFF;
+  --accent-foreground: #0D0D0D;
   
-  --destructive: #FF9AA2;       /* Rojo pastel suave */
-  --destructive-foreground: #2D2A32;
+  --destructive: #FF453A;
+  --destructive-foreground: #FFFFFF;
   
-  --border: #E8E6F0;            /* Border suave pastel */
-  --input: #FFFFFF;             /* Inputs con fondo limpio */
-  --ring: #A9C7FF;              /* Ring = primary */
+  --border: #E5E5E5;
+  --input: #FFFFFF;
+  --ring: #A38CFF;
   
-  /* Chart colors - Paleta pastel armoniosa */
-  --chart-1: #A9C7FF;           /* Azul pastel */
-  --chart-2: #C3E5E0;           /* Menta pastel */
-  --chart-3: #FFC8D6;           /* Rosa pastel */
-  --chart-4: #B49CFF;           /* Lila pastel */
-  --chart-5: #FFE5B4;           /* Durazno pastel */
+  --chart-1: #A38CFF;
+  --chart-2: #64D2FF;
+  --chart-3: #30D158;
+  --chart-4: #FFD60A;
+  --chart-5: #FF453A;
   
-  --radius: 1.25rem;            /* 20px - curvas suaves (rounded-2xl) */
+  --radius: 1.25rem;
   
-  /* Sidebar colors - unified pastel design */
-  --sidebar: #FAF9FF;
-  --sidebar-foreground: #2D2A32;
-  --sidebar-primary: #A9C7FF;
-  --sidebar-primary-foreground: #2D2A32;
-  --sidebar-accent: #F5F4F8;
-  --sidebar-accent-foreground: #6E6A76;
-  --sidebar-border: #E8E6F0;
-  --sidebar-ring: #A9C7FF;
+  --sidebar: #F9F6F2;
+  --sidebar-foreground: #1E255E;
+  --sidebar-primary: #A38CFF;
+  --sidebar-primary-foreground: #0D0D0D;
+  --sidebar-accent: #EDE9E3;
+  --sidebar-accent-foreground: #49508A;
+  --sidebar-border: #E5E5E5;
+  --sidebar-ring: #A38CFF;
 }
 
 /* Typography utilities */
@@ -151,70 +144,63 @@ body {
 }
 
 .dark {
-  /* ====================================================================
-     HUMAN-DIGITAL ESSENCE - Dark Mode
-     Tonos profundos pero conservando el alma pastel
-     Mantiene calidez emocional en ambiente nocturno
-     ==================================================================== */
+  /* ================================================================
+     KYLIO — Dark mode palette
+  ================================================================= */
+  --color-bg: #0D0D0D;
+  --color-surface: #1B1B1B;
+  --color-surface-subtle: #2F2F2F;
+  --color-primary: #A38CFF;
+  --color-secondary: #64D2FF;
+  --color-text: #F9F6F2;
+  --color-text-muted: #C9C6E8;
+  --color-success: #30D158;
+  --color-warning: #FFD60A;
+  --color-danger: #FF453A;
   
-  /* === Colores base personalizados Cleo Dark === */
-  --color-bg: #14161C;          /* Fondo base - oscuro pero no negro puro */
-  --color-surface: #1C1F28;     /* Superficie elevada */
-  --color-primary: #7EA8FF;     /* Azul pastel brillante */
-  --color-secondary: #FFABC6;   /* Rosa pastel brillante */
-  --color-accent: #91DAD0;      /* Menta pastel brillante */
-  --color-text: #FFF8E7;        /* Texto principal - blanco amarilloso pastel suave */
-  --color-text-muted: #C8BFAD;  /* Texto atenuado - beige pastel */
-  --color-highlight: #B49CFF;   /* Lila pastel para destacados */
-  --color-shadow: rgba(0, 0, 0, 0.3); /* Sombras más pronunciadas en dark */
+  --background: #0D0D0D;
+  --foreground: #F9F6F2;
   
-  /* === Mapeo a variables de Tailwind/shadcn === */
-  --background: #14161C;
-  --foreground: #FFF8E7;        /* Blanco amarilloso pastel - más sutil que blanco puro */
+  --card: #1B1B1B;
+  --card-foreground: #F9F6F2;
+  --popover: #1B1B1B;
+  --popover-foreground: #F9F6F2;
   
-  --card: #1C1F28;
-  --card-foreground: #FFF8E7;
-  --popover: #23262F;
-  --popover-foreground: #FFF8E7;
+  --primary: #A38CFF;
+  --primary-foreground: #0D0D0D;
   
-  --primary: #7EA8FF;           /* Azul pastel brillante */
-  --primary-foreground: #14161C;
+  --secondary: #64D2FF;
+  --secondary-foreground: #0D0D0D;
   
-  --secondary: #FFABC6;         /* Rosa pastel brillante */
-  --secondary-foreground: #14161C;
+  --muted: #1B1B1B;
+  --muted-foreground: #C9C6E8;
   
-  --muted: #23262F;             /* Superficie atenuada */
-  --muted-foreground: #C8BFAD;  /* Beige pastel para texto secundario */
+  --accent: #A38CFF;
+  --accent-foreground: #0D0D0D;
   
-  --accent: #91DAD0;            /* Menta pastel brillante */
-  --accent-foreground: #14161C;
+  --destructive: #FF453A;
+  --destructive-foreground: #FFFFFF;
   
-  --destructive: #FF9AA2;       /* Rojo pastel */
-  --destructive-foreground: #FFF8E7;
+  --border: #2F2F2F;
+  --input: #1B1B1B;
+  --ring: #64D2FF;
   
-  --border: #2C2F3B;            /* Border oscuro pero visible */
-  --input: #1C1F28;             /* Input = surface */
-  --ring: #7EA8FF;              /* Ring = primary */
+  --chart-1: #A38CFF;
+  --chart-2: #64D2FF;
+  --chart-3: #30D158;
+  --chart-4: #FFD60A;
+  --chart-5: #FF453A;
   
-  /* Chart colors - Paleta pastel brillante para dark */
-  --chart-1: #7EA8FF;           /* Azul pastel brillante */
-  --chart-2: #91DAD0;           /* Menta pastel */
-  --chart-3: #FFABC6;           /* Rosa pastel */
-  --chart-4: #B49CFF;           /* Lila pastel */
-  --chart-5: #FFD4A3;           /* Durazno pastel */
-  
-  /* Sidebar - unified dark pastel */
-  --sidebar: #14161C;
-  --sidebar-foreground: #FFF8E7;
-  --sidebar-primary: #7EA8FF;
-  --sidebar-primary-foreground: #14161C;
-  --sidebar-accent: #23262F;
-  --sidebar-accent-foreground: #C8BFAD;
-  --sidebar-border: #2C2F3B;
-  --sidebar-ring: #7EA8FF;
+  --sidebar: #0D0D0D;
+  --sidebar-foreground: #F9F6F2;
+  --sidebar-primary: #A38CFF;
+  --sidebar-primary-foreground: #0D0D0D;
+  --sidebar-accent: #1B1B1B;
+  --sidebar-accent-foreground: #C9C6E8;
+  --sidebar-border: #2F2F2F;
+  --sidebar-ring: #64D2FF;
 }
-
-/* === UTILITY CLASSES CLEO === */
+/* === UTILITY CLASSES KYLIO === */
 
 /* Sombras suaves y difusas - estilo Human-Digital Essence */
 .shadow-soft {

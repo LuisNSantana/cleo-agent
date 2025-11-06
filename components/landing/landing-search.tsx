@@ -10,7 +10,11 @@ type SearchItem = {
   type: "section" | "feature" | "agent"
 }
 
-export function LandingSearch() {
+interface LandingSearchProps {
+  placeholder: string
+}
+
+export function LandingSearch({ placeholder }: LandingSearchProps) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchItem[]>([])
   const [open, setOpen] = useState(false)
@@ -84,7 +88,7 @@ export function LandingSearch() {
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search features, agents, sections…"
+          placeholder={placeholder}
           className="w-full bg-transparent outline-none placeholder:text-muted-foreground/70"
         />
         {query && (

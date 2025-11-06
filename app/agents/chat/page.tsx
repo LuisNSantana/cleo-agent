@@ -1122,7 +1122,7 @@ export default function AgentsChatPage() {
     if (key?.includes('toby')) return '/img/agents/toby4.png'
     if (key?.includes('ami')) return '/img/agents/ami4.png'
     if (key?.includes('peter')) return '/img/agents/peter4.png'
-    if (key?.includes('cleo')) return '/img/agents/logocleo4.png'
+    if (key?.includes('cleo')) return '/img/kyliologo.png'
     if (key?.includes('emma')) return '/img/agents/emma4.png'
     if (key?.includes('wex')) return '/img/agents/wex4.png'
     if (key?.includes('apu')) return '/img/agents/apu4.png'

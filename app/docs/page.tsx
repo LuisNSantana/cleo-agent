@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     siteName: "Cleo",
     images: [
       {
-        url: "/img/agents/logocleo4.png",
+        url: "/img/kyliologo.png",
         width: 512,
         height: 512,
         alt: "Cleo Logo",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: "Cleo — Documentation",
     description:
       "Complete guide to use Cleo: agents, tasks, PWA & notifications, and analytics dashboard.",
-    images: ["/img/agents/logocleo4.png"],
+    images: ["/img/kyliologo.png"],
   },
 }
 

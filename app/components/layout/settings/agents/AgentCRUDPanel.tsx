@@ -836,8 +836,8 @@ const AgentForm: React.FC<AgentFormProps> = ({
                 : name.includes('emma') ? '/img/agents/emma4.png'
                 : name.includes('apu') ? '/img/agents/apu4.png'
                 : name.includes('wex') ? '/img/agents/wex4.png'
-                : name.includes('cleo') ? '/img/agents/logocleo4.png'
-                : '/img/agents/logocleo4.png'
+                : name.includes('cleo') ? '/img/kyliologo.png'
+                : '/img/kyliologo.png'
               const iconVal = (formData.icon || '').trim()
               const isUrlIcon = iconVal.startsWith('/') || iconVal.startsWith('http')
               const isEmojiIcon = !!iconVal && !isUrlIcon && iconVal.length <= 3
@@ -938,8 +938,8 @@ const AgentForm: React.FC<AgentFormProps> = ({
                         : lower.includes('emma') ? '/img/agents/emma4.png'
                         : lower.includes('apu') ? '/img/agents/apu4.png'
                         : lower.includes('wex') ? '/img/agents/wex4.png'
-                        : lower.includes('cleo') ? '/img/agents/logocleo4.png'
-                        : '/img/agents/logocleo4.png')
+                        : lower.includes('cleo') ? '/img/kyliologo.png'
+                        : '/img/kyliologo.png')
                       return (
                         <SelectItem key={a.id} value={a.id}>
                           <div className="flex items-center gap-2">
@@ -971,7 +971,7 @@ const AgentForm: React.FC<AgentFormProps> = ({
                 )
               })()}
             </div>
-            {formData.parentAgentId && (() => { const pAny: any = (agents.find(x => x.id === formData.parentAgentId) as any) || (parentCandidates.find((pc:any)=>pc.id===formData.parentAgentId) as any); if (!pAny) return null; const lower=(pAny.name||'').toLowerCase(); const avatar = pAny.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/agents/logocleo4.png' : '/img/agents/logocleo4.png'); return (
+            {formData.parentAgentId && (() => { const pAny: any = (agents.find(x => x.id === formData.parentAgentId) as any) || (parentCandidates.find((pc:any)=>pc.id===formData.parentAgentId) as any); if (!pAny) return null; const lower=(pAny.name||'').toLowerCase(); const avatar = pAny.avatar || (lower.includes('toby') ? '/img/agents/toby4.png' : lower.includes('ami') ? '/img/agents/ami4.png' : lower.includes('peter') ? '/img/agents/peter4.png' : lower.includes('emma') ? '/img/agents/emma4.png' : lower.includes('apu') ? '/img/agents/apu4.png' : lower.includes('wex') ? '/img/agents/wex4.png' : lower.includes('cleo') ? '/img/kyliologo.png' : '/img/kyliologo.png'); return (
               <div className="flex items-center gap-2 text-xs text-slate-300">
                 <Avatar className="h-5 w-5">
                   <AvatarImage src={avatar} alt={pAny.name} />
@@ -1515,7 +1515,7 @@ export function AgentCRUDPanel({ agents, onCreateAgent, onUpdateAgent, onDeleteA
     if (key.includes('ami')) return '/img/agents/ami4.png'
     if (key.includes('peter')) return '/img/agents/peter4.png'
   if (key.includes('nora')) return '/img/agents/nora4.png'
-    if (key.includes('cleo')) return '/img/agents/logocleo4.png'
+    if (key.includes('cleo')) return '/img/kyliologo.png'
     if (key.includes('emma')) return '/img/agents/emma4.png'
     if (key.includes('wex')) return '/img/agents/wex4.png'
     if (key.includes('apu')) return '/img/agents/apu4.png'

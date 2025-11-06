@@ -38,12 +38,12 @@ const appUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Cleo AI — Deploy Your Own Agents in Minutes",
-    template: "%s · Cleo AI",
+    default: "Kylio AI — Deploy Your Own Agents in Minutes",
+    template: "%s · Kylio AI",
   },
   description:
     "Deploy your own AI agents in under 5 minutes. Built on three pillars: Transparency, Personalization, and Simplicity. Free beta — no credit card required.",
-  applicationName: "Cleo",
+  applicationName: "Kylio AI",
   generator: "Next.js",
   keywords: [
     // Primary keywords (high intent)
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     "business process automation",
     
     // Brand
-    "Cleo AI",
+    "Kylio AI",
     "Huminary Labs",
   ],
   authors: [{ name: "Huminary Labs" }],
@@ -90,8 +90,8 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   openGraph: {
     type: "website",
-    siteName: "Cleo AI",
-    title: "Cleo AI — Deploy Your Own Agents in Minutes",
+    siteName: "Kylio AI",
+    title: "Kylio AI — Deploy Your Own Agents in Minutes",
     description:
       "Launch custom AI agents quickly with full transparency and simple controls. Try the free beta — no credit card required.",
   url: appUrl,
@@ -101,14 +101,14 @@ export const metadata: Metadata = {
         url: "/opengraph-image?v=2",
         width: 1200,
         height: 630,
-        alt: "Cleo - AI Agents Platform",
+        alt: "Kylio - AI Agents Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     creator: "@HuminaryLabs",
-    title: "Cleo AI — Deploy Your Own Agents in Minutes",
+    title: "Kylio AI — Deploy Your Own Agents in Minutes",
     description:
       "Build and deploy AI agents in under 5 minutes. Transparent by design. Free beta access.",
     // Keep in sync with openGraph.images and include cache-busting param
@@ -180,8 +180,9 @@ export default async function RootLayout({
                       >
                         <ThemeProvider
                           attribute="class"
-                          defaultTheme="system"
-                          enableSystem={true}
+                          defaultTheme="light" // Force light as the initial / fallback theme
+                          enableSystem={false}  // Ignore OS preference; user must toggle manually
+                          themes={['light','dark']}
                           disableTransitionOnChange
                         >
                           <ToolConfirmationProvider>

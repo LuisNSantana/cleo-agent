@@ -30,7 +30,7 @@ export default function RouterNode({ data }: NodeProps<RouterNodeData>) {
         )}
         <div className={`flex items-center gap-2 rounded-lg border bg-slate-800/90 backdrop-blur px-2.5 py-1.5 shadow-md ${isActive ? 'ring-2 ring-pink-500/70' : ''}`} style={{ borderColor: '#ec4899', borderWidth: 2 }}>
           <Avatar className="w-5 h-5">
-            <AvatarImage src="/img/agents/logocleo4.png" alt="Cleo" className="object-cover" />
+            <AvatarImage src="/img/kyliologo.png" alt="Cleo" className="object-cover" />
             <AvatarFallback className="bg-pink-200">
               <LucideHeart className="size-2 text-pink-700" />
             </AvatarFallback>
@@ -66,7 +66,7 @@ export default function RouterNode({ data }: NodeProps<RouterNodeData>) {
         <CardContent className="p-4">
           <div className="flex items-center gap-3 text-sm font-bold text-gray-800 mb-2">
             <Avatar className="w-8 h-8">
-              <AvatarImage src="/img/agents/logocleo4.png" alt="Cleo" className="object-cover" />
+              <AvatarImage src="/img/kyliologo.png" alt="Cleo" className="object-cover" />
               <AvatarFallback className={`transition-all duration-300 ${
                 isActive 
                   ? 'bg-gradient-to-r from-pink-300 to-purple-300' 

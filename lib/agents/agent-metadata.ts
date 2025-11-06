@@ -16,7 +16,7 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'cleo-supervisor': {
     id: 'cleo-supervisor',
     name: 'Cleo',
-    avatar: '/img/agents/logocleo4.png',
+    avatar: '/img/kyliologo.png',
     color: '#7C3AED',
     emoji: '🤖'
   },

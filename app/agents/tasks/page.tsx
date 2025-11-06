@@ -180,10 +180,10 @@ export default function AgentsTasksPage() {
       'apu': '/img/agents/apu4.png',
       'ami': '/img/agents/ami4.png',
       // fallback brand avatar
-      'cleo': '/img/agents/logocleo4.png'
+      'cleo': '/img/kyliologo.png'
     }
     const key = (agentName || '').toLowerCase().trim()
-    return map[key] || '/img/agents/logocleo4.png'
+    return map[key] || '/img/kyliologo.png'
   }
 
   const formatDate = (dateString?: string, timezone?: string) => {

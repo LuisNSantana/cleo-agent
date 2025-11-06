@@ -63,7 +63,7 @@ export function TypingIndicator({
       >
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-full" />
         <Image 
-          src="/img/agents/logocleo4.png" 
+          src="/img/kyliologo.png" 
           alt="Cleo" 
           width={40} 
           height={40}

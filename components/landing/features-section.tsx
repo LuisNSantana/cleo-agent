@@ -2,89 +2,25 @@
 
 import { motion } from 'framer-motion'
 import { useI18n } from '@/lib/i18n'
-import {
-  Brain,
-  Lightning,
-  Users,
-  ChartBar,
-  Code,
-  Palette,
-  Database,
-  Globe,
-  Shield,
-  Sparkle,
-  Rocket,
-  Check,
-} from '@phosphor-icons/react'
+import { Brain, Lightning, Users, Shield, Sparkle, Check, Rocket } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useMemo } from 'react'
+import { getLandingCopy } from '@/lib/i18n/landing-copy'
 
-const features = [
-  {
-    icon: Brain,
-    title: 'Intelligent Orchestration',
-    description: 'Multi-agent system that delegates tasks to specialized AI teammates',
-    color: 'from-purple-500 to-pink-500',
-    features: ['Smart task routing', 'Context-aware decisions', 'Autonomous execution'],
-  },
-  {
-    icon: Lightning,
-    title: 'Lightning Fast',
-    description: 'Optimized performance with smart caching and parallel processing',
-    color: 'from-yellow-500 to-orange-500',
-    features: ['Sub-second responses', 'Parallel agent execution', 'Hybrid cache system'],
-  },
-  {
-    icon: Users,
-    title: 'Team Collaboration',
-    description: 'Built for teams with real-time collaboration and shared workspaces',
-    color: 'from-blue-500 to-cyan-500',
-    features: ['Shared projects', 'Real-time sync', 'Role-based access'],
-  },
-  {
-    icon: ChartBar,
-    title: 'Analytics & Insights',
-    description: 'Deep visibility into agent performance and productivity metrics',
-    color: 'from-green-500 to-emerald-500',
-    features: ['Performance tracking', 'Usage analytics', 'Custom dashboards'],
-  },
-  {
-    icon: Code,
-    title: 'Developer Tools',
-    description: 'Powerful APIs and integrations for developers',
-    color: 'from-indigo-500 to-purple-500',
-    features: ['REST & GraphQL APIs', 'Webhook support', 'SDK libraries'],
-  },
-  {
-    icon: Database,
-    title: 'Knowledge Base',
-    description: 'RAG-powered search across your documents and data',
-    color: 'from-red-500 to-pink-500',
-    features: ['Vector search', 'Document indexing', 'Semantic retrieval'],
-  },
-  {
-    icon: Globe,
-    title: 'Multi-Language',
-    description: 'Works in 10+ languages with auto-detection',
-    color: 'from-teal-500 to-cyan-500',
-    features: ['Auto language detection', 'Real-time translation', 'Localized UI'],
-  },
-  {
-    icon: Shield,
-    title: 'Enterprise Security',
-    description: 'SOC 2 compliant with end-to-end encryption',
-    color: 'from-gray-600 to-gray-800',
-    features: ['E2E encryption', 'SOC 2 Type II', 'GDPR compliant'],
-  },
+const featureIcons = [Brain, Lightning, Users, Shield]
+const featureColors = [
+  'from-[#A38CFF] to-[#7E63F2]',
+  'from-[#64D2FF] to-[#4AA6FF]',
+  'from-[#30D158] to-[#0A9F41]',
+  'from-[#FFD60A] to-[#FFB800]',
 ]
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
+    transition: { staggerChildren: 0.1 },
   },
 }
 
@@ -93,98 +29,101 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.5,
-    },
+    transition: { duration: 0.5 },
   },
 }
 
 export function FeaturesSection() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const copy = getLandingCopy(locale)
+
+  const featureCards = useMemo(
+    () =>
+      copy.features.cards.map((card, index) => ({
+        ...card,
+        icon: featureIcons[index % featureIcons.length],
+        color: featureColors[index % featureColors.length],
+      })),
+    [copy, locale]
+  )
 
   return (
-    <section id="features" data-landing-search data-landing-search-title="Features" data-landing-search-type="section" className="relative w-full overflow-hidden bg-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">
-        {/* Section header */}
+    <section
+      id="features"
+      data-landing-search
+      data-landing-search-title="Features"
+      data-landing-search-type="section"
+      className="relative w-full overflow-hidden bg-[#F9F6F2] dark:bg-[#0D0D0D] py-16 sm:py-24 lg:py-32"
+    >
+      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
         <motion.div
-          className="mb-20 text-center"
+          className="mb-12 sm:mb-16 lg:mb-20 text-center"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
           <motion.div
-            className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-6 py-2.5 text-sm font-bold text-primary shadow-lg shadow-primary/20"
+            className="mb-4 sm:mb-6 inline-flex items-center gap-2 rounded-full border-2 border-[#A38CFF]/30 bg-gradient-to-r from-[#A38CFF]/20 via-[#8E73FF]/15 to-[#64D2FF]/20 dark:from-[#A38CFF]/10 dark:via-[#8E73FF]/8 dark:to-[#64D2FF]/10 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-[#A38CFF] shadow-lg shadow-[#A38CFF]/20"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            animate={{ 
+            animate={{
               scale: [1, 1.02, 1],
               boxShadow: [
-                "0 10px 40px rgba(var(--primary), 0.2)",
-                "0 10px 50px rgba(var(--primary), 0.3)",
-                "0 10px 40px rgba(var(--primary), 0.2)"
-              ]
+                '0 10px 40px rgba(163, 140, 255, 0.2)',
+                '0 10px 50px rgba(163, 140, 255, 0.3)',
+                '0 10px 40px rgba(163, 140, 255, 0.2)',
+              ],
             }}
-            transition={{ delay: 0.2, duration: 3, repeat: Infinity, repeatType: "reverse" }}
+            transition={{ delay: 0.2, duration: 3, repeat: Infinity, repeatType: 'reverse' }}
           >
-            <Sparkle weight="fill" className="h-5 w-5" />
-            Powerful Features
+            <Sparkle weight="fill" className="h-4 w-4 sm:h-5 sm:w-5" />
+            {copy.features.badge}
           </motion.div>
-          
-          <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
+
+          <h2 className="mb-4 sm:mb-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[#1E255E] dark:text-[#F9F6F2]">
             {t.landing.featuresTitle}
           </h2>
-          <p className="mx-auto max-w-3xl text-xl text-muted-foreground sm:text-2xl">
+          <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl xl:text-2xl text-[#1E255E]/80 dark:text-[#E5E5E5]">
             {t.landing.featuresSubtitle}
           </p>
         </motion.div>
 
-        {/* Features grid */}
         <motion.div
-          className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid gap-8 md:grid-cols-2 xl:grid-cols-4"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-100px' }}
         >
-          {features.map((feature, index) => (
-            <motion.div key={index} variants={itemVariants}>
+          {featureCards.map((feature, index) => (
+            <motion.div key={feature.title} variants={itemVariants}>
               <Card
                 data-landing-search
                 data-landing-search-title={feature.title}
                 data-landing-search-type="feature"
                 className="group relative h-full overflow-hidden rounded-2xl border-2 border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-card/95 p-8 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/20"
               >
-                {/* Animated gradient glow on hover */}
-                <div className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 blur transition duration-500 group-hover:opacity-20`} />
-
-                {/* Content wrapper */}
+                <div
+                  className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 blur transition duration-500 group-hover:opacity-20`}
+                />
                 <div className="relative">
-                  {/* Icon with enhanced effects */}
-                  <motion.div 
+                  <motion.div
                     className={`mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-xl transition-transform duration-300 group-hover:scale-110`}
                     whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                     transition={{ duration: 0.5 }}
                   >
                     <feature.icon weight="duotone" className="h-full w-full text-white" />
                   </motion.div>
-
-                  {/* Title */}
-                  <h3 className="mb-3 text-xl font-bold text-foreground">
-                    {feature.title}
-                  </h3>
-                  
-                  {/* Description */}
-                  <p className="mb-6 text-base leading-relaxed text-muted-foreground">
-                    {feature.description}
-                  </p>
-
-                  {/* Feature list with enhanced styling */}
+                  <h3 className="mb-3 text-xl font-bold text-foreground">{feature.title}</h3>
+                  <p className="mb-6 text-base leading-relaxed text-muted-foreground">{feature.description}</p>
                   <ul className="space-y-2.5">
-                    {feature.features.map((item, i) => (
+                    {feature.bullets.map((item, i) => (
                       <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${feature.color} p-1`}>
+                        <div
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${feature.color} p-1`}
+                        >
                           <Check weight="bold" className="h-full w-full text-white" />
                         </div>
                         <span className="leading-relaxed">{item}</span>
@@ -192,8 +131,6 @@ export function FeaturesSection() {
                     ))}
                   </ul>
                 </div>
-
-                {/* Bottom accent bar with animation */}
                 <motion.div
                   className={`absolute bottom-0 left-0 h-1.5 w-full bg-gradient-to-r ${feature.color}`}
                   initial={{ scaleX: 0 }}
@@ -206,7 +143,6 @@ export function FeaturesSection() {
           ))}
         </motion.div>
 
-        {/* Bottom highlight + CTA */}
         <motion.div
           className="mt-20 text-center"
           initial={{ opacity: 0, y: 12 }}
@@ -214,13 +150,17 @@ export function FeaturesSection() {
           viewport={{ once: true }}
           transition={{ delay: 0.3 }}
         >
-          <p className="mx-auto max-w-3xl text-balance text-2xl sm:text-3xl font-bold tracking-tight text-foreground/90">
-            And hundreds more capabilities ready for you to explore
+          <p className="mx-auto max-w-3xl text-balance text-2xl font-bold tracking-tight text-foreground/90 sm:text-3xl">
+            {copy.features.highlightHeadline}
           </p>
           <div className="mt-8 flex items-center justify-center">
-            <Button size="lg" className="group rounded-full px-8 py-6 text-base font-bold shadow-xl transition-all hover:shadow-2xl hover:shadow-primary/30" asChild>
+            <Button
+              size="lg"
+              className="group rounded-full bg-[#A38CFF] px-8 py-6 text-base font-bold text-white shadow-xl shadow-primary/30 transition-all hover:shadow-2xl hover:shadow-primary/40"
+              asChild
+            >
               <a href="/auth" className="flex items-center gap-2">
-                Try a live demo
+                {copy.features.highlightCta}
                 <Rocket weight="bold" className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </a>
             </Button>

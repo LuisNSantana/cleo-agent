@@ -10,8 +10,8 @@ export function resolveBuiltInAvatar(name?: string, avatar?: string) {
     'peter': '/img/agents/peter4.png',
     'apu': '/img/agents/apu4.png',
     'ami': '/img/agents/ami4.png',
-    'cleo': '/img/agents/logocleo4.png'
+    'cleo': '/img/kyliologo.png'
   }
   const key = (name || '').toLowerCase().trim()
-  return map[key] || '/img/agents/logocleo4.png'
+  return map[key] || '/img/kyliologo.png'
 }

@@ -776,7 +776,7 @@ export default function DocsPageClient({ initialLang = "en" }: { initialLang?: L
   <header className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <Image src="/img/agents/logocleo4.png" alt="Cleo" width={32} height={32} />
+            <Image src="/img/kyliologo.png" alt="Cleo" width={32} height={32} />
             <h1 className="text-lg font-semibold">{t.title}</h1>
           </div>
           <div className="flex items-center gap-4">

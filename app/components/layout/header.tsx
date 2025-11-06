@@ -15,6 +15,8 @@ import { Info, CheckSquare, ArrowsOut, Sidebar as SidebarIcon } from "@phosphor-
 import Link from "next/link"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
@@ -22,6 +24,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const { resetMessages } = useMessages()
   const { preferences, setLayout } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
+  const { theme, resolvedTheme } = useTheme()
+  const assetV = (process.env.NEXT_PUBLIC_ASSET_VERSION as string) || '3'
 
   const isLoggedIn = !!user
   const canToggleSidebar = isLoggedIn && (hasSidebar || isMobile)
@@ -41,23 +45,27 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                   className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
                   onClick={() => resetMessages()}
                 >
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border-2 border-primary/20 shadow-lg">
-                    <img 
-                      src="/img/agents/logocleo4.png" 
-                      alt="Cleo AI"
-                      className="h-full w-full object-cover"
-                    />
+                  {/* Simplified logo wrapper: remove backdrop blur, heavy border and shadow that created visual artifacts */}
+                  <div className="flex h-5 w-auto items-center justify-center rounded-md bg-transparent sm:h-6 md:h-7 lg:h-8 shrink-0">
+                    {(() => {
+                      const isDark = (resolvedTheme ?? theme) === 'dark'
+                      const logoSrc = isDark
+                        ? `/img/kyliologodarkmode.png?v=${assetV}`
+                        : `/img/kyliologo.png?v=${assetV}`
+                      return (
+                        <Image
+                          src={logoSrc}
+                          alt="Kylio"
+                          width={84}
+                          height={22}
+                          className="h-full w-auto object-contain select-none"
+                          priority
+                          sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
+                        />
+                      )
+                    })()}
                   </div>
-                  <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
-                    Cleo
-                  </span>
-                  <span
-                    aria-label="Beta"
-                    title="Cleo is in Beta"
-                    className="mt-1 hidden select-none items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-foreground/80 sm:inline-flex bg-secondary/70 border-border/60 backdrop-blur-sm"
-                  >
-                    BETA
-                  </span>
+                  {/* Only show the compact logo in the header; remove wordmark/BETA to keep header slim */}
                 </Link>
               </div>
             </div>
@@ -115,24 +123,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           )}
         </div>
       </div>
-      {/* Estilos premium para CTAs principales */}
-      <style jsx>{`
-        .brand-text {
-          animation: brand-pop-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
-          will-change: transform, opacity;
-          display: inline-block;
-        }
-        @keyframes brand-pop-in {
-          0% { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(2px); }
-          40% { opacity: 1; transform: translateY(-6px) scale(1.03); filter: blur(0); }
-          70% { transform: translateY(3px) scale(0.998); }
-          100% { transform: translateY(0) scale(1); }
-        }
-        
-        @media (prefers-reduced-motion: reduce) {
-          .brand-text { animation: none; opacity: 1; transform: none; }
-        }
-      `}</style>
+      {/* No additional brand animations needed; keep header lean */}
     </header>
   )
 }
