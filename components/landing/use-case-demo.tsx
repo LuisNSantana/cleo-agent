@@ -109,8 +109,8 @@ export function UseCaseDemo() {
   }, [currentStep, demo.steps.length])
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-5xl">
+    <section id="demo" data-landing-search data-landing-search-title="Live Demo" data-landing-search-type="section" className="relative w-full overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">
         <div className="mb-12 text-center">
           <motion.div
             className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"

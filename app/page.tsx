@@ -5,7 +5,6 @@ import { FeaturesSection } from "@/components/landing/features-section"
 import { AgentsSection } from "@/components/landing/agents-section"
 import { UseCaseDemo } from "@/components/landing/use-case-demo"
 import { BenefitsSection } from "@/components/landing/benefits-section"
-import { FounderStorySection } from "@/components/landing/founder-story-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { ScrollToTop } from "@/components/landing/scroll-to-top"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -57,21 +56,22 @@ export default async function Home({
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "USD",
-      "availability": "https://schema.org/InStock"
+      "availability": "https://schema.org/InStock",
+      "description": "Free beta access available"
     },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "ratingCount": "1000"
-    },
-    "description": "AI-powered productivity platform with specialized agents that automate tasks, manage workflows, and save 20+ hours weekly.",
+    "description": "Deploy your own AI agents in under 5 minutes. Built on three pillars: Transparency, Personalization, and Simplicity. No code required.",
     "featureList": [
-      "AI Task Automation",
-      "Workflow Management", 
-      "Multi-Agent Orchestration",
-      "Real-time Collaboration",
-      "Analytics & Insights"
-    ]
+      "Custom AI Agent Builder",
+      "Multi-Agent Orchestration", 
+      "Real-time Transparency",
+      "No-Code Deployment",
+      "Enterprise Security"
+    ],
+    "provider": {
+      "@type": "Organization",
+      "name": "Huminary Labs",
+      "url": "https://huminarylabs.com"
+    }
   }
 
   return (
@@ -87,35 +87,36 @@ export default async function Home({
       <main className="pt-16">
         {/* 1. Hero Section */}
         <HeroSection />
-        
-        {/* 2. Conoce a tu equipo de IA especializado */}
-        <div id="agents">
-          <AgentsSection />
-        </div>
-        
-        {/* 3. Watch your AI team work - Demo en vivo */}
-        <UseCaseDemo />
-        
-        {/* 4. Custom Agent Builder - Constructor personalizado */}
-        <CustomAgentsSection />
-        
-        {/* 5. Features Section */}
-        <div id="features">
-          <FeaturesSection />
-        </div>
-        
-        {/* 6. Benefits Section */}
-        <div id="benefits">
-          <BenefitsSection />
-        </div>
-        
-        {/* 7. Nuestra Historia - Founder Story */}
-        <div id="story">
-          <FounderStorySection />
-        </div>
-        
-        {/* Final CTA */}
-        <FinalCTASection />
+
+          {/* 2. Build Your Own Agents — focus on 5‑minute deploy */}
+          <div id="builder" data-landing-search data-landing-search-title="Builder" data-landing-search-type="section">
+            <CustomAgentsSection />
+          </div>
+
+          {/* 3. Live demo – watch your AI team work */}
+          <div id="demo" data-landing-search data-landing-search-title="Demo" data-landing-search-type="section">
+            <UseCaseDemo />
+          </div>
+
+          {/* 4. Meet your specialized AI team */}
+          <div id="agents" data-landing-search data-landing-search-title="Agents" data-landing-search-type="section">
+            <AgentsSection />
+          </div>
+
+          {/* 5. Features */}
+          <div id="features" data-landing-search data-landing-search-title="Features" data-landing-search-type="section">
+            <FeaturesSection />
+          </div>
+
+          {/* 6. Benefits */}
+          <div id="benefits" data-landing-search data-landing-search-title="Benefits" data-landing-search-type="section">
+            <BenefitsSection />
+          </div>
+
+          {/* Final CTA */}
+          <div id="get-started" data-landing-search data-landing-search-title="Start" data-landing-search-type="section">
+            <FinalCTASection />
+          </div>
       </main>
       
       <ScrollToTop />

@@ -114,6 +114,7 @@ export function CustomAgentsSection() {
     badge: t.landing.customAgentsBadge || 'Most Powerful Feature',
     title: t.landing.customAgentsTitle || 'Build Your Own AI Agents',
     subtitle: t.landing.customAgentsSubtitle || 'Create custom agents tailored to your exact needs. No coding required. Deploy specialized AI teammates in minutes.',
+    tagline: t.landing.customAgentsTagline || 'Deploy in under 5 minutes.',
     formName: t.landing.customAgentsFormName || 'Agent Name',
     formRole: t.landing.customAgentsFormRole || 'Role & Expertise',
     formCapability: t.landing.customAgentsFormCapability || 'Capability Level',
@@ -163,14 +164,14 @@ export function CustomAgentsSection() {
   ]
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+    <section id="builder" data-landing-search data-landing-search-title="Agent Builder" data-landing-search-type="section" className="relative w-full overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background py-20 sm:py-32">
       {/* Background decoration */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
         <div className="absolute right-0 top-1/2 h-full w-px bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
       </div>
 
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem] px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
           className="mb-16 text-center"
@@ -178,26 +179,55 @@ export function CustomAgentsSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
+          {/* PROMINENT 5-MINUTE TAGLINE - HERO BADGE */}
           <motion.div
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"
+            className="mb-6 inline-flex items-center gap-3 rounded-full border-2 border-primary/40 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-8 py-4 shadow-lg shadow-primary/20"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
+            animate={{ 
+              scale: [1, 1.05, 1],
+              boxShadow: [
+                "0 10px 40px rgba(var(--primary), 0.2)",
+                "0 10px 60px rgba(var(--primary), 0.4)",
+                "0 10px 40px rgba(var(--primary), 0.2)"
+              ]
+            }}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+          >
+            <Lightning weight="fill" className="h-6 w-6 text-primary" />
+            <span className="text-lg font-bold text-primary sm:text-xl md:text-2xl">
+              {customAgents.tagline}
+            </span>
+            <Lightning weight="fill" className="h-6 w-6 text-primary" />
+          </motion.div>
+
+          <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
+            {customAgents.title}
+          </h2>
+          <p className="mx-auto max-w-3xl text-xl text-muted-foreground sm:text-2xl">
+            {customAgents.subtitle}
+          </p>
+          
+          {/* Secondary badge for additional emphasis */}
+          <motion.div
+            className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-6 py-2 text-sm font-medium text-primary"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
           >
             <Sparkle weight="fill" className="h-4 w-4" />
             {customAgents.badge}
           </motion.div>
-
-          <h2 className="mb-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-            {customAgents.title}
-          </h2>
-          <p className="mx-auto max-w-3xl text-xl text-muted-foreground">
-            {customAgents.subtitle}
-          </p>
         </motion.div>
 
         {/* Main Content - Two Columns */}
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
+        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 xl:gap-20 items-start">
           {/* Left: Interactive Demo */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -206,28 +236,42 @@ export function CustomAgentsSection() {
             transition={{ duration: 0.6 }}
           >
             <div className="sticky top-24">
-              {/* Agent Creation Interface */}
-              <div className="rounded-2xl border border-border/60 bg-card/60 p-6 shadow-2xl backdrop-blur-sm">
-                {/* Header */}
-                <div className="mb-6 flex items-center justify-between border-b border-border/40 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Robot weight="duotone" className="h-6 w-6 text-primary" />
+              {/* Agent Creation Interface - MODERNIZED */}
+              <div className="group relative rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-card/95 via-card/90 to-card/95 p-8 shadow-2xl backdrop-blur-md transition-all hover:border-primary/40 hover:shadow-primary/20">
+                {/* Glow effect on hover */}
+                <div className="absolute -inset-0.5 rounded-3xl bg-gradient-to-r from-primary/20 via-blue-500/20 to-purple-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                
+                <div className="relative">
+                  {/* Header with pulse animation */}
+                  <div className="mb-8 flex items-center justify-between border-b-2 border-border/40 pb-6">
+                    <div className="flex items-center gap-4">
+                      <motion.div 
+                        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 ring-2 ring-primary/30"
+                        animate={{ 
+                          boxShadow: [
+                            "0 0 0 0 rgba(var(--primary), 0)",
+                            "0 0 0 8px rgba(var(--primary), 0.1)",
+                            "0 0 0 0 rgba(var(--primary), 0)"
+                          ]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <Robot weight="duotone" className="h-8 w-8 text-primary" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground">AI Agent Builder</h3>
+                        <p className="text-sm text-muted-foreground">No-code creation wizard</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">Agent Builder</h3>
-                      <p className="text-xs text-muted-foreground">Create your custom AI teammate</p>
+                    <div className="flex gap-2">
+                      <div className="h-3.5 w-3.5 rounded-full bg-red-500 ring-2 ring-red-500/30" />
+                      <div className="h-3.5 w-3.5 rounded-full bg-yellow-500 ring-2 ring-yellow-500/30" />
+                      <div className="h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-green-500/30" />
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-red-500/60" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/60" />
-                    <div className="h-3 w-3 rounded-full bg-green-500/60" />
-                  </div>
-                </div>
 
-                {/* Form Fields with Animation */}
-                <div className="space-y-4">
+                {/* Form Fields with Animation - IMPROVED */}
+                <div className="space-y-6">
                   {/* Agent Name */}
                   <div>
                     <label className="mb-2 block text-sm font-medium text-muted-foreground">
@@ -345,6 +389,7 @@ export function CustomAgentsSection() {
                       <CheckCircle weight="bold" className="h-5 w-5" />
                     </span>
                   </motion.button>
+                </div>
                 </div>
               </div>
 

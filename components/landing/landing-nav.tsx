@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LandingSearch } from '@/components/landing/landing-search'
 
 export function LandingNav() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export function LandingNav() {
   const { theme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [mobileQuery, setMobileQuery] = useState("")
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -30,8 +32,12 @@ export function LandingNav() {
     router.push('/auth')
   }
 
+  const handleStartFree = () => {
+    router.push('/auth')
+  }
+
   const handleGetStarted = () => {
-    router.push('/chat/guest')
+    router.push('/auth')
   }
 
   const currentLang = languages.find((lang) => lang.code === locale)
@@ -106,6 +112,18 @@ export function LandingNav() {
             {mounted ? (locale === 'es' ? 'Agentes' : locale === 'pt' ? 'Agentes' : locale === 'fr' ? 'Agents' : 'Agents') : 'Agents'}
           </a>
           <a
+            href="#builder"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {mounted ? (locale === 'es' ? 'Creador' : locale === 'pt' ? 'Construtor' : locale === 'fr' ? 'Générateur' : 'Builder') : 'Builder'}
+          </a>
+          <a
+            href="#demo"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {mounted ? (locale === 'es' ? 'Demo' : locale === 'pt' ? 'Demo' : locale === 'fr' ? 'Démo' : 'Demo') : 'Demo'}
+          </a>
+          <a
             href="#benefits"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
@@ -118,6 +136,9 @@ export function LandingNav() {
             Docs
           </button>
         </div>
+
+        {/* Landing search (desktop) */}
+        <LandingSearch />
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
@@ -190,6 +211,40 @@ export function LandingNav() {
           exit={{ opacity: 0, height: 0 }}
         >
           <div className="space-y-1 px-4 py-4">
+            {/* Mobile search */}
+            <div className="mb-2">
+              <input
+                value={mobileQuery}
+                onChange={(e) => setMobileQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && mobileQuery.trim()) {
+                    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-landing-search]'))
+                    const q = mobileQuery.toLowerCase()
+                    const match = nodes.find((n) => (n.dataset.landingSearchTitle || n.innerText).toLowerCase().includes(q))
+                    if (match) {
+                      setMobileMenuOpen(false)
+                      setTimeout(() => match.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+                    }
+                  }
+                }}
+                placeholder={mounted ? (locale === 'es' ? 'Buscar contenido…' : 'Search content…') : 'Search content…'}
+                className="w-full rounded-lg border border-border/50 bg-background/70 px-3 py-2 text-sm shadow-sm outline-none"
+              />
+            </div>
+            <a
+              href="#builder"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {mounted ? (locale === 'es' ? 'Creador' : locale === 'pt' ? 'Construtor' : locale === 'fr' ? 'Générateur' : 'Builder') : 'Builder'}
+            </a>
+            <a
+              href="#demo"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {mounted ? (locale === 'es' ? 'Demo' : locale === 'pt' ? 'Demo' : locale === 'fr' ? 'Démo' : 'Demo') : 'Demo'}
+            </a>
             <a
               href="#features"
               className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"

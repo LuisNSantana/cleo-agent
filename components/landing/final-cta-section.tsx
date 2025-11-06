@@ -11,14 +11,14 @@ export function FinalCTASection() {
   const { t } = useI18n()
 
   const handleStartFree = () => {
-    router.push('/chat/guest')
+    router.push('/auth')
   }
 
   return (
     <>
       {/* Philosophy Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-blue-500/5 xl:to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-screen-2xl">
+      <section className="relative w-full overflow-hidden bg-gradient-to-br from-primary/5 via-background to-blue-500/5 xl:to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+        <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">
           <motion.div
             className="mx-auto max-w-3xl text-center"
             initial={{ opacity: 0, y: 20 }}
@@ -77,8 +77,8 @@ export function FinalCTASection() {
         </div>
       </section>
 
-      {/* Final CTA Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/80 via-primary/70 to-blue-600/60 px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+            {/* Final CTA Section */}
+      <section className="relative w-full overflow-hidden bg-gradient-to-br from-primary/80 via-primary/70 to-blue-600/60 px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
         {/* Animated background */}
         <div className="absolute inset-0 -z-10">
           <motion.div
@@ -99,7 +99,8 @@ export function FinalCTASection() {
           />
         </div>
 
-        <div className="relative mx-auto max-w-4xl text-center">
+        <div className="relative mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">
+          <div className="mx-auto max-w-4xl text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -191,6 +192,7 @@ export function FinalCTASection() {
               </div>
             </motion.div>
           </motion.div>
+          </div>
         </div>
       </section>
     </>

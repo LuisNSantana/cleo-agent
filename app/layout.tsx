@@ -38,11 +38,11 @@ const appUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
+    default: "Cleo AI — Deploy Your Own Agents in Minutes",
     template: "%s · Cleo AI",
   },
   description:
-    "Let Cleo be with you. AI-powered productivity platform with specialized agents that automate tasks, manage workflows, and boost efficiency 10x. Free trial, no credit card required.",
+    "Deploy your own AI agents in under 5 minutes. Built on three pillars: Transparency, Personalization, and Simplicity. Free beta — no credit card required.",
   applicationName: "Cleo",
   generator: "Next.js",
   keywords: [
@@ -91,9 +91,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Cleo AI",
-    title: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
+    title: "Cleo AI — Deploy Your Own Agents in Minutes",
     description:
-      "Let Cleo be with you. AI agents automate tasks, manage workflows, and make your life 10x easier. Join 1000+ professionals saving time daily. Start free.",
+      "Launch custom AI agents quickly with full transparency and simple controls. Try the free beta — no credit card required.",
   url: appUrl,
     images: [
       {
@@ -108,9 +108,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     creator: "@HuminaryLabs",
-    title: "Cleo AI - Automate Your Work & Save 20+ Hours Weekly",
+    title: "Cleo AI — Deploy Your Own Agents in Minutes",
     description:
-      "Let Cleo be with you. AI agents automate tasks, manage workflows, and boost productivity 10x. Start free, no credit card.",
+      "Build and deploy AI agents in under 5 minutes. Transparent by design. Free beta access.",
     // Keep in sync with openGraph.images and include cache-busting param
     images: ["/opengraph-image?v=2"],
   },

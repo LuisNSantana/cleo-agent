@@ -103,38 +103,46 @@ export function FeaturesSection() {
   const { t } = useI18n()
 
   return (
-    <section className="relative overflow-hidden bg-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-screen-2xl">
+    <section id="features" data-landing-search data-landing-search-title="Features" data-landing-search-type="section" className="relative w-full overflow-hidden bg-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+      <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">
         {/* Section header */}
         <motion.div
-          className="mb-16 text-center"
+          className="mb-20 text-center"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
           <motion.div
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-6 py-2.5 text-sm font-bold text-primary shadow-lg shadow-primary/20"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
+            animate={{ 
+              scale: [1, 1.02, 1],
+              boxShadow: [
+                "0 10px 40px rgba(var(--primary), 0.2)",
+                "0 10px 50px rgba(var(--primary), 0.3)",
+                "0 10px 40px rgba(var(--primary), 0.2)"
+              ]
+            }}
+            transition={{ delay: 0.2, duration: 3, repeat: Infinity, repeatType: "reverse" }}
           >
-            <Sparkle weight="fill" className="h-4 w-4" />
-            Features
+            <Sparkle weight="fill" className="h-5 w-5" />
+            Powerful Features
           </motion.div>
           
-          <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+          <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
             {t.landing.featuresTitle}
           </h2>
-          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+          <p className="mx-auto max-w-3xl text-xl text-muted-foreground sm:text-2xl">
             {t.landing.featuresSubtitle}
           </p>
         </motion.div>
 
         {/* Features grid */}
         <motion.div
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
@@ -142,39 +150,56 @@ export function FeaturesSection() {
         >
           {features.map((feature, index) => (
             <motion.div key={index} variants={itemVariants}>
-              <Card className="group relative h-full overflow-hidden border-border/60 bg-card/60 p-6 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
-                {/* Gradient overlay on hover */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 transition-opacity duration-300 group-hover:opacity-5`} />
+              <Card
+                data-landing-search
+                data-landing-search-title={feature.title}
+                data-landing-search-type="feature"
+                className="group relative h-full overflow-hidden rounded-2xl border-2 border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-card/95 p-8 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/20"
+              >
+                {/* Animated gradient glow on hover */}
+                <div className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 blur transition duration-500 group-hover:opacity-20`} />
 
-                {/* Icon */}
-                <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-2.5 shadow-lg transition-transform duration-300 group-hover:scale-110`}>
-                  <feature.icon weight="duotone" className="h-full w-full text-white" />
+                {/* Content wrapper */}
+                <div className="relative">
+                  {/* Icon with enhanced effects */}
+                  <motion.div 
+                    className={`mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-xl transition-transform duration-300 group-hover:scale-110`}
+                    whileHover={{ rotate: [0, -10, 10, -10, 0] }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <feature.icon weight="duotone" className="h-full w-full text-white" />
+                  </motion.div>
+
+                  {/* Title */}
+                  <h3 className="mb-3 text-xl font-bold text-foreground">
+                    {feature.title}
+                  </h3>
+                  
+                  {/* Description */}
+                  <p className="mb-6 text-base leading-relaxed text-muted-foreground">
+                    {feature.description}
+                  </p>
+
+                  {/* Feature list with enhanced styling */}
+                  <ul className="space-y-2.5">
+                    {feature.features.map((item, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
+                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${feature.color} p-1`}>
+                          <Check weight="bold" className="h-full w-full text-white" />
+                        </div>
+                        <span className="leading-relaxed">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                {/* Content */}
-                <h3 className="mb-2 text-lg font-semibold text-foreground">
-                  {feature.title}
-                </h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  {feature.description}
-                </p>
-
-                {/* Feature list */}
-                <ul className="space-y-2">
-                  {feature.features.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <Check weight="bold" className={`mt-0.5 h-3 w-3 shrink-0 bg-gradient-to-br ${feature.color} bg-clip-text text-transparent`} />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Hover indicator */}
+                {/* Bottom accent bar with animation */}
                 <motion.div
-                  className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r ${feature.color}`}
+                  className={`absolute bottom-0 left-0 h-1.5 w-full bg-gradient-to-r ${feature.color}`}
                   initial={{ scaleX: 0 }}
-                  whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.3 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.05, duration: 0.6 }}
                 />
               </Card>
             </motion.div>
@@ -183,18 +208,21 @@ export function FeaturesSection() {
 
         {/* Bottom highlight + CTA */}
         <motion.div
-          className="mt-16 text-center"
+          className="mt-20 text-center"
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.3 }}
         >
-          <p className="mx-auto max-w-3xl text-balance text-xl sm:text-2xl font-semibold tracking-tight text-foreground/90">
+          <p className="mx-auto max-w-3xl text-balance text-2xl sm:text-3xl font-bold tracking-tight text-foreground/90">
             And hundreds more capabilities ready for you to explore
           </p>
-          <div className="mt-5 flex items-center justify-center">
-            <Button size="lg" className="rounded-full px-6" asChild>
-              <a href="/chat/guest">Try a live demo</a>
+          <div className="mt-8 flex items-center justify-center">
+            <Button size="lg" className="group rounded-full px-8 py-6 text-base font-bold shadow-xl transition-all hover:shadow-2xl hover:shadow-primary/30" asChild>
+              <a href="/auth" className="flex items-center gap-2">
+                Try a live demo
+                <Rocket weight="bold" className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </a>
             </Button>
           </div>
         </motion.div>

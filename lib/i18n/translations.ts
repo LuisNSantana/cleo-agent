@@ -96,6 +96,7 @@ export type Translations = {
     customAgentsBadge: string
     customAgentsTitle: string
     customAgentsSubtitle: string
+  customAgentsTagline: string
     customAgentsFormName: string
     customAgentsFormRole: string
     customAgentsFormCapability: string
@@ -144,6 +145,13 @@ export type Translations = {
     finalCtaTitle: string
     finalCtaSubtitle: string
     finalCta: string
+    tryDemo: string
+    getStarted: string
+    tryNow: string
+    
+    // Deploy time badge
+    deployTime: string
+    under5Minutes: string
     
     // Philosophy section
     philosophyTitle: string
@@ -219,28 +227,29 @@ const en: Translations = {
   },
   landing: {
     heroTitle: 'Let Cleo be with you',
-    heroSubtitle: 'Cleo makes your life 10x easier. Specialized AI agents automate tasks, manage workflows, and save 20+ hours weekly.',
-    heroCta: 'Start Free Trial',
+    heroSubtitle: 'Deploy your own AI agents in under 5 minutes. No code required. Built on three pillars: Transparency, Personalization, and Simplicity.',
+    heroCta: 'Start Free Beta',
     heroCtaSecondary: 'Watch Demo',
     
-    trustedBy: 'Join 1000+ professionals already saving hours daily',
+    trustedBy: 'Join the open beta — Experience the future of AI automation',
     
     // Custom Agents Section
-    customAgentsBadge: 'Most Powerful Feature',
+    customAgentsBadge: 'Deploy in Minutes',
     customAgentsTitle: 'Build Your Own AI Agents',
-    customAgentsSubtitle: 'Create custom agents tailored to your exact needs. No coding required. Deploy specialized AI teammates in minutes.',
+    customAgentsSubtitle: 'Create custom agents tailored to your exact needs. No coding required. Deploy specialized AI teammates in under 5 minutes.',
+  customAgentsTagline: 'Deploy faster than frying an egg.',
     customAgentsFormName: 'Agent Name',
     customAgentsFormRole: 'Role & Expertise',
     customAgentsFormCapability: 'Capability Level',
     customAgentsPreview: 'Preview',
     customAgentsDeploy: 'Deploy Agent',
-    customAgentsBenefitsTitle: 'Why Build Custom Agents?',
-    customAgentsBenefit1Title: 'Unlimited Custom Agents',
-    customAgentsBenefit1Desc: 'Create as many specialized agents as you need for different tasks and workflows.',
-    customAgentsBenefit2Title: 'Task-Specific Expertise',
-    customAgentsBenefit2Desc: 'Each agent focuses on one domain, ensuring expert-level performance and accuracy.',
-    customAgentsBenefit3Title: 'No-Code Builder',
-    customAgentsBenefit3Desc: 'Intuitive interface - no programming required. Build agents in minutes, not hours.',
+    customAgentsBenefitsTitle: 'Three Core Pillars',
+    customAgentsBenefit1Title: 'Transparency',
+    customAgentsBenefit1Desc: 'See exactly what your agents are doing in real-time. Full visibility into every action and decision.',
+    customAgentsBenefit2Title: 'Personalization',
+    customAgentsBenefit2Desc: 'Customize every aspect of your AI team. From personality to capabilities, make them truly yours.',
+    customAgentsBenefit3Title: 'Simplicity',
+    customAgentsBenefit3Desc: 'No code. No complexity. Deploy production-ready agents in under 5 minutes with our intuitive builder.',
     customAgentsBenefit4Title: 'Sub-Agents & Delegation',
     customAgentsBenefit4Desc: 'Create hierarchies - parent agents can delegate to specialized sub-agents automatically.',
     customAgentsUseCasesTitle: 'Popular Use Cases',
@@ -250,13 +259,13 @@ const en: Translations = {
     customAgentsUseCase4: 'Marketing campaigns with research, copywriting, and analytics agents',
     
     featuresTitle: 'Everything You Need to Work Better',
-    featuresSubtitle: 'Powerful tools that work together without complications',
+    featuresSubtitle: 'Powerful tools that work together seamlessly',
     
     agentsTitle: 'Meet Your Specialized AI Team',
-    agentsSubtitle: 'Each agent masters one domain. Together, they transform your productivity.',
+    agentsSubtitle: 'Each agent is an expert in their domain. Click to learn more about their capabilities.',
     
-    benefitsTitle: 'Real Productivity Gains',
-    benefitsSubtitle: 'Measurable results from day one',
+    benefitsTitle: 'Why Teams Choose Cleo',
+    benefitsSubtitle: 'Built for the modern workflow',
     
     useCasesTitle: 'Watch Your AI Team in Action',
     useCasesSubtitle: 'See how Cleo handles real tasks in real-time',
@@ -267,9 +276,15 @@ const en: Translations = {
     securityTitle: 'Enterprise Security Built-In',
     securitySubtitle: 'Bank-level encryption. Your data stays yours.',
     
-    finalCtaTitle: 'Ready to 10x Your Output?',
-    finalCtaSubtitle: 'Start free today. No credit card. Cancel anytime.',
-    finalCta: 'Try Cleo Free',
+    finalCtaTitle: 'Ready to Deploy Your AI Team?',
+    finalCtaSubtitle: 'Start your free beta access today. No credit card required.',
+    finalCta: 'Start Free Beta',
+    tryDemo: 'Try a live demo',
+    getStarted: 'Get Started',
+    tryNow: 'Try it now',
+    
+    deployTime: 'Deploy Time',
+    under5Minutes: 'Under 5 Minutes ⚡',
     
     philosophyTitle: 'Our Philosophy',
     philosophySubtitle: 'AI should empower, not replace. Cleo augments your capabilities, letting you focus on what matters most while intelligent agents handle the rest.',
@@ -344,28 +359,29 @@ const es: Translations = {
   },
   landing: {
     heroTitle: 'Deja que Cleo esté contigo',
-    heroSubtitle: 'Cleo hace tu vida 10x más fácil. Agentes de IA especializados automatizan tareas, gestionan flujos de trabajo y ahorran más de 20 horas semanales.',
-    heroCta: 'Prueba Gratis',
+    heroSubtitle: 'Despliega tus propios agentes de IA en menos de 5 minutos. Sin código. Basado en tres pilares: Transparencia, Personalización y Simplicidad.',
+    heroCta: 'Prueba Beta Gratis',
     heroCtaSecondary: 'Ver Demo',
     
-    trustedBy: 'Únete a más de 1000 profesionales ahorrando horas cada día',
+    trustedBy: 'Únete a la beta abierta — Experimenta el futuro de la automatización con IA',
     
     // Custom Agents Section
-    customAgentsBadge: 'Característica Más Poderosa',
+    customAgentsBadge: 'Despliega en Minutos',
     customAgentsTitle: 'Construye tus Propios Agentes de IA',
-    customAgentsSubtitle: 'Crea agentes personalizados adaptados a tus necesidades exactas. Sin programación. Despliega compañeros de IA especializados en minutos.',
+    customAgentsSubtitle: 'Crea agentes personalizados adaptados a tus necesidades exactas. Sin programación. Despliega compañeros de IA especializados en menos de 5 minutos.',
+  customAgentsTagline: 'Despliega tu agente en menos tiempo de lo que se fríe un huevo.',
     customAgentsFormName: 'Nombre del Agente',
     customAgentsFormRole: 'Rol y Experticia',
     customAgentsFormCapability: 'Nivel de Capacidad',
     customAgentsPreview: 'Vista Previa',
     customAgentsDeploy: 'Desplegar Agente',
-    customAgentsBenefitsTitle: '¿Por qué Crear Agentes Personalizados?',
-    customAgentsBenefit1Title: 'Agentes Personalizados Ilimitados',
-    customAgentsBenefit1Desc: 'Crea tantos agentes especializados como necesites para diferentes tareas y flujos de trabajo.',
-    customAgentsBenefit2Title: 'Experiencia Específica por Tarea',
-    customAgentsBenefit2Desc: 'Cada agente se enfoca en un dominio, asegurando rendimiento y precisión de nivel experto.',
-    customAgentsBenefit3Title: 'Constructor Sin Código',
-    customAgentsBenefit3Desc: 'Interfaz intuitiva - no requiere programación. Construye agentes en minutos, no horas.',
+    customAgentsBenefitsTitle: 'Tres Pilares Fundamentales',
+    customAgentsBenefit1Title: 'Transparencia',
+    customAgentsBenefit1Desc: 'Ve exactamente qué están haciendo tus agentes en tiempo real. Visibilidad total de cada acción y decisión.',
+    customAgentsBenefit2Title: 'Personalización',
+    customAgentsBenefit2Desc: 'Personaliza cada aspecto de tu equipo de IA. Desde la personalidad hasta las capacidades, hazlos verdaderamente tuyos.',
+    customAgentsBenefit3Title: 'Simplicidad',
+    customAgentsBenefit3Desc: 'Sin código. Sin complejidad. Despliega agentes listos para producción en menos de 5 minutos con nuestro constructor intuitivo.',
     customAgentsBenefit4Title: 'Sub-Agentes y Delegación',
     customAgentsBenefit4Desc: 'Crea jerarquías - los agentes padre pueden delegar a sub-agentes especializados automáticamente.',
     customAgentsUseCasesTitle: 'Casos de Uso Populares',
@@ -375,13 +391,13 @@ const es: Translations = {
     customAgentsUseCase4: 'Campañas de marketing con agentes de investigación, copywriting y analítica',
     
     featuresTitle: 'Todo lo que Necesitas para Trabajar Mejor',
-    featuresSubtitle: 'Herramientas potentes que funcionan juntas sin complicaciones',
+    featuresSubtitle: 'Herramientas potentes que funcionan juntas sin esfuerzo',
     
     agentsTitle: 'Conoce tu Equipo de IA Especializado',
-    agentsSubtitle: 'Cada agente domina un área. Juntos, transforman tu productividad.',
+    agentsSubtitle: 'Cada agente es un experto en su dominio. Haz clic para conocer más sobre sus capacidades.',
     
-    benefitsTitle: 'Ganancias Reales de Productividad',
-    benefitsSubtitle: 'Resultados medibles desde el primer día',
+    benefitsTitle: 'Por qué los Equipos Eligen Cleo',
+    benefitsSubtitle: 'Construido para el flujo de trabajo moderno',
     
     useCasesTitle: 'Observa a tu Equipo de IA Trabajar',
     useCasesSubtitle: 'Mira cómo Cleo maneja tareas reales en tiempo real',
@@ -392,9 +408,15 @@ const es: Translations = {
     securityTitle: 'Seguridad Empresarial Integrada',
     securitySubtitle: 'Cifrado de nivel bancario. Tus datos son tuyos.',
     
-    finalCtaTitle: '¿Listo para 10x tu Productividad?',
-    finalCtaSubtitle: 'Empieza gratis hoy. Sin tarjeta de crédito. Cancela cuando quieras.',
-    finalCta: 'Probar Cleo Gratis',
+    finalCtaTitle: '¿Listo para Desplegar tu Equipo de IA?',
+    finalCtaSubtitle: 'Comienza tu acceso beta gratuito hoy. Sin tarjeta de crédito.',
+    finalCta: 'Comenzar Beta Gratis',
+    tryDemo: 'Prueba en vivo',
+    getStarted: 'Comenzar',
+    tryNow: 'Pruébalo ahora',
+    
+    deployTime: 'Tiempo de Despliegue',
+    under5Minutes: 'Menos de 5 Minutos ⚡',
     
     philosophyTitle: 'Nuestra Filosofía',
     philosophySubtitle: 'La IA debe potenciar, no reemplazar. Cleo aumenta tus capacidades, permitiéndote enfocarte en lo más importante mientras los agentes inteligentes se encargan del resto.',
@@ -496,13 +518,20 @@ const pt: Translations = {
     finalCtaTitle: 'Pronto para 10x sua Produtividade?',
     finalCtaSubtitle: 'Comece grátis hoje. Sem cartão de crédito. Cancele quando quiser.',
     finalCta: 'Experimentar Cleo Grátis',
+    tryDemo: 'Demonstração ao vivo',
+    getStarted: 'Começar',
+    tryNow: 'Experimente agora',
     
+    deployTime: 'Tempo de Implantação',
+    under5Minutes: 'Menos de 5 Minutos ⚡',
+
     philosophyTitle: 'Nossa Filosofia',
     philosophySubtitle: 'A IA deve potencializar, não substituir. Cleo aumenta suas capacidades, permitindo que você se concentre no que mais importa enquanto agentes inteligentes cuidam do resto.',
     
     customAgentsBadge: 'Recurso Mais Poderoso',
     customAgentsTitle: 'Crie Seus Próprios Agentes de IA',
     customAgentsSubtitle: 'Crie agentes personalizados adaptados às suas necessidades exatas. Sem codificação necessária. Implante colegas de IA especializados em minutos.',
+  customAgentsTagline: 'Implante em menos de 5 minutos.',
     customAgentsFormName: 'Nome do Agente',
     customAgentsFormRole: 'Função e Especialização',
     customAgentsFormCapability: 'Nível de Capacidade',
@@ -620,13 +649,20 @@ const fr: Translations = {
     finalCtaTitle: 'Prêt à 10x votre Productivité?',
     finalCtaSubtitle: 'Commencez gratuitement aujourd\'hui. Sans carte bancaire. Annulez quand vous voulez.',
     finalCta: 'Essayer Cleo Gratuitement',
+    tryDemo: 'Essayer en direct',
+    getStarted: 'Commencer',
+    tryNow: 'Essayez maintenant',
     
+    deployTime: 'Temps de Déploiement',
+    under5Minutes: 'Moins de 5 Minutes ⚡',
+
     philosophyTitle: 'Notre Philosophie',
     philosophySubtitle: 'L\'IA doit renforcer, pas remplacer. Cleo augmente vos capacités, vous permettant de vous concentrer sur ce qui compte le plus pendant que les agents intelligents s\'occupent du reste.',
     
     customAgentsBadge: 'Fonctionnalité la Plus Puissante',
     customAgentsTitle: 'Créez Vos Propres Agents IA',
     customAgentsSubtitle: 'Créez des agents personnalisés adaptés à vos besoins exacts. Aucun codage requis. Déployez des coéquipiers IA spécialisés en quelques minutes.',
+  customAgentsTagline: 'Déployez en moins de 5 minutes.',
     customAgentsFormName: 'Nom de l\'Agent',
     customAgentsFormRole: 'Rôle et Expertise',
     customAgentsFormCapability: 'Niveau de Capacité',
@@ -736,12 +772,20 @@ const it: Translations = {
     finalCtaTitle: 'Ready to Multiply Your Productivity?',
     finalCtaSubtitle: 'Start free, no credit card required.',
     finalCta: 'Start Free Now',
+    tryDemo: 'Prova live',
+    getStarted: 'Inizia',
+    tryNow: 'Provalo ora',
+    
+    deployTime: 'Tempo di Distribuzione',
+    under5Minutes: 'Meno di 5 Minuti ⚡',
+    
     philosophyTitle: 'Our Philosophy',
     philosophySubtitle: 'AI should empower, not replace.',
     
     customAgentsBadge: 'Funzionalità Più Potente',
     customAgentsTitle: 'Crea i Tuoi Agenti IA',
     customAgentsSubtitle: 'Crea agenti personalizzati su misura per le tue esigenze specifiche. Nessuna codifica richiesta. Distribuisci colleghi IA specializzati in pochi minuti.',
+  customAgentsTagline: 'Distribuisci in meno di 5 minuti.',
     customAgentsFormName: 'Nome dell\'Agente',
     customAgentsFormRole: 'Ruolo ed Esperienza',
     customAgentsFormCapability: 'Livello di Capacità',
@@ -851,12 +895,20 @@ const de: Translations = {
     finalCtaTitle: 'Ready to Multiply Your Productivity?',
     finalCtaSubtitle: 'Start free, no credit card required.',
     finalCta: 'Start Free Now',
+    tryDemo: 'Live-Demo',
+    getStarted: 'Loslegen',
+    tryNow: 'Jetzt testen',
+    
+    deployTime: 'Bereitstellungszeit',
+    under5Minutes: 'Unter 5 Minuten ⚡',
+    
     philosophyTitle: 'Our Philosophy',
     philosophySubtitle: 'AI should empower, not replace.',
     
     customAgentsBadge: 'Leistungsstärkste Funktion',
     customAgentsTitle: 'Erstellen Sie Ihre Eigenen KI-Agenten',
     customAgentsSubtitle: 'Erstellen Sie maßgeschneiderte Agenten für Ihre spezifischen Bedürfnisse. Keine Programmierung erforderlich. Stellen Sie spezialisierte KI-Teammitglieder in Minuten bereit.',
+  customAgentsTagline: 'Bereitstellung in unter 5 Minuten.',
     customAgentsFormName: 'Agentenname',
     customAgentsFormRole: 'Rolle & Expertise',
     customAgentsFormCapability: 'Fähigkeitsstufe',
@@ -945,7 +997,7 @@ const ja: Translations = {
     appearance: '外観',
     language: '言語',
   },
-  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'最も強力な機能',customAgentsTitle:'独自のAIエージェントを構築',customAgentsSubtitle:'ニーズに合わせたカスタムエージェントを作成。コーディング不要。数分で専門的なAIチームメイトを展開。',customAgentsFormName:'エージェント名',customAgentsFormRole:'役割と専門知識',customAgentsFormCapability:'能力レベル',customAgentsPreview:'プレビュー',customAgentsDeploy:'エージェントを展開',customAgentsBenefitsTitle:'カスタムエージェントを構築する理由',customAgentsBenefit1Title:'無制限のカスタムエージェント',customAgentsBenefit1Desc:'さまざまなタスクとワークフローに必要な数の専門エージェントを作成。',customAgentsBenefit2Title:'タスク固有の専門知識',customAgentsBenefit2Desc:'各エージェントは1つのドメインに焦点を当て、専門家レベルのパフォーマンスと精度を保証。',customAgentsBenefit3Title:'ノーコードビルダー',customAgentsBenefit3Desc:'直感的なインターフェース - プログラミング不要。時間ではなく分でエージェントを構築。',customAgentsBenefit4Title:'サブエージェントと委任',customAgentsBenefit4Desc:'階層を作成 - 親エージェントは専門のサブエージェントに自動的に委任可能。',customAgentsUseCasesTitle:'人気のユースケース',customAgentsUseCase1:'専門製品エージェントによるカスタマーサポートの自動化',customAgentsUseCase2:'ライター、エディター、パブリッシャーエージェントによるコンテンツ作成パイプライン',customAgentsUseCase3:'コードレビューとドキュメントエージェントによる開発ワークフロー',customAgentsUseCase4:'リサーチ、コピーライティング、分析エージェントによるマーケティングキャンペーン'},
+  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',tryDemo:'ライブデモ',getStarted:'始める',tryNow:'今すぐ試す',deployTime:'展開時間',under5Minutes:'5分以内 ⚡',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'最も強力な機能',customAgentsTitle:'独自のAIエージェントを構築',customAgentsSubtitle:'ニーズに合わせたカスタムエージェントを作成。コーディング不要。数分で専門的なAIチームメイトを展開。',customAgentsTagline:'5分以内でデプロイ。',customAgentsFormName:'エージェント名',customAgentsFormRole:'役割と専門知識',customAgentsFormCapability:'能力レベル',customAgentsPreview:'プレビュー',customAgentsDeploy:'エージェントを展開',customAgentsBenefitsTitle:'カスタムエージェントを構築する理由',customAgentsBenefit1Title:'無制限のカスタムエージェント',customAgentsBenefit1Desc:'さまざまなタスクとワークフローに必要な数の専門エージェントを作成。',customAgentsBenefit2Title:'タスク固有の専門知識',customAgentsBenefit2Desc:'各エージェントは1つのドメインに焦点を当て、専門家レベルのパフォーマンスと精度を保証。',customAgentsBenefit3Title:'ノーコードビルダー',customAgentsBenefit3Desc:'直感的なインターフェース - プログラミング不要。時間ではなく分でエージェントを構築。',customAgentsBenefit4Title:'サブエージェントと委任',customAgentsBenefit4Desc:'階層を作成 - 親エージェントは専門のサブエージェントに自動的に委任可能。',customAgentsUseCasesTitle:'人気のユースケース',customAgentsUseCase1:'専門製品エージェントによるカスタマーサポートの自動化',customAgentsUseCase2:'ライター、エディター、パブリッシャーエージェントによるコンテンツ作成パイプライン',customAgentsUseCase3:'コードレビューとドキュメントエージェントによる開発ワークフロー',customAgentsUseCase4:'リサーチ、コピーライティング、分析エージェントによるマーケティングキャンペーン'},
 }
 
 const ko: Translations = {
@@ -1014,7 +1066,7 @@ const ko: Translations = {
     appearance: '외관',
     language: '언어',
   },
-  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'가장 강력한 기능',customAgentsTitle:'자신만의 AI 에이전트 구축',customAgentsSubtitle:'정확한 요구에 맞춘 맞춤 에이전트를 만드세요. 코딩 불필요. 몇 분 안에 전문화된 AI 팀원을 배포하세요.',customAgentsFormName:'에이전트 이름',customAgentsFormRole:'역할 및 전문성',customAgentsFormCapability:'능력 수준',customAgentsPreview:'미리보기',customAgentsDeploy:'에이전트 배포',customAgentsBenefitsTitle:'맞춤 에이전트를 구축하는 이유',customAgentsBenefit1Title:'무제한 맞춤 에이전트',customAgentsBenefit1Desc:'다양한 작업과 워크플로에 필요한 만큼 전문화된 에이전트를 만드세요.',customAgentsBenefit2Title:'작업별 전문 지식',customAgentsBenefit2Desc:'각 에이전트는 하나의 도메인에 집중하여 전문가 수준의 성능과 정확성을 보장합니다.',customAgentsBenefit3Title:'노코드 빌더',customAgentsBenefit3Desc:'직관적인 인터페이스 - 프로그래밍 불필요. 시간이 아닌 분 단위로 에이전트를 구축하세요.',customAgentsBenefit4Title:'하위 에이전트 및 위임',customAgentsBenefit4Desc:'계층 구조 생성 - 상위 에이전트가 전문화된 하위 에이전트에 자동으로 위임할 수 있습니다.',customAgentsUseCasesTitle:'인기 사용 사례',customAgentsUseCase1:'전문 제품 에이전트를 통한 고객 지원 자동화',customAgentsUseCase2:'작가, 편집자 및 게시자 에이전트를 통한 콘텐츠 제작 파이프라인',customAgentsUseCase3:'코드 리뷰 및 문서화 에이전트를 통한 개발 워크플로',customAgentsUseCase4:'리서치, 카피라이팅 및 분석 에이전트를 통한 마케팅 캠페인'},
+  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',tryDemo:'라이브 데모',getStarted:'시작하기',tryNow:'지금 시도',deployTime:'배포 시간',under5Minutes:'5분 이내 ⚡',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'가장 강력한 기능',customAgentsTitle:'자신만의 AI 에이전트 구축',customAgentsSubtitle:'정확한 요구에 맞춘 맞춤 에이전트를 만드세요. 코딩 불필요. 몇 분 안에 전문화된 AI 팀원을 배포하세요.',customAgentsTagline:'5분 안에 배포하세요.',customAgentsFormName:'에이전트 이름',customAgentsFormRole:'역할 및 전문성',customAgentsFormCapability:'능력 수준',customAgentsPreview:'미리보기',customAgentsDeploy:'에이전트 배포',customAgentsBenefitsTitle:'맞춤 에이전트를 구축하는 이유',customAgentsBenefit1Title:'무제한 맞춤 에이전트',customAgentsBenefit1Desc:'다양한 작업과 워크플로에 필요한 만큼 전문화된 에이전트를 만드세요.',customAgentsBenefit2Title:'작업별 전문 지식',customAgentsBenefit2Desc:'각 에이전트는 하나의 도메인에 집중하여 전문가 수준의 성능과 정확성을 보장합니다.',customAgentsBenefit3Title:'노코드 빌더',customAgentsBenefit3Desc:'직관적인 인터페이스 - 프로그래밍 불필요. 시간이 아닌 분 단위로 에이전트를 구축하세요.',customAgentsBenefit4Title:'하위 에이전트 및 위임',customAgentsBenefit4Desc:'계층 구조 생성 - 상위 에이전트가 전문화된 하위 에이전트에 자동으로 위임할 수 있습니다.',customAgentsUseCasesTitle:'인기 사용 사례',customAgentsUseCase1:'전문 제품 에이전트를 통한 고객 지원 자동화',customAgentsUseCase2:'작가, 편집자 및 게시자 에이전트를 통한 콘텐츠 제작 파이프라인',customAgentsUseCase3:'코드 리뷰 및 문서화 에이전트를 통한 개발 워크플로',customAgentsUseCase4:'리서치, 카피라이팅 및 분석 에이전트를 통한 마케팅 캠페인'},
 }
 
 const zh: Translations = {
@@ -1083,7 +1135,7 @@ const zh: Translations = {
     appearance: '外观',
     language: '语言',
   },
-  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'最强大的功能',customAgentsTitle:'构建您自己的AI代理',customAgentsSubtitle:'创建针对您确切需求的定制代理。无需编码。几分钟内部署专业AI团队成员。',customAgentsFormName:'代理名称',customAgentsFormRole:'角色和专长',customAgentsFormCapability:'能力水平',customAgentsPreview:'预览',customAgentsDeploy:'部署代理',customAgentsBenefitsTitle:'为什么要构建自定义代理？',customAgentsBenefit1Title:'无限自定义代理',customAgentsBenefit1Desc:'为不同任务和工作流创建所需数量的专业代理。',customAgentsBenefit2Title:'任务特定专长',customAgentsBenefit2Desc:'每个代理专注于一个领域，确保专家级的性能和准确性。',customAgentsBenefit3Title:'无代码构建器',customAgentsBenefit3Desc:'直观界面 - 无需编程。在几分钟而非几小时内构建代理。',customAgentsBenefit4Title:'子代理和委派',customAgentsBenefit4Desc:'创建层次结构 - 父代理可以自动委派给专业的子代理。',customAgentsUseCasesTitle:'热门用例',customAgentsUseCase1:'使用专业产品代理实现客户支持自动化',customAgentsUseCase2:'使用撰稿人、编辑和发布者代理创建内容流水线',customAgentsUseCase3:'使用代码审查和文档代理开发工作流',customAgentsUseCase4:'使用研究、文案和分析代理开展营销活动'},
+  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',tryDemo:'实时演示',getStarted:'开始',tryNow:'立即尝试',deployTime:'部署时间',under5Minutes:'5分钟内 ⚡',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'最强大的功能',customAgentsTitle:'构建您自己的AI代理',customAgentsSubtitle:'创建针对您确切需求的定制代理。无需编码。几分钟内部署专业AI团队成员。',customAgentsTagline:'5分钟内完成部署。',customAgentsFormName:'代理名称',customAgentsFormRole:'角色和专长',customAgentsFormCapability:'能力水平',customAgentsPreview:'预览',customAgentsDeploy:'部署代理',customAgentsBenefitsTitle:'为什么要构建自定义代理？',customAgentsBenefit1Title:'无限自定义代理',customAgentsBenefit1Desc:'为不同任务和工作流创建所需数量的专业代理。',customAgentsBenefit2Title:'任务特定专长',customAgentsBenefit2Desc:'每个代理专注于一个领域，确保专家级的性能和准确性。',customAgentsBenefit3Title:'无代码构建器',customAgentsBenefit3Desc:'直观界面 - 无需编程。在几分钟而非几小时内构建代理。',customAgentsBenefit4Title:'子代理和委派',customAgentsBenefit4Desc:'创建层次结构 - 父代理可以自动委派给专业的子代理。',customAgentsUseCasesTitle:'热门用例',customAgentsUseCase1:'使用专业产品代理实现客户支持自动化',customAgentsUseCase2:'使用撰稿人、编辑和发布者代理创建内容流水线',customAgentsUseCase3:'使用代码审查和文档代理开发工作流',customAgentsUseCase4:'使用研究、文案和分析代理开展营销活动'},
 }
 
 const ar: Translations = {
@@ -1152,7 +1204,7 @@ const ar: Translations = {
     appearance: 'المظهر',
     language: 'اللغة',
   },
-  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'الميزة الأقوى',customAgentsTitle:'قم ببناء وكلاء الذكاء الاصطناعي الخاصة بك',customAgentsSubtitle:'إنشاء وكلاء مخصصين مصممين لاحتياجاتك الدقيقة. لا حاجة للبرمجة. نشر زملاء ذكاء اصطناعي متخصصين في دقائق.',customAgentsFormName:'اسم الوكيل',customAgentsFormRole:'الدور والخبرة',customAgentsFormCapability:'مستوى القدرة',customAgentsPreview:'معاينة',customAgentsDeploy:'نشر الوكيل',customAgentsBenefitsTitle:'لماذا بناء وكلاء مخصصين؟',customAgentsBenefit1Title:'وكلاء مخصصون غير محدودون',customAgentsBenefit1Desc:'إنشاء عدد غير محدود من الوكلاء المتخصصين لمختلف المهام وسير العمل.',customAgentsBenefit2Title:'خبرة خاصة بالمهمة',customAgentsBenefit2Desc:'يركز كل وكيل على مجال واحد، مما يضمن أداء ودقة على مستوى الخبراء.',customAgentsBenefit3Title:'منشئ بدون كود',customAgentsBenefit3Desc:'واجهة بديهية - لا حاجة للبرمجة. بناء الوكلاء في دقائق، وليس ساعات.',customAgentsBenefit4Title:'الوكلاء الفرعيون والتفويض',customAgentsBenefit4Desc:'إنشاء تسلسلات هرمية - يمكن للوكلاء الرئيسيين التفويض تلقائيًا للوكلاء الفرعيين المتخصصين.',customAgentsUseCasesTitle:'حالات الاستخدام الشائعة',customAgentsUseCase1:'أتمتة دعم العملاء مع وكلاء منتجات متخصصين',customAgentsUseCase2:'خط أنابيب إنشاء المحتوى مع وكلاء الكاتب والمحرر والناشر',customAgentsUseCase3:'سير عمل التطوير مع وكلاء مراجعة الكود والتوثيق',customAgentsUseCase4:'حملات التسويق مع وكلاء البحث والكتابة والتحليل'},
+  landing: {heroTitle:'AI Agents That Multiply Your Productivity',heroSubtitle:'Meet Cleo, the intelligent multi-agent platform that transforms how you work.',heroCta:'Try Cleo for Free',heroCtaSecondary:'See How It Works',trustedBy:'Trusted by teams worldwide',featuresTitle:'Everything You Need',featuresSubtitle:'Powerful features that adapt to your workflow',agentsTitle:'Meet Your AI Team',agentsSubtitle:'Specialized agents ready for any task',benefitsTitle:'Why Choose Cleo',benefitsSubtitle:'Real results that transform productivity',useCasesTitle:'Built for Real Work',useCasesSubtitle:'See how teams use Cleo every day',testimonialsTitle:'Loved by Professionals',testimonialsSubtitle:'Join thousands who work smarter',securityTitle:'Enterprise-Grade Security',securitySubtitle:'Your data is safe with us',finalCtaTitle:'Ready to Multiply Your Productivity?',finalCtaSubtitle:'Start free, no credit card required.',finalCta:'Start Free Now',tryDemo:'تجربة مباشرة',getStarted:'ابدأ',tryNow:'جرب الآن',deployTime:'وقت النشر',under5Minutes:'أقل من 5 دقائق ⚡',philosophyTitle:'Our Philosophy',philosophySubtitle:'AI should empower, not replace.',customAgentsBadge:'الميزة الأقوى',customAgentsTitle:'قم ببناء وكلاء الذكاء الاصطناعي الخاصة بك',customAgentsSubtitle:'إنشاء وكلاء مخصصين مصممين لاحتياجاتك الدقيقة. لا حاجة للبرمجة. نشر زملاء ذكاء اصطناعي متخصصين في دقائق.',customAgentsTagline:'انشر خلال أقل من 5 دقائق.',customAgentsFormName:'اسم الوكيل',customAgentsFormRole:'الدور والخبرة',customAgentsFormCapability:'مستوى القدرة',customAgentsPreview:'معاينة',customAgentsDeploy:'نشر الوكيل',customAgentsBenefitsTitle:'لماذا بناء وكلاء مخصصين؟',customAgentsBenefit1Title:'وكلاء مخصصون غير محدودون',customAgentsBenefit1Desc:'إنشاء عدد غير محدود من الوكلاء المتخصصين لمختلف المهام وسير العمل.',customAgentsBenefit2Title:'خبرة خاصة بالمهمة',customAgentsBenefit2Desc:'يركز كل وكيل على مجال واحد، مما يضمن أداء ودقة على مستوى الخبراء.',customAgentsBenefit3Title:'منشئ بدون كود',customAgentsBenefit3Desc:'واجهة بديهية - لا حاجة للبرمجة. بناء الوكلاء في دقائق، وليس ساعات.',customAgentsBenefit4Title:'الوكلاء الفرعيون والتفويض',customAgentsBenefit4Desc:'إنشاء تسلسلات هرمية - يمكن للوكلاء الرئيسيين التفويض تلقائيًا للوكلاء الفرعيين المتخصصين.',customAgentsUseCasesTitle:'حالات الاستخدام الشائعة',customAgentsUseCase1:'أتمتة دعم العملاء مع وكلاء منتجات متخصصين',customAgentsUseCase2:'خط أنابيب إنشاء المحتوى مع وكلاء الكاتب والمحرر والناشر',customAgentsUseCase3:'سير عمل التطوير مع وكلاء مراجعة الكود والتوثيق',customAgentsUseCase4:'حملات التسويق مع وكلاء البحث والكتابة والتحليل'},
 }
 
 export const translations: Record<Locale, Translations> = {

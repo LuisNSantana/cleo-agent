@@ -41,7 +41,13 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                   className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
                   onClick={() => resetMessages()}
                 >
-                  <CleoIcon size={56} src="/img/agents/logocleo4.png" className="" />
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border-2 border-primary/20 shadow-lg">
+                    <img 
+                      src="/img/agents/logocleo4.png" 
+                      alt="Cleo AI"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
                   <span className="brand-text relative bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent text-xl font-extrabold tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] sm:text-2xl">
                     Cleo
                   </span>

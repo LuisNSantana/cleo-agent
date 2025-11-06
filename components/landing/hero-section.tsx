@@ -70,8 +70,8 @@ export function HeroSection() {
   }, [])
 
   const handleStartFree = async () => {
-    // Redirect to guest chat - users can try immediately without login
-    router.push('/chat/guest')
+    // Redirect to auth page for signup/login
+    router.push('/auth')
   }
 
   const handleDemo = () => {
@@ -79,7 +79,7 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 xl:to-background px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+    <section className="relative w-full overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 xl:to-background py-20 sm:py-32">
       {/* Animated background orbs */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <motion.div
@@ -108,11 +108,11 @@ export function HeroSection() {
         />
       </div>
 
-  <div className="mx-auto max-w-screen-2xl 2xl:max-w-[90rem]">
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
+  <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem] px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-12 lg:grid-cols-[1.3fr_0.9fr] lg:gap-16 xl:gap-24 items-center">
           {/* Left column - Text content */}
           <motion.div
-            className="flex flex-col justify-center space-y-8"
+            className="flex w-full flex-col justify-center space-y-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -131,12 +131,51 @@ export function HeroSection() {
               Now in Open Beta
             </motion.div>
 
+            {/* MEGA PROMINENT 5-MINUTE TAGLINE - FIRST */}
+            <motion.div
+              className="inline-flex items-center gap-4 rounded-full border-2 border-primary/40 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-10 py-5 shadow-xl shadow-primary/30 backdrop-blur-sm w-fit"
+              initial={{ opacity: 0, scale: 0.8, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+              whileHover={{ scale: 1.05 }}
+            >
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 10, -10, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: "reverse",
+                }}
+              >
+                <CheckCircle weight="fill" className="h-8 w-8 text-primary shrink-0 sm:h-10 sm:w-10" />
+              </motion.div>
+              <div>
+                <p className="text-xs font-bold text-primary/70 uppercase tracking-widest sm:text-sm">{t.landing.deployTime}</p>
+                <motion.p 
+                  className="text-3xl font-black text-foreground sm:text-4xl md:text-5xl"
+                  animate={{
+                    textShadow: [
+                      "0 0 20px rgba(var(--primary), 0.3)",
+                      "0 0 30px rgba(var(--primary), 0.5)",
+                      "0 0 20px rgba(var(--primary), 0.3)",
+                    ]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                >
+                  {t.landing.under5Minutes}
+                </motion.p>
+              </div>
+            </motion.div>
+
             {/* Main heading with spectacular letter animation */}
             <motion.h1
-              className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
+              className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
             >
               {t.landing.heroTitle.split('').map((char, i) => {
                 // Create gradient color effect across title
@@ -160,7 +199,7 @@ export function HeroSection() {
                       scale: 1
                     }}
                     transition={{ 
-                      delay: i * 0.05,
+                      delay: 0.5 + i * 0.05,
                       type: "spring",
                       stiffness: 200,
                       damping: 15
@@ -182,7 +221,7 @@ export function HeroSection() {
 
             {/* Subtitle */}
             <motion.p
-              className="text-lg text-muted-foreground sm:text-xl"
+              className="text-lg text-muted-foreground sm:text-xl lg:text-2xl leading-relaxed"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
@@ -255,29 +294,35 @@ export function HeroSection() {
               </Button> */}
             </motion.div>
 
+            {/* Speed promise microcopy */}
+            <p className="text-xs text-muted-foreground">
+              Deploy your first agent in less time than frying an egg 🍳 — under 5 minutes.
+            </p>
+
             {/* Trust indicators */}
             <motion.div
-              className="flex flex-col gap-2"
+              className="flex flex-col gap-3"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1 }}
             >
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2">
+                  <CheckCircle weight="fill" className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">
+                    No credit card required
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2">
+                  <CheckCircle weight="fill" className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">
+                    5-minute setup
+                  </p>
+                </div>
+              </div>
               <p className="text-sm text-muted-foreground">
                 {t.landing.trustedBy}
               </p>
-              <div className="flex items-center gap-6">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={i}
-                      className="h-8 w-8 rounded-full border-2 border-background bg-gradient-to-br from-primary/20 to-blue-500/20"
-                    />
-                  ))}
-                </div>
-                <p className="text-sm font-medium text-foreground">
-                  1000+ users worldwide
-                </p>
-              </div>
             </motion.div>
 
             {/* Small agent chips (relocated from right column to avoid overlap) */}
@@ -315,7 +360,7 @@ export function HeroSection() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            <div className="relative w-full max-w-lg">
+            <div className="relative w-full">
               {/* Main Onboarding Card */}
               <div className="relative z-10 rounded-2xl border border-border/50 bg-card/80 p-6 shadow-2xl backdrop-blur-xl">
                 <div className="mb-4 flex items-center justify-between">
