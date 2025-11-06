@@ -50,45 +50,231 @@ function requiresApproval(toolName: string): boolean {
 }
 
 /**
- * Normalize tool arguments from generic UI fields to tool-specific fields
- * Example: UI uses 'body', but sendGmailMessage expects 'text'
+ * Strip HTML tags and unescape HTML entities from text
  */
-function normalizeToolArgs(toolName: string, args: any): any {
+function stripHtml(text: string): string {
+  if (!text || typeof text !== 'string') return text
+  
+  // Only process if HTML is detected
+  if (!text.includes('<') && !text.includes('&lt;')) return text
+  
+  // Unescape HTML entities
+  let cleaned = text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+  
+  // Remove HTML tags
+  cleaned = cleaned.replace(/<[^>]*>/g, '')
+  
+  // Clean up extra whitespace
+  cleaned = cleaned
+    .replace(/\n\s*\n\s*\n/g, '\n\n')  // Triple+ newlines → double
+    .trim()
+  
+  return cleaned
+}
+
+/**
+ * Normalize tool arguments from generic UI fields to tool-specific fields
+ * Handles field mapping and HTML sanitization for all approval tools
+ * 
+ * @param toolName - Name of the tool being normalized
+ * @param args - Edited arguments from user (may be partial)
+ * @param originalArgs - Original arguments from agent (for preserving non-edited fields)
+ */
+function normalizeToolArgs(toolName: string, args: any, originalArgs?: any): any {
   if (!args) return args
   
-  // sendGmailMessage: body → text (and strip HTML if present)
-  if (toolName === 'sendGmailMessage' && args.body !== undefined) {
-    const { body, ...rest } = args
-    console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'text' for ${toolName}`)
-    
-    // Strip HTML tags if present (convert <p>text</p> → text)
-    let plainText = body
-    if (typeof body === 'string' && (body.includes('<') || body.includes('&lt;'))) {
-      // Unescape HTML entities first
-      plainText = body
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-      
-      // Remove HTML tags
-      plainText = plainText.replace(/<[^>]*>/g, '')
-      
-      // Clean up extra whitespace
-      plainText = plainText
-        .replace(/\n\s*\n/g, '\n\n')  // Multiple newlines → double newline
-        .trim()
-      
-      console.log(`🧹 [APPROVAL-NODE] Stripped HTML from email body`)
+  const normalized = { ...args }
+  
+  // ==========================================
+  // EMAIL TOOLS (Gmail)
+  // ==========================================
+  if (toolName === 'sendGmailMessage') {
+    // UI uses 'body' but tool expects 'text'
+    if (normalized.body !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'text' for ${toolName}`)
+      normalized.text = stripHtml(normalized.body)
+      delete normalized.body
+      console.log(`🧹 [APPROVAL-NODE] Cleaned email body (${normalized.text?.length || 0} chars)`)
     }
-    
-    return { ...rest, text: plainText }
+    // Also clean 'text' if it has HTML
+    else if (normalized.text) {
+      normalized.text = stripHtml(normalized.text)
+    }
   }
   
-  // Add more tool-specific mappings here as needed
+  // ==========================================
+  // CALENDAR TOOLS (Google Calendar)
+  // ==========================================
+  if (toolName === 'createCalendarEvent' || toolName === 'updateCalendarEvent') {
+    // Clean description from HTML
+    if (normalized.description) {
+      normalized.description = stripHtml(normalized.description)
+    }
+    // UI might use 'body' for description
+    if (normalized.body !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'description' for ${toolName}`)
+      normalized.description = stripHtml(normalized.body)
+      delete normalized.body
+    }
+    
+    // CRITICAL FIX: UI uses 'startTime'/'endTime' but Google Calendar API expects 'startDateTime'/'endDateTime'
+    if (normalized.startTime !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'startTime' → 'startDateTime' for ${toolName}`)
+      // Convert from HTML datetime-local format (2025-11-06T19:00) to ISO (2025-11-06T19:00:00)
+      const startTime = normalized.startTime
+      normalized.startDateTime = startTime.includes(':') && !startTime.endsWith(':00') && !startTime.includes('Z')
+        ? `${startTime}:00`  // Add seconds if missing (e.g., "2025-11-06T19:00" → "2025-11-06T19:00:00")
+        : startTime
+      delete normalized.startTime
+      console.log(`📅 [APPROVAL-NODE] Converted startDateTime: ${normalized.startDateTime}`)
+    }
+    
+    if (normalized.endTime !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'endTime' → 'endDateTime' for ${toolName}`)
+      // Convert from HTML datetime-local format (2025-11-06T20:00) to ISO (2025-11-06T20:00:00)
+      const endTime = normalized.endTime
+      normalized.endDateTime = endTime.includes(':') && !endTime.endsWith(':00') && !endTime.includes('Z')
+        ? `${endTime}:00`  // Add seconds if missing
+        : endTime
+      delete normalized.endTime
+      console.log(`📅 [APPROVAL-NODE] Converted endDateTime: ${normalized.endDateTime}`)
+    }
+    
+    // Preserve critical fields from original args if not provided by user
+    // (User might not edit all fields, preserve originals like timeZone, reminders, calendarId)
+    const originalArgs = args  // Reference to original interrupt payload args
+    
+    // Preserve timeZone if not edited
+    if (!normalized.timeZone && originalArgs.timeZone) {
+      normalized.timeZone = originalArgs.timeZone
+      console.log(`� [APPROVAL-NODE] Preserving original timeZone: ${normalized.timeZone}`)
+    }
+    
+    // Preserve reminders if not edited
+    if (!normalized.reminders && originalArgs.reminders) {
+      normalized.reminders = originalArgs.reminders
+      console.log(`🔄 [APPROVAL-NODE] Preserving original reminders: ${JSON.stringify(normalized.reminders)}`)
+    }
+    
+    // Preserve calendarId if not edited
+    if (!normalized.calendarId && originalArgs.calendarId) {
+      normalized.calendarId = originalArgs.calendarId
+    }
+    
+    // Preserve addConference if not edited
+    if (normalized.addConference === undefined && originalArgs.addConference !== undefined) {
+      normalized.addConference = originalArgs.addConference
+    }
+  }
   
-  return args
+  // ==========================================
+  // NOTION TOOLS
+  // ==========================================
+  if (toolName === 'createNotionPage' || toolName === 'updateNotionPage') {
+    // Clean content from HTML
+    if (normalized.content) {
+      // If content is a string, keep it as string (will be converted to blocks by tool)
+      if (typeof normalized.content === 'string') {
+        normalized.content = stripHtml(normalized.content)
+      }
+    }
+    
+    // UI might use 'body' for content
+    if (normalized.body !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'content' for ${toolName}`)
+      normalized.content = stripHtml(normalized.body)
+      delete normalized.body
+    }
+    
+    // UI uses 'database' but tool uses 'parent_id'
+    if (normalized.database !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'database' → 'parent_id' for ${toolName}`)
+      normalized.parent_id = normalized.database
+      delete normalized.database
+      
+      // If parent_id is provided, assume parent_type is database_id
+      if (!normalized.parent_type) {
+        normalized.parent_type = 'database_id'
+      }
+    }
+  }
+  
+  // ==========================================
+  // TWITTER/X TOOLS
+  // ==========================================
+  if (toolName === 'postTweet' || toolName === 'postTweetWithMedia') {
+    // Twitter tool uses 'content', but UI uses 'text'
+    // Map 'text' from UI → 'content' for tool
+    if (normalized.text !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'text' → 'content' for ${toolName}`)
+      normalized.content = stripHtml(normalized.text)
+      delete normalized.text
+    }
+    
+    // Clean content from HTML
+    if (normalized.content) {
+      normalized.content = stripHtml(normalized.content)
+    }
+    
+    // UI might use 'body' for tweet text
+    if (normalized.body !== undefined) {
+      console.log(`🔄 [APPROVAL-NODE] Mapping 'body' → 'content' for ${toolName}`)
+      normalized.content = stripHtml(normalized.body)
+      delete normalized.body
+    }
+  }
+  
+  if (toolName === 'createTwitterThread') {
+    // UI might provide 'text' field with thread content separated by newlines
+    // Tool expects 'tweets' array of objects with 'text' property
+    if (normalized.text !== undefined && !normalized.tweets) {
+      console.log(`🔄 [APPROVAL-NODE] Converting 'text' → 'tweets' array for ${toolName}`)
+      
+      // Split by visual separator used in preview (---) or by paragraphs
+      const threadParts = normalized.text
+        .split(/\n\n---\n\n|\n\n\n+/) // Split by separator or multiple newlines
+        .map((part: string) => part.trim())
+        .filter((part: string) => part.length > 0)
+      
+      // Convert to tweets array format
+      normalized.tweets = threadParts.map((text: string) => ({
+        text: stripHtml(text).slice(0, 280) // Ensure each tweet is max 280 chars
+      }))
+      
+      delete normalized.text
+    }
+    
+    // Clean thread tweets from HTML if provided as array
+    if (normalized.tweets && Array.isArray(normalized.tweets)) {
+      normalized.tweets = normalized.tweets.map((tweet: any) => {
+        if (typeof tweet === 'string') {
+          return { text: stripHtml(tweet).slice(0, 280) }
+        }
+        if (typeof tweet === 'object' && tweet.text) {
+          return { ...tweet, text: stripHtml(tweet.text).slice(0, 280) }
+        }
+        return tweet
+      })
+    }
+  }
+  
+  // ==========================================
+  // DRIVE TOOLS
+  // ==========================================
+  if (toolName === 'uploadFileToDrive' || toolName === 'createDriveFolder') {
+    // Clean description from HTML
+    if (normalized.description) {
+      normalized.description = stripHtml(normalized.description)
+    }
+  }
+  
+  return normalized
 }
 
 /**
@@ -250,6 +436,13 @@ export function createToolApprovalNode() {
         id: (lastMessage as AIMessage).id
       })
       messagesWithEditedCalls[lastMsgIndex] = editedMessage
+
+      // CRITICAL FIX: Mark edited tool calls as approved
+      // Generate new approval key based on EDITED tool call IDs
+      const editedToolCallIds = editedToolCalls.map((tc: any) => tc.id || 'no-id').join(',')
+      const editedApprovalKey = `${executionId}:${editedToolCallIds}`
+      approvedSet.add(editedApprovalKey)
+      console.log(`✅ [APPROVAL-NODE] Marked EDITED tool calls as approved (key: ${editedApprovalKey})`)
 
       return {
         ...state,

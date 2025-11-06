@@ -45,26 +45,60 @@ export async function GET(
       case "twitter":
       case "x":
         // OAuth 2.0 with PKCE for Twitter/X
+        // CRITICAL: Validate Twitter credentials are configured
+        const twitterClientId = process.env.TWITTER_CLIENT_ID
+        const twitterClientSecret = process.env.TWITTER_CLIENT_SECRET
+        
+        // DEBUG: Log credential status (masked)
+        console.log('🐦 [TWITTER-OAUTH-CONNECT] Environment check:', {
+          nodeEnv: process.env.NODE_ENV,
+          hasClientId: !!twitterClientId,
+          hasClientSecret: !!twitterClientSecret,
+          clientIdLength: twitterClientId?.length || 0,
+          clientIdPrefix: twitterClientId?.substring(0, 10) || 'EMPTY',
+          timestamp: new Date().toISOString()
+        })
+        
+        if (!twitterClientId || !twitterClientSecret) {
+          console.error('❌ [TWITTER-OAUTH] Missing credentials:', {
+            hasClientId: !!twitterClientId,
+            hasClientSecret: !!twitterClientSecret
+          })
+          return NextResponse.redirect(
+            new URL('/?error=twitter_credentials_missing&message=Admin must configure TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET in environment variables', request.url)
+          )
+        }
+        
         const codeVerifier = generateCodeVerifier()
         const codeChallenge = generateCodeChallenge(codeVerifier)
         
         authUrl = generateTwitterOAuthUrl({
-          clientId: process.env.TWITTER_CLIENT_ID || "",
+          clientId: twitterClientId,
           redirectUri,
           codeChallenge,
           state: statePayload,
           scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access']
         })
         
+        // DEBUG: Log generated OAuth URL (client_id should NOT be empty)
+        console.log('🐦 [TWITTER-OAUTH-CONNECT] Generated OAuth URL:', {
+          hasClientIdParam: authUrl.includes('client_id=' + twitterClientId),
+          urlLength: authUrl.length,
+          urlPreview: authUrl.substring(0, 100) + '...',
+          redirectUri
+        })
+        
         // Store code verifier in cookie and redirect to Twitter OAuth
         const twitterResponse = NextResponse.redirect(authUrl)
         twitterResponse.cookies.set('twitter_code_verifier', codeVerifier, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 10 * 60 // 10 minutes
+          secure: true, // Required for SameSite=None
+          sameSite: 'none', // CRITICAL: Allow cross-site cookie for OAuth redirect from Twitter
+          maxAge: 10 * 60, // 10 minutes
+          path: '/' // Ensure cookie is available for callback route
         })
         
+        console.log('🐦 [TWITTER-OAUTH-CONNECT] Redirecting to Twitter OAuth...')
         return twitterResponse
         
       case "google-calendar":

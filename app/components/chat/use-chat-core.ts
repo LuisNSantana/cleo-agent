@@ -988,8 +988,13 @@ export function useChatCore({
                             }))
                           }
                           
-                          // Special handling for email
+                          // ==========================================
+                          // MULTI-TOOL PREVIEW DATA MAPPING
+                          // ==========================================
+                          
+                          // Email tools (Gmail)
                           if (actionRequest.action === 'sendGmailMessage' || actionRequest.action === 'sendEmail') {
+                            preview.title = 'Enviar Correo'
                             preview.emailData = {
                               to: actionRequest.args.to,
                               subject: actionRequest.args.subject,
@@ -997,12 +1002,118 @@ export function useChatCore({
                             }
                           }
                           
+                          // Calendar tools (Google Calendar)
+                          else if (actionRequest.action === 'createCalendarEvent' || actionRequest.action === 'updateCalendarEvent') {
+                            // Helper to convert ISO 8601 to datetime-local format (YYYY-MM-DDTHH:mm)
+                            const toDateTimeLocal = (isoString: string | undefined) => {
+                              if (!isoString) return ''
+                              try {
+                                // ISO 8601 formats: "2025-11-06T19:00:00", "2025-11-06T19:00:00Z", "2025-11-06T19:00:00+01:00"
+                                // datetime-local format: "2025-11-06T19:00" (no seconds, no timezone)
+                                
+                                // If already in correct format (YYYY-MM-DDTHH:mm), return as-is
+                                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(isoString)) {
+                                  return isoString
+                                }
+                                
+                                // Remove everything after minutes: seconds (:SS), milliseconds (.SSS), and timezone (Z or ±HH:mm)
+                                // Pattern breakdown:
+                                // (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}) - Capture date and time up to minutes
+                                // (?::\d{2}(?:\.\d+)?)?           - Optional: seconds and milliseconds
+                                // (?:Z|[+-]\d{2}:?\d{2})?         - Optional: timezone
+                                const match = isoString.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/)
+                                return match ? match[1] : isoString
+                              } catch {
+                                return isoString
+                              }
+                            }
+                            
+                            preview.title = actionRequest.action === 'createCalendarEvent' ? 'Crear Evento' : 'Actualizar Evento'
+                            preview.calendarData = {
+                              summary: actionRequest.args.summary,
+                              description: actionRequest.args.description || actionRequest.args.body,
+                              // CRITICAL FIX: Google Calendar tool uses 'startDateTime' and 'endDateTime', not 'startTime'/'endTime'
+                              // Convert ISO 8601 to datetime-local format (YYYY-MM-DDTHH:mm) for HTML input compatibility
+                              startTime: toDateTimeLocal(actionRequest.args.startDateTime || actionRequest.args.startTime || actionRequest.args.start),
+                              endTime: toDateTimeLocal(actionRequest.args.endDateTime || actionRequest.args.endTime || actionRequest.args.end),
+                              location: actionRequest.args.location
+                            }
+                          }
+                          
+                          // Notion tools
+                          else if (actionRequest.action === 'createNotionPage' || actionRequest.action === 'updateNotionPage') {
+                            preview.title = actionRequest.action === 'createNotionPage' ? 'Crear Página Notion' : 'Actualizar Página Notion'
+                            preview.notionData = {
+                              title: actionRequest.args.title || actionRequest.args.name,
+                              // Content can be array of blocks or string
+                              content: Array.isArray(actionRequest.args.content) 
+                                ? actionRequest.args.content.map((block: any) => 
+                                    typeof block === 'string' ? block : (block.text?.content || JSON.stringify(block))
+                                  ).join('\n')
+                                : (actionRequest.args.content || actionRequest.args.body || ''),
+                              database: actionRequest.args.parent_id || actionRequest.args.database || actionRequest.args.databaseId
+                            }
+                          }
+                          
+                          // Twitter/Tweet tools
+                          else if (
+                            actionRequest.action === 'postTweet' || 
+                            actionRequest.action === 'createTwitterThread' || 
+                            actionRequest.action === 'postTweetWithMedia'
+                          ) {
+                            preview.title = actionRequest.action === 'createTwitterThread' ? 'Publicar Hilo' : 'Publicar Tweet'
+                            
+                            // Thread tool uses 'tweets' array, single tweet uses 'content' or 'text'
+                            if (actionRequest.action === 'createTwitterThread') {
+                              preview.tweetData = {
+                                text: Array.isArray(actionRequest.args.tweets)
+                                  ? actionRequest.args.tweets.map((t: any) => 
+                                      typeof t === 'string' ? t : (t.text || t.content || '')
+                                    ).join('\n\n---\n\n') // Visual separator for thread tweets
+                                  : (actionRequest.args.content || actionRequest.args.text || ''),
+                                media: actionRequest.args.media || actionRequest.args.mediaUrls || actionRequest.args.media_urls || [],
+                                isThread: true,
+                                tweetCount: Array.isArray(actionRequest.args.tweets) ? actionRequest.args.tweets.length : 1
+                              }
+                            } else {
+                              preview.tweetData = {
+                                // Twitter tool uses 'content', but accept 'text' as fallback
+                                text: actionRequest.args.content || actionRequest.args.text,
+                                media: actionRequest.args.media || actionRequest.args.mediaUrls || actionRequest.args.media_urls || [],
+                                isThread: false
+                              }
+                            }
+                          }
+                          
+                          // Drive tools (file upload, folder creation)
+                          else if (
+                            actionRequest.action === 'uploadFileToDrive' || 
+                            actionRequest.action === 'createDriveFolder' ||
+                            actionRequest.action === 'shareDriveFile'
+                          ) {
+                            preview.title = actionRequest.action === 'uploadFileToDrive' 
+                              ? 'Subir Archivo a Drive' 
+                              : actionRequest.action === 'createDriveFolder'
+                              ? 'Crear Carpeta en Drive'
+                              : 'Compartir Archivo'
+                          }
+                          
+                          // Delete operations (non-editable)
+                          else if (actionRequest.action === 'deleteGmailMessage') {
+                            preview.title = 'Eliminar Correo'
+                          }
+                          else if (actionRequest.action === 'deleteCalendarEvent') {
+                            preview.title = 'Eliminar Evento'
+                          }
+                          
                           console.log('🎯 [CHAT-CORE] ABOUT TO SET pendingToolConfirmation:', {
                             executionId: actualExecutionId,
                             toolName: actionRequest.action,
                             hasEmailData: !!preview.emailData,
-                            emailTo: preview.emailData?.to,
-                            emailSubject: preview.emailData?.subject
+                            hasCalendarData: !!preview.calendarData,
+                            hasNotionData: !!preview.notionData,
+                            hasTweetData: !!preview.tweetData,
+                            previewTitle: preview.title
                           })
                           
                           setPendingToolConfirmation({

@@ -56,14 +56,18 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     toolName: 'sendGmailMessage',
     requiresApproval: true,
     riskLevel: 'high',
-    approvalMessage: '📧 ¿Enviar este correo electrónico?'
+    approvalMessage: '📧 ¿Enviar este correo electrónico?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   deleteGmailMessage: {
     toolName: 'deleteGmailMessage',
     requiresApproval: true,
     riskLevel: 'high',
-    approvalMessage: '🗑️ ¿Eliminar este correo de forma permanente?'
+    approvalMessage: '🗑️ ¿Eliminar este correo de forma permanente?',
+    allowEdit: false,
+    allowIgnore: true
   },
 
   // ==========================================
@@ -74,49 +78,63 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     toolName: 'createCalendarEvent',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📅 ¿Crear este evento en el calendario?'
+    approvalMessage: '📅 ¿Crear este evento en el calendario?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   updateCalendarEvent: {
     toolName: 'updateCalendarEvent',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📅 ¿Modificar este evento del calendario?'
+    approvalMessage: '📅 ¿Modificar este evento del calendario?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   deleteCalendarEvent: {
     toolName: 'deleteCalendarEvent',
     requiresApproval: true,
     riskLevel: 'high',
-    approvalMessage: '🗑️ ¿Eliminar este evento del calendario?'
+    approvalMessage: '🗑️ ¿Eliminar este evento del calendario?',
+    allowEdit: false,
+    allowIgnore: true
   },
 
   uploadFileToDrive: {
     toolName: 'uploadFileToDrive',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📁 ¿Subir este archivo a Google Drive?'
+    approvalMessage: '📁 ¿Subir este archivo a Google Drive?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   createDriveFolder: {
     toolName: 'createDriveFolder',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📁 ¿Crear esta carpeta en Google Drive?'
+    approvalMessage: '📁 ¿Crear esta carpeta en Google Drive?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   createNotionPage: {
     toolName: 'createNotionPage',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📝 ¿Crear esta página en Notion?'
+    approvalMessage: '📝 ¿Crear esta página en Notion?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   updateNotionPage: {
     toolName: 'updateNotionPage',
     requiresApproval: true,
     riskLevel: 'medium',
-    approvalMessage: '📝 ¿Actualizar esta página de Notion?'
+    approvalMessage: '📝 ¿Actualizar esta página de Notion?',
+    allowEdit: true,
+    allowIgnore: true
   },
 
   // Twitter/X Tools
@@ -126,7 +144,7 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     riskLevel: 'high',
     approvalMessage: '🐦 ¿Publicar este tweet en X/Twitter?',
     reason: 'Posting to social media is public and permanent',
-    allowEdit: false,
+    allowEdit: true,
     allowIgnore: true
   },
 
@@ -136,7 +154,7 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     riskLevel: 'high',
     approvalMessage: '🧵 ¿Publicar este hilo en X/Twitter?',
     reason: 'Thread will be posted publicly on your timeline',
-    allowEdit: false,
+    allowEdit: true,
     allowIgnore: true
   },
 
@@ -146,7 +164,7 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     riskLevel: 'high',
     approvalMessage: '📸 ¿Publicar este tweet con imágenes en X/Twitter?',
     reason: 'Tweet with media will be posted publicly',
-    allowEdit: false,
+    allowEdit: true,
     allowIgnore: true
   },
 
@@ -157,7 +175,7 @@ export const TOOL_APPROVAL_CONFIG: Record<string, ToolApprovalConfig> = {
     riskLevel: 'high',
     approvalMessage: '🔗 ¿Compartir este archivo de Drive?',
     reason: 'Sharing may expose file content to others',
-    allowEdit: false,
+    allowEdit: true,
     allowIgnore: true
   },
 
