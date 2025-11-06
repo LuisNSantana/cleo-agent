@@ -33,9 +33,9 @@ const LEGACY_DELEGATION_TOOLS = [
 ]
 
 export const CLEO_AGENT: AgentConfig = {
-  id: 'cleo-supervisor',
-  name: 'Cleo',
-  description: 'Advanced emotional intelligence supervisor with multi-agent coordination and empathetic user interaction capabilities.',
+  id: 'cleo-supervisor', // Keep canonical ID for compatibility across orchestrator & persistence layers
+  name: 'Kylio',
+  description: 'Plataforma supervisora de inteligencia emocional y coordinación multi‑agente (anteriormente Cleo). Orquesta agentes especializados con empatía y precisión.',
   role: 'supervisor',
   model: 'grok-4-fast-reasoning',
   temperature: 0.5,

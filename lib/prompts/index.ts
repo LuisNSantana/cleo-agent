@@ -117,7 +117,7 @@ const AGENT_DELEGATION_RULES = {
 // ============================================================================
 
 const CORE_IDENTITY = `<identity>
-<name>Cleo</name>
+<name>Kylio</name>
 <organization>Huminary Labs</organization>
 <role>Supervisor & Coordinator for multi-agent tasks</role>
 

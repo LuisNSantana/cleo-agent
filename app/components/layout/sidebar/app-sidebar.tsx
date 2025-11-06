@@ -21,12 +21,14 @@ import {
   X,
 } from "@phosphor-icons/react"
 import { useParams, usePathname } from "next/navigation"
-import { useMemo, useCallback } from "react"
+import { useMemo, useCallback, useState } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { SidebarList } from "./sidebar-list"
 import { SidebarProject } from "./sidebar-project"
 import Link from "next/link"
 import { ThemeToggle } from "@/app/components/layout/theme-toggle"
+import { DialogCreateAgent } from './dialog-create-agent'
+import { PlusCircle } from '@phosphor-icons/react'
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -210,6 +212,8 @@ export function AppSidebar() {
                 ⌘⇧U
               </div>
             </Link>
+            {/* Primary CTA: Crear Agente */}
+            <CreateAgentCTA isMobile={isMobile} closeSidebar={() => setOpenMobile(false)} />
             <HistoryTrigger
               hasSidebar={false}
               classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/search"
@@ -316,5 +320,31 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+function CreateAgentCTA({ isMobile, closeSidebar }: { isMobile: boolean; closeSidebar: () => void }) {
+  const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true)
+          if (isMobile) closeSidebar()
+        }}
+        className="hover:bg-primary/10 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/new-agent border border-primary/30"
+      >
+        <div className="flex items-center gap-3">
+          <PlusCircle size={18} weight="duotone" />
+          <span className="font-medium">{t.sidebar.newAgent}</span>
+        </div>
+        <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/new-agent:opacity-100">
+          ⌘⇧N
+        </div>
+      </button>
+      <DialogCreateAgent isOpen={open} setIsOpenAction={setOpen} />
+    </>
   )
 }

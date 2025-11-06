@@ -23,6 +23,8 @@ export type Translations = {
     history: string
     settings: string
     files: string
+    newAgent: string
+    generatePrompt: string
   }
   
   // Time groupings
@@ -176,6 +178,8 @@ const en: Translations = {
     history: 'History',
     settings: 'Settings',
     files: 'Files',
+    newAgent: 'New Agent',
+    generatePrompt: 'Generate Prompt',
   },
   time: {
     today: 'Today',
@@ -308,6 +312,8 @@ const es: Translations = {
     history: 'Historial',
     settings: 'Configuración',
     files: 'Archivos',
+    newAgent: 'Crear Agente',
+    generatePrompt: 'Auto-generar Prompt',
   },
   time: {
     today: 'Hoy',
@@ -440,6 +446,8 @@ const pt: Translations = {
     history: 'Histórico',
     settings: 'Configurações',
     files: 'Arquivos',
+    newAgent: 'Novo Agente',
+    generatePrompt: 'Gerar Prompt',
   },
   time: {
     today: 'Hoje',
@@ -571,6 +579,8 @@ const fr: Translations = {
     history: 'Historique',
     settings: 'Paramètres',
     files: 'Fichiers',
+    newAgent: 'Nouvel Agent',
+    generatePrompt: 'Générer Prompt',
   },
   time: {
     today: "Aujourd'hui",
@@ -702,6 +712,8 @@ const it: Translations = {
     history: 'Cronologia',
     settings: 'Impostazioni',
     files: 'File',
+    newAgent: 'Nuovo Agente',
+    generatePrompt: 'Genera Prompt',
   },
   time: {
     today: 'Oggi',
@@ -825,6 +837,8 @@ const de: Translations = {
     history: 'Verlauf',
     settings: 'Einstellungen',
     files: 'Dateien',
+    newAgent: 'Neuer Agent',
+    generatePrompt: 'Prompt Erstellen',
   },
   time: {
     today: 'Heute',
@@ -948,6 +962,8 @@ const ja: Translations = {
     history: '履歴',
     settings: '設定',
     files: 'ファイル',
+    newAgent: '新しいエージェント',
+    generatePrompt: 'プロンプト生成',
   },
   time: {
     today: '今日',
@@ -1017,6 +1033,8 @@ const ko: Translations = {
     history: '기록',
     settings: '설정',
     files: '파일',
+    newAgent: '새 에이전트',
+    generatePrompt: '프롬프트 생성',
   },
   time: {
     today: '오늘',
@@ -1086,6 +1104,8 @@ const zh: Translations = {
     history: '历史',
     settings: '设置',
     files: '文件',
+    newAgent: '新建代理',
+    generatePrompt: '生成提示',
   },
   time: {
     today: '今天',
@@ -1155,6 +1175,8 @@ const ar: Translations = {
     history: 'السجل',
     settings: 'الإعدادات',
     files: 'الملفات',
+    newAgent: 'وكيل جديد',
+    generatePrompt: 'توليد موجه',
   },
   time: {
     today: 'اليوم',

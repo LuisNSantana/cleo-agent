@@ -35,7 +35,7 @@ export function canonicalizeAgentId(id: string): string {
 // Friendly display names for known agent IDs (canonical preferred)
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   // Main agents
-  'cleo-supervisor': 'Cleo',
+  'cleo-supervisor': 'Kylio',
   'toby-technical': 'Toby',
   'ami-creative': 'Ami',
   'peter-financial': 'Peter',
@@ -64,6 +64,19 @@ export function getAgentDisplayName(id: string): string {
   if (AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]) {
     return AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]
   }
+
+  // 1.5. Check runtime-registered dynamic agents (created at runtime)
+  // Quick-create and other flows register agents into globalThis.__cleoRuntimeAgents
+  try {
+    const g: any = globalThis as any
+    const runtimeAgents: Map<string, any> | undefined = g.__cleoRuntimeAgents
+    if (runtimeAgents && runtimeAgents instanceof Map) {
+      const cfg = runtimeAgents.get(canonical) || runtimeAgents.get(id)
+      if (cfg?.name && typeof cfg.name === 'string') {
+        return cfg.name
+      }
+    }
+  } catch {}
   
   // 2. For custom agents (UUIDs), try to get name from unified config
   // ✅ FIX: Custom agents should show their name, not UUID
