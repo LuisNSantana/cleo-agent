@@ -93,6 +93,7 @@ import {
 	formatSlideTextTool,
 	addSlideSpeakerNotesTool
 } from './google-slides-advanced'
+import { createStructuredSlidesTool } from './google-slides-structured'
 
 // Gmail
 import { listGmailMessagesTool, getGmailMessageTool, sendGmailMessageTool, trashGmailMessageTool, modifyGmailLabelsTool } from './google-gmail'
@@ -371,6 +372,7 @@ export const tools = {
 
 	// Google Slides
 	createGoogleSlidesPresentation: createGoogleSlidesPresentationTool,
+	createStructuredGoogleSlides: createStructuredSlidesTool, // ⭐ NEW: Markdown-like structured slide generation
 	addGoogleSlide: addGoogleSlideTool,
 	insertGoogleSlideTextBox: insertGoogleSlideTextBoxTool,
 	appendBulletedSlide: appendBulletedSlideTool,

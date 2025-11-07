@@ -76,7 +76,8 @@ export const createGoogleSlidesPresentationTool = tool({
   inputSchema: z.object({
     title: z.string().min(1).describe('Title for the presentation'),
     initialText: z.string().optional().describe('Optional text to place in the first slide textbox'),
-    shareSettings: z.enum(['private','public_read']).optional().default('private')
+    // Added public_edit to allow writer permission when sharing
+    shareSettings: z.enum(['private','public_read','public_edit']).optional().default('private')
   }),
   execute: async ({ title, initialText, shareSettings='private' }) => {
     const userId = getCurrentUserId(); const model = getCurrentModel(); const started = Date.now()
@@ -101,12 +102,12 @@ export const createGoogleSlidesPresentationTool = tool({
       }
       // Sharing (Drive API) only if public_read
       let shareLink = pres.presentLink || pres.links?.preview || null
-      if (shareSettings === 'public_read') {
+      if (shareSettings === 'public_read' || shareSettings === 'public_edit') {
         try {
           const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files/${pres.presentationId}/permissions`, {
             method:'POST',
             headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' },
-            body: JSON.stringify({ role:'reader', type:'anyone', allowFileDiscovery:false })
+            body: JSON.stringify({ role: shareSettings === 'public_edit' ? 'writer' : 'reader', type:'anyone', allowFileDiscovery:false })
           })
           if (driveRes.ok) shareLink = `https://docs.google.com/presentation/d/${pres.presentationId}/edit?usp=sharing`
         } catch (e) { console.warn('[Slides] share failed', e) }

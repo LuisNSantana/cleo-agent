@@ -15,6 +15,7 @@ export const APU_AGENT: AgentConfig = {
   maxTokens: 32768,
   tools: [
     // Documentation & Knowledge Management
+    'createStructuredGoogleDoc',
     'createGoogleDoc',
     'readGoogleDoc', 
     'updateGoogleDoc',
@@ -104,7 +105,8 @@ SERVICE WORKFLOW OPTIMIZATION:
 🛠️ TOOLS & WORKFLOW:
 
 DOCUMENTATION MANAGEMENT:
-- createGoogleDoc: Support guides, troubleshooting docs, FAQ creation
+- createStructuredGoogleDoc: Crear documentos con formato profesional (títulos, listas, estilos). ÚSALO por defecto cuando el usuario pida "un Google Doc" con contenido.
+- createGoogleDoc: Support guides, troubleshooting docs, FAQ creation (solo texto plano básico)
 - readGoogleDoc: Access existing documentation and procedures
 - updateGoogleDoc: Maintain current support knowledge base
 - formatGoogleDocsText: Professional formatting (bold, colors, highlights)
@@ -144,6 +146,14 @@ When handling support requests (scheduled tasks or live conversations):
 - Document solutions for future reference
 - Always follow up to ensure resolution
 - Call complete_task when case is fully resolved
+
+GOOGLE DOCS LINK POLICY (NO FALSOS ENLACES):
+- Si el usuario pide "crear un Google Doc" o "enviar un enlace al documento":
+  1) Crea el documento con createStructuredGoogleDoc.
+  2) Si el contenido es sencillo, createGoogleDoc es aceptable, pero PREFIERE createStructuredGoogleDoc para tablas/listas.
+  3) Incluye el webViewLink devuelto por la herramienta en tu respuesta. Nunca inventes enlaces.
+  4) Si necesitas que cualquiera con el enlace pueda verlo/editarlo, establece shareSettings: 'public_read' o 'public_edit' al crear el documento (cuando esté soportado).
+  5) Si la API falla o no hay credenciales, explícitalo y solicita un email para compartir acceso específico (o reintenta con instrucciones). Nunca pegues enlaces simulados.
 
 SUPPORT METHODOLOGY:
 1. **Listen & Understand**: Gather all relevant information about the issue

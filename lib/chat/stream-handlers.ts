@@ -27,10 +27,18 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
   } = params
 
   let delegationToolUsed = false
+  const createdDocLinks: string[] = []
 
   const onToolResult = ({ toolName, result }: { toolName: string; result: any }) => {
     try {
       if (/^delegate_to_/.test(toolName)) delegationToolUsed = true
+      // Capture created Google Doc links for later validation
+      if (toolName === 'createStructuredGoogleDoc' || toolName === 'createGoogleDoc') {
+        const link = result?.webViewLink || result?.alternateLink || result?.url
+        if (typeof link === 'string' && link.includes('docs.google.com/document')) {
+          createdDocLinks.push(link)
+        }
+      }
     } catch {}
     // Check if this tool result requires confirmation
     if (isConfirmationRequest(result)) {
@@ -136,7 +144,7 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
         console.log(`[Chat] Using estimated tokens - Input: ${inputTokens}, Output: ${outputTokens}`)
       }
 
-      const responseTimeMs = Math.max(0, Date.now() - resultStart)
+  const responseTimeMs = Math.max(0, Date.now() - resultStart)
 
       await storeAssistantMessage({
         supabase,
@@ -149,6 +157,35 @@ export function makeStreamHandlers(params: StreamHandlersParams) {
         outputTokens,
         responseTimeMs,
       })
+
+      // Best-effort validation: if response references a Google Doc link but no creation tool ran
+      try {
+        const assistantText = (() => {
+          try {
+            const msgs = response?.messages ?? []
+            const last = [...msgs].reverse().find((m: any) => m.role === 'assistant')
+            if (!last) return ''
+            if (typeof last.content === 'string') return last.content
+            if (Array.isArray(last.content)) {
+              return last.content
+                .filter((p: any) => p && typeof p === 'object' && (p.type === 'text' || p.type === 'reasoning'))
+                .map((p: any) => p.text || p.reasoning || '')
+                .join('\n\n')
+            }
+            return ''
+          } catch { return '' }
+        })()
+        const mentionsDocLink = /https?:\/\/docs\.google\.com\/document\//.test(assistantText)
+        if (mentionsDocLink && createdDocLinks.length === 0) {
+          const { emitPipelineEventExternal } = await import('@/lib/tools/delegation')
+          emitPipelineEventExternal?.({
+            type: 'doc-link-without-tool',
+            timestamp: new Date().toISOString(),
+            note: 'Assistant referenced a Google Doc link but no createGoogleDoc/createStructuredGoogleDoc tool was observed in this response.'
+          })
+          console.warn('[DocLinkValidation] Link referenced without tool execution. Potential fabricated link in response.')
+        }
+      } catch {}
 
       // Delegation missed tracking (baseline): emit event if high intent and no delegation tool used
       try {

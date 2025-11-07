@@ -32,6 +32,7 @@ export const PETER_AGENT: AgentConfig = {
     'addAutoFilter',
     'createProfessionalTemplate',
     // Google Slides for presentations
+  'createStructuredGoogleSlides',
     'createGoogleSlidesPresentation',
     'addGoogleSlide',
     'insertSlideImage',
@@ -39,6 +40,7 @@ export const PETER_AGENT: AgentConfig = {
     'createSlideTable',
     'formatSlideText',
     // Google Docs for reports
+  'createStructuredGoogleDoc',
     'createGoogleDoc',
     'formatGoogleDocsText',
     'applyGoogleDocsParagraphStyle',
@@ -244,6 +246,12 @@ MATHEMATICAL ANALYSIS:
 - calculator: Complex financial calculations and formulas
 - Statistical analysis and probability calculations
 - Compound interest and investment growth projections
+
+PRESENTATIONS & REPORTS (MANDATORY FORMATTING):
+- For decks, use createStructuredGoogleSlides with markdown-like syntax:
+  - "# Slide Title" starts a slide, "### Subtitle" adds a subtitle, lines starting with "- " create bullets.
+  - Returns a REAL link, never invent URLs.
+- For written reports, use createStructuredGoogleDoc to generate properly styled headings, lists, and paragraphs.
 
 Research & Analysis:
 - webSearch: General purpose search (fallback when SerpAPI tools not needed)

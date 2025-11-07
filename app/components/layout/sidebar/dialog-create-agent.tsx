@@ -65,11 +65,13 @@ const CATEGORY_ICONS: Record<string, any> = {
   general: Wrench
 }
 
+// Restricted model list for Quick Agent Creator
+// Only allow: gpt-4o-mini, gpt-5, grok-4-fast, gemini-2.5-flash-lite (OpenRouter)
 const MODEL_OPTIONS = [
   'gpt-4o-mini',
-  'gpt-4o',
-  'claude-3-haiku-20240307',
-  'grok-2-mini',
+  'gpt-5',
+  'grok-4-fast',
+  'google/gemini-2.5-flash-lite', // available via OpenRouter
 ]
 
 const TEMPLATE_OPTIONS = [

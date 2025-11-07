@@ -24,7 +24,16 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     'notion','workspace','página','page','database','db','tabla','base de datos','propiedad','properties','block'
   ],
   'peter-financial': [
-    'google doc','documento','docs','sheet','hoja de cálculo','spreadsheet','slides','presentación','drive','archivo drive'
+    { k: 'google doc', w: 4 },
+    { k: 'documento', w: 3 },
+    { k: 'docs', w: 3 },
+    { k: 'sheet', w: 2 },
+    { k: 'hoja de cálculo', w: 2 },
+    { k: 'spreadsheet', w: 2 },
+    { k: 'slides', w: 3 },
+    { k: 'presentación', w: 3 },
+    { k: 'drive', w: 2 },
+    { k: 'archivo drive', w: 2 }
   ],
   'apu-support': [
     'investiga','research','buscar','trend','tendencia','web','news','noticias','análisis','comparar','fuentes'
