@@ -7,12 +7,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Sparkle, ArrowRight, CheckCircle, XCircle, MagicWand } from '@phosphor-icons/react'
+import { Sparkle, ArrowRight, CheckCircle, XCircle, MagicWand, CalendarBlank, FolderOpen, FileText, Presentation, Table, EnvelopeSimple, NotePencil, TwitterLogo, InstagramLogo, FacebookLogo, TelegramLogo, ShoppingCart, Robot, MagnifyingGlass, CurrencyCircleDollar, Files, Brain, Users, Wrench } from '@phosphor-icons/react'
 import { useMutation } from '@tanstack/react-query'
 import { fetchClient } from '@/lib/fetch'
 import { normalizeModelId } from '@/lib/openproviders/provider-map'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
+import { motion } from 'framer-motion'
 
 // Dynamic tool metadata fetched from API. Each entry mapped into a simplified UI model.
 interface FetchedToolMeta { name: string; description: string; category: string; requiresConnection?: string }
@@ -39,6 +40,29 @@ const CATEGORY_LABELS: Record<string, string> = {
   delegation: 'Delegación',
   utilities: 'Utilidades',
   general: 'General'
+}
+
+const CATEGORY_ICONS: Record<string, any> = {
+  google_calendar: CalendarBlank,
+  google_drive: FolderOpen,
+  google_docs: FileText,
+  google_slides: Presentation,
+  google_sheets: Table,
+  gmail: EnvelopeSimple,
+  notion: NotePencil,
+  twitter: TwitterLogo,
+  instagram: InstagramLogo,
+  facebook: FacebookLogo,
+  telegram: TelegramLogo,
+  shopify: ShoppingCart,
+  skyvern: Robot,
+  research: MagnifyingGlass,
+  finance: CurrencyCircleDollar,
+  documents: Files,
+  memory: Brain,
+  delegation: Users,
+  utilities: Wrench,
+  general: Wrench
 }
 
 const MODEL_OPTIONS = [
@@ -68,13 +92,18 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
   const [description, setDescription] = useState('')
   const [model, setModel] = useState('gpt-4o-mini')
   const [template, setTemplate] = useState('basic')
-  const [selectedTools, setSelectedTools] = useState<string[]>(['webSearch'])
+  const [selectedTools, setSelectedTools] = useState<string[]>(['webSearch', 'complete_task', 'get_current_date_time'])
   const [loadingTools, setLoadingTools] = useState(false)
   const [allTools, setAllTools] = useState<UIToolMeta[]>([])
   const [toolCategoryOpen, setToolCategoryOpen] = useState<Record<string, boolean>>({})
   const [connections, setConnections] = useState<Record<string, { connected: boolean; account?: string | null }>>({})
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [showConnectDrawer, setShowConnectDrawer] = useState<string | null>(null)
+  const [toolSearchQuery, setToolSearchQuery] = useState('')
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdAgentData, setCreatedAgentData] = useState<{ agent: { id: string; name: string; icon?: string; color?: string; model?: string }; chatId: string } | null>(null)
+  const [sendingWelcomeMessage, setSendingWelcomeMessage] = useState(false)
+  
   // Fetch connection statuses + tool metadata when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -159,6 +188,10 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
   }, [name, description, selectedTools, template, step])
 
   const toggleTool = useCallback((id: string) => {
+    // Prevent disabling required tools
+    const requiredTools = ['complete_task', 'get_current_date_time']
+    if (requiredTools.includes(id)) return
+    
     setSelectedTools(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
   }, [])
 
@@ -168,10 +201,11 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
     setDescription('')
     setModel('gpt-4o-mini')
     setTemplate('basic')
-  setSelectedTools(['webSearch'])
+    setSelectedTools(['webSearch', 'complete_task', 'get_current_date_time'])
     setCustomPrompt('')
     setColor('#6366f1')
     setError(null)
+    setToolSearchQuery('')
   }
 
   const quickCreateMutation = useMutation({
@@ -193,12 +227,13 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error creando agente')
-      return data as { agent: { id: string; name: string }; chatId: string }
+      return data as { agent: { id: string; name: string; icon?: string; color?: string; model?: string }; chatId: string }
     },
     onSuccess: (data) => {
+      setCreatedAgentData(data)
+      setShowSuccessDialog(true)
       setIsOpenAction(false)
       resetAll()
-      router.push(`/c/${data.chatId}`)
     },
     onError: (err: any) => {
       setError(err?.message || 'Error desconocido')
@@ -209,8 +244,9 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
   const handleBack = () => setStep(s => Math.max(s - 1, 1))
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(v) => { if (!v) setIsOpenAction(false) }}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear agente personalizado</DialogTitle>
           <DialogDescription>Despliega un agente en menos de 2 minutos. 4 pasos rápidos.</DialogDescription>
@@ -268,56 +304,84 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium mb-1 block">Tools opcionales</label>
-                {loadingTools && <div className="text-[10px] opacity-60 mb-2">Cargando tools...</div>}
+                <label className="text-xs font-medium mb-2 block">Tools opcionales</label>
+                
+                {/* Search filter */}
+                <div className="mb-3">
+                  <Input 
+                    type="text" 
+                    placeholder="Buscar tools..." 
+                    value={toolSearchQuery}
+                    onChange={(e) => setToolSearchQuery(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                
+                {loadingTools && <div className="text-xs opacity-60 mb-2">Cargando tools...</div>}
                 {!loadingTools && allTools.length === 0 && (
-                  <div className="text-[11px] opacity-70">No se encontró ningún tool.</div>
+                  <div className="text-xs opacity-70">No se encontró ningún tool.</div>
                 )}
-                <div className="space-y-3 max-h-72 overflow-auto pr-1 border rounded-md p-2 bg-background/40">
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 border rounded-md p-3 bg-muted/20">
                   {Object.entries(
-                    allTools.reduce<Record<string, UIToolMeta[]>>((acc, t) => {
-                      (acc[t.category] ||= []).push(t); return acc
-                    }, {})
+                    allTools
+                      .filter(tool => {
+                        if (!toolSearchQuery.trim()) return true
+                        const query = toolSearchQuery.toLowerCase()
+                        return tool.label.toLowerCase().includes(query) || 
+                               tool.capability.toLowerCase().includes(query) ||
+                               tool.category.toLowerCase().includes(query)
+                      })
+                      .reduce<Record<string, UIToolMeta[]>>((acc, t) => {
+                        (acc[t.category] ||= []).push(t); return acc
+                      }, {})
                   ).sort((a,b) => a[0].localeCompare(b[0])).map(([category, items]) => {
                     const open = toolCategoryOpen[category]
+                    const CategoryIcon = CATEGORY_ICONS[category] || Wrench
                     return (
-                      <div key={category} className="space-y-1">
+                      <div key={category} className="space-y-2">
                         <button
                           type="button"
                           onClick={() => setToolCategoryOpen(s => ({ ...s, [category]: !open }))}
-                          className="flex items-center justify-between w-full text-[11px] font-semibold py-1 px-1 rounded hover:bg-muted/60"
+                          className="flex items-center gap-2 w-full text-xs font-semibold py-1.5 px-2 rounded-md hover:bg-muted/80 transition-colors"
                         >
-                          <span>{CATEGORY_LABELS[category] || category} <span className="opacity-50 font-normal">({items.length})</span></span>
-                          <span className="text-xs">{open ? '−' : '+'}</span>
+                          <CategoryIcon size={14} weight="duotone" className="text-primary/80" />
+                          <span className="flex-1 text-left">{CATEGORY_LABELS[category] || category}</span>
+                          <span className="text-[10px] opacity-60 font-normal">({items.length})</span>
+                          <span className="text-sm font-bold">{open ? '−' : '+'}</span>
                         </button>
                         {open && (
-                          <div className="grid grid-cols-2 gap-2 pl-1">
+                          <div className="grid grid-cols-1 gap-2 pl-6">
                             {items.map(tool => {
                               const active = selectedTools.includes(tool.id)
                               const requires = tool.requiresConnection
                               const conn = requires ? connections[requires] : undefined
                               const needsConnect = requires && !conn?.connected
+                              const isRequired = tool.id === 'complete_task' || tool.id === 'get_current_date_time'
                               return (
-                                <div key={tool.id} className={`border rounded-md p-2 flex flex-col gap-1 bg-background/50 ${active ? 'border-primary' : 'border-border'}`}>
+                                <div key={tool.id} className={`border rounded-md p-2.5 flex flex-col gap-1.5 transition-all ${active ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-background/50 hover:border-border/60'} ${isRequired ? 'opacity-100' : ''}`}>
                                   <button
                                     type="button"
                                     onClick={() => toggleTool(tool.id)}
-                                    className={`flex justify-between items-center text-[10px] font-medium ${active ? 'text-primary' : ''}`}
+                                    disabled={isRequired}
+                                    className={`flex justify-between items-center text-xs font-medium ${active ? 'text-primary' : 'text-foreground'} ${isRequired ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                   >
-                                    <span className="truncate" title={tool.label}>{tool.label}</span>
-                                    <span className={`inline-block size-2 rounded-full ${active ? 'bg-primary' : 'bg-muted-foreground/30'}`}></span>
+                                    <span className="truncate flex items-center gap-1.5" title={tool.label}>
+                                      {tool.label}
+                                      {isRequired && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Requerido</span>}
+                                    </span>
+                                    <span className={`inline-block size-3 rounded-full transition-colors ${active ? 'bg-primary' : 'bg-muted-foreground/30'}`}></span>
                                   </button>
-                                  <p className="text-[9px] leading-tight opacity-70 line-clamp-3" title={tool.capability}>{tool.capability}</p>
+                                  <p className="text-[10px] leading-snug opacity-75 line-clamp-2" title={tool.capability}>{tool.capability}</p>
                                   {requires && (
-                                    <div className="flex items-center gap-1 mt-1">
+                                    <div className="flex items-center gap-1.5 mt-0.5">
                                       {needsConnect ? (
                                         <button
                                           type="button"
                                           onClick={() => setShowConnectDrawer(requires)}
-                                          className="text-[9px] px-1 py-0.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10"
+                                          className="text-[10px] px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 font-medium transition-colors"
                                         >Conectar</button>
                                       ) : (
-                                        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Conectado</span>
+                                        <span className="text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">✓ Conectado</span>
                                       )}
                                     </div>
                                   )}
@@ -329,19 +393,41 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
                       </div>
                     )
                   })}
+                  {toolSearchQuery.trim() && Object.keys(
+                    allTools
+                      .filter(tool => {
+                        const query = toolSearchQuery.toLowerCase()
+                        return tool.label.toLowerCase().includes(query) || 
+                               tool.capability.toLowerCase().includes(query) ||
+                               tool.category.toLowerCase().includes(query)
+                      })
+                      .reduce<Record<string, UIToolMeta[]>>((acc, t) => {
+                        (acc[t.category] ||= []).push(t); return acc
+                      }, {})
+                  ).length === 0 && (
+                    <div className="text-xs opacity-60 text-center py-4">
+                      No se encontraron tools que coincidan con "{toolSearchQuery}"
+                    </div>
+                  )}
                 </div>
                 {checkingConnections && (
-                  <div className="text-[10px] mt-2 opacity-60">Verificando conexiones...</div>
+                  <div className="text-xs mt-2 opacity-60">Verificando conexiones...</div>
                 )}
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium block">Prompt personalizado (opcional)</label>
                   <Button type="button" size="sm" variant="outline" onClick={generatePrompt}>
                     <MagicWand className="mr-1" size={14} /> {t.sidebar.generatePrompt}
                   </Button>
                 </div>
-                <Textarea rows={6} value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="Genera el prompt automáticamente o edítalo a tu gusto" />
+                <Textarea 
+                  value={customPrompt} 
+                  onChange={e => setCustomPrompt(e.target.value)} 
+                  placeholder="Genera el prompt automáticamente o edítalo a tu gusto" 
+                  className="min-h-[140px] max-h-[140px] resize-none overflow-y-auto font-mono text-xs leading-relaxed"
+                />
+                <p className="text-[10px] opacity-60 mt-1.5">Usa scroll para leer el prompt completo</p>
               </div>
               <div>
                 <label className="text-xs font-medium mb-1 block">Color</label>
@@ -353,20 +439,25 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           {step === 4 && (
             <div className="space-y-4">
               <div className="rounded-md border p-3 bg-muted/40">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkle size={16} weight="duotone" />
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkle size={16} weight="duotone" className="text-primary" />
                   <span className="text-xs font-semibold">Preview final</span>
                 </div>
-                <div className="text-sm font-medium mb-1">{name || 'Sin nombre'}</div>
-                <div className="text-xs mb-2 opacity-80">Modelo: {model} · Tools: {selectedTools.length ? selectedTools.join(', ') : 'Ninguno'}</div>
-                <div className="text-xs whitespace-pre-wrap leading-relaxed max-h-40 overflow-auto border-t pt-2 font-mono bg-background/40">
+                <div className="text-sm font-semibold mb-1">{name || 'Sin nombre'}</div>
+                <div className="text-xs mb-3 opacity-80">
+                  <span className="font-medium">Modelo:</span> {model} · <span className="font-medium">Tools:</span> {selectedTools.length ? selectedTools.length : 'Ninguno'}
+                </div>
+                <div className="text-[11px] whitespace-pre-wrap leading-relaxed h-40 overflow-y-auto border-t pt-2 font-mono bg-background/60 rounded-md p-2">
                   {previewPrompt}
                 </div>
+                <p className="text-[10px] opacity-60 mt-2">Usa scroll para leer el prompt completo</p>
               </div>
               {error && (
                 <div className="text-xs text-red-600 flex items-center gap-1"><XCircle size={14} /> {error}</div>
               )}
-              <div className="text-[11px] opacity-60">Al crear el agente se abrirá automáticamente un chat con saludo inicial.</div>
+              <div className="text-xs opacity-70 bg-blue-500/10 border border-blue-500/20 rounded-md p-2">
+                💡 Al crear el agente se abrirá automáticamente un chat con saludo inicial.
+              </div>
             </div>
           )}
         </div>
@@ -418,5 +509,130 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
         </div>
       )}
     </Dialog>
+
+    {/* Success Confirmation Dialog */}
+    <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 bg-green-500/10 rounded-full">
+              <CheckCircle size={32} className="text-green-500" weight="fill" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-lg">¡Agente desplegado con éxito!</DialogTitle>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        {createdAgentData && (
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+              <div 
+                className="w-12 h-12 rounded-lg flex items-center justify-center text-xl"
+                style={{ backgroundColor: createdAgentData.agent.color || '#6366f1' }}
+              >
+                {createdAgentData.agent.icon || '🤖'}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold">{createdAgentData.agent.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {createdAgentData.agent.model || 'gpt-4o-mini'} · {selectedTools.length} herramientas
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-sm text-muted-foreground space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 mt-0.5" weight="fill" />
+                <span>Agente registrado y disponible en el sistema</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 mt-0.5" weight="fill" />
+                <span>Chat creado con mensaje de bienvenida</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 mt-0.5" weight="fill" />
+                <span>Listo para recibir tu primera consulta</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowSuccessDialog(false)}
+            disabled={sendingWelcomeMessage}
+          >
+            Cerrar
+          </Button>
+          <Button 
+            size="sm"
+            disabled={sendingWelcomeMessage}
+            onClick={async () => {
+              if (!createdAgentData?.chatId || !createdAgentData?.agent) return
+              
+              setSendingWelcomeMessage(true)
+              try {
+                // Dynamic, personalized welcome prompt inspired by UX best practices
+                const welcomePrompt = `¡Acabo de crear mi nuevo agente "${createdAgentData.agent.name}"! 
+                
+Su especialidad es: ${description || 'asistente inteligente'}.
+
+Preséntalo de forma amigable y entusiasta. Explica brevemente qué puede hacer por mí y hazme una pregunta sobre cómo puedo empezar a usarlo. Máximo 3-4 líneas. Usa emojis relevantes. ✨`
+                
+                // Send message and wait for response to start before redirecting
+                const response = await fetchClient('/api/chat', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chatId: createdAgentData.chatId,
+                    messages: [{ role: 'user', content: welcomePrompt }],
+                    model: 'gpt-4o-mini', // Fastest model
+                    stream: true, // Enable streaming
+                  })
+                })
+                
+                // Wait a tiny bit for the stream to start (200ms)
+                // This ensures Kylio is already "typing" when user arrives
+                await new Promise(resolve => setTimeout(resolve, 200))
+                
+                // Redirect - user will see Kylio responding in real-time
+                router.push(`/c/${createdAgentData.chatId}`)
+                setShowSuccessDialog(false)
+              } catch (error) {
+                console.error('Error sending welcome message:', error)
+                // Even if message fails, still redirect to chat
+                router.push(`/c/${createdAgentData.chatId}`)
+                setShowSuccessDialog(false)
+              } finally {
+                setSendingWelcomeMessage(false)
+              }
+            }}
+          >
+            {sendingWelcomeMessage ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="mr-2"
+                >
+                  ⚡
+                </motion.div>
+                Conectando con Kylio...
+              </>
+            ) : (
+              <>
+                Ir al chat <ArrowRight size={14} className="ml-1" />
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
+
+

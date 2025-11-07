@@ -351,6 +351,16 @@ img {
   to { height: 0; }
 }
 
+/* Gradient shift animation for welcome message */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
 .animate-accordion-down {
   animation: accordion-down 0.2s ease-out;
 }

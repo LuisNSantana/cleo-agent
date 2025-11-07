@@ -320,7 +320,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
           <div aria-live="polite" aria-atomic="true">
             <AnimatePresence initial={false} mode="popLayout">
               {(() => {
-                const meta = getAgentMetadata(latestStep.agent)
+                const meta = getAgentMetadata(latestStep.agent, latestStep.agentName)
                 const reasoningBlocks: ReasoningBlock[] = latestStep.metadata?.reasoningBlocks || []
                 const toolName = latestStep.metadata?.toolName
                 const toolParameters = latestStep.metadata?.toolParameters
@@ -357,8 +357,9 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     key={latestStep.id}
                     id={latestStep.id}
                     agentId={latestStep.agent}
+                    agentName={latestStep.agentName}
                     title={actionLabel(latestStep.action)}
-                    subtitle={meta.name || latestStep.agentName || latestStep.agent}
+                    subtitle={latestStep.agentName || meta.name}
                     timestamp={new Date(latestStep.timestamp)}
                     isActive={true}
                     isCompleted={isStepCompleted(latestStep)} // ✅ Show checkmark for completed steps
@@ -436,7 +437,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                   canonical: s.metadata?.canonical
                 })
                 
-                const meta = getAgentMetadata(s.agent)
+                const meta = getAgentMetadata(s.agent, s.agentName)
                 const isActive = index === visibleSteps.length - 1 // Last step is active
                 
                 // Parse reasoning blocks if present
@@ -473,8 +474,9 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     key={s.id}
                     id={s.id}
                     agentId={s.agent}
+                    agentName={s.agentName}
                     title={actionLabel(s.action)}
-                    subtitle={meta.name || s.agentName || s.agent}
+                    subtitle={s.agentName || meta.name}
                     timestamp={new Date(s.timestamp)}
                     isActive={isActive}
                     isCompleted={isStepCompleted(s)} // ✅ Show checkmark for completed steps

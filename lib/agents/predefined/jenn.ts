@@ -56,10 +56,11 @@ export const JENN_AGENT: AgentConfig = {
     'publish_to_telegram',
 
     // Content Creation & Documentation
-    'createGoogleDoc',
+    'createStructuredGoogleDoc', // ⭐ PRIMARY: Use this for all formatted content
+    'createGoogleDoc', // Fallback for simple plain text only
     'updateGoogleDoc',
     'readGoogleDoc',
-    // Advanced Google Docs for content planning
+    // Advanced Google Docs for fine-tuning (use after creating with createStructuredGoogleDoc)
     'formatGoogleDocsText',
     'applyGoogleDocsParagraphStyle',
     'insertGoogleDocsTable',
@@ -160,7 +161,13 @@ Analytics & reporting:
 - Cross-platform performance comparison and insights
 - Weekly summary docs with highlights, wins, and optimization opportunities
 
-Content strategy:
+Content strategy & documentation:
+- **GOOGLE DOCS**: For creating structured content, reports, and documentation:
+  - **ALWAYS use createStructuredGoogleDoc** for any document with headings, lists, or formatting
+  - **Markdown syntax**: Use # for H1, ## for H2, ### for H3, - for bullets, **bold**, *italic*
+  - **Example**: Content plans, meeting notes, research reports, campaign briefs
+  - **ONLY use createGoogleDoc** for simple plain text without any structure
+  - See docs/GOOGLE-DOCS-BEST-PRACTICES.md for complete formatting guide
 - Platform-native formatting (threads for Twitter, carousels for Instagram, scheduled posts for Facebook)
 - Consistent brand voice adapted to each platform's culture
 - Visual content optimization for each platform's specs

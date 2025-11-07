@@ -56,6 +56,7 @@ import {
 	copyMoveDriveFileTool
 } from './google-drive-advanced'
 import { createGoogleDocTool, readGoogleDocTool, updateGoogleDocTool } from './google-docs'
+import { createStructuredGoogleDocTool } from './google-docs-structured'
 import {
 	formatGoogleDocsTextTool,
 	applyGoogleDocsParagraphStyleTool,
@@ -357,6 +358,7 @@ export const tools = {
 
 	// Google Docs
 	createGoogleDoc: createGoogleDocTool,
+	createStructuredGoogleDoc: createStructuredGoogleDocTool, // ⭐ NEW: Better formatting for complex documents
 	readGoogleDoc: readGoogleDocTool,
 	updateGoogleDoc: updateGoogleDocTool,
 	

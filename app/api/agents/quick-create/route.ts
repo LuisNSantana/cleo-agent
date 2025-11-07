@@ -126,10 +126,22 @@ export async function POST(req: NextRequest) {
 
     const chatId = chatInsert.data.id
 
-    // Seed greeting messages into both messages AND agent_messages (for context loader)
+    // Streamlined, personalized onboarding messages
     const nowIso = new Date().toISOString()
-    const greeting1 = `✅ Agente "${newAgentUnified.name}" desplegado. Puede ayudarte con: ${newAgentUnified.description || 'tareas especializadas.'} Configurado con modelo ${normalizedModel}.`
-    const greeting2 = `👋 Hola, soy ${newAgentUnified.name}. Estoy listo para ayudarte. ¿Cuál es tu primer objetivo?`
+    
+    const greeting1 = `## ✨ Agente "${newAgentUnified.name}" desplegado con éxito
+
+**Tu nuevo asistente:**
+- 🤖 **${newAgentUnified.name}**
+- 🧠 Modelo: ${normalizedModel}
+- 🎯 Especialidad: ${newAgentUnified.description || 'Asistente inteligente multifuncional'}
+- 🛠️ ${(newAgentUnified.tools || []).length} herramientas activas listas para usar`
+
+    const greeting2 = `👋 ¡Hola! Soy **${newAgentUnified.name}**, tu nuevo asistente inteligente.
+
+Estoy listo para ${newAgentUnified.description ? newAgentUnified.description.toLowerCase() : 'ayudarte con tus tareas'}. 
+
+¿Qué te gustaría hacer primero? Puedo mostrarte mis capacidades o empezar directamente con lo que necesites. 🚀`
 
     const baseMessages = [greeting1, greeting2]
     const messageRows = baseMessages.map(content => ({
@@ -147,6 +159,9 @@ export async function POST(req: NextRequest) {
     if (msgError) {
       console.error('[quick-create-agent] Failed inserting greetings into messages:', msgError)
     }
+
+    // Small delay to ensure database propagation before redirect
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Also persist into agent_messages so the smart loader can reconstruct history on first user message
     try {

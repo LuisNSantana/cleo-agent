@@ -297,7 +297,7 @@ export function ChatInput({
           
           <PromptInputTextarea
             ref={textareaRef}
-            placeholder={placeholder || "Ask Cleo..."}
+            placeholder={placeholder || "Ask Kylio..."}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}

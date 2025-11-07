@@ -15,8 +15,8 @@ export interface AgentMetadata {
 export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'cleo-supervisor': {
     id: 'cleo-supervisor',
-    name: 'Cleo',
-    avatar: '/img/kyliologo.png',
+    name: 'Kylio',
+    avatar: '/img/agents/cleo4.png',
     color: '#7C3AED',
     emoji: '🤖'
   },
@@ -108,14 +108,22 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
 
 /**
  * Get agent display metadata by ID
+ * Enhanced to support agentName override for custom/dynamic agents
  */
-export function getAgentMetadata(agentId: string): AgentMetadata {
+export function getAgentMetadata(agentId: string, agentName?: string): AgentMetadata {
   // Handle legacy IDs and variations
   const normalizedId = normalizeAgentId(agentId)
   
-  return AGENT_METADATA[normalizedId] || {
+  const defaultMeta = AGENT_METADATA[normalizedId]
+  
+  if (defaultMeta) {
+    return defaultMeta
+  }
+  
+  // For custom/dynamic agents, use provided name or format from ID
+  return {
     id: agentId,
-    name: formatAgentName(agentId),
+    name: agentName || formatAgentName(agentId),
     emoji: '🤖'
   }
 }

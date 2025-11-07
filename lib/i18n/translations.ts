@@ -57,6 +57,11 @@ export type Translations = {
     close: string
   }
   
+  // Badges
+  badges: {
+    new: string
+  }
+  
   // Projects
   projects: {
     viewAll: string
@@ -207,6 +212,9 @@ const en: Translations = {
     open: 'Open',
     close: 'Close',
   },
+  badges: {
+    new: 'New',
+  },
   projects: {
     viewAll: 'View all',
     new: 'New',
@@ -340,6 +348,9 @@ const es: Translations = {
     create: 'Crear',
     open: 'Abrir',
     close: 'Cerrar',
+  },
+  badges: {
+    new: 'Nuevo',
   },
   projects: {
     viewAll: 'Ver todos',
@@ -475,6 +486,9 @@ const pt: Translations = {
     open: 'Abrir',
     close: 'Fechar',
   },
+  badges: {
+    new: 'Novo',
+  },
   projects: {
     viewAll: 'Ver todos',
     new: 'Novo',
@@ -607,6 +621,9 @@ const fr: Translations = {
     create: 'Créer',
     open: 'Ouvrir',
     close: 'Fermer',
+  },
+  badges: {
+    new: 'Nouveau',
   },
   projects: {
     viewAll: 'Voir tout',
@@ -741,6 +758,9 @@ const it: Translations = {
     open: 'Apri',
     close: 'Chiudi',
   },
+  badges: {
+    new: 'Nuovo',
+  },
   projects: {
     viewAll: 'Vedi tutti',
     new: 'Nuovo',
@@ -865,6 +885,9 @@ const de: Translations = {
     create: 'Erstellen',
     open: 'Öffnen',
     close: 'Schließen',
+  },
+  badges: {
+    new: 'Neu',
   },
   projects: {
     viewAll: 'Alle anzeigen',
@@ -991,6 +1014,9 @@ const ja: Translations = {
     open: '開く',
     close: '閉じる',
   },
+  badges: {
+    new: '新規',
+  },
   projects: {
     viewAll: 'すべて表示',
     new: '新規',
@@ -1061,6 +1087,9 @@ const ko: Translations = {
     create: '만들기',
     open: '열기',
     close: '닫기',
+  },
+  badges: {
+    new: '새로운',
   },
   projects: {
     viewAll: '모두 보기',
@@ -1133,6 +1162,9 @@ const zh: Translations = {
     open: '打开',
     close: '关闭',
   },
+  badges: {
+    new: '新',
+  },
   projects: {
     viewAll: '查看全部',
     new: '新建',
@@ -1203,6 +1235,9 @@ const ar: Translations = {
     create: 'إنشاء',
     open: 'فتح',
     close: 'إغلاق',
+  },
+  badges: {
+    new: 'جديد',
   },
   projects: {
     viewAll: 'عرض الكل',

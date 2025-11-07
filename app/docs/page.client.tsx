@@ -125,7 +125,7 @@ const content: Record<string, LocaleContent> = {
     backHome: "Back to Home",
 
     // Hero Section
-    heroTitle: "Welcome to Cleo",
+    heroTitle: "Welcome to Kylio",
     heroSubtitle: "Your intelligent workspace companion that adapts to your workflow",
     heroFeatures: [
       { icon: Brain, text: "Multi-Agent System", desc: "Specialized agents for every task" },
@@ -262,8 +262,8 @@ const content: Record<string, LocaleContent> = {
     guide: "Getting Started Guide",
     guideSteps: [
       {
-        title: "Welcome to Cleo",
-        content: "Cleo is your intelligent workspace companion designed to enhance productivity through AI-powered agents and seamless integrations.",
+        title: "Welcome to Kylio",
+        content: "Kylio is your intelligent workspace companion designed to enhance productivity through AI-powered agents and seamless integrations.",
         icon: Sparkles
       },
       {

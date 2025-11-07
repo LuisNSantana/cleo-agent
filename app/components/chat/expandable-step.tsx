@@ -9,6 +9,7 @@ import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 export type ExpandableStepProps = {
   id: string
   agentId: string // ✅ Cambiado de icon a agentId para usar AgentAvatar
+  agentName?: string // ✅ Override name for custom agents
   title: string
   subtitle?: string
   timestamp?: string | Date
@@ -32,6 +33,7 @@ export type ExpandableStepProps = {
 export function ExpandableStep({
   id,
   agentId,
+  agentName,
   title,
   subtitle,
   timestamp,
@@ -44,7 +46,7 @@ export function ExpandableStep({
   accentColor
 }: ExpandableStepProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const agentMeta = getAgentMetadata(agentId)
+  const agentMeta = getAgentMetadata(agentId, agentName)
   
   // Get initials from agent name for avatar fallback
   const getInitials = (name: string) => {

@@ -162,6 +162,22 @@ const config: Config = {
             opacity: "0.8",
           },
         },
+        "gradient-x": {
+          "0%, 100%": {
+            backgroundPosition: "0% 50%",
+          },
+          "50%": {
+            backgroundPosition: "100% 50%",
+          },
+        },
+        "shimmer": {
+          "0%": {
+            backgroundPosition: "-200% center",
+          },
+          "100%": {
+            backgroundPosition: "200% center",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -172,6 +188,8 @@ const config: Config = {
         "scale-in": "scale-in 0.3s ease-out",
         "glow": "glow 2s ease-in-out infinite",
         "pulse-agent": "pulse-agent 2s ease-in-out infinite",
+        "gradient-x": "gradient-x 3s ease infinite",
+        "shimmer": "shimmer 2s linear infinite",
       },
       backdropBlur: {
         xs: "2px",

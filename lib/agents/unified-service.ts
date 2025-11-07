@@ -150,18 +150,45 @@ export class UnifiedAgentService {
   }
 
   /**
-   * Delete an agent (soft delete by setting is_active = false)
+   * Smart delete: Hard delete if no data, soft delete if has history
+   * - If agent has executions/analytics: SOFT DELETE (preserve historical data)
+   * - If agent has no data: HARD DELETE (clean removal, allows immediate name reuse)
    */
   async deleteAgent(agentId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
-        .from('agents')
-        .update({ 
-          is_active: false, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', agentId)
-        .eq('user_id', userId)
+      // Check if agent has associated data
+      const { data: executionsCheck } = await this.supabase
+        .from('agent_executions')
+        .select('id')
+        .eq('agent_id', agentId)
+        .limit(1)
+      
+      const hasExecutions = executionsCheck && executionsCheck.length > 0
+
+      let error = null
+
+      if (hasExecutions) {
+        // Soft delete: preserve historical data
+        const { error: updateError } = await this.supabase
+          .from('agents')
+          .update({ 
+            is_active: false, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', agentId)
+          .eq('user_id', userId)
+        error = updateError
+        console.log(`[UNIFIED-SERVICE] Agent ${agentId} soft-deleted (has executions)`)
+      } else {
+        // Hard delete: no data to preserve
+        const { error: deleteError } = await this.supabase
+          .from('agents')
+          .delete()
+          .eq('id', agentId)
+          .eq('user_id', userId)
+        error = deleteError
+        console.log(`[UNIFIED-SERVICE] Agent ${agentId} hard-deleted (no executions)`)
+      }
 
       if (error) {
         console.error('Error deleting agent:', error)

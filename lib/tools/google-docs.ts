@@ -153,10 +153,14 @@ async function makeGoogleDocsRequest(accessToken: string, endpoint: string, opti
 
 // 📄 Create a new Google Doc
 export const createGoogleDocTool = tool({
-  description: '📄 Create a new Google Document with title and initial content. Returns the document ID and web link for sharing.',
+  description: `📄 Create a new Google Document with title and initial content. 
+
+⚠️ IMPORTANT: For documents with structured content (headings, lists, formatting), use 'createStructuredGoogleDoc' instead!
+
+This tool is for SIMPLE documents with plain text only. Returns the document ID and web link for sharing.`,
   inputSchema: z.object({
     title: z.string().min(1).describe('Title of the new document'),
-    content: z.string().optional().describe('Initial content for the document (plain text)'),
+    content: z.string().optional().describe('Initial content for the document (plain text). For formatted content, use createStructuredGoogleDoc instead.'),
     shareSettings: z.enum(['private', 'public_read', 'public_edit']).optional().default('private').describe('Sharing settings for the document'),
   }),
   execute: async ({ title, content, shareSettings = 'private' }) => {
@@ -202,21 +206,28 @@ export const createGoogleDocTool = tool({
 
       // Add initial content if provided
       if (content) {
-        await makeGoogleDocsRequest(accessToken, `documents/${documentId}:batchUpdate`, {
-          method: 'POST',
-          body: JSON.stringify({
-            requests: [
-              {
-                insertText: {
-                  location: {
-                    index: 1,
-                  },
-                  text: content,
-                },
-              },
-            ],
-          }),
-        })
+        // Split content into paragraphs for better formatting
+        const paragraphs = content.split('\n').filter(p => p.trim())
+        
+        if (paragraphs.length > 0) {
+          const requests = []
+          
+          // Insert paragraphs with proper newlines
+          for (let i = 0; i < paragraphs.length; i++) {
+            const text = paragraphs[i] + (i < paragraphs.length - 1 ? '\n' : '')
+            requests.push({
+              insertText: {
+                location: { index: 1 },
+                text: text
+              }
+            })
+          }
+          
+          await makeGoogleDocsRequest(accessToken, `documents/${documentId}:batchUpdate`, {
+            method: 'POST',
+            body: JSON.stringify({ requests }),
+          })
+        }
       }
 
       // Handle sharing settings

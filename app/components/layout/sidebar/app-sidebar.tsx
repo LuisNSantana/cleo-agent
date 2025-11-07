@@ -134,7 +134,49 @@ export function AppSidebar() {
           <SidebarGroup className="mb-1">
             <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Navigation</SidebarGroupLabel>
             <SidebarMenu className="space-y-1">
-              {primaryNav.map(({ href, label, icon: Icon, iconWeight }) => {
+              {/* Home first */}
+              {(() => {
+                const { href, label, icon: Icon, iconWeight } = primaryNav[0]
+                const isActive = pathname === "/"
+                return (
+                  <SidebarMenuItem key={href}>
+                    <SidebarMenuButton 
+                      asChild
+                      isActive={isActive} 
+                      tooltip={label}
+                    >
+                      <Link
+                        href={href}
+                        prefetch
+                        className="flex items-center w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
+                        onClick={() => {
+                          // Reset messages when clicking Home
+                          resetMessages()
+                          if (isMobile) {
+                            setOpenMobile(false)
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="size-[18px]" weight={iconWeight} />
+                          <span className="text-[13.5px]">{label}</span>
+                        </div>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })()}
+
+              {/* Crear Agente — subtle featured CTA directly under Home */}
+              <SidebarMenuItem>
+                <CreateAgentMenuItem
+                  isMobile={isMobile}
+                  closeSidebar={() => setOpenMobile(false)}
+                />
+              </SidebarMenuItem>
+
+              {/* Rest of primary nav */}
+              {primaryNav.slice(1).map(({ href, label, icon: Icon, iconWeight }) => {
                 const isActive = href === "/"
                   ? pathname === "/"
                   : pathname === href || pathname.startsWith(href + "/")
@@ -176,7 +218,7 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1">
               <SidebarMenuItem>
                 <SidebarMenuButton 
-                  tooltip="Customize Cleo's personality"
+                  tooltip="Customize Kylio's personality"
                   onClick={() => {
                     personalityAction.action()
                   }}
@@ -212,8 +254,20 @@ export function AppSidebar() {
                 ⌘⇧U
               </div>
             </Link>
-            {/* Primary CTA: Crear Agente */}
-            <CreateAgentCTA isMobile={isMobile} closeSidebar={() => setOpenMobile(false)} />
+            {/* Quick link: Agentes (replacing previous Crear Agente here) */}
+            <Link
+              href="/agents/manage"
+              className="hover:bg-muted/80 hover:text-foreground text-foreground group/agents relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5"
+              prefetch
+              onClick={() => {
+                if (isMobile) setOpenMobile(false)
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <AgentsIcon className="size-[18px]" weight="duotone" />
+                <span className="font-medium">{t.sidebar.agents}</span>
+              </div>
+            </Link>
             <HistoryTrigger
               hasSidebar={false}
               classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/search"
@@ -289,7 +343,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <div className="text-sidebar-foreground text-sm font-medium">
-              Cleo by Huminary Labs
+              Kylio by Huminary Labs
             </div>
             <div className="text-sidebar-foreground/70 text-xs">
               Star the repo on GitHub!
@@ -323,28 +377,51 @@ export function AppSidebar() {
   )
 }
 
-function CreateAgentCTA({ isMobile, closeSidebar }: { isMobile: boolean; closeSidebar: () => void }) {
+function CreateAgentMenuItem({ isMobile, closeSidebar }: { isMobile: boolean; closeSidebar: () => void }) {
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
+  
   return (
     <>
-      <button
-        type="button"
+      <SidebarMenuButton 
+        tooltip={t.sidebar.newAgent}
         onClick={() => {
           setOpen(true)
           if (isMobile) closeSidebar()
         }}
-        className="hover:bg-primary/10 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/new-agent border border-primary/30"
       >
-        <div className="flex items-center gap-3">
-          <PlusCircle size={18} weight="duotone" />
-          <span className="font-medium">{t.sidebar.newAgent}</span>
+        <div className="flex items-center gap-3 w-full relative">
+          <PlusCircle className="size-[18px]" weight="duotone" />
+          <span className="text-[13.5px]">{t.sidebar.newAgent}</span>
+          {/* Subtle floating badge with shimmer effect */}
+          <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 relative overflow-hidden">
+            {t.badges.new}
+            {/* Shimmer overlay */}
+            <span 
+              className="absolute inset-0 -translate-x-full animate-[shimmer_3s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              style={{
+                animation: 'shimmer 3s ease-in-out infinite'
+              }}
+            />
+          </span>
         </div>
-        <div className="text-muted-foreground ml-auto text-xs opacity-0 duration-150 group-hover/new-agent:opacity-100">
-          ⌘⇧N
-        </div>
-      </button>
+      </SidebarMenuButton>
       <DialogCreateAgent isOpen={open} setIsOpenAction={setOpen} />
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+            opacity: 0;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </>
   )
 }

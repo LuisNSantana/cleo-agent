@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
   }
 }
 
-// DELETE /api/agents/:id - Soft delete agent
+// DELETE /api/agents/:id - Smart delete: hard delete if no data, soft delete if has history
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
@@ -134,20 +134,49 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
       return NextResponse.json({ error: 'Default agents cannot be deleted' }, { status: 403 })
     }
 
-  const { error } = await supabase
-      .from('agents' as any)
-      .update({ is_active: false })
-      .eq('id', id)
+    // Check if agent has associated data (executions, analytics, etc.)
+    const { data: executionsCheck } = await supabase
+      .from('agent_executions' as any)
+      .select('id')
+      .eq('agent_id', id)
+      .limit(1)
+    
+    const hasExecutions = executionsCheck && executionsCheck.length > 0
+
+    // Smart delete strategy:
+    // - If agent has executions/history: SOFT DELETE (preserve data for analytics)
+    // - If agent has no data: HARD DELETE (clean removal, allows name reuse immediately)
+    let deleteType: 'hard' | 'soft' = 'hard'
+    let error = null
+
+    if (hasExecutions) {
+      // Soft delete: mark as inactive to preserve historical data
+      deleteType = 'soft'
+      const { error: updateError } = await supabase
+        .from('agents' as any)
+        .update({ is_active: false })
+        .eq('id', id)
+      error = updateError
+    } else {
+      // Hard delete: physically remove agent (no data to preserve)
+      const { error: deleteError } = await supabase
+        .from('agents' as any)
+        .delete()
+        .eq('id', id)
+      error = deleteError
+    }
 
     if (error) {
-      console.error('Delete agent error:', error)
+      console.error(`[DELETE AGENT] ${deleteType} delete error:`, error)
       return NextResponse.json({ error: 'Failed to delete agent' }, { status: 500 })
     }
+
+    console.log(`[DELETE AGENT] ${id} - ${deleteType} deleted (has executions: ${hasExecutions})`)
 
     // 🚀 TRIGGER AUTO-SYNC: Update delegation tools after agent deletion
     await triggerAgentDeleted(id, user.id, 'Deleted Agent')
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, deleteType })
   } catch (e) {
     console.error('DELETE /api/agents/:id error:', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

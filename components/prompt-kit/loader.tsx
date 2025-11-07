@@ -54,7 +54,7 @@ export function Loader() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Cleo Avatar with pulse animation */}
+      {/* Kylio Avatar with pulse animation */}
       <motion.div 
         className="relative h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
         animate={{ 
@@ -71,8 +71,8 @@ export function Loader() {
       >
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-full" />
         <Image 
-          src="/img/kyliologo.png" 
-          alt="Cleo" 
+          src="/img/agents/cleo4.png" 
+          alt="Kylio" 
           width={40} 
           height={40}
           className="relative z-10 rounded-full"

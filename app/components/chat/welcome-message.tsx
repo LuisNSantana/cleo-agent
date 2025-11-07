@@ -9,6 +9,24 @@ export function WelcomeMessage() {
   const { user } = useUser()
   const [greeting, setGreeting] = useState("Hello")
   const [timeIcon, setTimeIcon] = useState<"morning" | "afternoon" | "evening">("afternoon")
+  const [isDark, setIsDark] = useState(false)
+  
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    }
+    checkDarkMode()
+    
+    // Watch for theme changes
+    const observer = new MutationObserver(checkDarkMode)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+    
+    return () => observer.disconnect()
+  }, [])
   
   // Get first name from display_name or email
   const getFirstName = () => {
@@ -70,51 +88,125 @@ export function WelcomeMessage() {
 
   return (
     <div className="flex flex-col items-center text-center space-y-4 mb-6">
-      {/* Time Icon with animation */}
+      {/* Time Icon with enhanced animation and glow effect */}
       <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
+        initial={{ scale: 0, rotate: -180, opacity: 0 }}
+        animate={{ 
+          scale: 1, 
+          rotate: 0, 
+          opacity: 1,
+        }}
         transition={{ 
           type: "spring",
-          stiffness: 200,
-          damping: 15,
+          stiffness: 260,
+          damping: 20,
           delay: 0.1
         }}
+        className="relative"
       >
-        <TimeIcon />
+        <motion.div
+          animate={{
+            scale: [1, 1.15, 1],
+            rotate: [0, 5, -5, 0],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          style={{
+            filter: "drop-shadow(0 0 8px currentColor)",
+          }}
+        >
+          <motion.div
+            animate={{
+              filter: [
+                "drop-shadow(0 0 8px currentColor)",
+                "drop-shadow(0 0 16px currentColor)",
+                "drop-shadow(0 0 8px currentColor)",
+              ],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <TimeIcon />
+          </motion.div>
+        </motion.div>
       </motion.div>
 
-      {/* Greeting with word-by-word reveal */}
-      <div className="text-3xl md:text-4xl font-medium tracking-tight">
+      {/* Greeting with word-by-word reveal + gradient effect */}
+            {/* Greeting with word-by-word reveal + color transition effect */}
+      <div className="text-3xl md:text-4xl font-bold tracking-tight">
         {words.map((word, index) => (
           <motion.span
             key={index}
-            initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            initial={{ 
+              opacity: 0, 
+              y: 20, 
+              filter: "blur(8px)", 
+              scale: 0.8 
+            }}
+            animate={{ 
+              opacity: 1, 
+              y: 0, 
+              filter: "blur(0px)", 
+              scale: 1,
+            }}
             transition={{
-              duration: 0.3,
-              delay: 0.3 + index * 0.1,
-              ease: [0.25, 0.4, 0.25, 1]
+              duration: 0.5,
+              delay: 0.3 + index * 0.15,
+              ease: [0.34, 1.56, 0.64, 1]
             }}
             className="inline-block mr-[0.3em] last:mr-0"
           >
-            {word}
+            <motion.span
+              animate={{
+                color: [
+                  "rgb(99, 102, 241)",  // indigo-500
+                  "rgb(168, 85, 247)",  // purple-500
+                  "rgb(99, 102, 241)",  // back to indigo-500
+                ],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: index * 0.1,
+              }}
+              className="font-bold"
+            >
+              {word}
+            </motion.span>
           </motion.span>
         ))}
       </div>
       
-      {/* Subtitle with gentle fade-in */}
+      {/* Subtitle with gentle fade-in and breathing effect */}
       <motion.p
         className="text-muted-foreground text-sm md:text-base max-w-md"
-        initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+        initial={{ opacity: 0, y: 20, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ 
-          duration: 0.5, 
-          delay: 0.3 + words.length * 0.1,
-          ease: [0.25, 0.4, 0.25, 1]
+          duration: 0.6, 
+          delay: 0.3 + words.length * 0.15,
+          ease: [0.34, 1.56, 0.64, 1]
         }}
       >
-        Let Cleo be with you — your AI companion for work, creativity, and beyond
+        <motion.span
+          animate={{
+            opacity: [0.7, 1, 0.7],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          Let Kylio be with you — your AI companion for work, creativity, and beyond
+        </motion.span>
       </motion.p>
     </div>
   )
