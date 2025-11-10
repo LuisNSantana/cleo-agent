@@ -42,6 +42,8 @@ export interface GraphBuilderConfig {
   modelFactory: ModelFactory
   eventEmitter: EventEmitter
   executionManager: ExecutionManager
+  checkpointer?: any // ✅ Shared Supabase checkpointer (optional for backward compat)
+  graphCache?: any   // ✅ Shared graph cache (optional for backward compat)
 }
 
 export interface DualModeGraphConfig {

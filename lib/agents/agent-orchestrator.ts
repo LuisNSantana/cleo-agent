@@ -54,7 +54,7 @@ async function createAndRunExecution(
 	userId?: string,
 	lastUserParts?: any[]
 ): Promise<AgentExecution> {
-	const core = getGlobalOrchestrator()
+	const core = await getGlobalOrchestrator()
 	
 	// Derive effective user id with fallbacks
 	let effectiveUserId = userId || getCurrentUserId()
@@ -263,8 +263,8 @@ async function createAndRunExecution(
 // ----------------------------------------------------------------------------
 // Public API (legacy-compatible)
 // ----------------------------------------------------------------------------
-export function getAgentOrchestrator() {
-	const core = getGlobalOrchestrator()
+export async function getAgentOrchestrator() {
+	const core = await getGlobalOrchestrator()
 	
 	const api = {
 		__id: 'stateless-legacy-wrapper',

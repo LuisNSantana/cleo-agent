@@ -377,13 +377,20 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     // Helper: Get latest timestamp
     const getTimestamp = (step: any) => new Date(step.timestamp).getTime()
     
-    // Helper: Check if pipeline truly finished (no active steps)
-    const hasActiveSteps = uniqueSteps.some(s => 
-      s.action !== 'completing' && 
-      (s.metadata?.stage === 'started' || 
-       s.metadata?.stage === 'in_progress' ||
-       s.metadata?.status === 'in_progress')
-    )
+    // Helper: Check if a step is actively running (not completed)
+    const isStepActive = (s: any) => {
+      // Don't consider completing steps as active
+      if (s.action === 'completing') return false
+      
+      // A step is active if it's started or in progress (not completed)
+      return (
+        s.metadata?.stage === 'started' || 
+        s.metadata?.stage === 'in_progress' ||
+        s.metadata?.status === 'in_progress'
+      ) && s.metadata?.stage !== 'completed'
+    }
+    
+    const hasActiveSteps = uniqueSteps.some(isStepActive)
 
     // 🔴 PRIORITY 1: ERROR/FAILURE STATE (requires immediate attention)
     const errorStep = uniqueSteps.find(s => 
@@ -413,37 +420,41 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     
     if (activeDelegation) return activeDelegation
 
-    // 🟢 PRIORITY 4: MOST DOWNSTREAM RUNNING STEP (furthest in execution)
-    // Show the most recent tool/action being executed
+    // ✅ PRIORITY 4: COMPLETED (if completing step exists and no active work)
+    // Show "completing" as soon as it appears and no tools are actively running
+    const completingStep = uniqueSteps.find(s => s.action === 'completing')
+    if (completingStep && !hasActiveSteps) {
+      return completingStep
+    }
+
+    // 🟢 PRIORITY 5: MOST DOWNSTREAM RUNNING STEP (furthest in execution)
+    // Show the most recent tool/action being executed (exclude completed ones)
     const runningSteps = uniqueSteps
-      .filter(s => 
-        (s.action === 'executing' && s.metadata?.stage === 'started') ||
-        (s.action === 'thinking' && !s.metadata?.stage)
-      )
+      .filter(s => {
+        // Exclude steps that already completed
+        if (s.metadata?.stage === 'completed') return false
+        
+        return (
+          (s.action === 'executing' && s.metadata?.stage === 'started') ||
+          (s.action === 'thinking' && !s.metadata?.stage)
+        )
+      })
       .sort((a, b) => getTimestamp(b) - getTimestamp(a))
     
     if (runningSteps.length > 0) return runningSteps[0]
 
-    // 🟢 PRIORITY 5: ROUTING/ANALYZING (initial stages)
+    // 🟢 PRIORITY 6: ROUTING/ANALYZING (initial stages)
     const routingStep = uniqueSteps
       .filter(s => s.action === 'routing' || s.action === 'analyzing')
       .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
     
     if (routingStep && hasActiveSteps) return routingStep
 
-    // ✅ PRIORITY 6: COMPLETED (only if ALL steps are done)
-    // Never show "completing" prematurely
-    if (!hasActiveSteps && isPipelineCompleted(uniqueSteps)) {
-      const completingStep = uniqueSteps.find(s => s.action === 'completing')
-      if (completingStep) return completingStep
-    }
-
-    // 🔄 FALLBACK: Most recent non-completing step
-    const fallback = uniqueSteps
-      .filter(s => s.action !== 'completing')
-      .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
+    // 🔄 FALLBACK: If there's a completing step, show it
+    // Otherwise show most recent step
+    if (completingStep) return completingStep
     
-    return fallback || uniqueSteps[uniqueSteps.length - 1]
+    return uniqueSteps.sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
   }, [uniqueSteps]);
   
   // ✅ Progressive message based on elapsed time for long-running steps

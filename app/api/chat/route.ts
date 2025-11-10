@@ -810,7 +810,7 @@ export async function POST(req: Request) {
   // Orchestrator-backed Cleo-supervised mode for global chat
     if (orchestratorBacked) {
         try {
-          const orchestrator = getAgentOrchestrator() as any
+          const orchestrator = await getAgentOrchestrator() as any
         const lastMsg = messages[messages.length - 1]
         // Prefer AI SDK v5 parts text for base prompt
         const baseUserText = Array.isArray((lastMsg as any)?.parts)
@@ -1368,7 +1368,7 @@ export async function POST(req: Request) {
               try {
                 // CRITICAL: Read directly from CoreOrchestrator.activeExecutions (single source of truth)
                 // This ensures we see interrupt steps that were added to the authoritative execution state
-                const coreOrch = getCoreOrchestrator()
+                const coreOrch = await getCoreOrchestrator()
                 const snapshot = execId ? coreOrch.getExecutionStatus(execId) : null
 
                 // Only log on status changes or errors (reduce noise)

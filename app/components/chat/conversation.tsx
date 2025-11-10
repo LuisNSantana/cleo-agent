@@ -6,7 +6,7 @@ import { useRef, useMemo, Fragment, useEffect } from "react"
 import { Message } from "./message"
 // DISABLED: AgentExecutionFlow redundant with PipelineTimeline in message-assistant.tsx
 // import { AgentExecutionFlow } from './agent-execution-flow'
-import type { PipelineStep } from './pipeline-timeline'
+import type { PipelineStep } from '@/lib/types/definitions'
 import { OptimizationInsights, extractPipelineOptimizations } from './optimization-insights'
 import { useOptimizationStatus } from '@/app/hooks/use-optimization-status'
 import { TypingIndicator } from "@/components/ui/typing-indicator"

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-  const orchestrator = getAgentOrchestrator()
+  const orchestrator = await getAgentOrchestrator()
   // Debug instance identity
   console.log('[API/execute] Orchestrator instance id:', (orchestrator as any)["__id"] || (globalThis as any).__cleoOrchestrator ? 'global' : 'local')
   // Log configured/effective model for requested agent and for supervisor finalize
@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const orchestrator = getAgentOrchestrator()
+    const orchestrator = await getAgentOrchestrator()
     const executions = orchestrator.getAllExecutions()
 
     return NextResponse.json({

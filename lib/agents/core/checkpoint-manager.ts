@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getCurrentUserId } from '@/lib/server/request-context';
+import { BaseCheckpointSaver } from '@langchain/langgraph';
 
 export interface RunnableConfig {
   configurable: {
@@ -77,6 +78,7 @@ export interface CheckpointSaver {
 /**
  * Supabase implementation of CheckpointSaver
  * Uses admin client to bypass RLS (checkpoints are system data, not user data)
+ * TODO: Properly extend BaseCheckpointSaver from LangGraph
  */
 export class SupabaseCheckpointSaver implements CheckpointSaver {
   constructor(private supabase: SupabaseClient) {}

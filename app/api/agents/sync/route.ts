@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const orchestrator = getAgentOrchestrator()
+    const orchestrator = await getAgentOrchestrator()
     
     // Get all available agent configs from server
     const serverAgents = Array.from(orchestrator.getAgentConfigs().entries()).map(([id, config]) => ({
