@@ -6,9 +6,8 @@
  * qué está haciendo el sistema en cada momento.
  */
 
-import type { PipelineStep } from '@/app/components/chat/agent-execution-flow'
+import type { PipelineStep, Action } from '@/lib/types/definitions';
 
-type Action = 'routing' | 'analyzing' | 'thinking' | 'delegating' | 'executing' | 'completing' | 'responding' | 'reviewing' | 'supervising' | 'delegation'
 
 interface MessageContext {
   // Contexto de la conversación

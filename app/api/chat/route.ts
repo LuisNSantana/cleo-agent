@@ -1418,6 +1418,21 @@ export async function POST(req: Request) {
                   for (let i = lastStepCount; i < steps.length; i++) {
                     const step = steps[i]
                     
+                    // ✅ Enrich step with token usage from snapshot metadata
+                    const snapshotMetadata = (snapshot as any).metadata
+                    if (snapshotMetadata?.lastUsage) {
+                      const stepAny = step as any
+                      stepAny.metadata = {
+                        ...stepAny.metadata,
+                        tokens: snapshotMetadata.lastUsage.total_tokens || 0,
+                        usage: {
+                          prompt_tokens: snapshotMetadata.lastUsage.input_tokens || 0,
+                          completion_tokens: snapshotMetadata.lastUsage.output_tokens || 0,
+                          total_tokens: snapshotMetadata.lastUsage.total_tokens || 0
+                        }
+                      }
+                    }
+                    
                     // Debug: Log step structure to understand what we're getting
                     console.log('🔍 [PIPELINE DEBUG] Step received:', {
                       id: step?.id,
@@ -1425,7 +1440,8 @@ export async function POST(req: Request) {
                       agent: step?.agent,
                       agentName: step?.agentName, // ✅ Log agentName to verify it's present
                       content: step?.content?.slice(0, 100),
-                      metadata: step?.metadata
+                      metadata: step?.metadata,
+                      tokens: step?.metadata?.tokens // ✅ Log tokens to verify enrichment
                     })
 
                     // HUMAN-IN-THE-LOOP: Detect interrupt steps and emit special event

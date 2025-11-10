@@ -300,14 +300,13 @@ function highlightJSON(json: string): React.ReactNode {
 
   // For simplicity, just return formatted JSON with monospace
   // Advanced syntax highlighting would require a proper parser
-  return json.split('\n').map((line, i) => (
-    <div key={i}>
-      {line.replace(/(".*?")/g, (match) => {
-        if (match.endsWith(':')) {
-          return `<span class="text-blue-600 dark:text-blue-400">${match.slice(0, -1)}</span>:`
-        }
-        return `<span class="text-green-600 dark:text-green-400">${match}</span>`
-      })}
-    </div>
-  ))
+    return json.split('\n').map((line, i) => {
+    const highlightedLine = line.replace(/(".*?")/g, (match) => {
+      if (match.endsWith(':')) {
+        return `<span class="text-blue-600 dark:text-blue-400">${match.slice(0, -1)}</span>:`
+      }
+      return `<span class="text-green-600 dark:text-green-400">${match}</span>`
+    });
+    return <div key={i} dangerouslySetInnerHTML={{ __html: highlightedLine }} />;
+  });
 }

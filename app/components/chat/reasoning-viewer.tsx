@@ -3,13 +3,9 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { Brain, Lightbulb, Target } from "@phosphor-icons/react"
+import { Brain, Lightbulb, Target, CheckCircle, List } from "@phosphor-icons/react";
+import type { ReasoningBlock } from '@/lib/types/definitions';
 
-export type ReasoningBlock = {
-  type: 'thought' | 'analysis' | 'decision' | 'tool_selection' | 'planning'
-  content: string
-  timestamp?: Date
-}
 
 export type ReasoningViewerProps = {
   blocks: ReasoningBlock[]
@@ -52,40 +48,37 @@ export function ReasoningViewer({
   const getBlockIcon = (type: ReasoningBlock['type']) => {
     switch (type) {
       case 'thought':
-        return <Brain className="h-4 w-4" weight="duotone" />
-      case 'analysis':
-        return <Target className="h-4 w-4" weight="duotone" />
-      case 'decision':
-      case 'tool_selection':
-        return <Lightbulb className="h-4 w-4" weight="duotone" />
-      case 'planning':
-        return <Target className="h-4 w-4" weight="duotone" />
+        return <Brain className="h-4 w-4" weight="duotone" />;
+      case 'observation':
+        return <Target className="h-4 w-4" weight="duotone" />;
+      case 'plan':
+        return <List className="h-4 w-4" weight="duotone" />;
+      case 'final_answer':
+        return <CheckCircle className="h-4 w-4" weight="duotone" />;
       default:
-        return <Brain className="h-4 w-4" weight="duotone" />
+        return <Brain className="h-4 w-4" weight="duotone" />;
     }
-  }
+  };
 
   const getBlockLabel = (type: ReasoningBlock['type']) => {
     switch (type) {
-      case 'thought': return 'Pensamiento'
-      case 'analysis': return 'Análisis'
-      case 'decision': return 'Decisión'
-      case 'tool_selection': return 'Selección de herramienta'
-      case 'planning': return 'Planificación'
-      default: return type
+      case 'thought': return 'Pensamiento';
+      case 'observation': return 'Observación';
+      case 'plan': return 'Plan de Acción';
+      case 'final_answer': return 'Respuesta Final';
+      default: return type;
     }
-  }
+  };
 
   const getBlockColor = (type: ReasoningBlock['type']) => {
     switch (type) {
-      case 'thought': return 'blue'
-      case 'analysis': return 'purple'
-      case 'decision': return 'green'
-      case 'tool_selection': return 'orange'
-      case 'planning': return 'cyan'
-      default: return 'gray'
+      case 'thought': return 'blue';
+      case 'observation': return 'purple';
+      case 'plan': return 'cyan';
+      case 'final_answer': return 'green';
+      default: return 'gray';
     }
-  }
+  };
 
   if (blocks.length === 0) {
     return (
@@ -121,7 +114,6 @@ export function ReasoningViewer({
                 color === 'blue' && "border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20",
                 color === 'purple' && "border-purple-200 bg-purple-50/50 dark:border-purple-900/50 dark:bg-purple-950/20",
                 color === 'green' && "border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20",
-                color === 'orange' && "border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-950/20",
                 color === 'cyan' && "border-cyan-200 bg-cyan-50/50 dark:border-cyan-900/50 dark:bg-cyan-950/20"
               )}
             >
@@ -132,7 +124,6 @@ export function ReasoningViewer({
                   color === 'blue' && "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
                   color === 'purple' && "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300",
                   color === 'green' && "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300",
-                  color === 'orange' && "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
                   color === 'cyan' && "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300"
                 )}>
                   {getBlockIcon(block.type)}

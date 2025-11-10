@@ -11,6 +11,9 @@ export interface AgentMetadata {
   emoji?: string
 }
 
+// Cache for custom agents loaded dynamically
+const customAgentCache = new Map<string, AgentMetadata>()
+
 // Agent display metadata
 export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'cleo-supervisor': {
@@ -107,6 +110,19 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
 }
 
 /**
+ * Register a custom agent in the cache (called by agent discovery)
+ */
+export function registerCustomAgent(agent: { id: string; name: string; avatar?: string; color?: string }) {
+  customAgentCache.set(agent.id, {
+    id: agent.id,
+    name: agent.name,
+    avatar: agent.avatar,
+    color: agent.color,
+    emoji: '🤖'
+  })
+}
+
+/**
  * Get agent display metadata by ID
  * Enhanced to support agentName override for custom/dynamic agents
  */
@@ -114,13 +130,19 @@ export function getAgentMetadata(agentId: string, agentName?: string): AgentMeta
   // Handle legacy IDs and variations
   const normalizedId = normalizeAgentId(agentId)
   
+  // 1. Check predefined agents
   const defaultMeta = AGENT_METADATA[normalizedId]
-  
   if (defaultMeta) {
     return defaultMeta
   }
   
-  // For custom/dynamic agents, use provided name or format from ID
+  // 2. Check custom agent cache (for dynamic agents)
+  const cachedMeta = customAgentCache.get(agentId)
+  if (cachedMeta) {
+    return cachedMeta
+  }
+  
+  // 3. For unknown agents, use provided name or format from ID
   return {
     id: agentId,
     name: agentName || formatAgentName(agentId),

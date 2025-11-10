@@ -1,0 +1,114 @@
+/* Estilos mejorados para pipeline timeline */
+
+.pipeline-compact {
+  background: linear-gradient(to right, rgba(var(--muted), 0.2), transparent);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(var(--border), 0.3);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease-in-out;
+}
+
+.pipeline-compact:hover {
+  background: rgba(var(--muted), 0.3);
+  border-color: rgba(var(--border), 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .pipeline-compact:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pipeline-indicator {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--primary));
+  border-top-color: transparent;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pipeline-completed {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pipeline-completed::after {
+  content: '✓';
+  @apply text-white text-xs font-bold;
+}
+
+.pipeline-progress-ring {
+  @apply w-5 h-5 rounded-full border-2 border-border;
+  background: conic-gradient(
+    var(--primary) 0deg,
+    var(--primary) calc(var(--progress) * 3.6deg),
+    transparent calc(var(--progress) * 3.6deg)
+  );
+}
+
+/* Mejoras de responsive */
+@media (max-width: 768px) {
+  .pipeline-compact {
+    @apply p-2;
+  }
+  
+  .pipeline-compact .text-sm {
+    @apply text-xs;
+  }
+  
+  .pipeline-compact .text-xs {
+    @apply text-[10px];
+  }
+}
+
+/* Animaciones suaves */
+.pipeline-enter {
+  animation: pipelineSlideIn 0.3s ease-out;
+}
+
+@keyframes pipelineSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estados de hover mejorados */
+.message-hover-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-container:hover .message-hover-actions {
+  opacity: 1;
+}
+
+/* Skeleton loading */
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

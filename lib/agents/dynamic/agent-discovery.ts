@@ -103,6 +103,15 @@ export class AgentDiscoveryService {
     for (const agent of allAgents) {
       this.discoveredAgents.set(agent.id, agent)
       
+      // ✅ Register in agent-metadata cache for UI display
+      const { registerCustomAgent } = await import('../agent-metadata')
+      registerCustomAgent({
+        id: agent.id,
+        name: agent.name,
+        avatar: undefined, // Could be added to DiscoveredAgent interface if needed
+        color: undefined
+      })
+      
       // Create delegation tool if not exists
       if (!this.delegationTools.has(agent.delegationToolName)) {
         const tool = this.createDelegationTool(agent)

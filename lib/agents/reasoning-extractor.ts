@@ -187,11 +187,13 @@ function extractImplicitAnalysis(content: string): string | null {
 
 /**
  * Convierte un bloque de razonamiento en un PipelineStep para UI
+ * @param usage - Optional token usage metadata to include in step
  */
 export function createReasoningStep(
   block: ReasoningBlock,
   agentId: string,
-  executionId: string
+  executionId: string,
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number }
 ): PipelineStep {
   const actionMap: Record<ReasoningBlock['type'], PipelineStep['action']> = {
     'thinking': 'thinking',
@@ -212,7 +214,16 @@ export function createReasoningStep(
       reasoningType: block.type,
       rawContent: block.content,
       confidence: block.confidence,
-      ...block.metadata
+      ...block.metadata,
+      // ✅ Add token usage if provided
+      ...(usage ? {
+        tokens: usage.total_tokens,
+        usage: {
+          prompt_tokens: usage.input_tokens,
+          completion_tokens: usage.output_tokens,
+          total_tokens: usage.total_tokens
+        }
+      } : {})
     }
   }
 }

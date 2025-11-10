@@ -17,6 +17,8 @@ import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import Image from "next/image"
 import { useTheme } from "next-themes"
+import { useState, useEffect } from "react"
+import { CreditDisplay, type CreditBalance } from "@/app/components/credits/credit-display"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
@@ -29,6 +31,43 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
 
   const isLoggedIn = !!user
   const canToggleSidebar = isLoggedIn && (hasSidebar || isMobile)
+
+  // ✅ Fix hydration: Wait for client-side mount before determining theme
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Credit balance state
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null)
+  const [loadingCredits, setLoadingCredits] = useState(false)
+
+  // Fetch credit balance when user is logged in
+  useEffect(() => {
+    if (!isLoggedIn) return
+
+    const fetchBalance = async () => {
+      try {
+        setLoadingCredits(true)
+        const response = await fetch('/api/credits/balance')
+        if (response.ok) {
+          const data = await response.json()
+          setCreditBalance(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch credit balance:', error)
+      } finally {
+        setLoadingCredits(false)
+      }
+    }
+
+    fetchBalance()
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchBalance, 30000)
+    return () => clearInterval(interval)
+  }, [isLoggedIn])
 
   return (
     <header className="app-fixed-header">
@@ -47,23 +86,37 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                 >
                   {/* Simplified logo wrapper: remove backdrop blur, heavy border and shadow that created visual artifacts */}
                   <div className="flex h-5 w-auto items-center justify-center rounded-md bg-transparent sm:h-6 md:h-7 lg:h-8 shrink-0">
-                    {(() => {
-                      const isDark = (resolvedTheme ?? theme) === 'dark'
-                      const logoSrc = isDark
-                        ? `/img/kyliologodarkmode.png?v=${assetV}`
-                        : `/img/kyliologo.png?v=${assetV}`
-                      return (
-                        <Image
-                          src={logoSrc}
-                          alt="Kylio"
-                          width={84}
-                          height={22}
-                          className="h-full w-auto object-contain select-none"
-                          priority
-                          sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
-                        />
-                      )
-                    })()}
+                    {!mounted ? (
+                      // ✅ Server-side & initial render: show neutral/light logo to avoid hydration mismatch
+                      <Image
+                        src={`/img/kyliologo.png?v=${assetV}`}
+                        alt="Kylio"
+                        width={84}
+                        height={22}
+                        className="h-full w-auto object-contain select-none"
+                        priority
+                        sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
+                      />
+                    ) : (
+                      // ✅ Client-side only: use theme-aware logo
+                      (() => {
+                        const isDark = (resolvedTheme ?? theme) === 'dark'
+                        const logoSrc = isDark
+                          ? `/img/kyliologodarkmode.png?v=${assetV}`
+                          : `/img/kyliologo.png?v=${assetV}`
+                        return (
+                          <Image
+                            src={logoSrc}
+                            alt="Kylio"
+                            width={84}
+                            height={22}
+                            className="h-full w-auto object-contain select-none"
+                            priority
+                            sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
+                          />
+                        )
+                      })()
+                    )}
                   </div>
                   {/* Only show the compact logo in the header; remove wordmark/BETA to keep header slim */}
                 </Link>
@@ -104,8 +157,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
               <button
                 type="button"
                 className="hidden md:inline-flex bg-background text-foreground/80 hover:text-foreground hover:bg-muted h-8 w-8 items-center justify-center rounded-md transition-colors"
-                aria-label={hasSidebar ? "Switch to Chat-only" : "Show Sidebar"}
-                title={hasSidebar ? "Switch to Chat-only" : "Show Sidebar"}
+                aria-label={hasSidebar ? "Modo Enfoque" : "Ver Barra"}
+                title={hasSidebar ? "Modo Enfoque" : "Ver Barra"}
                 aria-pressed={hasSidebar}
                 onClick={() => {
                   // On mobile: avoid server updates; sidebar sheet is mounted independently
@@ -117,6 +170,17 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
               </button>
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
+              
+              {/* Credit Display - Minimal badge */}
+              <div className="hidden sm:flex">
+                <CreditDisplay 
+                  balance={creditBalance} 
+                  loading={loadingCredits}
+                  variant="badge"
+                  className="transition-all hover:scale-105"
+                />
+              </div>
+              
               <NotificationBell />
               <UserMenu />
             </div>

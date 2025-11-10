@@ -2,27 +2,16 @@
 
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react";
+import { enrichStepWithContextualMessage, getProgressMessage } from '@/lib/agents/ui-messaging';
+import type { PipelineStep, Action, ReasoningBlock } from '@/lib/types/definitions';
+import { ReasoningViewer } from './reasoning-viewer';
+import { ToolDetails } from './tool-details';
+import { ExpandableStep } from './expandable-step';
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
-import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react"
-import { enrichStepWithContextualMessage, getProgressMessage } from "@/lib/agents/ui-messaging"
-import { ExpandableStep } from "./expandable-step"
-import { ReasoningViewer, type ReasoningBlock } from "./reasoning-viewer"
-import { ToolDetails } from "./tool-details"
+import { CaretDownIcon, CaretUpIcon, CheckCircle } from "@phosphor-icons/react"
 
-export type Action = 'analyzing' | 'thinking' | 'responding' | 'delegating' | 'completing' | 'routing' | 'reviewing' | 'supervising' | 'executing' | 'delegation'
 
-export type PipelineStep = {
-  id: string
-  uniqueId?: string // ✅ UUID for idempotent deduplication
-  timestamp: string | Date
-  agent: string
-  agentName?: string  // ✅ Friendly name for custom agents
-  action: Action
-  content: string
-  progress?: number
-  metadata?: any
-}
 
 function formatTime(ts: string | Date) {
   try {
@@ -75,6 +64,99 @@ function actionColor(action: Action): string {
 function isStepCompleted(step: PipelineStep): boolean {
   return step.action === 'completing' || 
          (typeof step.progress === 'number' && step.progress >= 100)
+}
+
+/**
+ * Check if the entire pipeline flow has completed
+ * Pipeline is only completed if:
+ * 1. There's a 'completing' step from the orchestrator
+ * 2. AND there are NO active delegations (in_progress or researching)
+ */
+function isPipelineCompleted(steps: PipelineStep[]): boolean {
+  const hasCompleting = steps.some(step => step.action === 'completing')
+  if (!hasCompleting) return false
+  
+  // Check for active delegations
+  const hasActiveDelegation = steps.some(step => 
+    step.action === 'delegating' && 
+    (step.metadata?.status === 'in_progress' || step.metadata?.stage === 'researching')
+  )
+  
+  return !hasActiveDelegation // Only complete if no active delegations
+}
+
+/**
+ * Calculate pipeline execution metrics including token usage
+ */
+function calculateMetrics(steps: PipelineStep[]) {
+  if (!steps.length) return { totalTime: 0, completedSteps: 0, totalSteps: 0, progress: 0, totalTokens: 0 }
+  
+  const sortedSteps = [...steps].sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )
+  
+  const firstStep = sortedSteps[0]
+  const lastStep = sortedSteps[sortedSteps.length - 1]
+  const totalTime = new Date(lastStep.timestamp).getTime() - new Date(firstStep.timestamp).getTime()
+  
+  const completedSteps = steps.filter(s => 
+    s.action === 'completing' || 
+    (typeof s.progress === 'number' && s.progress >= 100)
+  ).length
+  
+  const progress = steps.length > 0 ? (completedSteps / steps.length) * 100 : 0
+  
+  // ✅ Calculate total tokens from metadata
+  const totalTokens = steps.reduce((sum, step) => {
+    const tokens = step.metadata?.tokens || 
+                   step.metadata?.usage?.total_tokens || 
+                   step.metadata?.tokenCount || 0
+    return sum + tokens
+  }, 0)
+  
+  return {
+    totalTime: Math.round(totalTime / 1000), // en segundos
+    completedSteps,
+    totalSteps: steps.length,
+    progress: Math.min(progress, 100),
+    totalTokens
+  }
+}
+
+/**
+ * Get step type badge based on metadata
+ */
+function getStepTypeBadge(step: PipelineStep): { label: string; color: string } | null {
+  const toolName = step.metadata?.toolName
+  const isDelegation = step.action === 'delegating' || step.action === 'delegation'
+  const hasReasoningBlocks = step.metadata?.reasoningBlocks && step.metadata.reasoningBlocks.length > 0
+  
+  if (toolName) {
+    return { label: '🔧 TOOL', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' }
+  }
+  if (isDelegation) {
+    return { label: '🤝 DELEGATION', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400' }
+  }
+  if (hasReasoningBlocks || step.action === 'thinking') {
+    return { label: '🧠 LLM', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' }
+  }
+  if (step.metadata?.requiresApproval) {
+    return { label: '👤 HUMAN', color: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' }
+  }
+  
+  return null
+}
+
+/**
+ * Format time duration in human-readable format (lowercase)
+ */
+function formatDuration(seconds: number): string {
+  if (seconds < 1) return '< 1s'
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (secs === 0) return `${mins}m`
+  return `${mins}m ${secs}s`
 }
 
 /**
@@ -151,8 +233,8 @@ function StepContent({ step }: { step: PipelineStep }) {
 }
 
 export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; className?: string }) {
-  // ✅ Auto-expand si hay menos de 5 steps (mensajes recientes)
-  const [isExpanded, setIsExpanded] = useState((steps || []).length > 0 && (steps || []).length <= 5)
+  // ✅ Vista colapsada por defecto con diseño minimalista
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const normalized = useMemo(() => {
     const filtered = (steps || [])
@@ -160,6 +242,26 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
         // ❌ Filter out "reviewing" phantom steps (legacy UI bug)
         if (s.action === 'reviewing') {
           return false
+        }
+        // ✅ KEEP delegation steps (show delegation flow)
+        // Only filter out very redundant ones
+        if (s.action === 'delegating') {
+          // Keep steps with meaningful status
+          if (s.metadata?.status === 'in_progress' || s.metadata?.stage === 'researching' || s.metadata?.stage === 'processing') {
+            return true
+          }
+          // Filter ONLY the generic "Delegating to X..." without context
+          if (s.metadata?.status === 'starting' && !s.metadata?.task) {
+            return false
+          }
+        }
+        // ❌ Filter out "supervising" steps that appear AFTER completing
+        if (s.action === 'supervising') {
+          const hasCompletingBefore = (steps || []).some(step => 
+            step.action === 'completing' && 
+            new Date(step.timestamp).getTime() < new Date(s.timestamp).getTime()
+          )
+          if (hasCompletingBefore) return false
         }
         return true
       })
@@ -210,52 +312,164 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     return mapped
   }, [steps])
 
-  // Keep majority of steps; only dedupe by exact id to avoid dropping stages
+  // ✅ IMPROVED: Smart deduplication that removes redundant steps
   const uniqueSteps = useMemo(() => {
     const byId = new Map<string, typeof normalized[0]>()
+    const completingSteps: typeof normalized = []
+    
     normalized.forEach(step => {
-      byId.set(step.id, step)
+      // Dedupe by ID first
+      if (byId.has(step.id)) return
+      
+      // ✅ Collect all "completing" steps separately to consolidate later
+      if (step.action === 'completing') {
+        completingSteps.push(step)
+        return
+      }
+      
+      // ✅ IMPROVED: Smart deduplication for same action+agent pairs
+      // Format: action-agent
+      const signature = `${step.action}-${step.agent}`
+      
+      // Skip if we've seen the EXACT same action+agent recently
+      const recentSteps = Array.from(byId.values()).slice(-5)
+      const isDuplicate = recentSteps.some(recent => {
+        const recentSig = `${recent.action}-${recent.agent}`
+        const timeDiff = Math.abs(new Date(step.timestamp).getTime() - new Date(recent.timestamp).getTime())
+        
+        // ✅ LESS aggressive deduplication
+        // Only dedupe if EXACT same signature AND very close in time
+        const isHighDupeRisk = ['routing'].includes(step.action) // Only routing is high risk
+        const timeWindow = isHighDupeRisk ? 5000 : 2000 // 5s for routing, 2s for others (reduced from 10s/3s)
+        
+        // ✅ DON'T dedupe delegation or execution steps (show progress)
+        if (['delegating', 'executing', 'thinking'].includes(step.action)) {
+          return false // Always show these
+        }
+        
+        return recentSig === signature && timeDiff < timeWindow
+      })
+      
+      if (!isDuplicate) {
+        byId.set(step.id, step)
+      }
     })
+    
+    // ✅ Keep only the FINAL "completing" step (the one from the main orchestrator)
+    if (completingSteps.length > 0) {
+      // Prefer the step from 'cleo-supervisor' or the last one chronologically
+      const finalCompleting = completingSteps.find(s => s.agent === 'cleo-supervisor') || 
+                             completingSteps[completingSteps.length - 1]
+      byId.set(finalCompleting.id, finalCompleting)
+    }
+    
     return Array.from(byId.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [normalized])
 
+  // Calculate pipeline metrics
+  const metrics = useMemo(() => calculateMetrics(uniqueSteps), [uniqueSteps])
+
   // Identify the latest step overall for collapsed preview
-  const latestStep = useMemo(() => {
-    if (!normalized.length) return null
-    let latest = normalized[0]
-    for (let i = 1; i < normalized.length; i++) {
-      const s = normalized[i]
-      if (new Date(s.timestamp).getTime() > new Date(latest.timestamp).getTime()) {
-        latest = s
-      }
+  // Based on best practices from GitHub Actions, CircleCI, Airflow
+  const summaryStep = useMemo(() => {
+    if (!uniqueSteps.length) return null;
+
+    // Helper: Get latest timestamp
+    const getTimestamp = (step: any) => new Date(step.timestamp).getTime()
+    
+    // Helper: Check if pipeline truly finished (no active steps)
+    const hasActiveSteps = uniqueSteps.some(s => 
+      s.action !== 'completing' && 
+      (s.metadata?.stage === 'started' || 
+       s.metadata?.stage === 'in_progress' ||
+       s.metadata?.status === 'in_progress')
+    )
+
+    // 🔴 PRIORITY 1: ERROR/FAILURE STATE (requires immediate attention)
+    const errorStep = uniqueSteps.find(s => 
+      s.metadata?.status === 'error' || 
+      s.metadata?.status === 'failed'
+    )
+    if (errorStep) return errorStep
+
+    // 🟡 PRIORITY 2: USER INPUT REQUIRED (awaiting human action)
+    const awaitingInput = uniqueSteps.find(s => 
+      s.metadata?.type === 'interrupt' ||
+      s.metadata?.status === 'awaiting_approval' ||
+      s.metadata?.requiresApproval === true
+    )
+    if (awaitingInput) return awaitingInput
+
+    // 🔵 PRIORITY 3: BLOCKING STEP - Active delegation (critical path)
+    // Delegation blocks progress until sub-agent completes
+    const activeDelegation = uniqueSteps
+      .filter(s => 
+        s.action === 'delegating' && 
+        (s.metadata?.status === 'in_progress' || 
+         s.metadata?.stage === 'researching' || 
+         s.metadata?.stage === 'processing')
+      )
+      .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
+    
+    if (activeDelegation) return activeDelegation
+
+    // 🟢 PRIORITY 4: MOST DOWNSTREAM RUNNING STEP (furthest in execution)
+    // Show the most recent tool/action being executed
+    const runningSteps = uniqueSteps
+      .filter(s => 
+        (s.action === 'executing' && s.metadata?.stage === 'started') ||
+        (s.action === 'thinking' && !s.metadata?.stage)
+      )
+      .sort((a, b) => getTimestamp(b) - getTimestamp(a))
+    
+    if (runningSteps.length > 0) return runningSteps[0]
+
+    // 🟢 PRIORITY 5: ROUTING/ANALYZING (initial stages)
+    const routingStep = uniqueSteps
+      .filter(s => s.action === 'routing' || s.action === 'analyzing')
+      .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
+    
+    if (routingStep && hasActiveSteps) return routingStep
+
+    // ✅ PRIORITY 6: COMPLETED (only if ALL steps are done)
+    // Never show "completing" prematurely
+    if (!hasActiveSteps && isPipelineCompleted(uniqueSteps)) {
+      const completingStep = uniqueSteps.find(s => s.action === 'completing')
+      if (completingStep) return completingStep
     }
-    return latest
-  }, [normalized])
+
+    // 🔄 FALLBACK: Most recent non-completing step
+    const fallback = uniqueSteps
+      .filter(s => s.action !== 'completing')
+      .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
+    
+    return fallback || uniqueSteps[uniqueSteps.length - 1]
+  }, [uniqueSteps]);
   
   // ✅ Progressive message based on elapsed time for long-running steps
   const [progressiveContent, setProgressiveContent] = useState<Record<string, string>>({})
   
   useEffect(() => {
-    if (!latestStep) return
+    if (!summaryStep) return
     
-    const startTime = new Date(latestStep.timestamp).getTime()
+    const startTime = new Date(summaryStep.timestamp).getTime()
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime
-      if (elapsed > 5000 && !latestStep.metadata?.reasoning) { // Solo para steps genéricos
+      if (elapsed > 5000 && !summaryStep.metadata?.reasoning) { // Solo para steps genéricos
         const progressMsg = getProgressMessage(
-          latestStep.action,
+          summaryStep.action,
           elapsed,
-          latestStep.agentName
+          summaryStep.agentName
         )
         setProgressiveContent(prev => ({
           ...prev,
-          [latestStep.id]: progressMsg
+          [summaryStep.id]: progressMsg
         }))
       }
     }, 5000) // Check every 5 seconds
     
     return () => clearInterval(interval)
-  }, [latestStep])
+  }, [summaryStep])
 
   // Show all unique steps when expanded; when collapsed show just the latest live step
   const hasSteps = uniqueSteps.length > 0
@@ -274,10 +488,10 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
       <div className="bg-gradient-to-b from-background/60 to-transparent pointer-events-none absolute inset-0" />
       <div className="relative p-2 sm:p-3">
         <div className="flex items-center justify-between mb-1.5">
-          <div className="text-muted-foreground/80 text-[11px] uppercase tracking-wide font-medium flex items-center gap-2">
+          <div className="text-muted-foreground/80 text-[11px] uppercase tracking-wide font-medium flex items-center gap-2 flex-wrap">
             {/* ✅ Subtle pulse on active steps */}
             <motion.span
-              animate={latestStep && !isStepCompleted(latestStep) ? { 
+              animate={!isPipelineCompleted(uniqueSteps) ? { 
                 opacity: [1, 0.5, 1] 
               } : {}}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -285,144 +499,162 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
               ⛓️
             </motion.span>
             <span>Pipeline</span>
-            {/* ✅ Step counter like Pokee workflow UI */}
+            {/* ✅ Step counter with completion ratio */}
             {uniqueSteps.length > 0 && (
-              <motion.span 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/40 text-[10px] font-mono"
-              >
-                <span className="text-foreground/70">{uniqueSteps.length}</span>
-                <span className="text-muted-foreground/60">pasos</span>
-              </motion.span>
+              <>
+                <motion.span 
+                  key={uniqueSteps.length}
+                  initial={{ scale: 1.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.6 }}
+                  className="text-[10px] tabular-nums"
+                >
+                  {metrics.completedSteps}/{metrics.totalSteps} pasos
+                </motion.span>
+                {/* ✅ Execution time */}
+                {metrics.totalTime > 0 && (
+                  <span className="text-[10px] tabular-nums opacity-50">
+                    • {formatDuration(metrics.totalTime)}
+                  </span>
+                )}
+                {/* ✅ Token usage */}
+                {metrics.totalTokens > 0 && (
+                  <span className="text-[10px] tabular-nums opacity-50">
+                    • {metrics.totalTokens.toLocaleString()} tokens
+                  </span>
+                )}
+              </>
             )}
           </div>
           {hasSteps && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1 text-xs transition-colors"
-            >
-              {isExpanded ? (
-                <>
-                  <span>Collapse</span>
-                  <CaretUpIcon size={14} />
-                </>
-              ) : (
-                <>
-                  <span>Show steps{hiddenCount > 0 ? ` (+${hiddenCount} more)` : ''}</span>
-                  <CaretDownIcon size={14} />
-                </>
+            <div className="flex items-center gap-2">
+              {/* ✅ Global progress bar */}
+              {!isPipelineCompleted(uniqueSteps) && metrics.totalSteps > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-16 h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary/60 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${metrics.progress}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-muted-foreground/50 tabular-nums">
+                    {Math.round(metrics.progress)}%
+                  </span>
+                </div>
               )}
-            </button>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-muted-foreground/60 hover:text-foreground text-[10px] uppercase tracking-wide font-medium transition-colors flex items-center gap-1"
+              >
+                {isExpanded ? 'Ocultar' : 'Mostrar'}
+                {isExpanded ? <CaretUpIcon className="w-3 h-3" /> : <CaretDownIcon className="w-3 h-3" />}
+              </button>
+            </div>
           )}
         </div>
-        {!isExpanded && latestStep && (
-          <div aria-live="polite" aria-atomic="true">
-            <AnimatePresence initial={false} mode="popLayout">
-              {(() => {
-                const meta = getAgentMetadata(latestStep.agent, latestStep.agentName)
-                const reasoningBlocks: ReasoningBlock[] = latestStep.metadata?.reasoningBlocks || []
-                const toolName = latestStep.metadata?.toolName
-                const toolParameters = latestStep.metadata?.toolParameters
-                const toolResult = latestStep.metadata?.toolResult
-                const toolError = latestStep.metadata?.toolError
-                const toolStatus = latestStep.metadata?.toolStatus || (toolError ? 'error' : 'success')
-                
-                const otherMetadata = latestStep.metadata ? Object.fromEntries(
-                  Object.entries(latestStep.metadata).filter(([key]) => 
-                    !['reasoningBlocks', 'toolName', 'toolParameters', 'toolResult', 'toolError', 'toolStatus', 'reasoning', 'canonical', 'stage'].includes(key)
-                  )
-                ) : {}
-                
-                const stepChildren = (
-                  <div className="space-y-3 mt-2">
-                    {reasoningBlocks.length > 0 && (
-                      <ReasoningViewer blocks={reasoningBlocks} />
-                    )}
+        {!isExpanded && summaryStep && (
+          <motion.div 
+            className="flex items-center justify-between p-3 bg-gradient-to-r from-muted/20 to-transparent rounded-lg cursor-pointer hover:bg-muted/30 transition-all"
+            onClick={() => setIsExpanded(true)}
+            whileHover={{ scale: 1.01 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {isPipelineCompleted(uniqueSteps) ? (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                  className="flex-shrink-0"
+                >
+                  <CheckCircle className="w-5 h-5 text-emerald-500" weight="fill" />
+                </motion.div>
+              ) : (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent flex-shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground">
+                    {actionLabel(summaryStep.action)}
+                  </p>
+                  {/* ✅ Step Type Badge in collapsed view */}
+                  {(() => {
+                    const badge = getStepTypeBadge(summaryStep)
+                    return badge ? (
+                      <span className={cn(
+                        "inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider",
+                        badge.color
+                      )}>
+                        {badge.label}
+                      </span>
+                    ) : null
+                  })()}
+                  {/* ✅ Time badge with better styling */}
+                  {metrics.totalTime > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono text-muted-foreground/70 bg-muted/30">
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {formatDuration(metrics.totalTime)}
+                    </span>
+                  )}
+                  {/* ✅ Token/Credit badge - show when available */}
+                  {(() => {
+                    const totalTokens = metrics.totalTokens
                     
-                    {toolName && (
-                      <ToolDetails
-                        toolName={toolName}
-                        parameters={toolParameters}
-                        result={toolResult}
-                        error={toolError}
-                        status={toolStatus as any}
-                      />
-                    )}
-                  </div>
-                )
-                
-                return (
-                  <ExpandableStep
-                    key={latestStep.id}
-                    id={latestStep.id}
-                    agentId={latestStep.agent}
-                    agentName={latestStep.agentName}
-                    title={actionLabel(latestStep.action)}
-                    subtitle={latestStep.agentName || meta.name}
-                    timestamp={new Date(latestStep.timestamp)}
-                    isActive={true}
-                    isCompleted={isStepCompleted(latestStep)} // ✅ Show checkmark for completed steps
-                    accentColor={actionColor(latestStep.action)} // ✅ Visual distinction by action type
-                    metadata={{
-                      reasoning: latestStep.metadata?.reasoning,
-                      toolName: latestStep.metadata?.toolName,
-                      canonical: latestStep.metadata?.canonical,
-                    }}
-                    defaultExpanded={false} // Collapsed view should not auto-expand
-                  >
-                    {latestStep.content && (
-                      <div className="text-sm text-foreground/80 leading-relaxed mb-3">
-                        <StepContent step={{
-                          ...latestStep,
-                          content: progressiveContent[latestStep.id] || latestStep.content
-                        }} />
-                      </div>
-                    )}
+                    // If we have tokens from metadata, show them
+                    if (totalTokens > 0) {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono text-purple-600/70 dark:text-purple-400/70 bg-purple-500/10">
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                          </svg>
+                          {totalTokens.toLocaleString()}
+                        </span>
+                      )
+                    }
                     
-                    {/* ✅ Show typing indicator if step is active and not completed */}
-                    {!isStepCompleted(latestStep) && !latestStep.content && (
-                      <TypingIndicator />
-                    )}
+                    // Otherwise show credit estimate if completed
+                    if (isPipelineCompleted(uniqueSteps)) {
+                      // Calculate estimated credits (1 credit ≈ 10k tokens for Grok)
+                      const estimatedCredits = Math.max(1, Math.ceil(uniqueSteps.length / 2))
+                      return (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-500/10" title="Créditos estimados (cálculo preciso en historial)">
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <circle cx="10" cy="10" r="8" fill="currentColor" opacity="0.2"/>
+                            <path d="M10 6v4l3 3" stroke="currentColor" strokeWidth="2" fill="none"/>
+                          </svg>
+                          ~{estimatedCredits}
+                        </span>
+                      )
+                    }
                     
-                    {/* ✅ Modern Progress bar (same shimmer effect as expanded view) */}
-                    {typeof latestStep.progress === 'number' && latestStep.progress < 100 && (
-                      <div className="mb-3 space-y-1">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-muted-foreground/60">Progreso</span>
-                          <span className="text-foreground/70 font-mono tabular-nums">
-                            {Math.round(latestStep.progress)}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40 relative">
-                          {/* Shimmer effect */}
-                          <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-background/20 to-transparent"
-                            animate={{ x: ['-100%', '200%'] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                          />
-                          {/* Progress bar */}
-                          <motion.div 
-                            className="bg-gradient-to-r from-primary/80 via-primary to-primary/80 h-full relative"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, Math.max(0, latestStep.progress))}%` }}
-                            transition={{ 
-                              duration: 0.8, 
-                              ease: [0.4, 0.0, 0.2, 1]
-                            }}
-                          >
-                            <div className="absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-primary-foreground/15 to-transparent" />
-                          </motion.div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {stepChildren}
-                  </ExpandableStep>
-                )
-              })()}
-            </AnimatePresence>
-          </div>
+                    return null
+                  })()}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <AgentAvatar agentId={summaryStep.agent} />
+                  <p className="text-xs text-muted-foreground truncate">
+                    {summaryStep.agentName || getAgentMetadata(summaryStep.agent).name}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {typeof summaryStep.progress === 'number' && summaryStep.progress < 100 && (
+                <span className="text-xs text-muted-foreground font-mono">
+                  {Math.round(summaryStep.progress)}%
+                </span>
+              )}
+              <CaretDownIcon className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </motion.div>
         )}
         {isExpanded && (
           <ul className="grid gap-1.5">
@@ -469,6 +701,8 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                   </div>
                 )
                 
+                const badge = getStepTypeBadge(s)
+                
                 return (
                   <ExpandableStep
                     key={s.id}
@@ -481,6 +715,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     isActive={isActive}
                     isCompleted={isStepCompleted(s)} // ✅ Show checkmark for completed steps
                     accentColor={actionColor(s.action)} // ✅ Visual distinction by action type
+                    badge={badge} // ✅ Pass badge to header for prominence
                     metadata={{
                       reasoning: s.metadata?.reasoning,
                       toolName: s.metadata?.toolName,
@@ -488,6 +723,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     }}
                     defaultExpanded={isActive} // Auto-expand active step
                   >
+                    
                     {/* Main Content */}
                     {s.content && (
                       <div className="text-sm text-foreground/80 leading-relaxed mb-3">

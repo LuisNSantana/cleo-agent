@@ -13,19 +13,31 @@ const AGENT_ID_ALIASES: Record<string, string> = {
   'peter-google': 'peter-financial',
   'peter-advisor': 'peter-financial',
   'peter-finance': 'peter-financial',
+  'peter_financial': 'peter-financial', // ✅ FIX: Dynamic tool name conversion
   'toby': 'toby-technical',
+  'toby_technical': 'toby-technical', // ✅ FIX: Dynamic tool name conversion
   'peter': 'peter-financial',
   'ami': 'ami-creative',
+  'ami_creative': 'ami-creative', // ✅ FIX: Dynamic tool name conversion
   'apu': 'apu-support',
+  'apu_support': 'apu-support', // ✅ FIX: Dynamic tool name conversion
   // Legacy DB canonical that drifted from code; normalize to current canonical
   'apu-research': 'apu-support',
   'nora': 'nora-medical', // ✅ FIX: Was nora-community, should be nora-medical
   'nora-community': 'nora-medical', // ✅ FIX: Legacy alias
   'astra': 'astra-email',
+  'astra_email': 'astra-email', // ✅ FIX: Dynamic tool name conversion
   'notion': 'notion-agent',
+  'notion_agent': 'notion-agent', // ✅ FIX: Dynamic tool name conversion
   'wex': 'wex-intelligence',
+  'wex_intelligence': 'wex-intelligence', // ✅ FIX: Dynamic tool name conversion
   'iris': 'iris-insights', // ✅ FIX: Add Iris alias
+  'iris_insights': 'iris-insights', // ✅ FIX: Dynamic tool name conversion
   'jenn': 'jenn-community', // ✅ FIX: Add Jenn alias
+  'jenn_community': 'jenn-community', // ✅ FIX: Dynamic tool name conversion
+  'emma_ecommerce': 'emma-ecommerce', // ✅ FIX: Dynamic tool name conversion
+  'nora_medical': 'nora-medical', // ✅ FIX: Dynamic tool name conversion
+  'cleo_supervisor': 'cleo-supervisor', // ✅ FIX: Dynamic tool name conversion
 }
 
 export function canonicalizeAgentId(id: string): string {
@@ -60,13 +72,21 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
 export function getAgentDisplayName(id: string): string {
   const canonical = canonicalizeAgentId(id)
   
-  // 1. Check predefined display names first (fast path)
+  // 0. PRIORITY: Check agent-metadata cache (updated by agent discovery)
+  try {
+    const { getAgentMetadata } = require('./agent-metadata')
+    const metadata = getAgentMetadata(canonical) || getAgentMetadata(id)
+    if (metadata?.name && metadata.name !== 'Agent') {
+      return metadata.name
+    }
+  } catch {}
+  
+  // 1. Check predefined display names (fast path)
   if (AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]) {
     return AGENT_DISPLAY_NAMES[canonical] || AGENT_DISPLAY_NAMES[id]
   }
 
-  // 1.5. Check runtime-registered dynamic agents (created at runtime)
-  // Quick-create and other flows register agents into globalThis.__cleoRuntimeAgents
+  // 2. Check runtime-registered dynamic agents (created at runtime)
   try {
     const g: any = globalThis as any
     const runtimeAgents: Map<string, any> | undefined = g.__cleoRuntimeAgents
@@ -78,11 +98,9 @@ export function getAgentDisplayName(id: string): string {
     }
   } catch {}
   
-  // 2. For custom agents (UUIDs), try to get name from unified config
-  // ✅ FIX: Custom agents should show their name, not UUID
+  // 3. For custom agents (UUIDs), try to get name from unified config
   if (canonical.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
     try {
-      // Dynamic import to avoid circular dependencies
       const { getAllAgentsSync } = require('./unified-config')
       const agents = getAllAgentsSync()
       const agent = agents.find((a: any) => a.id === canonical || a.id === id)

@@ -493,6 +493,39 @@ export class GraphBuilder {
 
           const toolCalls = (aiMessage as any).tool_calls || []
           span.setAttribute('tool_calls.count', toolCalls.length)
+          
+          // ✅ Extract usage metadata for token tracking
+          const usageMetadata = (aiMessage as any).usage_metadata || (aiMessage as any).response_metadata?.usage || null
+          if (usageMetadata) {
+            logger.debug('💰 [TOKENS] Captured usage metadata', {
+              agent: agentConfig.id,
+              input_tokens: usageMetadata.input_tokens,
+              output_tokens: usageMetadata.output_tokens,
+              total_tokens: usageMetadata.total_tokens
+            })
+            
+            // ✅ Record credit usage (async, non-blocking)
+            const threadId = (state.metadata as any)?.threadId || (state as any).threadId
+            if (state.userId && threadId) {
+              try {
+                const { recordCreditUsage } = await import('../../credits/credit-tracker')
+                recordCreditUsage({
+                  userId: state.userId,
+                  executionId,
+                  threadId: threadId,
+                  agentId: agentConfig.id,
+                  modelName: agentConfig.model,
+                  inputTokens: usageMetadata.input_tokens || 0,
+                  outputTokens: usageMetadata.output_tokens || 0,
+                }).catch(err => {
+                  logger.warn('⚠️ [CREDITS] Failed to record usage (non-blocking):', err)
+                })
+              } catch (err) {
+                // Don't block execution if credit tracking fails
+                logger.warn('⚠️ [CREDITS] Credit tracking module error:', err)
+              }
+            }
+          }
 
           this.eventEmitter.emit('node.completed', {
             nodeId: agentConfig.id,
@@ -528,7 +561,14 @@ export class GraphBuilder {
               
               // Emit each reasoning block as a separate event for real-time UI updates
               reasoningBlocks.forEach((block, index) => {
-                const step = createReasoningStep(block, agentConfig.id, executionId)
+                // ✅ Pass token usage to reasoning step
+                const usage = usageMetadata ? {
+                  input_tokens: usageMetadata.input_tokens || 0,
+                  output_tokens: usageMetadata.output_tokens || 0,
+                  total_tokens: usageMetadata.total_tokens || 0
+                } : undefined
+                
+                const step = createReasoningStep(block, agentConfig.id, executionId, usage)
                 
                 // Emit to event emitter for SSE streaming
                 this.eventEmitter.emit('execution.reasoning', {
@@ -541,7 +581,8 @@ export class GraphBuilder {
                 
                 logger.debug(`💭 [REASONING] Emitted step ${index + 1}/${reasoningBlocks.length}`, {
                   type: block.type,
-                  content: step.content.slice(0, 80)
+                  content: step.content.slice(0, 80),
+                  tokens: usage?.total_tokens || 0
                 })
               })
             } else {
@@ -566,7 +607,13 @@ export class GraphBuilder {
               ...state.metadata,
               toolRuntime, // CRITICAL: Pass toolRuntime to next nodes
               agentId: agentConfig.id,
-              executionId
+              executionId,
+              // ✅ Add usage metadata for token tracking in UI
+              lastUsage: usageMetadata ? {
+                input_tokens: usageMetadata.input_tokens || 0,
+                output_tokens: usageMetadata.output_tokens || 0,
+                total_tokens: usageMetadata.total_tokens || 0
+              } : undefined
             }
           }
 

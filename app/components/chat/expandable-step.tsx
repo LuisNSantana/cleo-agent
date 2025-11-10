@@ -20,6 +20,7 @@ export type ExpandableStepProps = {
   defaultExpanded?: boolean
   className?: string
   accentColor?: string // ✅ Semantic color for visual distinction (e.g., 'border-l-blue-500/50')
+  badge?: { label: string; color: string } | null // ✅ Step type badge (TOOL, DELEGATION, LLM, etc)
 }
 
 /**
@@ -43,7 +44,8 @@ export function ExpandableStep({
   metadata,
   defaultExpanded = false,
   className,
-  accentColor
+  accentColor,
+  badge
 }: ExpandableStepProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const agentMeta = getAgentMetadata(agentId, agentName)
@@ -129,6 +131,16 @@ export function ExpandableStep({
             )}>
               {title}
             </h4>
+            
+            {/* ✅ Step Type Badge - Prominent in header */}
+            {badge && (
+              <span className={cn(
+                "inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider flex-shrink-0",
+                badge.color
+              )}>
+                {badge.label}
+              </span>
+            )}
             
             {/* ✅ Completed Checkmark */}
             {isCompleted && (
