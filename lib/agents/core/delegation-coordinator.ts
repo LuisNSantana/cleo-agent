@@ -222,6 +222,22 @@ export class DelegationCoordinator {
 
       if (!targetAgentConfig) {
         logger.error(`❌ [DELEGATION] Target agent not found: ${delegationData.targetAgent}`)
+        
+        // ✅ CIRCUIT BREAKER: Resolve delegation promise immediately with error
+        // Prevents 300s timeout waiting for non-existent agent
+        const canonicalTargetAgent = canonicalizeAgentId(delegationData.targetAgent)
+        const delegationKey = `${delegationData.sourceExecutionId}:${delegationData.sourceAgent}:${canonicalTargetAgent}`
+        
+        const resolver = getResolver(delegationKey)
+        if (resolver) {
+          logger.info('[DELEGATION-COORD]', '🚨 Resolving delegation with error (circuit breaker)')
+          resolver.resolve({
+            success: false,
+            error: new Error(`Agent ${delegationData.targetAgent} not found`),
+            result: null
+          })
+        }
+        
         this.eventEmitter.emit('delegation.failed', {
           sourceAgent: delegationData.sourceAgent,
           targetAgent: delegationData.targetAgent,

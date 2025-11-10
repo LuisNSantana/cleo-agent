@@ -34,20 +34,32 @@ CREATE INDEX IF NOT EXISTS idx_checkpoints_parent
 -- Enable RLS
 ALTER TABLE public.checkpoints ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can only access their own checkpoints
+-- Policy 1: Service role bypass (for LangGraph execution context)
+-- CRITICAL: LangGraph runs in server context without auth.uid(), needs service_role
+CREATE POLICY "Service role can manage all checkpoints"
+  ON public.checkpoints
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Policy 2: Authenticated users can access their own checkpoints
 -- Note: This assumes user_id is stored in thread_id or can be derived from it
--- Adjust based on your auth setup
+-- For user-facing checkpoint access (e.g., debugging UI)
 CREATE POLICY "Users can manage their own checkpoints"
   ON public.checkpoints
   FOR ALL
+  TO authenticated
   USING (
     -- Allow if authenticated and thread_id matches user context
     auth.uid()::text IS NOT NULL
   );
 
--- Grant access to authenticated users
+-- Grant access to authenticated users and service role
 GRANT ALL ON public.checkpoints TO authenticated;
+GRANT ALL ON public.checkpoints TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE checkpoints_id_seq TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE checkpoints_id_seq TO service_role;
 
 -- Add helpful comment
 COMMENT ON TABLE public.checkpoints IS 

@@ -27,6 +27,7 @@ export interface SchedulerStats {
   tasksFailed: number;
   lastRunAt: Date;
   isRunning: boolean;
+  lastSkipCount?: number; // Track consecutive skips to detect stuck locks
 }
 
 class AgentTaskScheduler {
@@ -162,9 +163,21 @@ class AgentTaskScheduler {
   private async processScheduledTasks(): Promise<void> {
     if (this.isRunning) {
       console.log('⚠️ Task processing already in progress, skipping');
+      // ✅ DIAGNOSTIC: Track consecutive skips to detect stuck locks
+      if (!this.stats.lastSkipCount) this.stats.lastSkipCount = 0;
+      this.stats.lastSkipCount++;
+      
+      if (this.stats.lastSkipCount > 5) {
+        console.error('🚨 [SCHEDULER] Lock stuck for 5+ cycles, forcing reset');
+        this.isRunning = false;
+        this.stats.isRunning = false;
+        this.stats.lastSkipCount = 0;
+      }
       return;
     }
 
+    // Reset skip counter on successful start
+    this.stats.lastSkipCount = 0;
     this.isRunning = true;
     this.stats.isRunning = true;
     this.stats.lastRunAt = new Date();

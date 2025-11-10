@@ -76,9 +76,46 @@ export interface CheckpointSaver {
 
 /**
  * Supabase implementation of CheckpointSaver
+ * Uses admin client to bypass RLS (checkpoints are system data, not user data)
  */
 export class SupabaseCheckpointSaver implements CheckpointSaver {
   constructor(private supabase: SupabaseClient) {}
+
+  /**
+   * Derive user_id from thread_id for auditing
+   * Thread IDs follow patterns:
+   * - Direct mode: {agentId}_direct
+   * - Supervised: cleo-supervisor_supervised  
+   * - Delegations: delegation_{timestamp}_{random}
+   * - Regular: UUID from agent_threads table
+   */
+  private async deriveUserIdFromThread(threadId: string): Promise<string | null> {
+    try {
+      // First, try to find in agent_threads table
+      const { data, error } = await this.supabase
+        .from('agent_threads')
+        .select('user_id')
+        .eq('id', threadId)
+        .single();
+
+      if (!error && data?.user_id) {
+        return data.user_id;
+      }
+
+      // Fallback: check if we have userId in AsyncLocalStorage
+      const contextUserId = getCurrentUserId();
+      if (contextUserId) {
+        return contextUserId;
+      }
+
+      // If all fails, return null (will be logged as system-initiated)
+      console.warn(`⚠️ Could not derive user_id for thread: ${threadId}`);
+      return null;
+    } catch (error) {
+      console.error('Error deriving user_id from thread:', error);
+      return null;
+    }
+  }
 
   async getTuple(config: RunnableConfig): Promise<CheckpointTuple | null> {
     const threadId = config.configurable.thread_id;
@@ -116,11 +153,9 @@ export class SupabaseCheckpointSaver implements CheckpointSaver {
     const checkpointNs = config.configurable.checkpoint_ns || '';
     const parentCheckpointId = config.configurable.checkpoint_id;
 
-    // Get current user from request context for RLS
-    const userId = getCurrentUserId();
-    if (!userId) {
-      console.warn('⚠️ No userId in request context, checkpoint save may fail due to RLS');
-    }
+    // ✅ ROBUST: Derive user_id from thread for auditing
+    // Admin client bypasses RLS, but we still want proper user attribution
+    const userId = await this.deriveUserIdFromThread(threadId);
 
     const row = {
       thread_id: threadId,
@@ -130,10 +165,11 @@ export class SupabaseCheckpointSaver implements CheckpointSaver {
       type: 'checkpoint',
       checkpoint: checkpoint,
       metadata: metadata,
-      user_id: userId, // Required for RLS policy
+      user_id: userId, // Derived from thread or context, can be null for system operations
       created_at: new Date().toISOString(),
     };
 
+    // ✅ ADMIN CLIENT: Bypasses RLS, no policy violations
     const { error } = await this.supabase.from('checkpoints').upsert(row);
 
     if (error) {

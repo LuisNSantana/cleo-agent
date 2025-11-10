@@ -518,6 +518,10 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
             const currentChunkCount = (ragSystemAddon.match(/\n---\n/g) || []).length
             if (currentChunkCount < 3) {
               try {
+                // ✅ OPTIMIZATION: User profile query with increased timeout
+                // Profile queries often need translation (es↔en), which adds ~2-3s
+                // Old timeout: 1200ms → frequent deadline errors
+                // New timeout: 4000ms → allows translation + embedding + search
                 const profileQuery = 'perfil del usuario nombre intereses gustos comida favorita hobbies preferencias biografia datos personales'
                 const extra = await retrieveRelevant({
                   userId: normalizedUserId,
@@ -528,7 +532,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
                   projectId,
                   useHybrid: true,
                   useReranking: true,
-                  timeoutMs: 1200,
+                  timeoutMs: 4000, // Increased from 1200ms to accommodate translation
                   cacheTtlMs: 120000,
                 })
                 if (extra.length) {

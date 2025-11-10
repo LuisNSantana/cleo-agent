@@ -95,13 +95,17 @@ export class GraphBuilder {
 
   private async initializeCheckpointSaver() {
     try {
-      const { createClient } = await import('@/lib/supabase/server')
-      const supabase = await createClient()
-      if (supabase) {
-        this.checkpointSaver = new SupabaseCheckpointSaver(supabase)
-        logger.debug('✅ Checkpoint saver initialized')
+      // ✅ USE ADMIN CLIENT: Checkpoints are system data, bypass RLS
+      // Checkpoints are internal LangGraph state, not user-facing data
+      // Using admin client prevents RLS policy violations (error 42501)
+      const { getSupabaseAdmin } = await import('@/lib/supabase/admin')
+      const adminClient = getSupabaseAdmin()
+      
+      if (adminClient) {
+        this.checkpointSaver = new SupabaseCheckpointSaver(adminClient)
+        logger.debug('✅ Checkpoint saver initialized with admin client (RLS bypassed)')
       } else {
-        logger.warn('Supabase not available, checkpoints disabled')
+        logger.warn('Supabase admin client not available, checkpoints disabled')
       }
     } catch (error) {
       logger.warn('Checkpoint saver initialization failed, checkpoints disabled:', error)
@@ -990,10 +994,16 @@ export class GraphBuilder {
     return toolName.startsWith('delegate_to_') || toolName.includes('delegation')
   }
 
+  /**
+   * Extract agent ID from delegation tool name
+   * CRITICAL: Must match format from delegation/tools.ts (line 57): `delegate_to_${agentId}`
+   * No longer converts underscores to hyphens - preserves original UUID format
+   */
   private deriveAgentIdFromToolName(toolName?: string, explicit?: string): string {
     if (explicit && typeof explicit === 'string') return explicit
     if (!toolName) return 'unknown-agent'
-    return toolName.replace(/^delegate_to_/, '').replace(/_/g, '-').trim() || 'unknown-agent'
+    // Strip 'delegate_to_' prefix, preserve original ID format (UUIDs with hyphens)
+    return toolName.replace(/^delegate_to_/i, '').trim() || 'unknown-agent'
   }
 
   private safeJsonParse(value: string) {

@@ -60,7 +60,10 @@ export async function generateDelegationToolsForAgent(
  * Create a delegation tool for a specific sub-agent
  */
 function createDelegationTool(parentAgent: AgentConfig, subAgent: AgentConfig): DelegationToolDefinition {
-  const toolName = `delegate_to_${subAgent.id.replace(/[^a-zA-Z0-9]/g, '_')}`
+  // CRITICAL: Keep original UUID format - UUIDs are valid tool names and sanitization breaks ID matching
+  // Old logic: `delegate_to_${subAgent.id.replace(/[^a-zA-Z0-9]/g, '_')}`
+  // This converted hyphens to underscores, then graph-builder converted back, breaking original IDs with underscores
+  const toolName = `delegate_to_${subAgent.id}`
   const specialization = getSpecializationFromAgent(subAgent)
   
   return {
