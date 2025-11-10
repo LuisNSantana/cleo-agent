@@ -29,17 +29,23 @@ export async function GET(request: NextRequest) {
     const balance = await getUserCredits(user.id)
 
     if (!balance) {
-      // Return default free tier if no data
+      // Return default beta tier if no data (1000 credits during beta)
       return NextResponse.json({
         plan: 'free',
-        total_credits: 100,
+        total_credits: 1000,  // Beta: 1000 credits for free tier
         used_credits: 0,
-        remaining_credits: 100,
-        usage_percentage: 0
+        remaining_credits: 1000,
+        usage_percentage: 0,
+        user_id: user.id,
+        last_reset_at: new Date().toISOString()
       })
     }
 
-    return NextResponse.json(balance)
+    // Ensure usage_percentage is included
+    return NextResponse.json({
+      ...balance,
+      usage_percentage: balance.usage_percentage || 0
+    })
   } catch (error) {
     console.error('[API] Error fetching credit balance:', error)
     return NextResponse.json(

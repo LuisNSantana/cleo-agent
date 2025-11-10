@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const orchestrator = getAgentOrchestrator()
+    const orchestrator = await getAgentOrchestrator()
     
     // Get current agent configs before cleanup
     const agentConfigs = await orchestrator.getAgentConfigs()

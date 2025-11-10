@@ -35,6 +35,7 @@ export interface UserCredits {
   total_credits: number
   used_credits: number
   remaining_credits: number
+  usage_percentage: number
   last_reset_at: string
 }
 
@@ -110,10 +111,10 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
   try {
     const supabase = getSupabaseAdmin()
     
-    // Get user's plan (from users table, NOT profiles)
+    // Get user's credits from database (now includes total_credits and used_credits columns)
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('subscription_tier')
+      .select('subscription_tier, total_credits, used_credits')
       .eq('id', userId)
       .single()
 
@@ -124,17 +125,20 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
 
     const plan = (user as any)?.subscription_tier || 'free'
     
-    // Get total credits for plan
-    const planCredits: Record<string, number> = {
-      free: 100,
-      pro: 2500,
-      'pro+': 7500,
-      business: 999999 // Effectively unlimited for tracking
-    }
-    
-    const totalCredits = planCredits[plan] || 100
+    // Use credits from database if available, otherwise fall back to plan defaults
+    const totalCredits = (user as any)?.total_credits || (() => {
+      // Beta: Free tier users get 1000 credits (10x normal)
+      // Post-beta: Will revert to 100 for free tier
+      const planCredits: Record<string, number> = {
+        free: 1000,  // Beta tier: 1000 credits
+        pro: 2500,
+        'pro+': 7500,
+        business: 999999
+      }
+      return planCredits[plan] || 1000  // Default to 1000 during beta
+    })()
 
-    // Get total used credits this billing cycle
+    // Get total used credits from credit_usage table this billing cycle
     const { data: usage, error: usageError } = await supabase
       .from('credit_usage')
       .select('credits_used')
@@ -146,15 +150,32 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
       return null
     }
 
-    const usedCredits = (usage as any)?.reduce((sum: number, record: any) => sum + (record.credits_used || 0), 0) || 0
-    const remainingCredits = Math.max(0, totalCredits - usedCredits)
+    // Calculate used credits from credit_usage table
+    const usedCreditsFromTable = (usage as any)?.reduce((sum: number, record: any) => sum + (record.credits_used || 0), 0) || 0
+    
+    // Also add the used_credits from users table (if manually set)
+    const manualUsedCredits = (user as any)?.used_credits || 0
+    const totalUsedCredits = usedCreditsFromTable + manualUsedCredits
+    
+    const remainingCredits = Math.max(0, totalCredits - totalUsedCredits)
+    const usagePercentage = totalCredits > 0 ? (totalUsedCredits / totalCredits) * 100 : 0
+
+    console.log('💰 [CREDITS] Balance check:', {
+      userId: userId.slice(0, 8),
+      plan,
+      total: totalCredits,
+      used: totalUsedCredits,
+      remaining: remainingCredits,
+      percentage: `${usagePercentage.toFixed(1)}%`
+    })
 
     return {
       user_id: userId,
       plan: plan as any,
       total_credits: totalCredits,
-      used_credits: usedCredits,
+      used_credits: totalUsedCredits,
       remaining_credits: remainingCredits,
+      usage_percentage: usagePercentage,
       last_reset_at: getStartOfBillingCycle()
     }
   } catch (error) {

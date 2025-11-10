@@ -41,11 +41,11 @@ import {
   House as HouseIcon,
   Sparkle as AgentsIcon,
   ListChecks as TasksIcon,
-  BookOpen as DocsIcon,
   ChartLine as DashboardIcon,
   Plugs as IntegrationsIcon,
   Folder as Folders,
   MaskHappy as MaskHappyIcon,
+  CreditCard as CreditsIcon,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
 import { SidebarVoiceButton } from "@/app/components/voice/sidebar-voice-button"
@@ -100,7 +100,7 @@ export function AppSidebar() {
     { href: "/agents/tasks", label: t.sidebar.tasks, icon: TasksIcon, iconWeight: "duotone" as const },
     { href: "/integrations", label: t.sidebar.integrations, icon: IntegrationsIcon, iconWeight: "duotone" as const },
     { href: "/dashboard", label: t.sidebar.dashboard, icon: DashboardIcon, iconWeight: "duotone" as const },
-    { href: "/docs", label: t.sidebar.docs, icon: DocsIcon, iconWeight: "duotone" as const },
+    { href: "/account", label: "Credits", icon: CreditsIcon, iconWeight: "duotone" as const },
   ], [t.sidebar])
 
   // Personality navigation item (opens settings with personality tab)
@@ -254,20 +254,6 @@ export function AppSidebar() {
                 ⌘⇧U
               </div>
             </Link>
-            {/* Quick link: Agentes (replacing previous Crear Agente here) */}
-            <Link
-              href="/agents/manage"
-              className="hover:bg-muted/80 hover:text-foreground text-foreground group/agents relative inline-flex w-full items-center radius-md bg-transparent px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5"
-              prefetch
-              onClick={() => {
-                if (isMobile) setOpenMobile(false)
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <AgentsIcon className="size-[18px]" weight="duotone" />
-                <span className="font-medium">{t.sidebar.agents}</span>
-              </div>
-            </Link>
             <HistoryTrigger
               hasSidebar={false}
               classNameTrigger="bg-transparent hover:bg-muted/80 hover:text-foreground text-foreground relative inline-flex w-full items-center radius-md px-3 py-2.5 text-[13.5px] transition-all duration-200 hover:translate-x-0.5 group/search"
@@ -282,7 +268,6 @@ export function AppSidebar() {
               }
               hasPopover={false}
             />
-            <SidebarVoiceButton />
           </div>
           {/* OPTIMIZED: Quick links removed for Grok-style minimal sidebar */}
           <SidebarProject />

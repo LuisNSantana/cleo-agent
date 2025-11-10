@@ -18,7 +18,8 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
-import { CreditDisplay, type CreditBalance } from "@/app/components/credits/credit-display"
+import { CreditDisplay } from "@/app/components/credits/credit-display"
+import { useCreditBalance } from "@/app/hooks/use-credit-balance"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
@@ -39,35 +40,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
     setMounted(true)
   }, [])
 
-  // Credit balance state
-  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null)
-  const [loadingCredits, setLoadingCredits] = useState(false)
-
-  // Fetch credit balance when user is logged in
-  useEffect(() => {
-    if (!isLoggedIn) return
-
-    const fetchBalance = async () => {
-      try {
-        setLoadingCredits(true)
-        const response = await fetch('/api/credits/balance')
-        if (response.ok) {
-          const data = await response.json()
-          setCreditBalance(data)
-        }
-      } catch (error) {
-        console.error('Failed to fetch credit balance:', error)
-      } finally {
-        setLoadingCredits(false)
-      }
-    }
-
-    fetchBalance()
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchBalance, 30000)
-    return () => clearInterval(interval)
-  }, [isLoggedIn])
+  // Credit balance using custom hook
+  const { balance: creditBalance, loading: loadingCredits } = useCreditBalance()
 
   return (
     <header className="app-fixed-header">

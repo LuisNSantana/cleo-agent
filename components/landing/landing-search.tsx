@@ -35,7 +35,7 @@ export function LandingSearch({ placeholder }: LandingSearchProps) {
       return { id, title, type }
     })
     // Add known anchors as sections if present
-  const anchors = ["features", "agents", "demo", "builder", "benefits", "final", "get-started"]
+  const anchors = ["features", "agents", "pricing", "benefits", "final", "get-started"]
     anchors.forEach((a) => {
       const node = document.getElementById(a)
       if (node) items.push({ id: a, title: a.charAt(0).toUpperCase() + a.slice(1), type: "section" })
@@ -75,7 +75,7 @@ export function LandingSearch({ placeholder }: LandingSearchProps) {
   }
 
   return (
-    <div className="relative hidden md:block w-72">
+    <div className="relative hidden md:block w-48 lg:w-52 xl:w-56">
       <div
         className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/70 px-3 py-2 text-sm shadow-sm focus-within:border-primary/50"
         onClick={() => {

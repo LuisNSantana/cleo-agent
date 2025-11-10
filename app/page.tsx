@@ -6,6 +6,7 @@ import { AgentsSection } from "@/components/landing/agents-section"
 import { UseCaseDemo } from "@/components/landing/use-case-demo"
 import { BenefitsSection } from "@/components/landing/benefits-section"
 import { TestimonialsSection } from "@/components/landing/testimonials-section"
+import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { ScrollToTop } from "@/components/landing/scroll-to-top"
 import { LandingFooter } from "@/components/landing/landing-footer"
@@ -115,6 +116,11 @@ export default async function Home({
 
           {/* 7. Proof & Security */}
           <TestimonialsSection />
+
+          {/* 8. Pricing */}
+          <div id="pricing" data-landing-search data-landing-search-title="Pricing" data-landing-search-type="section">
+            <PricingSection />
+          </div>
 
           {/* Final CTA */}
           <div id="get-started" data-landing-search data-landing-search-title="Start" data-landing-search-type="section">

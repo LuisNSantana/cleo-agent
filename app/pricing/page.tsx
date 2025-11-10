@@ -1,21 +1,23 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { CheckIcon, StarIcon, ZapIcon, ShieldIcon, UsersIcon, CreditCardIcon } from "lucide-react"
+import { CheckIcon, StarIcon, ZapIcon, ShieldIcon, UsersIcon, CreditCardIcon, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/lib/i18n"
 
 const tiers = [
   {
     name: "Free",
     price: "$0",
     description: "Perfecto para empezar",
-    credits: "100",
+    credits: "1,000",  // Beta: 1000 credits (10x normal)
     agents: "1",
     features: [
-      "Chat básico con Cleo",
+      "1,000 créditos mensuales (Beta)",
+      "Chat básico con Kylio",
       "3 agentes predefinidos",
       "Historial 7 días",
       "Integraciones limitadas",
@@ -85,6 +87,28 @@ const tiers = [
 ]
 
 export default function PricingPage() {
+  const { locale } = useI18n()
+  
+  const t = {
+    title: locale === 'es' ? 'Elige tu plan' : locale === 'pt' ? 'Escolha seu plano' : locale === 'fr' ? 'Choisissez votre forfait' : 'Choose your plan',
+    subtitle: locale === 'es' ? 'Desde principiantes hasta empresas, tenemos el plan perfecto para ti.' : 
+              locale === 'pt' ? 'De iniciantes a empresas, temos o plano perfeito para você.' : 
+              locale === 'fr' ? 'Des débutants aux entreprises, nous avons le forfait parfait pour vous.' : 
+              'From beginners to enterprises, we have the perfect plan for you.',
+    perMonth: locale === 'es' ? '/mes' : locale === 'pt' ? '/mês' : locale === 'fr' ? '/mois' : '/month',
+    soon: locale === 'es' ? 'Pronto' : locale === 'pt' ? 'Em breve' : locale === 'fr' ? 'Bientôt' : 'Soon',
+    betaNotice: {
+      title: locale === 'es' ? '🚧 Beta - Suscripciones Próximamente' :
+              locale === 'pt' ? '🚧 Beta - Assinaturas em Breve' :
+              locale === 'fr' ? '🚧 Beta - Abonnements Bientôt' :
+              '🚧 Beta - Subscriptions Coming Soon',
+      description: locale === 'es' ? 'Actualmente estamos en beta. Las suscripciones de pago y compra de créditos estarán disponibles próximamente. Los precios mostrados son preliminares y pueden variar. Mientras tanto, disfruta del plan Free y ayúdanos a mejorar con tu feedback.' :
+                    locale === 'pt' ? 'Atualmente estamos em beta. Assinaturas pagas e compra de créditos estarão disponíveis em breve. Os preços mostrados são preliminares e podem variar. Enquanto isso, aproveite o plano Free e nos ajude a melhorar com seu feedback.' :
+                    locale === 'fr' ? 'Nous sommes actuellement en bêta. Les abonnements payants et l\'achat de crédits seront bientôt disponibles. Les prix affichés sont préliminaires et peuvent varier. En attendant, profitez du forfait gratuit et aidez-nous à nous améliorer avec vos commentaires.' :
+                    'We are currently in beta. Paid subscriptions and credit purchases will be available soon. Prices shown are preliminary and may vary. Meanwhile, enjoy the Free plan and help us improve with your feedback.'
+    }
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Hero Section */}
@@ -95,18 +119,32 @@ export default function PricingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center"
+            className="text-center space-y-6"
           >
             <Badge variant="outline" className="mb-4">
               🚀 Precios transparentes, sin sorpresas
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Elige tu plan
+              {t.title}
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto">
-              Desde principiantes hasta empresas, tenemos el plan perfecto para ti. 
-              Empieza gratis y escala cuando lo necesites.
+              {t.subtitle}
             </p>
+            
+            {/* Beta Notice */}
+            <Card className="mt-8 max-w-3xl mx-auto border-amber-500/50 bg-amber-500/10 p-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="text-left">
+                  <h3 className="font-semibold text-amber-600 dark:text-amber-400 mb-2">
+                    {t.betaNotice.title}
+                  </h3>
+                  <p className="text-sm text-amber-600/80 dark:text-amber-400/80">
+                    {t.betaNotice.description}
+                  </p>
+                </div>
+              </div>
+            </Card>
           </motion.div>
 
           {/* Credit System Explanation */}
@@ -206,7 +244,7 @@ export default function PricingPage() {
                     <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
                     <div className="mb-4">
                       <span className="text-4xl font-bold">{tier.price}</span>
-                      {tier.price !== "Custom" && <span className="text-muted-foreground">/mes</span>}
+                      {tier.price !== "Custom" && <span className="text-muted-foreground">{t.perMonth}</span>}
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">{tier.description}</p>
                     
@@ -231,16 +269,27 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  <Button 
-                    className={cn(
-                      "w-full",
-                      tier.popular ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600" : ""
-                    )}
-                    variant={tier.popular ? "default" : "outline"}
-                    size="lg"
-                  >
-                    {tier.cta}
-                  </Button>
+                  <div className="w-full">
+                    <Button 
+                      className={cn(
+                        "w-full",
+                        tier.popular ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600" : ""
+                      )}
+                      variant={tier.popular ? "default" : "outline"}
+                      size="lg"
+                      disabled={tier.name !== "Free"}
+                      title={tier.name !== "Free" ? "Próximamente disponible - Estamos en beta" : ""}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        {tier.cta}
+                        {tier.name !== "Free" && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 shrink-0">
+                            {t.soon}
+                          </Badge>
+                        )}
+                      </span>
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </motion.div>

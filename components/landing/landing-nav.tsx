@@ -55,7 +55,7 @@ export function LandingNav() {
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <nav className="mx-auto flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10 2xl:px-16 max-w-[1920px]">
+      <nav className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-[1920px]">
         {/* Logo */}
         <motion.div
           className="flex cursor-pointer items-center gap-2 sm:gap-3"
@@ -87,7 +87,7 @@ export function LandingNav() {
         </motion.div>
 
         {/* Desktop Navigation */}
-        <div className="hidden items-center gap-6 xl:gap-8 lg:flex">
+        <div className="hidden items-center gap-3 xl:gap-5 lg:flex">
           <a
             href="#features"
             className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
@@ -101,16 +101,10 @@ export function LandingNav() {
             {mounted ? copy.nav.agents : 'Agents'}
           </a>
           <a
-            href="#builder"
+            href="#pricing"
             className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
           >
-            {mounted ? copy.nav.builder : 'Builder'}
-          </a>
-          <a
-            href="#demo"
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
-          >
-            {mounted ? copy.nav.demo : 'Demo'}
+            {mounted ? (locale === 'es' ? 'Precios' : locale === 'pt' ? 'Preços' : locale === 'fr' ? 'Tarifs' : 'Pricing') : 'Pricing'}
           </a>
           <a
             href="#benefits"
@@ -118,33 +112,27 @@ export function LandingNav() {
           >
             {mounted ? copy.nav.benefits : 'Benefits'}
           </a>
-          <button
-            onClick={() => router.push('/docs')}
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
-          >
-            {copy.nav.docs}
-          </button>
         </div>
 
-        {/* Landing search (desktop) */}
-        <div className="hidden flex-1 justify-center lg:flex">
+        {/* Landing search (desktop) - more compact */}
+        <div className="hidden lg:flex lg:ml-4 xl:ml-6">
           <LandingSearch placeholder={copy.nav.searchPlaceholder} />
         </div>
 
         {/* Right side actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 lg:gap-3">
           {/* Theme toggle */}
           {mounted && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="h-10 w-10 p-0"
+              className="h-9 w-9 p-0"
             >
               {theme === 'dark' ? (
-                <Sun className="h-6 w-6" weight="duotone" />
+                <Sun className="h-5 w-5" weight="duotone" />
               ) : (
-                <Moon className="h-6 w-6" weight="duotone" />
+                <Moon className="h-5 w-5" weight="duotone" />
               )}
             </Button>
           )}
@@ -152,9 +140,9 @@ export function LandingNav() {
           {/* Language selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-1.5 h-9">
                 <span>{mounted ? currentLang?.flag : '🌐'}</span>
-                <span className="hidden sm:inline">{mounted ? currentLang?.code.toUpperCase() : 'EN'}</span>
+                <span className="hidden sm:inline text-xs">{mounted ? currentLang?.code.toUpperCase() : 'EN'}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -172,19 +160,19 @@ export function LandingNav() {
           </DropdownMenu>
 
           {/* Desktop buttons */}
-          <div className="hidden items-center gap-3 lg:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={handleLogin}
-              className="text-[#1E255E] dark:text-[#E5E5E5] hover:bg-[#A38CFF]/10"
+              className="text-[#1E255E] dark:text-[#E5E5E5] hover:bg-[#A38CFF]/10 h-9 text-xs lg:text-sm px-3 lg:px-4"
             >
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
               size="sm"
               onClick={handleGetStarted}
-              className="bg-[#A38CFF] text-white shadow-lg shadow-[#A38CFF]/30 transition-all hover:scale-[1.02] hover:bg-[#8E73FF] hover:shadow-[#A38CFF]/50"
+              className="bg-[#A38CFF] text-white shadow-lg shadow-[#A38CFF]/30 transition-all hover:scale-[1.02] hover:bg-[#8E73FF] hover:shadow-[#A38CFF]/50 h-9 text-xs lg:text-sm px-3 lg:px-4"
             >
               {mounted ? copy.nav.getStarted : 'Get Started'}
             </Button>
@@ -232,18 +220,11 @@ export function LandingNav() {
               />
             </div>
             <a
-              href="#builder"
+              href="#pricing"
               className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
               onClick={() => setMobileMenuOpen(false)}
             >
-              {mounted ? (locale === 'es' ? 'Creador' : locale === 'pt' ? 'Construtor' : locale === 'fr' ? 'Générateur' : 'Builder') : 'Builder'}
-            </a>
-            <a
-              href="#demo"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              {mounted ? (locale === 'es' ? 'Demo' : locale === 'pt' ? 'Demo' : locale === 'fr' ? 'Démo' : 'Demo') : 'Demo'}
+              {mounted ? (locale === 'es' ? 'Precios' : locale === 'pt' ? 'Preços' : locale === 'fr' ? 'Tarifs' : 'Pricing') : 'Pricing'}
             </a>
             <a
               href="#features"
@@ -266,15 +247,6 @@ export function LandingNav() {
             >
               Benefits
             </a>
-            <button
-              onClick={() => {
-                router.push('/docs')
-                setMobileMenuOpen(false)
-              }}
-              className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1E255E]/70 dark:text-[#E5E5E5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
-            >
-              Docs
-            </button>
             <div className="my-4 border-t border-[#E5E5E5] dark:border-[#2F2F2F]" />
             <Button
               variant="outline"
