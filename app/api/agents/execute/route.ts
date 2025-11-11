@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
         })
         
   const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
-  const newOrchestrator = recreateAgentOrchestrator()
+  const newOrchestrator = await recreateAgentOrchestrator()
 
         try {
           const execution = newOrchestrator.startAgentExecution(input, agentId)

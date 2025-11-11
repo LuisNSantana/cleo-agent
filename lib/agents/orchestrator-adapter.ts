@@ -5,7 +5,7 @@
  */
 
 import { BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
-import { AgentOrchestrator as CoreOrchestrator, ExecutionContext, ExecutionOptions as CoreExecOptions } from '@/lib/agents/core/orchestrator'
+import { AgentOrchestrator as CoreOrchestrator, ExecutionContext, ExecutionOptions as CoreExecOptions, getGlobalOrchestrator } from '@/lib/agents/core/orchestrator'
 // Lazy-init legacy orchestrator when needed for delegation/tooling parity
 import { getAgentOrchestrator as getLegacyOrchestrator } from '@/lib/agents/agent-orchestrator'
 import type { AgentConfig, AgentExecution } from '@/lib/agents/types'
@@ -24,10 +24,12 @@ const runtimeAgents = g.__cleoRuntimeAgents as Map<string, AgentConfig>
 const execRegistry = g.__cleoExecRegistry as AgentExecution[]
 const listeners = g.__cleoAdapterListeners as Array<(event: any) => void>
 
-function getCore(): CoreOrchestrator {
+// Initialize orchestrator singleton asynchronously
+async function initializeCore(): Promise<CoreOrchestrator> {
   const g = globalThis as any
   if (!g.__cleoCoreOrchestrator) {
-    g.__cleoCoreOrchestrator = new CoreOrchestrator({ enableMetrics: true, enableMemory: true })
+    // Use singleton getter instead of direct instantiation
+    g.__cleoCoreOrchestrator = await getGlobalOrchestrator()
     
     // CRITICAL FIX: Bridge core events to adapter listeners for delegation completion
     // When a delegated execution completes, notify waiting delegation tools
@@ -63,14 +65,16 @@ function getCore(): CoreOrchestrator {
         }
       })
     })
+    
+    coreInstance = g.__cleoCoreOrchestrator as CoreOrchestrator
   }
-  coreInstance = g.__cleoCoreOrchestrator as CoreOrchestrator
-  return coreInstance
+  return g.__cleoCoreOrchestrator as CoreOrchestrator
 }
 
-export function getAgentOrchestrator() {
+export async function getAgentOrchestrator() {
   // Minimal wrapper exposing a subset of the legacy methods used by routes
-  const core = getCore()
+  // Initialize core on first call (async)
+  const core = await initializeCore()
   return {
     __id: 'core-adapter',
     // CRITICAL FIX: Expose eventEmitter so SSE listeners can subscribe to interrupts
@@ -302,12 +306,12 @@ function createAndRunExecution(
   return exec
 }
 
-export function recreateAgentOrchestrator() {
+export async function recreateAgentOrchestrator() {
   const g = globalThis as any
   if (g.__cleoCoreOrchestrator) {
     try { g.__cleoCoreOrchestrator.shutdown?.() } catch {}
     delete g.__cleoCoreOrchestrator
   }
   coreInstance = null
-  return getAgentOrchestrator()
+  return await getAgentOrchestrator()
 }

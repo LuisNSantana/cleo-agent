@@ -59,8 +59,8 @@ export const useAgentStore = create<AgentStoreState>()(
         
         // Get runtime agents from orchestrator
   const { getAgentOrchestrator } = await import('./orchestrator-adapter')
-        const orchestrator = getAgentOrchestrator()
-        const agentConfigs = orchestrator.getAgentConfigs()
+        const orchestrator = await getAgentOrchestrator()
+        const agentConfigs = await orchestrator.getAgentConfigs()
         const runtimeAgents = Array.from(agentConfigs.values()).filter(config => {
           // Runtime agents have ID pattern: custom_{timestamp}
           return /^custom_\d+$/.test(config.id)
@@ -85,7 +85,7 @@ export const useAgentStore = create<AgentStoreState>()(
 
       try {
   const { getAgentOrchestrator } = await import('./orchestrator-adapter')
-        const orchestrator = getAgentOrchestrator()
+        const orchestrator = await getAgentOrchestrator()
         const execution = await orchestrator.executeAgent(input, agentId)
 
         set((state) => ({
@@ -188,7 +188,7 @@ export const useAgentStore = create<AgentStoreState>()(
 
     subscribeToEvents: async () => {
   const { getAgentOrchestrator } = await import('./orchestrator-adapter')
-      const orchestrator = getAgentOrchestrator()
+      const orchestrator = await getAgentOrchestrator()
 
       const handleEvent = (event: AgentActivity) => {
         set((state) => {
@@ -231,7 +231,7 @@ export const useAgentStore = create<AgentStoreState>()(
 
     unsubscribeFromEvents: async () => {
   const { getAgentOrchestrator } = await import('./orchestrator-adapter')
-      const orchestrator = getAgentOrchestrator()
+      const orchestrator = await getAgentOrchestrator()
       // Note: In a real implementation, you'd want to pass the specific listener
       // For now, we'll clear all listeners
       orchestrator.cleanup()
