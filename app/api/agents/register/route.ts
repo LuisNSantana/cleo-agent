@@ -15,11 +15,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Invalid agent payload' }, { status: 400 })
     }
 
-    const orch = getAgentOrchestrator()
+    const orch = await getAgentOrchestrator()
     console.log('[API/register] Orchestrator shape:', typeof orch, Object.keys(Object(orch)).slice(0,50))
     try {
       // Use the exported wrapper to avoid method-binding and proxy issues
-      registerRuntimeAgent(cfg)
+      await registerRuntimeAgent(cfg)
       if (process.env.NODE_ENV !== 'production') {
         console.log('[API/register] Registered runtime agent with icon:', { id: cfg.id, icon: cfg.icon })
       }
@@ -66,8 +66,8 @@ export async function POST(req: Request) {
       // Try recreating and using the wrapper again
       try {
   const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
-        recreateAgentOrchestrator()
-        registerRuntimeAgent(cfg)
+        await recreateAgentOrchestrator()
+        await registerRuntimeAgent(cfg)
 
         // Trigger dynamic discovery refresh for Cleo (retry)
         try {

@@ -14,7 +14,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { createTaskNotification } from './notifications';
 import { withRequestContext } from '@/lib/server/request-context';
 import type { JsonObject, JsonValue } from '@/types/json';
-import type { AgentExecution } from '@/lib/agents/types';
+import type { AgentExecution, AgentConfig } from '@/lib/agents/types';
 
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) return null;
@@ -191,14 +191,17 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     console.log(`⏱️ Timeout: ${TIMEOUT_MS/1000}s`);
 
     // Get agent configuration using unified function (supports both static and DB agents)
-    let agent = await getAgentById(task.agent_id, task.user_id);
-    if (!agent && task.agent_name) {
+    let agentOrNull = await getAgentById(task.agent_id, task.user_id);
+    if (!agentOrNull && task.agent_name) {
       const lower = String(task.agent_name).toLowerCase().trim()
-      agent = await getAgentByName(lower, task.user_id);
+      agentOrNull = await getAgentByName(lower, task.user_id);
     }
-    if (!agent) {
+    if (!agentOrNull) {
       throw new Error(`Agent not found: ${task.agent_id}`);
     }
+    
+    // Type assertion: agent is guaranteed to exist after the check above
+    const agent: AgentConfig = agentOrNull;
 
     // Create task-specific prompt based on agent and task type
     const taskPrompt = createTaskPrompt(task, TIMEOUT_MS);
@@ -210,7 +213,7 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     
     // Use the legacy orchestrator which has CoreOrchestrator with delegation support
     const { getAgentOrchestrator } = await import('@/lib/agents/agent-orchestrator');
-    const orchestrator = getAgentOrchestrator();
+    const orchestrator = await getAgentOrchestrator();
     
     const initialMessage = {
       role: 'user' as const,

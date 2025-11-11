@@ -507,7 +507,7 @@ export function ensureDelegationToolForAgent(agentId: string, agentName: string)
 				const { resolveAgentCanonicalKey } = await import('../agents/alias-resolver')
 				const canonicalAgentId = await resolveAgentCanonicalKey(agentId)
 				
-				const orchestrator = getAgentOrchestrator() as any
+				const orchestrator = await getAgentOrchestrator() as any
 				// Dynamic import to avoid build issues
 				let userId: string | undefined
 				try {

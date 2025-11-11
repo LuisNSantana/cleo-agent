@@ -101,7 +101,7 @@ async function runDelegation(params: {
     : (priority === 'urgent')
       ? 'high'
       : (priority || 'normal')
-  const orchestrator = getAgentOrchestrator() as any
+  const orchestrator = await getAgentOrchestrator() as any
   let userId = params.userId || getCurrentUserId?.() || '00000000-0000-0000-0000-000000000000'
 
   // Guard: late recovery if NIL UUID

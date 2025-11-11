@@ -427,13 +427,13 @@ export async function getAgentOrchestrator() {
 }
 
 // Convenience wrapper
-export function registerRuntimeAgent(agentConfig: AgentConfig) {
-	const orch = getAgentOrchestrator() as any
+export async function registerRuntimeAgent(agentConfig: AgentConfig) {
+	const orch = await getAgentOrchestrator() as any
 	return orch.registerRuntimeAgent(agentConfig)
 }
 
-export function recreateAgentOrchestrator() {
+export async function recreateAgentOrchestrator() {
 	// Reset listeners only
 	listeners.splice(0, listeners.length)
-	return getAgentOrchestrator()
+	return await getAgentOrchestrator()
 }

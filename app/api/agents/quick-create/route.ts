@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Runtime registration for immediate availability
-    registerRuntimeAgent({
+    await registerRuntimeAgent({
       id: newAgentUnified.id,
       name: newAgentUnified.name,
       description: newAgentUnified.description || '',

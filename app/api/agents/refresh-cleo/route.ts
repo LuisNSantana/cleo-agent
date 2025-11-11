@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       const orchestrator = await getAgentOrchestrator()
       
       // Re-register Cleo with updated configuration
-      registerRuntimeAgent(dynamicCleoConfig)
+      await registerRuntimeAgent(dynamicCleoConfig)
       
       logger.info('[API/refresh-cleo] Successfully updated Cleo with dynamic configuration')
       logger.info(`[API/refresh-cleo] Cleo now has ${dynamicCleoConfig.tools.length} tools available`)
@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
       // Try to recreate orchestrator and retry
       try {
         const { recreateAgentOrchestrator } = await import('@/lib/agents/orchestrator-adapter')
-        recreateAgentOrchestrator()
+        await recreateAgentOrchestrator()
         
         // Retry registration
-        registerRuntimeAgent(dynamicCleoConfig)
+        await registerRuntimeAgent(dynamicCleoConfig)
         
         return NextResponse.json({
           success: true,
