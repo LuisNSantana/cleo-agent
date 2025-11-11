@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useMemo, useState, useEffect } from "react";
 import { enrichStepWithContextualMessage, getProgressMessage } from '@/lib/agents/ui-messaging';
 import type { PipelineStep, Action, ReasoningBlock } from '@/lib/types/definitions';
+
+// Re-export types for external usage
+export type { PipelineStep, Action, ReasoningBlock };
 import { ReasoningViewer } from './reasoning-viewer';
 import { ToolDetails } from './tool-details';
 import { ExpandableStep } from './expandable-step';
