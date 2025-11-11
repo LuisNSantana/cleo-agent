@@ -317,6 +317,7 @@ export function ChatInput({
                   isUserAuthenticated={isUserAuthenticated}
                 />
               )}
+              {/* Search button hidden per user request
               {hasSearchSupport ? (
                 <ButtonSearch
                   isSelected={enableSearch}
@@ -324,6 +325,7 @@ export function ChatInput({
                   isAuthenticated={isUserAuthenticated}
                 />
               ) : null}
+              */}
               {onVoiceModeAction && (
                 <ButtonVoice
                   onClick={onVoiceModeAction}

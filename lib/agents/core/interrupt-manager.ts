@@ -1,29 +1,6 @@
 /**
  * Interrupt State Manager
- * Manages pending interrupts (human-in-the-loop approvals) du    // If not     // If not in memory, check Supabase
-    try {
-      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
-      const supabase = await createClient()
-      if (!supabase) {
-        console.warn('⚠️ [INTERRUPT] Supabase not available for fallback')
-        return undefined
-      }
-      
-      const { data, error } = await supabase
-        .from('agent_interrupts')
-        .select('*')
-        .eq('execution_id', executionId)
-        .eq('status', 'pending')
-        .single() check Supabase
-    try {
-      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
-      const supabase = await createClient()
-      const { data, error } = await supabase
-        .from('agent_interrupts')
-        .select('*')
-        .eq('execution_id', executionId)
-        .eq('status', 'pending')
-        .single() execution
+ * Manages pending interrupts (human-in-the-loop approvals) during agent execution
  * 
  * Uses Supabase for persistent storage across serverless function instances
  * Based on LangGraph official patterns from agent-chat-ui
@@ -137,7 +114,9 @@ export class InterruptManager {
         .from('agent_interrupts')
         .select('*')
         .eq('execution_id', executionId)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'approved', 'rejected', 'edited'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single()
       
       if (error) {
@@ -153,7 +132,7 @@ export class InterruptManager {
         state = {
           executionId: data.execution_id,
           threadId: data.thread_id,
-          status: data.status as 'pending',
+          status: data.status as InterruptState['status'],
           interrupt: data.interrupt_payload as unknown as HumanInterrupt,
           timestamp: new Date(data.created_at),
           response: data.response as unknown as HumanResponse | undefined

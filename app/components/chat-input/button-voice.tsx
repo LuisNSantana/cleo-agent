@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { Microphone } from "@phosphor-icons/react"
+import { Waveform } from "@phosphor-icons/react"
 import React from "react"
 import { PopoverContentAuth } from "./popover-content-auth"
 
@@ -29,13 +29,13 @@ export function ButtonVoice({
             <PopoverTrigger asChild>
               <Button
                 variant="secondary"
+                size="icon"
                 className={cn(
-                  "border-border dark:bg-secondary rounded-full border bg-transparent dark:!text-gray-900 dark:hover:!text-gray-900",
+                  "border-border dark:bg-secondary rounded-full border bg-transparent dark:!text-gray-900 dark:hover:!text-gray-900 h-9 w-9",
                   className
                 )}
               >
-                <Microphone className="size-5" weight="fill" />
-                <span className="hidden md:inline-block">Voice</span>
+                <Waveform className="size-5" weight="regular" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -51,14 +51,14 @@ export function ButtonVoice({
       <TooltipTrigger asChild>
         <Button
           variant="secondary"
+          size="icon"
           className={cn(
-            "border-border dark:bg-secondary rounded-full border bg-transparent transition-all duration-150 dark:!text-gray-900 dark:hover:!text-gray-900",
+            "border-border dark:bg-secondary rounded-full border bg-transparent transition-all duration-150 dark:!text-gray-900 dark:hover:!text-gray-900 h-9 w-9",
             className
           )}
           onClick={onClick}
         >
-          <Microphone className="size-5" weight="fill" />
-          <span className="hidden md:inline-block">Voice</span>
+          <Waveform className="size-5" weight="regular" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>Voice mode</TooltipContent>
