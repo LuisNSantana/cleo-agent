@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     // Update Cleo in the orchestrator
     try {
-      const orchestrator = getAgentOrchestrator()
+      const orchestrator = await getAgentOrchestrator()
       
       // Re-register Cleo with updated configuration
       registerRuntimeAgent(dynamicCleoConfig)

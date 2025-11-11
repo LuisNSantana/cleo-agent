@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const orchestrator = getAgentOrchestrator()
+    const orchestrator = await getAgentOrchestrator()
     
     // Get current server agents
     const serverAgentIds = Array.from(orchestrator.getAgentConfigs().keys())

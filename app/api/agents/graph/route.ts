@@ -10,7 +10,7 @@ import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 export async function GET() {
   try {
     const agents = await getAllAgents()
-    const orchestrator = getAgentOrchestrator()
+    const orchestrator = await getAgentOrchestrator()
     const executions = orchestrator.getAllExecutions()
 
     // Create nodes for visualization with hierarchical positioning

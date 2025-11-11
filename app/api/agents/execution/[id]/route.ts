@@ -17,7 +17,7 @@ export async function GET(
       )
     }
 
-  const orchestrator = getAgentOrchestrator()
+  const orchestrator = await getAgentOrchestrator()
   const exec = orchestrator.getExecution(executionId)
 
     if (!exec) {
