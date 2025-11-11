@@ -91,19 +91,24 @@ export class InterruptManager {
 
   /**
    * Get pending interrupt for an execution (check Supabase if not in memory)
+   * @param forceRefresh - If true, always check Supabase even if found in memory (for serverless polling)
    */
-  static async getInterrupt(executionId: string): Promise<InterruptState | undefined> {
-    // Check L1 cache first
+  static async getInterrupt(executionId: string, forceRefresh = false): Promise<InterruptState | undefined> {
+    // Check L1 cache first (unless forceRefresh)
     let state = activeInterrupts.get(executionId)
     
-    if (state) {
+    if (state && !forceRefresh) {
       console.log('🔍 [INTERRUPT] Found in memory cache:', executionId)
       return state
     }
     
-    // If not in memory, check Supabase
+    // If not in memory OR forceRefresh, check Supabase
     try {
-      console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
+      if (forceRefresh && state) {
+        console.log('🔄 [INTERRUPT] Force refresh from Supabase (bypassing memory):', executionId)
+      } else {
+        console.log('🔍 [INTERRUPT] Not in memory, checking Supabase:', executionId)
+      }
       const supabase = await createClient()
       if (!supabase) {
         console.warn('⚠️ [INTERRUPT] Supabase not available for fallback')
@@ -254,10 +259,10 @@ export class InterruptManager {
     const maxAttempts = Math.floor(timeoutMs / pollInterval)
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // CRITICAL FIX: Use getInterrupt() which checks Supabase fallback
+      // CRITICAL FIX: ALWAYS check Supabase during polling (forceRefresh=true)
       // In serverless, the approval may come from a different process
-      // Memory cache is NOT shared between processes
-      const state = await this.getInterrupt(executionId)
+      // Memory cache is NOT shared between processes - MUST bypass cache
+      const state = await this.getInterrupt(executionId, true)
       
       if (!state) {
         console.error('❌ [INTERRUPT] Interrupt disappeared during wait:', executionId)
