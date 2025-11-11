@@ -65,6 +65,13 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
     color: '#10B981',
     emoji: '🌐'
   },
+  'iris-insights': {
+    id: 'iris-insights',
+    name: 'Iris',
+    avatar: '/img/agents/iris4.jpeg',
+    color: '#0EA5E9',
+    emoji: '🔎'
+  },
   'skyvern-agent': {
     id: 'skyvern-agent',
     name: 'Skyvern',

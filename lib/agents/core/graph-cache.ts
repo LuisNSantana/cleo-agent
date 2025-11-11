@@ -91,6 +91,8 @@ export class GraphCache {
         recursionLimit: 50  // Increased from LangGraph default of 25
       })
       
+      logger.info(`✅ [GRAPH-CACHE] Compiled graph for ${agentId} with recursionLimit=50`)
+      
       const compileTimeMs = Date.now() - startTime
       
       // Cache compiled graph

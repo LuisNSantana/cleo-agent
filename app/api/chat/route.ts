@@ -989,8 +989,9 @@ export async function POST(req: Request) {
           const { orderTextBeforeImages } = await import('@/lib/chat/parts-order')
           const lastConvertedUser = [...(convertedMessages || [])].reverse().find((m: any) => m?.role === 'user') as any
           if (lastConvertedUser && Array.isArray(lastConvertedUser.content)) {
-            // Keep only provider-supported parts (text | image)
-            const parts = lastConvertedUser.content.filter((p: any) => p && (p.type === 'text' || p.type === 'image'))
+            // Keep only provider-supported parts (text | image | file)
+            // CRITICAL: Include 'file' type for PDF/document attachments
+            const parts = lastConvertedUser.content.filter((p: any) => p && (p.type === 'text' || p.type === 'image' || p.type === 'file'))
             // 1) Ensure image-only gets a text hint
             let ensured = ensureImageAnalysisHint(parts)
             // 2) Always prefer text before images to guide models reliably
