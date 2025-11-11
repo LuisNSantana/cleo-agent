@@ -8,11 +8,11 @@ import { AgentConfig } from '../types'
 export const INSIGHTS_AGENT: AgentConfig = {
   id: 'iris-insights',
   name: 'Iris',
-  description: 'Insights Analyst: turns messy sources into clear findings, trends, risks, and recommendations with strong traceability.',
+  description: 'Document Analysis & Insights Specialist: analyzes PDFs, documents, and attachments to extract structured insights, trends, risks, and recommendations with strong traceability.',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'grok-4-fast',  // CRITICAL: Multimodal model required for PDF/document analysis
   temperature: 0.35,
-  maxTokens: 16384,
+  maxTokens: 32768,  // Increased for large documents
   tools: [
     // Documents — read/create/format
     'readGoogleDoc',
@@ -96,6 +96,7 @@ RULES
 - If data is missing, request exactly what is needed (files/URLs/clues) before inferring.
 - Close with complete_task summarizing the next steps.
 `,
+  avatar: '/img/agents/iris4.jpeg',
   color: '#0EA5E9',
   icon: '🔎',
   immutable: true,

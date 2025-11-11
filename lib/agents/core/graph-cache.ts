@@ -83,9 +83,12 @@ export class GraphCache {
       // Create graph from factory
       const graph = graphFactory()
       
-      // Compile with shared checkpointer
+      // Compile with shared checkpointer and increased recursion limit
+      // CRITICAL: Increased from default 25 to 50 to handle complex agent workflows
+      // especially when agents need multiple tool calls (PDF analysis, web search, etc.)
       const compiled = graph.compile({ 
-        checkpointer: this.checkpointer 
+        checkpointer: this.checkpointer,
+        recursionLimit: 50  // Increased from LangGraph default of 25
       })
       
       const compileTimeMs = Date.now() - startTime

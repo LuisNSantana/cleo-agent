@@ -171,10 +171,31 @@ async function runDelegation(params: {
     event: startedEvent
   })
 
+  // CRITICAL FIX: Propagate attachments to delegated agent
+  // When delegating (especially to Iris/Wex for document analysis), the child agent needs access to PDFs
+  let attachments: any[] = []
+  try {
+    const g = globalThis as any
+    // Check for attachments in global context (set by chat route)
+    if (g.__lastAttachmentUrl && typeof g.__lastAttachmentUrl === 'string') {
+      attachments.push({
+        url: g.__lastAttachmentUrl,
+        contentType: 'application/pdf',
+        name: 'attachment.pdf'
+      })
+      logger.info('📎 [DELEGATION] Propagating PDF attachment to delegated agent', { 
+        url: g.__lastAttachmentUrl.slice(0, 80) + '...',
+        targetAgent: agentId 
+      })
+    }
+  } catch (err) {
+    logger.warn('⚠️ [DELEGATION] Failed to retrieve attachments:', err)
+  }
+
   // Start execution (UI variant propagates user/thread when present)
   // NOTE: startAgentExecutionForUI in the enhanced adapter is async; ensure we await to get the exec object (id/status)
   const exec = orchestrator.startAgentExecutionForUI
-    ? await orchestrator.startAgentExecutionForUI(input, agentId, undefined, userId, [], true)
+    ? await orchestrator.startAgentExecutionForUI(input, agentId, undefined, userId, attachments, true)
     : (orchestrator.startAgentExecution ? await orchestrator.startAgentExecution(input, agentId) : undefined)
 
   // Try to capture execution id; if missing, attempt a quick recovery from active executions
@@ -711,7 +732,7 @@ export const delegateToJennTool = tool({
 });
 
 export const delegateToIrisTool = tool({
-  description: 'Delegate insight synthesis and analysis to Iris. ONLY use for: analyzing documents/PDFs/attachments, generating executive summaries, identifying trends and patterns, risk assessment with severity/probability/confidence, evidence-based recommendations. Iris excels at turning messy inputs into structured insights with traceability. Use when user provides attachments or needs deep analysis of documents.',
+  description: 'Delegate document analysis and insight synthesis to Iris. PRIMARY USE: analyzing PDFs, documents, and attachments (contracts, reports, whitepapers, research papers). ALWAYS delegate to Iris when user provides attachments/files. Iris specializes in: PDF/document analysis with multimodal understanding, extracting structured insights, generating executive summaries, identifying trends and patterns, risk assessment with severity/probability/confidence scores, evidence-based recommendations with traceability. Iris excels at turning messy document inputs into clear, actionable, and well-cited reports. DO NOT use for market research or competitive intelligence (use Wex for that).',
   inputSchema: delegationSchema,
   execute: async ({ taskDescription, context, priority, requirements, userId }) => {
     return runDelegation({ agentId: 'iris-insights', taskDescription, context, priority, requirements, userId })
