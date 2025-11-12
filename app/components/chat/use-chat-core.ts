@@ -126,7 +126,7 @@ function convertToMessageAISDK(message: UIMessage | ChatMessage): MessageAISDK {
       id: message.id || generateUniqueMessageId(),
       role: message.role,
       content: content as any, // Use multimodal array format for backend
-      parts: message.parts,
+      parts: content as any,  // CRITICAL FIX: Use converted content (with files) instead of original parts (text only)
       createdAt: (message as any).createdAt,
     }
   }
