@@ -81,9 +81,9 @@ async function createAndRunExecution(
 	if (Array.isArray(lastUserParts) && lastUserParts.length > 0) {
 		// Convert AI SDK format to LangChain format
 		// AI SDK: { type: "image", image: "url" }
-		// LangChain: { type: "image_url", image_url: { url: "..." } }
+		// LangChain: { type: "image_url", image_url: "data:image/jpeg;base64,..." }
 		const { convertAiSdkPartsToLangChain } = await import('@/lib/chat/ai-sdk-to-langchain')
-		const langchainParts = convertAiSdkPartsToLangChain(lastUserParts)
+		const langchainParts = await convertAiSdkPartsToLangChain(lastUserParts)
 		
 		console.log('[MULTIMODAL CONVERSION] AI SDK → LangChain:', {
 			originalPartsCount: lastUserParts.length,
@@ -122,7 +122,11 @@ async function createAndRunExecution(
 			// Replace the last message with the multimodal version to ensure images are present
 			const copy = [...baseMessages]
 			// CRITICAL: HumanMessage expects { content: [...] } not just the array
-			const newMsg = new HumanMessage({ content: langchainParts } as any)
+			// Also ensure message has an ID to avoid coercion issues
+			const newMsg = new HumanMessage({ 
+				content: langchainParts,
+				id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+			})
 			copy[copy.length - 1] = newMsg
 			messageHistory = copy
 			
@@ -147,7 +151,11 @@ async function createAndRunExecution(
 		} else {
 			// Append new multimodal message
 			// CRITICAL: HumanMessage expects { content: [...] } not just the array
-			const newMsg = new HumanMessage({ content: langchainParts } as any)
+			// Also ensure message has an ID to avoid coercion issues
+			const newMsg = new HumanMessage({ 
+				content: langchainParts,
+				id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+			})
 			messageHistory = [...baseMessages, newMsg]
 			
 			const imageCount = langchainParts.filter((p: any) => p?.type === 'image_url').length
