@@ -4,10 +4,12 @@
  * AI SDK format:
  * - { type: "text", text: "..." }
  * - { type: "image", image: "url" | Uint8Array }
+ * - { type: "file", url: "...", name: "...", mediaType: "..." }
  * 
  * LangChain format:
  * - { type: "text", text: "..." }
  * - { type: "image_url", image_url: { url: "..." } }
+ * - { type: "file", url: "...", name: "...", mediaType: "..." } (preserved for tool processing)
  * 
  * @see https://js.langchain.com/docs/how_to/tool_calls_multimodal/
  */
@@ -53,6 +55,26 @@ export function convertAiSdkPartsToLangChain(parts: any[]): any[] {
 			// Fallback: return as-is and hope for the best
 			console.warn('[AI SDK → LangChain] Unknown image format:', typeof imageData)
 			return part
+		}
+		
+		// ✅ FIX: File parts (PDFs, documents) - convert to text instructions for the model
+		// Models don't understand { type: 'file' } natively, so we convert to clear text
+		if (part.type === 'file') {
+			const fileName = part.name || 'document'
+			const fileType = part.mediaType || 'unknown'
+			const fileUrl = part.url
+			
+			console.log('[AI SDK → LangChain] Converting file part to text instruction:', {
+				name: fileName,
+				mediaType: fileType,
+				hasUrl: !!fileUrl
+			})
+			
+			// Convert to clear text instruction the model can understand
+			return {
+				type: 'text',
+				text: `[ATTACHED FILE: ${fileName}]\nType: ${fileType}\nURL: ${fileUrl}\n\nIMPORTANT: This is an attached ${fileType === 'application/pdf' ? 'PDF' : 'document'}. Use extract_text_from_pdf tool with the URL above to access its content before analyzing.`
+			}
 		}
 		
 		// Unknown part type: pass through

@@ -145,6 +145,15 @@ export async function uploadFile(
     throw new Error(`Error uploading file: ${error.message}`)
   }
 
+  // Always try to return a signed URL so private buckets work out of the box.
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from("chat-attachments")
+    .createSignedUrl(filePath, 60 * 60 * 24 * 30) // 30 días
+
+  if (!signedError && signedData?.signedUrl) {
+    return signedData.signedUrl
+  }
+
   const {
     data: { publicUrl },
   } = supabase.storage.from("chat-attachments").getPublicUrl(filePath)

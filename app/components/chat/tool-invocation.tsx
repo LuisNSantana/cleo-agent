@@ -24,6 +24,7 @@ import {
   isDelegationToolInvocation, 
   extractDelegationInfo 
 } from "@/app/components/chat/delegation-display"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const StockChartViewer = dynamic(() => import("@/components/markets/stock-chart-viewer"), { ssr: false })
 
@@ -594,6 +595,39 @@ function SingleToolCard({
     return "No result data available"
   }
 
+  const parameterPreview = useMemo(() => {
+    if (!args || Object.keys(args).length === 0) {
+      return "Sin parámetros declarados"
+    }
+    return Object.entries(args)
+      .slice(0, 4)
+      .map(([key, value]) => {
+        const serialized =
+          typeof value === "string"
+            ? value
+            : JSON.stringify(value, null, 2)
+        return `${key}: ${serialized}`.slice(0, 120)
+      })
+      .join("\n")
+  }, [args])
+
+  const resultPreview = useMemo(() => {
+    if (!parsedResult) return null
+    if (typeof parsedResult === "string") {
+      return parsedResult.replace(/\s+/g, " ").trim()
+    }
+    if (typeof parsedResult === "object") {
+      const candidate =
+        (parsedResult as any).summary ||
+        (parsedResult as any).text ||
+        (parsedResult as any).result
+      if (typeof candidate === "string") {
+        return candidate.replace(/\s+/g, " ").trim()
+      }
+    }
+    return null
+  }, [parsedResult])
+
   return (
     <div
       className={cn(
@@ -636,7 +670,16 @@ function SingleToolCard({
             const ToolIcon = getToolIcon(toolName)
             return <ToolIcon className="text-muted-foreground size-4" />
           })()}
-          <span className="font-mono text-sm">{toolName}</span>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <span className="font-mono text-sm cursor-help">
+                {toolName}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-pre-wrap text-xs">
+              {parameterPreview}
+            </TooltipContent>
+          </Tooltip>
           {delegationAgentId ? (
             <span className="text-muted-foreground hidden text-sm sm:inline">
               · {getAgentMetadata(delegationAgentId).name}
@@ -684,6 +727,11 @@ function SingleToolCard({
           )}
         />
       </button>
+      {!isExpanded && resultPreview && (
+        <div className="mx-3 mb-1 text-[11px] text-muted-foreground/80 line-clamp-2">
+          {resultPreview}
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isExpanded && (

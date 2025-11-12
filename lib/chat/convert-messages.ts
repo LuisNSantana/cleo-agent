@@ -1,6 +1,6 @@
 import type { CoreMessage } from "ai"
 
-export async function convertUserMultimodalMessages(messages: CoreMessage[], model: string, modelVision: boolean) {
+export async function convertUserMultimodalMessages(messages: CoreMessage[], model: string, modelVision: boolean): Promise<any[]> {
   // Count input images for diagnostics
   let inputImageCount = 0
   messages.forEach((msg) => {
@@ -89,6 +89,19 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
                   }
                 }
 
+                // ✅ FIX: HTTP URLs (Supabase Storage) should be preserved as file parts
+                // so tools like extract_text_from_pdf can download and process them
+                if (typedPart.url.startsWith("http://") || typedPart.url.startsWith("https://")) {
+                  console.log(`📋 ✅ [PDF] Preserving HTTP URL as file part: ${typedPart.url.substring(0, 80)}...`)
+                  return {
+                    type: "file" as const,
+                    url: typedPart.url,
+                    name: fileName,
+                    mediaType: fileType
+                  }
+                }
+
+                // Only process data URLs (base64) - extract text for immediate use
                 let documentContent = ""
                 try {
                   if (typedPart.url.startsWith("data:")) {
@@ -136,7 +149,10 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
         )
 
         const filteredContent = convertedContent.filter(
-          (part) => (part.type === "text" && part.text !== "") || part.type === "image"
+          (part) => 
+            (part.type === "text" && part.text !== "") || 
+            part.type === "image" ||
+            part.type === "file" // ✅ FIX: Preserve file parts (PDFs, docs with HTTP URLs)
         )
 
         if (filteredContent.length === 0) {

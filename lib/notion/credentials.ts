@@ -86,14 +86,20 @@ export async function listNotionKeys(userId: string) {
     
     return { 
       success: true, 
-      data: (data || []).map(r => ({
-        id: r.id,
-        label: (r.account_info as any)?.label || 'primary',
-        api_key: '', // Don't expose encrypted key in list view
-        is_active: r.connected,
-        created_at: r.created_at,
-        updated_at: r.updated_at
-      }))
+      data: (data || []).map(r => {
+        const accountInfo = r.account_info as any
+        const hasError = accountInfo?.error === 'encryption_key_rotated'
+        return {
+          id: r.id,
+          label: hasError ? `${accountInfo?.label || 'primary'} (Needs Re-auth)` : (accountInfo?.label || 'primary'),
+          api_key: '', // Don't expose encrypted key in list view
+          is_active: r.connected,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          needs_reauth: hasError,
+          error_message: accountInfo?.message
+        }
+      })
     }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
@@ -182,22 +188,59 @@ export async function getActiveNotionKey(userId: string): Promise<string | null>
     const raw = String(data.access_token)
     const parts = raw.split(':')
     console.log('[Notion][getActiveNotionKey] Raw token parts:', parts.length)
-    if (parts.length === 3) {
-      const [encryptedText, authTag, iv] = parts
-      const encryptedWithTag = `${encryptedText}:${authTag}`
-      return decryptKey(encryptedWithTag, iv)
+    
+    // Attempt decryption with better error handling
+    try {
+      if (parts.length === 3) {
+        const [encryptedText, authTag, iv] = parts
+        const encryptedWithTag = `${encryptedText}:${authTag}`
+        return decryptKey(encryptedWithTag, iv)
+      }
+      if (parts.length === 2) {
+        const [encryptedWithTag, iv] = parts
+        return decryptKey(encryptedWithTag, iv)
+      }
+      if (parts.length > 3) {
+        const iv = parts.pop() as string
+        const authTag = parts.pop() as string
+        const encryptedText = parts.join(':')
+        const encryptedWithTag = `${encryptedText}:${authTag}`
+        return decryptKey(encryptedWithTag, iv)
+      }
+    } catch (decryptError) {
+      // Decryption failed - likely due to ENCRYPTION_KEY rotation
+      console.error('[Notion][getActiveNotionKey] Decryption failed - credentials need to be re-saved:', decryptError)
+      
+      // Get existing account_info to preserve label
+      const { data: existingData } = await supabase
+        .from('user_service_connections')
+        .select('account_info')
+        .eq('user_id', userId)
+        .eq('service_id', SERVICE_ID)
+        .eq('connected', true)
+        .limit(1)
+        .single()
+      
+      const existingAccountInfo = (existingData?.account_info as any) || {}
+      
+      // Mark credential as disconnected and store error info in account_info
+      await supabase
+        .from('user_service_connections')
+        .update({ 
+          connected: false,
+          account_info: { 
+            ...existingAccountInfo,
+            error: 'encryption_key_rotated',
+            message: 'Credentials need to be re-saved due to encryption key update',
+            timestamp: new Date().toISOString()
+          }
+        })
+        .eq('user_id', userId)
+        .eq('service_id', SERVICE_ID)
+      
+      return null
     }
-    if (parts.length === 2) {
-      const [encryptedWithTag, iv] = parts
-      return decryptKey(encryptedWithTag, iv)
-    }
-    if (parts.length > 3) {
-      const iv = parts.pop() as string
-      const authTag = parts.pop() as string
-      const encryptedText = parts.join(':')
-      const encryptedWithTag = `${encryptedText}:${authTag}`
-      return decryptKey(encryptedWithTag, iv)
-    }
+    
     return null
   } catch (err) {
     console.error('[Notion][getActiveNotionKey] Exception:', err)

@@ -16,6 +16,7 @@ const BASE_TOOLS = [
   'getCurrentDateTime', // Time/timezone
   'weatherInfo', // Weather data
   'randomFact', // Fun facts
+  'extract_text_from_pdf', // ✅ PDF extraction for direct document analysis
 ]
 
 // Legacy delegation tools for backward compatibility

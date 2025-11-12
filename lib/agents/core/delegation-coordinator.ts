@@ -330,12 +330,40 @@ export class DelegationCoordinator {
       const historyLimit = isSimpleTask ? 3 : 10
       const recentHistory = conversationHistory.slice(-historyLimit)
 
+      // 🔧 CRITICAL FIX: Preserve multimodal parts (images, PDFs, etc.) from original message
+      // Find the last HumanMessage in conversationHistory that has multimodal content
+      let delegationTaskMessage: any
+      const lastHumanMsg = conversationHistory
+        .slice()
+        .reverse()
+        .find((msg: any) => msg._getType && msg._getType() === 'human')
+      
+      // If original message has multimodal parts, preserve them in delegation
+      if (lastHumanMsg && Array.isArray((lastHumanMsg as any).content)) {
+        logger.debug('🎯 [DELEGATION] Preserving multimodal parts from original message', {
+          partsCount: (lastHumanMsg as any).content.length,
+          types: (lastHumanMsg as any).content.map((p: any) => p.type)
+        })
+        
+        // Create new message with preserved multimodal content + delegation task
+        const originalParts = (lastHumanMsg as any).content
+        delegationTaskMessage = new HumanMessage({ 
+          content: [
+            { type: 'text', text: delegationData.task },
+            ...originalParts.filter((p: any) => p.type !== 'text') // Keep images, files, etc.
+          ]
+        })
+      } else {
+        // Fallback: text-only message (original behavior)
+        delegationTaskMessage = new HumanMessage({ content: delegationData.task })
+      }
+
       const delegationMessageHistory = [
         ...recentHistory,
         new SystemMessage({
           content: `You have been delegated a task by ${delegationData.sourceAgent}. ${delegationData.context ? `Context: ${delegationData.context}` : ''}`
         }),
-        new HumanMessage({ content: delegationData.task })
+        delegationTaskMessage
       ]
 
       logger.debug('🔍 [DELEGATION CONTEXT] Building context with conversation history:', {

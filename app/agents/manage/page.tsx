@@ -5,10 +5,8 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { AgentCRUDPanel } from '@/app/components/layout/settings/agents/AgentCRUDPanel'
-import { ShopifyCredentialsManager, SkyvernCredentialsManager, NotionCredentialsManager } from '@/components/common/CredentialsManager'
+import { ShopifyCredentialsManager, NotionCredentialsManager } from '@/components/common/CredentialsManager'
 import { TwitterCredentialsManager } from '@/components/twitter/twitter-credentials-manager'
-import dynamic from 'next/dynamic'
-const SerpapiCredentialsManager = dynamic(()=>import('@/components/serpapi/serpapi-credentials-manager').then(m=>m.SerpapiCredentialsManager), { ssr:false })
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { PlusIcon, RobotIcon, GearSix, Key, Users } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -317,15 +315,101 @@ export default function AgentsManagePage() {
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold text-foreground">Agent credentials</h2>
                   <p className="text-sm text-muted-foreground">
-                    Manage API keys and credentials for your specialized agents. Each agent requires specific credentials to access external services.
+                    Connect external services to unlock specialized agent capabilities. Most integrations use secure OAuth2 authentication.
                   </p>
                 </div>
-                <div className="grid gap-5 lg:grid-cols-1 xl:grid-cols-2">
-                  <ShopifyCredentialsManager />
-                  <SkyvernCredentialsManager />
-                  <SerpapiCredentialsManager />
-                  <NotionCredentialsManager />
-                  <TwitterCredentialsManager />
+
+                {/* Manual API Key Section - Shopify Only */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="text-lg font-medium text-foreground">API Keys</h3>
+                  </div>
+                  <div className="grid gap-4">
+                    <ShopifyCredentialsManager />
+                  </div>
+                </div>
+
+                {/* OAuth2 Connections Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <GearSix className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="text-lg font-medium text-foreground">OAuth2 Connections</h3>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Notion OAuth2 Card */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-border/60 bg-card/60 p-5 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50">
+                            <span className="text-xl">📝</span>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">Notion</h4>
+                            <p className="text-xs text-muted-foreground">Document management</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-500">
+                          <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                          OAuth2
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Connect your Notion workspace to enable document reading, writing, and database operations.
+                      </p>
+                      <NotionCredentialsManager />
+                    </motion.div>
+
+                    {/* Twitter OAuth2 Card */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="rounded-xl border border-border/60 bg-card/60 p-5 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50">
+                            <span className="text-xl">𝕏</span>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">Twitter / X</h4>
+                            <p className="text-xs text-muted-foreground">Social media automation</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-500">
+                          <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                          OAuth2
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Authorize access to post tweets, read timelines, and manage your Twitter presence.
+                      </p>
+                      <TwitterCredentialsManager />
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Info Card */}
+                <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+                      <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-foreground mb-1">About OAuth2</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        OAuth2 connections are more secure than API keys because they use temporary tokens that can be revoked anytime. 
+                        You'll be redirected to the service's website to authorize access without sharing your password.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -21,6 +21,7 @@ import { useMemo } from 'react'
 import { PipelineTimeline, type PipelineStep } from '@/app/components/chat/pipeline-timeline'
 import { OptimizationInsights, extractPipelineOptimizations } from '@/app/components/chat/optimization-insights'
 import { Loader } from '@/components/prompt-kit/loader'
+import { Button } from "@/components/ui/button"
 // ❌ REMOVED: ApprovalMessage (duplicate form, using ConfirmationPanel instead)
 // import { ApprovalMessage } from '@/app/components/chat/approval-message'
 
@@ -357,7 +358,6 @@ export function MessageAssistant({
             isStreaming={status === "streaming"}
           />
         )}
-
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
   {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (

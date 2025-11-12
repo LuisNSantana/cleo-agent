@@ -235,9 +235,17 @@ function StepContent({ step }: { step: PipelineStep }) {
   )
 }
 
-export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; className?: string }) {
+type PipelineTimelineProps = {
+  steps: PipelineStep[]
+  className?: string
+  onPause?: () => void
+  onResume?: () => void
+}
+
+export function PipelineTimeline({ steps, className, onPause, onResume }: PipelineTimelineProps) {
   // ✅ Vista colapsada por defecto con diseño minimalista
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
 
   const normalized = useMemo(() => {
     const filtered = (steps || [])
@@ -485,11 +493,36 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
     return () => clearInterval(interval)
   }, [summaryStep])
 
-  // Show all unique steps when expanded; when collapsed show just the latest live step
+  // Show all unique steps when expanded and keep a compact preview for collapsed mode
   const hasSteps = uniqueSteps.length > 0
-  const VISIBLE_LIMIT = 12
-  const visibleSteps = isExpanded ? uniqueSteps.slice(-VISIBLE_LIMIT) : []
-  const hiddenCount = Math.max(0, uniqueSteps.length - VISIBLE_LIMIT)
+  const visibleSteps = isExpanded ? uniqueSteps : []
+  const compactSteps = useMemo(() => uniqueSteps.slice(-3), [uniqueSteps])
+
+  const estimatedRemainingSeconds = useMemo(() => {
+    if (!summaryStep) return null
+    const explicit = summaryStep.metadata?.etaSeconds ?? summaryStep.metadata?.estimatedRemainingSeconds
+    if (typeof explicit === 'number' && !Number.isNaN(explicit)) {
+      return explicit
+    }
+    if (metrics.completedSteps === 0 || metrics.totalSteps === 0) return null
+    const avgStepDuration = metrics.totalTime / Math.max(1, metrics.completedSteps)
+    const remainingSteps = Math.max(0, metrics.totalSteps - metrics.completedSteps)
+    return Math.max(1, Math.round(avgStepDuration * remainingSteps))
+  }, [summaryStep, metrics])
+
+  const expectedCompletionLabel = estimatedRemainingSeconds ? formatDuration(estimatedRemainingSeconds) : null
+
+  const handlePauseToggle = () => {
+    setIsPaused((prev) => {
+      const next = !prev
+      if (next) {
+        onPause?.()
+      } else {
+        onResume?.()
+      }
+      return next
+    })
+  }
 
   if (!hasSteps) return null
 
@@ -540,7 +573,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
             )}
           </div>
           {hasSteps && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {/* ✅ Global progress bar */}
               {!isPipelineCompleted(uniqueSteps) && metrics.totalSteps > 0 && (
                 <div className="flex items-center gap-1.5">
@@ -557,6 +590,22 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                   </span>
                 </div>
               )}
+              {expectedCompletionLabel && (
+                <span className="text-[10px] text-muted-foreground/70 font-medium">
+                  ETA ~ {expectedCompletionLabel}
+                </span>
+              )}
+              <button
+                onClick={handlePauseToggle}
+                className={cn(
+                  "text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border transition-colors",
+                  isPaused
+                    ? "border-emerald-300/60 text-emerald-500/90 hover:bg-emerald-500/10"
+                    : "border-primary/40 text-primary hover:bg-primary/10"
+                )}
+              >
+                {isPaused ? "Reanudar" : "Pausar"}
+              </button>
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="text-muted-foreground/60 hover:text-foreground text-[10px] uppercase tracking-wide font-medium transition-colors flex items-center gap-1"
@@ -670,19 +719,33 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
             </div>
           </motion.div>
         )}
+        {!isExpanded && compactSteps.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {compactSteps.map((step) => (
+              <div
+                key={step.id}
+                className="flex items-center gap-2 text-xs text-muted-foreground/80 bg-muted/10 rounded-lg px-3 py-1.5"
+              >
+                <StatusDot action={step.action} />
+                <span className="font-medium text-foreground/80">
+                  {actionLabel(step.action)}
+                </span>
+                <span className="text-[11px] truncate flex-1">
+                  {step.agentName || getAgentMetadata(step.agent).name}
+                </span>
+                {step.metadata?.toolName && (
+                  <code className="text-[10px] bg-background/80 px-1 py-0.5 rounded border border-border/40">
+                    {step.metadata.toolName}
+                  </code>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {isExpanded && (
           <ul className="grid gap-1.5">
             <AnimatePresence initial={false}>
               {visibleSteps.map((s, index) => {
-                console.log('🎨 [EXPANDABLE-STEP] Rendering step:', {
-                  id: s.id,
-                  action: s.action,
-                  hasMetadata: !!s.metadata,
-                  hasReasoningBlocks: !!s.metadata?.reasoningBlocks,
-                  hasToolName: !!s.metadata?.toolName,
-                  canonical: s.metadata?.canonical
-                })
-                
                 const meta = getAgentMetadata(s.agent, s.agentName)
                 const isActive = index === visibleSteps.length - 1 // Last step is active
                 
@@ -695,6 +758,24 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                 const toolResult = s.metadata?.toolResult
                 const toolError = s.metadata?.toolError
                 const toolStatus = s.metadata?.toolStatus || (toolError ? 'error' : 'success')
+                const stepDurationSeconds =
+                  typeof s.metadata?.executionTime === 'number'
+                    ? s.metadata.executionTime
+                    : (() => {
+                        const next = visibleSteps[index + 1]
+                        if (!next) return undefined
+                        const diff =
+                          (new Date(next.timestamp).getTime() -
+                            new Date(s.timestamp).getTime()) /
+                          1000
+                        return diff > 0 ? Math.round(diff) : undefined
+                      })()
+                const etaSeconds =
+                  typeof s.metadata?.etaSeconds === 'number'
+                    ? s.metadata.etaSeconds
+                    : typeof s.metadata?.estimatedRemainingSeconds === 'number'
+                    ? s.metadata.estimatedRemainingSeconds
+                    : undefined
                 
                 // Generate ExpandableStep children
                 const stepChildren = (
@@ -710,6 +791,7 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                         result={toolResult}
                         error={toolError}
                         status={toolStatus as any}
+                        executionTime={stepDurationSeconds}
                       />
                     )}
                   </div>
@@ -737,6 +819,26 @@ export function PipelineTimeline({ steps, className }: { steps: PipelineStep[]; 
                     }}
                     defaultExpanded={isActive} // Auto-expand active step
                   >
+                    {(stepDurationSeconds || etaSeconds) && (
+                      <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground/80 mb-2">
+                        {stepDurationSeconds && (
+                          <span className="inline-flex items-center gap-1">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Duración {formatDuration(stepDurationSeconds)}
+                          </span>
+                        )}
+                        {etaSeconds && (
+                          <span className="inline-flex items-center gap-1">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                            </svg>
+                            ETA {formatDuration(etaSeconds)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Main Content */}
                     {s.content && (

@@ -1690,7 +1690,8 @@ export function useChatCore({
           for (const file of processedFiles) {
             const key = `${file.name}|${file.type}`
             if (uploadedKeySet.has(key)) continue // already uploaded
-            // Convert file to data URL
+            
+            // Convert to data URL for inline attachments (images work inline)
             const dataUrl = await new Promise<string>((resolve) => {
               const reader = new FileReader()
               reader.onload = (e) => resolve(e.target?.result as string)

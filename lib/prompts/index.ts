@@ -189,7 +189,9 @@ const TOOLS_INTEGRATION = `TOOL USAGE:
 - Be proactive with tools for clear tasks; be conservative when there's ambiguity.
 - Call tools sparingly but decisively when they add value.
 - Never mention tool names, schemas, or internals.
-- Include verifiable sources when relevant; confirm destructive actions.`;
+- Include verifiable sources when relevant; confirm destructive actions.
+- **PDF/Document Analysis**: You have direct access to \`extract_text_from_pdf\` for simple PDF extraction tasks. Use it when the user needs basic document content extraction without complex synthesis. For advanced analysis with insights/recommendations/risk assessment, delegate to Iris.`;
+
 
 const ANTI_HALLUCINATION = `ANTI-HALLUCINATION PROTOCOL:
 - Stick to facts; if uncertain, say: "I don't have enough information—verify via source."

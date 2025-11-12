@@ -75,12 +75,28 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
             if (toolName === 'extract_text_from_pdf') {
               const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
               const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+              console.log('🔧 [PDF Tool] Normalizing parameters:', {
+                toolName,
+                hasLastUrl: !!lastUrl,
+                lastUrlPreview: lastUrl?.slice(0, 100),
+                provided: provided?.slice(0, 100),
+                looksTruncated
+              })
               if (!provided && lastUrl) {
+                console.log('✅ [PDF Tool] Injecting lastAttachmentUrl as url parameter')
                 params.url = lastUrl
                 delete params.pdfDataUrl
               } else if (looksTruncated && lastUrl) {
+                console.log('✅ [PDF Tool] Replacing truncated placeholder with lastAttachmentUrl')
                 params.url = lastUrl
                 delete params.pdfDataUrl
+              } else if (provided && provided.startsWith('data:')) {
+                console.warn('⚠️ [PDF Tool] data: URL provided - will likely fail. lastUrl available:', !!lastUrl)
+                if (lastUrl && (lastUrl.startsWith('http://') || lastUrl.startsWith('https://'))) {
+                  console.log('✅ [PDF Tool] Replacing data: URL with HTTP URL from lastAttachmentUrl')
+                  params.url = lastUrl
+                  delete params.pdfDataUrl
+                }
               }
             }
             if (toolName === 'firecrawl_analyze_pdf') {
@@ -116,12 +132,28 @@ export function wrapToolExecuteWithRequestContext(toolName: string, toolDef: any
             if (toolName === 'extract_text_from_pdf') {
               const provided = (params.url as string | undefined) || (params.pdfDataUrl as string | undefined)
               const looksTruncated = typeof provided === 'string' && provided.includes('[base64_encoded_pdf_content_from_attachment]')
+              console.log('🔧 [PDF Tool] Normalizing parameters (with context):', {
+                toolName,
+                hasLastUrl: !!lastUrl,
+                lastUrlPreview: lastUrl?.slice(0, 100),
+                provided: provided?.slice(0, 100),
+                looksTruncated
+              })
               if (!provided && lastUrl) {
+                console.log('✅ [PDF Tool] Injecting lastAttachmentUrl as url parameter')
                 params.url = lastUrl
                 delete params.pdfDataUrl
               } else if (looksTruncated && lastUrl) {
+                console.log('✅ [PDF Tool] Replacing truncated placeholder with lastAttachmentUrl')
                 params.url = lastUrl
                 delete params.pdfDataUrl
+              } else if (provided && provided.startsWith('data:')) {
+                console.warn('⚠️ [PDF Tool] data: URL provided - will likely fail. lastUrl available:', !!lastUrl)
+                if (lastUrl && (lastUrl.startsWith('http://') || lastUrl.startsWith('https://'))) {
+                  console.log('✅ [PDF Tool] Replacing data: URL with HTTP URL from lastAttachmentUrl')
+                  params.url = lastUrl
+                  delete params.pdfDataUrl
+                }
               }
             }
             if (toolName === 'firecrawl_analyze_pdf') {

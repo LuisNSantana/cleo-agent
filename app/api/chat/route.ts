@@ -151,21 +151,37 @@ export async function POST(req: Request) {
     try {
       const anyUser = userMessage as any
       const atts = Array.isArray(anyUser?.experimental_attachments) ? anyUser.experimental_attachments : undefined
+      chatLogger.debug('🔍 [PDF] Checking attachments', { 
+        hasAtts: !!atts, 
+        count: atts?.length,
+        types: atts?.map((a: any) => a?.contentType)
+      })
       const pdfAtt = atts?.find((a: any) => typeof a?.url === 'string' && (a?.contentType?.includes('pdf') || a?.url?.startsWith('http')))
       if (pdfAtt && typeof pdfAtt.url === 'string') {
-        ;(globalThis as any).__lastAttachmentUrl = pdfAtt.url
-        chatLogger.debug('PDF attachment detected for Iris preference')
+        // Only use HTTP(S) URLs, not data URLs
+        if (pdfAtt.url.startsWith('http://') || pdfAtt.url.startsWith('https://')) {
+          ;(globalThis as any).__lastAttachmentUrl = pdfAtt.url
+          chatLogger.info('✅ [PDF] Attachment detected for tool', { 
+            url: pdfAtt.url.slice(0, 100),
+            contentType: pdfAtt.contentType 
+          })
+        } else if (pdfAtt.url.startsWith('data:')) {
+          chatLogger.warn('⚠️ [PDF] data: URL detected - this will fail extraction. Need http(s) URL')
+          // Don't set the global URL for data URLs
+        }
       } else {
         // Also scan multimodal parts for data URLs
         if (Array.isArray((anyUser as any)?.parts)) {
           const partPdf = (anyUser as any).parts.find((p: any) => p?.type === 'file' && (p?.mediaType?.includes('pdf') || (typeof p?.url === 'string' && p.url.startsWith('http'))))
-          if (partPdf?.url) {
+          if (partPdf?.url && (partPdf.url.startsWith('http://') || partPdf.url.startsWith('https://'))) {
             ;(globalThis as any).__lastAttachmentUrl = partPdf.url
-            chatLogger.debug('PDF attachment detected in parts for Iris preference')
+            chatLogger.info('✅ [PDF] Attachment detected in parts', { url: partPdf.url.slice(0, 100) })
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      chatLogger.error('Error extracting PDF attachment', e as Error)
+    }
     
     if (userMessageText && isImageModel) {
       chatLogger.info('Image generation model detected', { 
