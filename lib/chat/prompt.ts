@@ -157,12 +157,17 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
       if (delegationDecision.shouldDelegate && delegationDecision.targetAgent) {
         const normalize = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_')
 
-        // Get dynamic agent mapping from database (may fail in local/dev without service key)
-        const { getDynamicAgentMapping } = await import('@/lib/agents/dynamic-delegation')
-        const agentMap = await getDynamicAgentMapping()
-
         const decisionKey = delegationDecision.targetAgent.toLowerCase()
-        let toolName = agentMap[decisionKey]
+        let toolName: string | undefined
+
+        // Get dynamic agent mapping from database (may fail in local/dev without service key)
+        try {
+          const { getDynamicAgentMapping } = await import('@/lib/agents/dynamic-delegation')
+          const agentMap = await getDynamicAgentMapping({ userId })
+          toolName = agentMap[decisionKey]
+        } catch (mappingError) {
+          console.warn('[DELEGATION] Unable to get dynamic agent mapping', mappingError)
+        }
 
         // Fallback: attempt to resolve via agent loader (covers custom agents when DB mapping unavailable)
         if (!toolName && userId) {
@@ -361,7 +366,7 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     baseSystemPrompt = SYSTEM_PROMPT_DEFAULT,
     model,
     messages,
-    supabase,
+    supabase: supabaseClient,
     realUserId,
     threadId,  // ✅ Thread isolation
     enableSearch,
@@ -369,6 +374,8 @@ export async function buildFinalSystemPrompt(params: BuildPromptParams) {
     projectId,
     debugRag,
   } = params
+
+  const supabase = supabaseClient
 
   console.log(`🔍 buildFinalSystemPrompt called with:`, {
     model,

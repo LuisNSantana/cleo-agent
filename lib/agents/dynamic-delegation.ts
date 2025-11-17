@@ -1,61 +1,83 @@
-import { createClient } from '@/lib/supabase/server-admin'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Cache for agent mapping to avoid repeated DB queries
-let agentMapCache: Record<string, string> | null = null
-let lastCacheUpdate = 0
+type Supabase = SupabaseClient<any, 'public', any>
+
+type AgentMappingCacheEntry = {
+  data: Record<string, string>
+  expiresAt: number
+}
+
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const CACHE_KEY_GLOBAL = '__predefined__'
+const agentMapCache = new Map<string, AgentMappingCacheEntry>()
+
+type MappingOptions = {
+  userId?: string | null
+  supabase?: Supabase | null
+}
 
 /**
- * Get dynamic agent mapping from database
- * Returns a mapping of agent names to their delegation tool names
+ * Normalize IDs to tool-safe format (letters, numbers, underscores)
  */
-export async function getDynamicAgentMapping(): Promise<Record<string, string>> {
+function sanitizeAgentId(id: string): string {
+  return (id || '').replace(/[^a-zA-Z0-9]/g, '_')
+}
+
+/**
+ * Get dynamic agent mapping from Supabase (scoped per user)
+ * Returns a mapping of agent identifiers (name/id) to delegate tool names
+ */
+export async function getDynamicAgentMapping(options: MappingOptions = {}): Promise<Record<string, string>> {
+  const { userId, supabase } = options
+  const cacheKey = userId || CACHE_KEY_GLOBAL
   const now = Date.now()
+  const cached = agentMapCache.get(cacheKey)
   
-  // Return cached mapping if still valid
-  if (agentMapCache && (now - lastCacheUpdate) < CACHE_TTL) {
-    return agentMapCache
+  if (cached && cached.expiresAt > now) {
+    return cached.data
+  }
+
+  const baseMap: Record<string, string> = { ...getStaticAgentMapping() }
+
+  // Without a valid user/supabase context, return predefined mapping only
+  if (!userId || !supabase) {
+    agentMapCache.set(cacheKey, { data: baseMap, expiresAt: now + CACHE_TTL })
+    return baseMap
   }
 
   try {
-    const supabase = createClient()
-    
-    // Get all agents from database
     const { data: agents, error } = await supabase
       .from('agents')
       .select('id, name')
-    
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
     if (error) {
-      console.error('Error fetching agents for dynamic mapping:', error)
-      return getStaticAgentMapping()
+      console.error('[DYNAMIC DELEGATION] Failed to fetch user agents for mapping:', error)
+      agentMapCache.set(cacheKey, { data: baseMap, expiresAt: now + CACHE_TTL })
+      return baseMap
     }
 
-    if (!agents || agents.length === 0) {
-      console.warn('No agents found in database, using static mapping')
-      return getStaticAgentMapping()
-    }
+    for (const agent of agents || []) {
+      if (!agent?.id) continue
+      const toolName = `delegate_to_${sanitizeAgentId(agent.id)}`
 
-    // Build dynamic mapping
-    const dynamicMap: Record<string, string> = {}
-    
-    agents.forEach(agent => {
-      if (agent.name && agent.id) {
-        const lowerName = agent.name.toLowerCase()
-        const toolName = `delegate_to_${agent.id.replace(/[^a-zA-Z0-9]/g, '_')}`
-        dynamicMap[lowerName] = toolName
+      if (agent.name) {
+        baseMap[agent.name.toLowerCase()] = toolName
       }
-    })
 
-    // Update cache
-    agentMapCache = dynamicMap
-    lastCacheUpdate = now
+      // Allow lookups by raw UUID or sanitized form for safety
+      baseMap[agent.id.toLowerCase()] = toolName
+      baseMap[sanitizeAgentId(agent.id).toLowerCase()] = toolName
+    }
 
-    console.log('🔄 [DYNAMIC DELEGATION] Updated agent mapping:', Object.keys(dynamicMap))
-    return dynamicMap
-
+    agentMapCache.set(cacheKey, { data: baseMap, expiresAt: now + CACHE_TTL })
+    return baseMap
   } catch (error) {
-    console.error('Error building dynamic agent mapping:', error)
-    return getStaticAgentMapping()
+    console.error('[DYNAMIC DELEGATION] Error building agent mapping:', error)
+    agentMapCache.set(cacheKey, { data: baseMap, expiresAt: now + CACHE_TTL })
+    return baseMap
   }
 }
 
@@ -79,32 +101,19 @@ function getStaticAgentMapping(): Record<string, string> {
 /**
  * Clear the agent mapping cache to force refresh
  */
-export function clearAgentMappingCache(): void {
-  agentMapCache = null
-  lastCacheUpdate = 0
-  console.log('🔄 [DYNAMIC DELEGATION] Agent mapping cache cleared')
+export function clearAgentMappingCache(userId?: string | null): void {
+  if (userId) {
+    agentMapCache.delete(userId)
+  } else {
+    agentMapCache.clear()
+  }
+  console.log('🔄 [DYNAMIC DELEGATION] Agent mapping cache cleared', userId ? `(user: ${userId})` : '')
 }
 
 /**
  * Get all available agent names from database
  */
-export async function getAvailableAgentNames(): Promise<string[]> {
-  try {
-    const supabase = createClient()
-    
-    const { data: agents, error } = await supabase
-      .from('agents')
-      .select('name')
-      .order('name')
-    
-    if (error) {
-      console.error('Error fetching agent names:', error)
-      return ['ami', 'peter', 'emma', 'apu', 'wex', 'astra'] // fallback
-    }
-
-    return agents?.map(a => a.name?.toLowerCase()).filter(Boolean) || []
-  } catch (error) {
-    console.error('Error getting available agent names:', error)
-    return ['ami', 'peter', 'emma', 'apu', 'wex', 'astra'] // fallback
-  }
+export async function getAvailableAgentNames(options: MappingOptions = {}): Promise<string[]> {
+  const map = await getDynamicAgentMapping(options)
+  return Object.keys(map)
 }

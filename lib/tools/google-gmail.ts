@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { trackToolUsage } from '@/lib/analytics'
 import { getCurrentUserId } from '@/lib/server/request-context'
 
@@ -13,18 +13,28 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
   if (cached && cached.expiry > Date.now()) return cached.token
 
   try {
-    const supabase = await createClient()
-    if (!supabase) return null
-
-    const { data, error } = await (supabase as any)
+    const supabase = getSupabaseAdmin()
+    const { data, error } = await supabase
       .from('user_service_connections')
       .select('access_token, refresh_token, token_expires_at')
       .eq('user_id', userId)
       .eq('service_id', 'google-workspace')
       .eq('connected', true)
-      .single()
+      .single() as { 
+        data: { 
+          access_token: string | null; 
+          refresh_token: string | null; 
+          token_expires_at: string | null 
+        } | null; 
+        error: any 
+      }
 
-    if (error || !data) return null
+    if (error || !data) {
+      if (error) {
+        console.error('[Gmail] Credential lookup failed:', error)
+      }
+      return null
+    }
 
     const now = Date.now()
     const expiresAt = data.token_expires_at ? new Date(data.token_expires_at).getTime() : 0
@@ -49,7 +59,7 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
 
     if (!refreshRes.ok) {
       // mark disconnected on hard failure
-      await (supabase as any)
+      await supabase
         .from('user_service_connections')
         .update({ connected: false })
         .eq('user_id', userId)
@@ -60,7 +70,7 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
     const tokenData = await refreshRes.json()
     const newExpiry = now + tokenData.expires_in * 1000
 
-    await (supabase as any)
+    await supabase
       .from('user_service_connections')
       .update({ access_token: tokenData.access_token, token_expires_at: new Date(newExpiry).toISOString(), connected: true })
       .eq('user_id', userId)
