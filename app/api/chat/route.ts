@@ -27,6 +27,7 @@ import { setPipelineEventController, clearPipelineEventController } from '@/lib/
 import { getAgentOrchestrator } from '@/lib/agents/agent-orchestrator'
 import { getGlobalOrchestrator as getCoreOrchestrator } from '@/lib/agents/core/orchestrator'
 import { getRuntimeConfig } from '@/lib/agents/runtime-config'
+import { getAgentDisplayName } from '@/lib/agents/id-canonicalization'
 
 // Image generation
 import { isImageGenerationModel } from '@/lib/image-generation/models'
@@ -1535,17 +1536,44 @@ export async function POST(req: Request) {
                       generatedSteps.add(delegationKey)
                       
                       const target = step.metadata.delegatedTo
-                      // Extract TARGET agent name from content "Source delegating to TARGET: ..."
-                      let targetName = 'Agent' // fallback
-                      if (step.content) {
+                      const delegatedId = typeof target === 'string' ? target : undefined
+
+                      let targetName: string | undefined = typeof step.agentName === 'string' && step.agentName.trim()
+                        ? step.agentName.trim()
+                        : undefined
+                      
+                      // Normalize noisy default names and UUID-like placeholders
+                      if (targetName) {
+                        const looksLikeUuid = targetName.length >= 20 && targetName.includes('-')
+                        if (looksLikeUuid || targetName.toLowerCase() === 'agent' || (delegatedId && targetName === delegatedId)) {
+                          targetName = undefined
+                        }
+                      }
+                      
+                      if (!targetName && delegatedId) {
+                        const friendly = getAgentDisplayName(delegatedId)
+                        if (friendly && friendly !== delegatedId) {
+                          targetName = friendly
+                        }
+                      }
+                      
+                      if (!targetName && step.content) {
                         const contentMatch = step.content.match(/delegating to ([^:]+):/i)
-                        if (contentMatch && contentMatch[1]) {
+                        if (contentMatch?.[1]) {
                           const extractedName = contentMatch[1].trim()
-                          // Only use if it doesn't look like a UUID
-                          if (!extractedName.includes('-') || extractedName.length < 20) {
+                          const looksLikeUuid = extractedName.length >= 20 && extractedName.includes('-')
+                          if (!looksLikeUuid) {
                             targetName = extractedName
                           }
                         }
+                      }
+                      
+                      if (!targetName && delegatedId) {
+                        targetName = delegatedId // final fallback before generic label
+                      }
+                      
+                      if (!targetName) {
+                        targetName = 'Agent'
                       }
                       
                       console.log('🔍 [LIVE STEP DEBUG]', { 

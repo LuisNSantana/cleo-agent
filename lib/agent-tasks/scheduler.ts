@@ -447,9 +447,8 @@ export function getSchedulerStats(): SchedulerStats | null {
  * Manually trigger task processing (for testing)
  */
 export async function triggerTaskProcessing(): Promise<void> {
-  if (globalScheduler) {
-    await (globalScheduler as any).processScheduledTasks();
-  }
+  const scheduler = getScheduler();
+  await (scheduler as any).processScheduledTasks();
 }
 
 export { AgentTaskScheduler };
