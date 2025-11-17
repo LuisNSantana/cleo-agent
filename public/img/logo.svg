@@ -1,0 +1,41 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg{fill:#FFFFFF}
+      .frame{fill:none; stroke:#000000; stroke-width:16; stroke-linecap:round; stroke-linejoin:round}
+      .agent{fill:#0A84FF} /* Cambia a #2ECC71 para verde, o #000 para monocromo */
+      .link{stroke:#000000; stroke-width:8; stroke-linecap:round}
+      .type{fill:#000000; font-family:'Inter','Plus Jakarta Sans','Poppins',Arial,sans-serif; font-weight:700}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="420"/>
+  <!-- ICON -->
+  <g transform="translate(150,60)">
+    <!-- hex marco -->
+    <path class="frame" d="M120 40 L210 90 L210 210 L120 260 L30 210 L30 90 Z"/>
+    <!-- nodos/agentes -->
+    <circle class="agent" cx="120" cy="70" r="10"/>
+    <circle class="agent" cx="70" cy="200" r="10"/>
+    <circle class="agent" cx="170" cy="200" r="10"/>
+    <!-- enlaces -->
+    <path class="link" d="M120 70 L70 200 M120 70 L170 200 M70 200 L170 200"/>
+    <!-- “A” implícita con barra -->
+    <path class="frame" d="M70 200 L120 90 L170 200"/>
+    <line class="link" x1="92" y1="165" x2="148" y2="165"/>
+  </g>
+  <!-- HORIZONTAL -->
+  <g transform="translate(420,105)">
+    <g transform="scale(0.95)">
+      <path class="frame" d="M120 40 L210 90 L210 210 L120 260 L30 210 L30 90 Z"/>
+      <circle class="agent" cx="120" cy="70" r="10"/>
+      <circle class="agent" cx="70" cy="200" r="10"/>
+      <circle class="agent" cx="170" cy="200" r="10"/>
+      <path class="link" d="M120 70 L70 200 M120 70 L170 200 M70 200 L170 200"/>
+      <path class="frame" d="M70 200 L120 90 L170 200"/>
+      <line class="link" x1="92" y1="165" x2="148" y2="165"/>
+    </g>
+    <g transform="translate(260,96)">
+      <text class="type" font-size="88">Ankie</text>
+    </g>
+  </g>
+</svg>

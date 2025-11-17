@@ -1,10 +1,13 @@
 import '@/lib/suppress-warnings'
 import pdf from "pdf-parse-debugging-disabled"
 import * as mammoth from "mammoth"
+import { isPdfLikelyScanned, convertPdfPagesToImages, createVisionOcrContent } from './pdf-to-image'
 
 /**
  * Extract text content from PDF buffer with size limits optimized for Grok-4-Fast
  * Grok-4-Fast supports 2M token context window, allowing analysis of multiple large documents
+ * 
+ * ENHANCED: Now includes automatic fallback to vision OCR for scanned PDFs
  */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
@@ -127,10 +130,45 @@ export async function processFileContent(
       }
     }
 
-    // Handle PDF files
+    // Handle PDF files with automatic scanned PDF detection
     if (mimeType === "application/pdf") {
       const pdfBuffer = Buffer.from(base64Data, "base64")
       const extractedText = await extractPdfText(pdfBuffer)
+      
+      // Check if PDF is likely scanned (no/minimal text)
+      const isScanned = isPdfLikelyScanned(extractedText)
+      
+      if (isScanned) {
+        console.log('[PDF-SCAN] Detected scanned PDF, converting to images for OCR...')
+        
+        const imageResult = await convertPdfPagesToImages(pdfBuffer, {
+          maxPages: 3,
+          scale: 2.0,
+          format: 'png'
+        })
+        
+        if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
+          console.log(`[PDF-SCAN] Converted ${imageResult.images.length} pages to images for vision OCR`)
+          
+          // Return special marker for convert-messages.ts to handle
+          const visionOcrMarker = {
+            type: 'pdf_vision_ocr',
+            images: imageResult.images,
+            originalFileName: fileName,
+            totalPages: imageResult.totalPages
+          }
+          
+          return {
+            content: JSON.stringify(visionOcrMarker),
+            type: "image", // Mark as image type for multimodal handling
+            summary: `[PDF ESCANEADO: ${fileName}]\nTipo: ${mimeType}\nEstado: Convertido a ${imageResult.images.length} imágenes para análisis OCR con visión\nPáginas totales: ${imageResult.totalPages}`
+          }
+        } else {
+          console.warn('[PDF-SCAN] Failed to convert scanned PDF to images:', imageResult.error)
+          // Fall through to text extraction result
+        }
+      }
+      
       const summary = createFileSummary(fileName, mimeType, extractedText)
 
       return {

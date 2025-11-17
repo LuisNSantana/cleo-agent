@@ -59,6 +59,12 @@ const nextConfig: NextConfig = withBundleAnalyzer({
               port: "",
               pathname: "/storage/v1/object/public/**",
             },
+            {
+              protocol: "https",
+              hostname: supabaseHost,
+              port: "",
+              pathname: "/storage/v1/object/sign/**",
+            },
           ]
         : []),
       // Avatars and favicons used in Gmail list UI

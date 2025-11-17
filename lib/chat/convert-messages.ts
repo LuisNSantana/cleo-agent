@@ -89,21 +89,47 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
                   }
                 }
 
-                // ✅ FIX: HTTP URLs (Supabase Storage) should be preserved as file parts
-                // so tools like extract_text_from_pdf can download and process them
-                if (typedPart.url.startsWith("http://") || typedPart.url.startsWith("https://")) {
-                  console.log(`📋 ✅ [PDF] Preserving HTTP URL as file part: ${typedPart.url.substring(0, 80)}...`)
-                  return {
-                    type: "file" as const,
-                    url: typedPart.url,
-                    name: fileName,
-                    mediaType: fileType
-                  }
-                }
-
-                // Only process data URLs (base64) - extract text for immediate use
+                // Process PDFs (both HTTP URLs and data URLs)
                 let documentContent = ""
+                let pdfBuffer: Buffer | null = null
+                
                 try {
+                  // Download PDF if it's an HTTP URL (Supabase Storage)
+                  if ((typedPart.url.startsWith("http://") || typedPart.url.startsWith("https://")) && fileType === "application/pdf") {
+                    console.log(`📋 [PDF] Downloading from HTTP URL: ${typedPart.url.substring(0, 80)}...`)
+                    try {
+                      const response = await fetch(typedPart.url)
+                      if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`)
+                      }
+                      const arrayBuffer = await response.arrayBuffer()
+                      const downloadedBuffer = Buffer.from(arrayBuffer)
+                      pdfBuffer = downloadedBuffer
+                      console.log(`📋 [PDF] Downloaded successfully: ${(downloadedBuffer.length / 1024).toFixed(0)} KB`)
+                    } catch (downloadError) {
+                      console.error(`❌ [PDF] Download failed:`, downloadError)
+                      // Fallback: preserve as file part for tool processing
+                      return {
+                        type: "file" as const,
+                        url: typedPart.url,
+                        name: fileName,
+                        mediaType: fileType
+                      }
+                    }
+                  }
+                  
+                  // For non-PDF HTTP URLs, preserve as file parts for tool processing
+                  if ((typedPart.url.startsWith("http://") || typedPart.url.startsWith("https://")) && fileType !== "application/pdf") {
+                    console.log(`📋 [FILE] Preserving HTTP URL as file part: ${typedPart.url.substring(0, 80)}...`)
+                    return {
+                      type: "file" as const,
+                      url: typedPart.url,
+                      name: fileName,
+                      mediaType: fileType
+                    }
+                  }
+
+                  // Process data URLs (base64)
                   if (typedPart.url.startsWith("data:")) {
                     const base64Data = typedPart.url.split(",")[1]
                     if (base64Data) {
@@ -115,28 +141,87 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
                       ) {
                         documentContent = Buffer.from(base64Data, "base64").toString("utf8")
                       } else if (fileType === "application/pdf") {
-                        try {
-                          const pdfBuffer = Buffer.from(base64Data, "base64")
-                          const { extractPdfText } = await import("@/lib/file-processing")
-                          const extractedText = await extractPdfText(pdfBuffer)
-                          documentContent = extractedText
-                        } catch (error) {
-                          if (model === "grok-3-mini" || model === "gpt-5-mini-2025-08-07") {
-                            documentContent = `[ARCHIVO PDF - ${fileName}]\n\n⚠️ El PDF es demasiado grande para procesar automáticamente.\n\nOpciones: pregunta específica, capturas de páginas, archivo <20 págs, o pega texto.`
-                          } else {
-                            documentContent = `[PDF Document: ${fileName}] - Documento grande. Usa Faster/Smarter o convierte a texto/imágenes.`
-                          }
-                        }
+                        pdfBuffer = Buffer.from(base64Data, "base64")
                       } else {
                         documentContent = `[Archivo binario: ${fileName}. Tipo: ${fileType}]\n\nEste archivo requiere procesamiento especializado. Di qué análisis necesitas.`
                       }
                     }
                   }
+                  
+                  // Process PDF buffer (from HTTP download or data URL)
+                  if (pdfBuffer && fileType === "application/pdf") {
+                    try {
+                      const { extractPdfText } = await import("@/lib/file-processing")
+                      const { isPdfLikelyScanned, convertPdfPagesToImages } = await import("@/lib/pdf-to-image")
+                      
+                      const extractedText = await extractPdfText(pdfBuffer)
+                      console.log(`📋 [PDF] Extracted text length: ${extractedText.length} chars`)
+                      
+                      // Check if PDF is scanned (no/minimal text)
+                      const isScanned = isPdfLikelyScanned(extractedText)
+                      console.log(`📋 [PDF] Is scanned? ${isScanned} (modelVision: ${modelVision})`)
+                      
+                      if (isScanned && modelVision) {
+                        console.log('[PDF-SCAN] Detected scanned PDF in convert-messages, converting to images for vision OCR...')
+                        
+                        const imageResult = await convertPdfPagesToImages(pdfBuffer, {
+                          maxPages: 3,
+                          scale: 2.0,
+                          format: 'png'
+                        })
+                        
+                        if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
+                          console.log(`[PDF-SCAN] Converted ${imageResult.images.length} pages for vision analysis`)
+                          
+                          // Create special marker that will be expanded below
+                          documentContent = `__PDF_VISION_OCR__${JSON.stringify({
+                            images: imageResult.images,
+                            fileName,
+                            totalPages: imageResult.totalPages
+                          })}`
+                        } else {
+                          documentContent = extractedText
+                        }
+                      } else {
+                        documentContent = extractedText
+                      }
+                    } catch (error) {
+                      console.error(`❌ [PDF] Processing error:`, error)
+                      if (model === "grok-3-mini" || model === "gpt-5-mini-2025-08-07") {
+                        documentContent = `[ARCHIVO PDF - ${fileName}]\n\n⚠️ El PDF es demasiado grande para procesar automáticamente.\n\nOpciones: pregunta específica, capturas de páginas, archivo <20 págs, o pega texto.`
+                      } else {
+                        documentContent = `[PDF Document: ${fileName}] - Documento grande. Usa Faster/Smarter o convierte a texto/imágenes.`
+                      }
+                    }
+                  }
                 } catch (error) {
+                  console.error(`❌ [FILE] Processing error:`, error)
                   documentContent = `[Error leyendo el contenido del documento ${fileName}. Intenta subir de nuevo o pega el texto.]`
                 }
 
                 const finalText = `📄 [${fileName}]\n\n${documentContent}`
+                
+                // Check if this is a PDF vision OCR marker
+                if (documentContent.startsWith('__PDF_VISION_OCR__')) {
+                  const markerData = JSON.parse(documentContent.replace('__PDF_VISION_OCR__', ''))
+                  
+                  // Return intro text + all images as separate parts
+                  const parts: any[] = [{
+                    type: "text" as const,
+                    text: `📄 [${markerData.fileName}] - PDF escaneado (${markerData.totalPages} páginas)\n\nAnalizando imágenes de las primeras ${markerData.images.length} páginas con visión OCR...`
+                  }]
+                  
+                  // Add each page as an image
+                  for (const img of markerData.images) {
+                    parts.push({
+                      type: "image" as const,
+                      image: img.base64
+                    })
+                  }
+                  
+                  return parts
+                }
+                
                 return { type: "text" as const, text: finalText }
               }
 
@@ -148,7 +233,10 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
             })
         )
 
-        const filteredContent = convertedContent.filter(
+        // Flatten any arrays (from PDF vision OCR expansion)
+        const flattenedContent = convertedContent.flat()
+
+        const filteredContent = flattenedContent.filter(
           (part) => 
             (part.type === "text" && part.text !== "") || 
             part.type === "image" ||
