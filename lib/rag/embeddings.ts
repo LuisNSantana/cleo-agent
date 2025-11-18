@@ -1,4 +1,14 @@
 import OpenAI from 'openai'
+import { createCircuitBreaker } from '@/lib/resilience/circuit-breaker'
+
+// Circuit breaker for OpenAI embeddings API
+const embeddingsBreaker = createCircuitBreaker('openai-embeddings', {
+  threshold: 5,
+  timeout: 30000, // 30s
+  onStateChange: (from, to) => {
+    console.log(`[OpenAI Embeddings] Circuit breaker: ${from} → ${to}`)
+  }
+})
 
 // Simple LRU cache for embeddings (per-process). Keyed by `${modelId}:${hash(text)}`.
 class EmbeddingLRU {
@@ -70,7 +80,12 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     if (needTexts.length) {
       const client = this.getClient()
-      const res = await client.embeddings.create({ model: this.modelId, input: needTexts }) as any
+      
+      // Wrap OpenAI API call with circuit breaker
+      const res = await embeddingsBreaker.execute(async () => {
+        return client.embeddings.create({ model: this.modelId, input: needTexts }) as any
+      })
+      
       const embs: number[][] = (res.data as any[]).map((d: any) => d.embedding as number[])
       // Fill outputs and cache
       needIdx.forEach((idx, j) => {

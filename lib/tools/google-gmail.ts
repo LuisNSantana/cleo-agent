@@ -3,9 +3,28 @@ import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { trackToolUsage } from '@/lib/analytics'
 import { getCurrentUserId } from '@/lib/server/request-context'
+import { createCircuitBreaker } from '@/lib/resilience/circuit-breaker'
 
 // Simple in-memory token cache (5 min)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
+
+// Circuit breaker for OAuth token refresh
+const tokenRefreshBreaker = createCircuitBreaker('gmail-token-refresh', {
+  threshold: 3,
+  timeout: 60000, // 1 min
+  onStateChange: (from, to) => {
+    console.log(`[Gmail Token Refresh] Circuit breaker: ${from} → ${to}`)
+  }
+})
+
+// Circuit breaker for Gmail API calls
+const gmailApiBreaker = createCircuitBreaker('gmail-api', {
+  threshold: 5,
+  timeout: 30000, // 30s
+  onStateChange: (from, to) => {
+    console.log(`[Gmail API] Circuit breaker: ${from} → ${to}`)
+  }
+})
 
 async function getGmailAccessToken(userId: string): Promise<string | null> {
   const cacheKey = `gmail:${userId}`
@@ -45,16 +64,18 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
 
     if (!data.refresh_token) return null
 
-    // Refresh token
-    const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        refresh_token: data.refresh_token,
-        grant_type: 'refresh_token',
-      }),
+    // Refresh token with circuit breaker protection
+    const refreshRes = await tokenRefreshBreaker.execute(async () => {
+      return fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          refresh_token: data.refresh_token!,
+          grant_type: 'refresh_token',
+        }),
+      })
     })
 
     if (!refreshRes.ok) {
@@ -85,19 +106,22 @@ async function getGmailAccessToken(userId: string): Promise<string | null> {
 }
 
 async function gmailRequest(accessToken: string, endpoint: string, options: RequestInit = {}) {
-  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${endpoint}`, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+  // Wrap Gmail API calls with circuit breaker
+  return gmailApiBreaker.execute(async () => {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Gmail API error ${res.status}: ${text}`)
+    }
+    return res.json()
   })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Gmail API error ${res.status}: ${text}`)
-  }
-  return res.json()
 }
 
 function decodeBase64Url(data?: string): string {

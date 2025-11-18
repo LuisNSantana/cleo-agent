@@ -6,6 +6,7 @@
 import { getReadyScheduledTasksAdmin, updateAgentTaskAdmin, createTaskExecutionAdmin, updateTaskExecutionAdmin } from './tasks-db';
 import { executeAgentTask } from './task-executor';
 import type { AgentTask } from './tasks-db';
+import { isRetryableError } from '@/lib/resilience/retry';
 
 function normalizeResultPayload(result: unknown): Record<string, any> {
   if (result === null || result === undefined) return {};
@@ -342,9 +343,15 @@ class AgentTaskScheduler {
         
         console.error(`❌ Task execution error: ${task.title} - ${errorMessage}`);
         
-        // Determine if should retry
+        // Determine if should retry using intelligent error detection
         const currentRetries = task.retry_count || 0;
-        const shouldRetry = currentRetries < MAX_RETRIES && !isTimeout; // Don't retry timeouts
+        const isRetryable = isRetryableError(executionError);
+        const shouldRetry = currentRetries < MAX_RETRIES && !isTimeout && isRetryable;
+        
+        // Log retry decision
+        if (!isRetryable) {
+          console.log(`[Task Scheduler] Not retrying task ${task.task_id} - error is not transient (${errorMessage})`)
+        }
         
         // Update task as failed
         await updateAgentTaskAdmin(task.task_id, {
