@@ -38,15 +38,15 @@ export default async function Image() {
           {/* Logo */}
           { }
           <img
-            src={new URL("/img/kyliologo.png", appUrl).toString()}
+            src={new URL("/img/agents/ankie4.png", appUrl).toString()}
             width={200}
             height={200}
-            alt="Cleo logo"
+            alt="Ankie AI logo"
             style={{ borderRadius: 24 }}
           />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ opacity: 0.8, fontSize: 28 }}>Huminary Labs</div>
-            <div>Cleo - Agent of Agents</div>
+            <div>Ankie AI - Your AI Workspace</div>
           </div>
         </div>
       </div>

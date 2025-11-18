@@ -19,7 +19,7 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'cleo-supervisor': {
     id: 'cleo-supervisor',
     name: 'Ankie',
-    avatar: '/img/agents/cleo4.png',
+    avatar: '/img/agents/ankie4.png',
     color: '#7C3AED',
     emoji: '🤖'
   },
@@ -75,14 +75,14 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'skyvern-agent': {
     id: 'skyvern-agent',
     name: 'Skyvern',
-    avatar: '/img/agents/wex4.png', // Using wex avatar as placeholder for now
+    avatar: '/img/agents/wex4.png', // Using wex avatar as placeholder (no dedicated skyvern image)
     color: '#6366F1',
     emoji: '🕸️'
   },
   'jenn-community': {
     id: 'jenn-community',
     name: 'Jenn',
-    avatar: '/img/agents/nora4.png', // Placeholder avatar
+    avatar: '/img/agents/jenn4.png',
     color: '#E879F9',
     emoji: '💬'
   },
@@ -96,23 +96,37 @@ export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'luna-content': {
     id: 'luna-content',
     name: 'Luna',
-    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    avatar: '/img/agents/nora4.png', // Using nora avatar (no dedicated luna image)
     color: '#F472B6',
     emoji: '✨'
   },
   'zara-analytics': {
     id: 'zara-analytics',
     name: 'Zara',
-    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    avatar: '/img/agents/nora4.png', // Using nora avatar (no dedicated zara image)
     color: '#FB7185',
     emoji: '📊'
   },
   'viktor-publisher': {
     id: 'viktor-publisher',
     name: 'Viktor',
-    avatar: '/img/agents/nora4.png', // Using same avatar for now
+    avatar: '/img/agents/toby4.png', // Using toby avatar (no dedicated viktor image)
     color: '#EC4899',
     emoji: '🚀'
+  },
+  'astra-email': {
+    id: 'astra-email',
+    name: 'Astra',
+    avatar: '/img/agents/astra4.png',
+    color: '#A78BFA',
+    emoji: '✉️'
+  },
+  'notion-agent': {
+    id: 'notion-agent',
+    name: 'Notion Agent',
+    avatar: '/img/agents/ami4.png', // Using ami avatar (parent agent)
+    color: '#000000',
+    emoji: '📝'
   }
 }
 
@@ -191,7 +205,12 @@ function normalizeAgentId(agentId: string): string {
   'ami-creative': 'ami-creative',
   'emma-ecommerce': 'emma-ecommerce',
   'toby-technical': 'toby-technical',
-  'astra-email': 'astra-email'
+  'astra-email': 'astra-email',
+  'astra': 'astra-email',
+  'iris': 'iris-insights',
+  'iris-insights': 'iris-insights',
+  'notion': 'notion-agent',
+  'notion-agent': 'notion-agent'
   }
   
   return idMap[agentId.toLowerCase()] || agentId

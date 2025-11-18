@@ -1,15 +1,11 @@
 import { Locale } from "./translations"
 
-// Structured landing-page copy (card lists, stats, etc.) lives here so we can keep
-// `translations.ts` focused on short UI strings. Components consume it through the
-// memoized `useLandingCopy` hook to avoid re-render loops during hydration.
-
 type AgentId = "Kylio" | "Emma" | "Toby" | "Nora" | "Apu" | "Astra"
 
 type FeatureCard = {
   title: string
   description: string
-  bullets: [string, string, string]
+  bullets: string[]
 }
 
 type BenefitStat = {
@@ -157,7 +153,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Impact",
       docs: "Docs",
       signIn: "Sign In",
-      getStarted: "Launch with Kylio →",
+      getStarted: "Launch with Ankie AI →",
       searchPlaceholder: "Search playbooks, agents, sections…",
     },
     hero: {
@@ -170,7 +166,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
         Nora: "Nurturing your community…",
         Apu: "Resolving the support backlog…",
       },
-      onboardingTitle: "Kylio Agent Studio",
+      onboardingTitle: "Ankie AI Agent Studio",
       onboardingActive: "Live",
       onboardingTasks: {
         Kylio: "Orchestrating your automation roadmap",
@@ -189,7 +185,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       steps: [
         { title: "Describe the mission", description: "Give your agent a name, voice, and north star" },
         { title: "Wire their stack", description: "Connect docs, APIs, workflows, and guardrails" },
-        { title: "Show an example", description: "Drop a message or file—Kylio mirrors the tone instantly" },
+        { title: "Show an example", description: "Drop a message or file—Ankie AI mirrors the tone instantly" },
         { title: "Go live", description: "Publish to chat, workflows, or your product with one click" },
       ],
       capabilityLabels: {
@@ -197,7 +193,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       },
     },
     features: {
-      badge: "Why teams choose Kylio",
+      badge: "Why teams choose Ankie AI",
       cards: [
         {
           title: "Visual Agent Studio",
@@ -206,7 +202,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
         },
         {
           title: "Human-in-the-loop by default",
-          description: "Decide when Kylio acts autonomously, requests approval, or hands off to a teammate.",
+          description: "Decide when Ankie AI acts autonomously, requests approval, or hands off to a teammate.",
           bullets: ["Granular roles & permissions", "Approval queues", "Conversation takeovers"],
         },
         {
@@ -215,17 +211,17 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Chat & shareable links", "Workflow automations", "GraphQL + REST endpoints"],
         },
         {
-          title: "Observability that builds trust",
-          description: "Watch every decision, prompt, and action—complete transparency for stakeholders.",
-          bullets: ["Event timeline & replays", "Metrics dashboards", "Audit-grade exports"],
+          title: "Remember every preference",
+          description: "Ankie captures names, goals, and custom instructions so every response feels personal.",
+          bullets: ["Profile-aware prompts", "Personality & tone controls", "Custom instructions baked in"],
         },
       ],
-      highlightHeadline: "Pair Kylio agents with your stack: Notion, HubSpot, Linear, Slack, Google Workspace, and more.",
-      highlightCta: "Preview the Studio",
+      highlightHeadline: "Pair Ankie AI agents with your stack: Notion, HubSpot, Linear, Slack, Google Workspace, and more.",
+      highlightCta: "Meet your agents",
     },
     useCaseDemo: {
       badge: "Play it live",
-      title: "See Kylio build an agent in real time",
+      title: "See Ankie AI build an agent in real time",
       subtitle: "Choose a template, plug in data, and launch. Every step is visible so teams trust the workflow.",
       currentTask: "Current task",
       scenarios: [
@@ -267,7 +263,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "AI Agents",
       featuredBadge: "⭐ Lead orchestrator",
-      featuredDescription: "Kylio delegates to specialists, safeguards your voice, and keeps every decision reviewable.",
+      featuredDescription: "Ankie AI delegates to specialists, safeguards your voice, and keeps every decision reviewable.",
       cards: {
         Kylio: {
           role: "Your AI Orchestrator",
@@ -295,7 +291,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
         },
       },
       ctaHeadline: "Spin up specialists for campaigns, engineering, ops, and support in minutes—not sprints.",
-      primaryCta: "Launch Kylio Studio",
+      primaryCta: "Launch Ankie AI Studio",
       secondaryCta: "See starter kits",
     },
     benefits: {
@@ -305,7 +301,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           stat: "5 min",
           statLabel: "from idea to live agent",
           title: "Deploy faster than you prototype",
-          description: "Kylio Studio handles prompts, guardrails, and hosting automatically.",
+          description: "Ankie AI Studio handles prompts, guardrails, and hosting automatically.",
         },
         {
           stat: "12h",
@@ -391,7 +387,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       trustBullets: ["Free forever sandbox", "Cancel anytime", "SOC 2 certified"],
     },
     footer: {
-      tagline: "Kylio is the all-in-one studio for production AI agents.",
+      tagline: "Ankie AI is the all-in-one studio for production AI agents.",
       poweredBy: "Powered by",
       product: "Product",
       company: "Company",
@@ -418,7 +414,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Beneficios",
       docs: "Documentación",
       signIn: "Iniciar sesión",
-      getStarted: "Prueba Kylio gratis →",
+      getStarted: "Prueba Ankie AI gratis →",
       searchPlaceholder: "Busca funciones, agentes, secciones…",
     },
     hero: {
@@ -476,13 +472,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Acceso basado en roles", "Aprobaciones y revisiones", "Actividad en tiempo real"],
         },
         {
-          title: "Seguridad y gobernanza",
-          description: "Resguardos empresariales desde el primer día.",
-          bullets: ["Políticas SOC 2", "Permisos granulares", "Trazas de auditoría completas"],
+          title: "Recuerda cada preferencia",
+          description: "Ankie guarda nombres, objetivos e instrucciones para responder con contexto real.",
+          bullets: ["Prompts conscientes del perfil", "Controles de personalidad y tono", "Instrucciones personalizadas integradas"],
         },
       ],
       highlightHeadline: "Amplía con integraciones para bases de conocimiento, chat y automatización",
-  highlightCta: "Explora el estudio",
+    highlightCta: "Conoce a tus agentes",
     },
     useCaseDemo: {
       badge: "Míralo en acción",
@@ -737,13 +733,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Acesso por função", "Aprovações e revisões", "Feed de atividade ao vivo"],
         },
         {
-          title: "Segurança e governança",
-          description: "Proteções empresariais desde o primeiro dia.",
-          bullets: ["Políticas SOC 2", "Permissões granulares", "Trilhas de auditoria completas"],
+          title: "Memoriza cada preferência",
+          description: "A Ankie guarda nomes, objetivos e instruções personalizadas para manter o contexto vivo.",
+          bullets: ["Prompts com consciência de perfil", "Controles de personalidade e tom", "Instruções customizadas embutidas"],
         },
       ],
       highlightHeadline: "Expanda com integrações para bases de conhecimento, chat e automação",
-      highlightCta: "Ver demo ao vivo",
+      highlightCta: "Conheça seus agentes",
     },
     useCaseDemo: {
       badge: "Veja na prática",
@@ -998,13 +994,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Accès basé sur les rôles", "Approbations et revues", "Flux d'activité en direct"],
         },
         {
-          title: "Sécurité et gouvernance",
-          description: "Protections d'entreprise dès le premier jour.",
-          bullets: ["Politiques SOC 2", "Permissions granulaires", "Pistes d'audit complètes"],
+          title: "Retient chaque préférence",
+          description: "Ankie mémorise noms, objectifs et consignes pour répondre avec le bon contexte.",
+          bullets: ["Prompts sensibles au profil", "Contrôles de personnalité et de ton", "Instructions personnalisées intégrées"],
         },
       ],
-      highlightHeadline: "Étendez-vous avec des intégrations pour bases de connaissances, chat et automatisation",
-      highlightCta: "Voir la démo en direct",
+      highlightHeadline: "Rencontrez des agents qui connaissent votre nom, vos objectifs et votre style.",
+      highlightCta: "Découvrez vos agents",
     },
     useCaseDemo: {
       badge: "Voyez-le en action",
@@ -1259,13 +1255,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Accessi basati sui ruoli", "Approvazioni e revisioni", "Feed attività in tempo reale"],
         },
         {
-          title: "Sicurezza e governance",
-          description: "Tutele enterprise fin dal primo giorno.",
-          bullets: ["Policy SOC 2", "Permessi granulari", "Tracciabilità completa"],
+          title: "Ricorda ogni preferenza",
+          description: "Ankie memorizza nomi, obiettivi e istruzioni così ogni risposta resta nel tuo tono.",
+          bullets: ["Prompt consapevoli del profilo", "Controlli di personalità e tono", "Istruzioni personalizzate integrate"],
         },
       ],
-      highlightHeadline: "Amplia con integrazioni per knowledge base, chat e automazione",
-      highlightCta: "Guarda la demo",
+      highlightHeadline: "Incontra agenti che conoscono il tuo nome, i tuoi obiettivi e replicano il tuo stile.",
+      highlightCta: "Scopri i tuoi agenti",
     },
     useCaseDemo: {
       badge: "Guardala in azione",
@@ -1520,13 +1516,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["Rollenbasierter Zugriff", "Freigaben & Reviews", "Live-Aktivitätsfeed"],
         },
         {
-          title: "Sicherheit & Governance",
-          description: "Enterprise-Schutzmaßnahmen von Tag Eins.",
-          bullets: ["SOC-2-Richtlinien", "Granulare Berechtigungen", "Vollständige Audit-Trails"],
+          title: "Merkt sich jede Präferenz",
+          description: "Ankie speichert Namen, Ziele und Anweisungen, damit jede Antwort den Kontext trifft.",
+          bullets: ["Profilbewusste Prompts", "Steuerung von Persönlichkeit & Ton", "Eigene Instruktionen eingebacken"],
         },
       ],
       highlightHeadline: "Erweitere mit Integrationen für Wissensdatenbanken, Chat und Automatisierung",
-      highlightCta: "Live-Demo ansehen",
+      highlightCta: "Lerne deine Agenten kennen",
     },
     useCaseDemo: {
       badge: "So funktioniert es",
@@ -1781,13 +1777,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["役割ベースの権限", "承認とレビュー", "リアルタイム活動フィード"],
         },
         {
-          title: "セキュリティとガバナンス",
-          description: "初日からエンタープライズレベルの保護。",
-          bullets: ["SOC 2 ポリシー", "細かな権限管理", "完全な監査ログ"],
+          title: "好みをすべて記憶",
+          description: "Ankie が名前や目標、カスタム指示を保存し、文脈に沿った返答を行います。",
+          bullets: ["プロフィール意識のプロンプト", "パーソナリティとトーンの調整", "カスタム指示の自動適用"],
         },
       ],
       highlightHeadline: "ナレッジ、チャット、自動化の統合でさらに拡張",
-      highlightCta: "ライブデモを見る",
+      highlightCta: "エージェントを見る",
     },
     useCaseDemo: {
       badge: "実際の動作",
@@ -2042,13 +2038,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["역할 기반 권한", "승인 및 리뷰", "실시간 활동 피드"],
         },
         {
-          title: "보안과 거버넌스",
-          description: "첫날부터 엔터프라이즈급 보호.",
-          bullets: ["SOC 2 정책", "세분화된 권한", "완전한 감사 로그"],
+          title: "모든 선호를 기억",
+          description: "Ankie가 이름, 목표, 맞춤 지침을 기억해 매 응답이 당신만을 향합니다.",
+          bullets: ["프로필 기반 프롬프트", "성격·톤 제어", "맞춤 지침 완전 반영"],
         },
       ],
-      highlightHeadline: "지식, 채팅, 자동화를 위한 통합으로 확장",
-      highlightCta: "라이브 데모 보기",
+      highlightHeadline: "이름, 목표, 말투까지 이해하는 맞춤형 AI 팀을 지금 만나보세요.",
+      highlightCta: "에이전트 만나보기",
     },
     useCaseDemo: {
       badge: "실제 동작",
@@ -2303,13 +2299,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["基于角色的权限", "审批与审阅", "实时活动流"],
         },
         {
-          title: "安全与治理",
-          description: "开箱即用的企业级防护。",
-          bullets: ["SOC 2 政策", "精细化权限", "完整审计日志"],
+          title: "记住每一条偏好",
+          description: "Ankie 会记住姓名、目标和定制指令，让每次回复都像专属助理。",
+          bullets: ["基于档案的提示", "性格与语气控制", "内置自定义指令"],
         },
       ],
-      highlightHeadline: "通过知识库、聊天和自动化集成进一步扩展",
-      highlightCta: "观看在线演示",
+      highlightHeadline: "让记住你名字、目标和语气的 AI 团队立即上岗。",
+      highlightCta: "认识这些智能体",
     },
     useCaseDemo: {
       badge: "实际演示",
@@ -2564,13 +2560,13 @@ const landingCopy: Record<Locale, LandingCopy> = {
           bullets: ["صلاحيات مبنية على الأدوار", "موافقات ومراجعات", "تغذية نشاط مباشرة"],
         },
         {
-          title: "الأمن والحَوْكمة",
-          description: "حماية على مستوى الشركات منذ اليوم الأول.",
-          bullets: ["سياسات SOC 2", "صلاحيات دقيقة", "سجلات تدقيق كاملة"],
+          title: "يتذكر كل تفضيل",
+          description: "تحفظ Ankie الأسماء والأهداف والتعليمات المخصّصة ليشعر كل رد بأنه مكتوب لك.",
+          bullets: ["مطالبات واعية بالملف الشخصي", "ضبط الشخصية ونبرة الصوت", "تعليمات مخصّصة مدمجة"],
         },
       ],
-      highlightHeadline: "وسّع منظومتك بدمج قواعد المعرفة والمحادثة والأتمتة",
-      highlightCta: "شاهد العرض المباشر",
+      highlightHeadline: "قابل فريق وكلاء يعرف اسمك وأهدافك ويطابق أسلوبك.",
+      highlightCta: "تعرّف على الوكلاء",
     },
     useCaseDemo: {
       badge: "كيف تعمل فعليًا",

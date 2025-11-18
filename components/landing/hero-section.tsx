@@ -152,7 +152,7 @@ export function HeroSection() {
 
               <Button
                 size="lg"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   const section = document.getElementById('agents')
                   if (section) {
@@ -160,11 +160,11 @@ export function HeroSection() {
                   }
                 }}
                 aria-label={copy.features.highlightCta}
-                className="flex-1 rounded-2xl border border-border/70 bg-white/90 text-brand-ink shadow-[0_10px_26px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-transparent dark:text-white/90 dark:hover:bg-white/5"
+                className="group flex-1 rounded-2xl border border-transparent bg-transparent text-brand-violet shadow-none transition hover:text-brand-magenta dark:text-white/80"
               >
-                <span className="flex items-center justify-center gap-2">
+                <span className="flex items-center justify-center gap-2 text-base font-semibold">
                   {copy.features.highlightCta}
-                  <ArrowRight weight="bold" className="text-brand-violet" />
+                  <ArrowRight weight="bold" className="text-current transition-transform group-hover:translate-x-1" />
                 </span>
               </Button>
             </motion.div>

@@ -22,20 +22,31 @@ async function getUserProfileBlock(supabase: any, userId: string | null): Promis
     const now = Date.now()
     if (cached && cached.expires > now) return cached.block
 
-    const { data, error } = await (supabase as any)
+    // Fetch user profile from users table
+    const { data: userData, error: userError } = await (supabase as any)
       .from('users')
       .select('display_name, favorite_features, favorite_models')
       .eq('id', userId)
       .single()
-    if (error) return ''
+    
+    // Fetch custom instructions from user_preferences table
+    const { data: prefsData, error: prefsError } = await (supabase as any)
+      .from('user_preferences')
+      .select('personality_settings')
+      .eq('user_id', userId)
+      .single()
+    
+    if (userError && prefsError) return ''
 
-    const name = (data?.display_name || '').toString().trim()
-    const favFeatures: string[] = Array.isArray(data?.favorite_features) ? data.favorite_features.slice(0, 5) : []
-    const favModels: string[] = Array.isArray(data?.favorite_models) ? data.favorite_models.slice(0, 5) : []
+    const name = (userData?.display_name || '').toString().trim()
+    const favFeatures: string[] = Array.isArray(userData?.favorite_features) ? userData.favorite_features.slice(0, 5) : []
+    const favModels: string[] = Array.isArray(userData?.favorite_models) ? userData.favorite_models.slice(0, 5) : []
+    const customStyle = prefsData?.personality_settings?.customStyle?.trim() || ''
 
   const lines: string[] = []
   lines.push('USER PROFILE (compact)')
   if (name) lines.push(`- Name: ${name}`)
+  if (customStyle) lines.push(`- Custom instructions: ${customStyle}`)
   if (favFeatures.length) lines.push(`- Favorite features: ${favFeatures.join(', ')}`)
   if (favModels.length) lines.push(`- Favorite models: ${favModels.join(', ')}`)
   const block = lines.length > 1 ? lines.join('\n') : ''

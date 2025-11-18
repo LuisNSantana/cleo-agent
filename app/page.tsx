@@ -85,7 +85,13 @@ export default async function Home({
       
       <LandingNav />
       
-  <main className="pt-16 bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.12),_transparent_45%)] text-foreground dark:bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.08),_transparent_45%)]">
+  <main className="relative isolate overflow-hidden bg-background pt-16 text-foreground">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.12),_transparent_45%)] dark:bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.08),_transparent_45%)]" />
+          <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-white/70 via-transparent to-transparent dark:from-[#05070d]/80" />
+          <div className="absolute inset-x-0 bottom-0 h-[420px] translate-y-1/2 bg-gradient-to-t from-white via-white/60 to-transparent dark:from-[#05070d] dark:via-[#05070d]/60" />
+        </div>
+        <div className="relative z-10">
         {/* 1. Hero Section */}
         <HeroSection />
 
@@ -126,6 +132,7 @@ export default async function Home({
           <div id="get-started" data-landing-search data-landing-search-title="Start" data-landing-search-type="section">
             <FinalCTASection />
           </div>
+        </div>
       </main>
 
       <ScrollToTop />

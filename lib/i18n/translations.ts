@@ -238,7 +238,7 @@ const en: Translations = {
     language: 'Language',
   },
   landing: {
-    heroTitle: 'Let Kylio be with you',
+    heroTitle: 'Let Ankie AI be with you',
     heroSubtitle: 'Deploy your own AI agents in under 5 minutes. No code required. Built on three pillars: Transparency, Personalization, and Simplicity.',
     heroCta: 'Start Free Beta',
     heroCtaSecondary: 'Watch Demo',
@@ -375,7 +375,7 @@ const es: Translations = {
     language: 'Idioma',
   },
   landing: {
-    heroTitle: 'Deja que Kylio AI esté contigo',
+    heroTitle: 'Deja que Ankie AI esté contigo',
     heroSubtitle: 'Despliega tus propios agentes de IA en menos de 5 minutos. Sin código. Basado en tres pilares: Transparencia, Personalización y Simplicidad.',
     heroCta: 'Prueba Beta Gratis',
     heroCtaSecondary: 'Ver Demo',
@@ -413,11 +413,11 @@ const es: Translations = {
     agentsTitle: 'Conoce tu Equipo de IA Especializado',
     agentsSubtitle: 'Cada agente es un experto en su dominio. Haz clic para conocer más sobre sus capacidades.',
     
-  benefitsTitle: 'Por qué los Equipos Eligen Kylio AI',
+  benefitsTitle: 'Por qué los Equipos Eligen Ankie AI',
     benefitsSubtitle: 'Construido para el flujo de trabajo moderno',
     
     useCasesTitle: 'Observa a tu Equipo de IA Trabajar',
-  useCasesSubtitle: 'Mira cómo Kylio AI maneja tareas reales en tiempo real',
+  useCasesSubtitle: 'Mira cómo Ankie AI maneja tareas reales en tiempo real',
     
   testimonialsTitle: 'Lo que logran los usuarios',
     testimonialsSubtitle: 'Los resultados hablan más que las promesas',
@@ -436,7 +436,7 @@ const es: Translations = {
     under5Minutes: 'Menos de 5 Minutos ⚡',
     
     philosophyTitle: 'Nuestra Filosofía',
-  philosophySubtitle: 'La IA debe potenciar, no reemplazar. Kylio AI aumenta tus capacidades, permitiéndote enfocarte en lo más importante mientras los agentes inteligentes se encargan del resto.',
+  philosophySubtitle: 'La IA debe potenciar, no reemplazar. Ankie AI aumenta tus capacidades, permitiéndote enfocarte en lo más importante mientras los agentes inteligentes se encargan del resto.',
   },
 }
 

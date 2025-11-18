@@ -37,14 +37,19 @@ export function FeaturesSection() {
   const { t, locale } = useI18n()
   const copy = useLandingCopy(locale)
 
+  const filteredCards = useMemo(() => {
+    const blockedTitleRegex = /(security|seguridad|gobernanza|governance|governança|sécurité|sicurezza|sicherheit|セキュリティ|보안|安全)/i
+    return copy.features.cards.filter((card) => !blockedTitleRegex.test(card.title))
+  }, [copy, locale])
+
   const featureCards = useMemo(
     () =>
-      copy.features.cards.map((card, index) => ({
+      filteredCards.map((card, index) => ({
         ...card,
         icon: featureIcons[index % featureIcons.length],
         color: featureColors[index % featureColors.length],
       })),
-    [copy, locale]
+    [filteredCards]
   )
 
   return (
@@ -59,7 +64,7 @@ export function FeaturesSection() {
         <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-brand-cyan/15 blur-3xl" />
         <div className="absolute right-0 bottom-0 h-80 w-80 rounded-full bg-brand-violet/15 blur-[180px]" />
       </div>
-      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
+  <div className="mx-auto w-full max-w-[1800px] px-4 sm:px-8 lg:px-16">
         <motion.div
           className="mb-12 sm:mb-16 lg:mb-20 text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -123,7 +128,7 @@ export function FeaturesSection() {
                   <h3 className="mb-3 text-xl font-bold text-foreground">{feature.title}</h3>
                   <p className="mb-6 text-base leading-relaxed text-muted-foreground">{feature.description}</p>
                   <ul className="space-y-2.5">
-                    {feature.bullets.map((item, i) => (
+                    {feature.bullets.map((item: string, i: number) => (
                       <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
                         <div
                           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${feature.color} p-1`}
@@ -163,7 +168,7 @@ export function FeaturesSection() {
               className="group rounded-full bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta px-10 py-6 text-base font-bold text-white ring-2 ring-white/50 shadow-[0_20px_60px_rgba(23,20,73,0.35)] transition-all hover:scale-[1.02] dark:ring-white/10"
               asChild
             >
-              <a href="/auth" className="flex items-center gap-2">
+              <a href="#agents" className="flex items-center gap-2">
                 {copy.features.highlightCta}
                 <Rocket weight="bold" className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </a>

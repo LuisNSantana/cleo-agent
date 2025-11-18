@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useI18n } from '@/lib/i18n'
-import { Star, ShieldCheck } from '@phosphor-icons/react'
+import { Star } from '@phosphor-icons/react'
 import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 import { useMemo } from 'react'
 
@@ -11,7 +11,6 @@ export function TestimonialsSection() {
   const copy = useLandingCopy(locale)
 
   const stats = useMemo(() => copy.testimonials.stats, [copy, locale])
-  const complianceBadges = useMemo(() => copy.testimonials.complianceBadges, [copy, locale])
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-[#F9F6FF] via-[#F2F6FF] to-[#F9F6FF] px-4 py-24 text-foreground dark:from-[#070912] dark:via-[#0B1020] dark:to-[#070912] sm:px-6 sm:py-32 lg:px-12">
@@ -64,39 +63,6 @@ export function TestimonialsSection() {
           </div>
         </motion.div>
 
-        <motion.div
-          className="rounded-3xl border border-border/40 bg-card/80 p-6 shadow-xl shadow-primary/10 backdrop-blur sm:p-10 dark:border-white/5 dark:bg-white/5"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
-          <motion.div
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-          >
-            <ShieldCheck weight="duotone" className="h-4 w-4" />
-            {copy.testimonials.securityBadge}
-          </motion.div>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="text-2xl font-semibold text-foreground">{t.landing.securityTitle}</h3>
-              <p className="text-sm text-muted-foreground">{t.landing.securitySubtitle}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {complianceBadges.map((badge) => (
-                <span
-                  key={badge}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/5"
-                >
-                  <ShieldCheck weight="fill" className="h-4 w-4 text-[#30D158]" />
-                  {badge}
-                </span>
-              ))}
-            </div>
-          </div>
-        </motion.div>
       </div>
     </section>
   )
