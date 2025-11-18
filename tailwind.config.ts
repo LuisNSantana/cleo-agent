@@ -52,6 +52,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        brand: {
+          cyan: "#00B2FF",
+          violet: "#6F00FF",
+          magenta: "#FF1EC8",
+          ink: "#0B0B0F",
+          surface: "#1E1E28",
+        },
         // Colores premium para agentes
         agent: {
           cleo: {

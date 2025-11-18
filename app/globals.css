@@ -74,63 +74,63 @@
 
 :root {
   /* ================================================================
-     KYLIO — Core palette (light mode)
-     Branded identity: confident violets + deep navy copy
+     ANKIE — Core palette (light mode)
   ================================================================= */
-  --color-bg: #F9F6F2;
+  --color-bg: #F5FAFF;
   --color-surface: #FFFFFF;
-  --color-surface-subtle: #E5E5E5;
-  --color-primary: #A38CFF;   /* Morado suave */
-  --color-secondary: #64D2FF; /* Cian de soporte */
-  --color-text: #1E255E;      /* Azul oscuro corporativo */
-  --color-text-muted: #49508A;
+  --color-surface-subtle: #E7F0FF;
+  --color-primary: #00B2FF;   /* Azul cian vivo */
+  --color-secondary: #6F00FF; /* Violeta eléctrico */
+  --color-accent-strong: #FF1EC8; /* Magenta de detalles */
+  --color-text: #0B0B0F;
+  --color-text-muted: #4B4F6B;
   --color-success: #30D158;
-  --color-warning: #FFD60A;
-  --color-danger: #FF453A;
+  --color-warning: #FFC857;
+  --color-danger: #FF4D5A;
   
-  --background: #F9F6F2;
-  --foreground: #1E255E;
+  --background: #F5FAFF;
+  --foreground: #0B0B0F;
   
   --card: #FFFFFF;
-  --card-foreground: #1E255E;
+  --card-foreground: #0B0B0F;
   --popover: #FFFFFF;
-  --popover-foreground: #1E255E;
+  --popover-foreground: #0B0B0F;
   
-  --primary: #A38CFF;
-  --primary-foreground: #0D0D0D;
+  --primary: #00B2FF;
+  --primary-foreground: #010409;
   
-  --secondary: #64D2FF;
-  --secondary-foreground: #0D0D0D;
+  --secondary: #6F00FF;
+  --secondary-foreground: #F9F5FF;
   
-  --muted: #F0ECE6;
-  --muted-foreground: #595F8C;
+  --muted: #EAF2FF;
+  --muted-foreground: #56607A;
   
-  --accent: #A38CFF;
-  --accent-foreground: #0D0D0D;
+  --accent: #FF1EC8;
+  --accent-foreground: #140015;
   
-  --destructive: #FF453A;
+  --destructive: #FF4D5A;
   --destructive-foreground: #FFFFFF;
   
-  --border: #E5E5E5;
+  --border: #D8E2FF;
   --input: #FFFFFF;
-  --ring: #A38CFF;
+  --ring: #00B2FF;
   
-  --chart-1: #A38CFF;
-  --chart-2: #64D2FF;
-  --chart-3: #30D158;
-  --chart-4: #FFD60A;
-  --chart-5: #FF453A;
+  --chart-1: #00B2FF;
+  --chart-2: #6F00FF;
+  --chart-3: #FF1EC8;
+  --chart-4: #30D158;
+  --chart-5: #FFC857;
   
   --radius: 1.25rem;
   
-  --sidebar: #F9F6F2;
-  --sidebar-foreground: #1E255E;
-  --sidebar-primary: #A38CFF;
-  --sidebar-primary-foreground: #0D0D0D;
-  --sidebar-accent: #EDE9E3;
-  --sidebar-accent-foreground: #49508A;
-  --sidebar-border: #E5E5E5;
-  --sidebar-ring: #A38CFF;
+  --sidebar: #F5FAFF;
+  --sidebar-foreground: #0B0B0F;
+  --sidebar-primary: #00B2FF;
+  --sidebar-primary-foreground: #010409;
+  --sidebar-accent: #E7F0FF;
+  --sidebar-accent-foreground: #4B4F6B;
+  --sidebar-border: #D8E2FF;
+  --sidebar-ring: #6F00FF;
 }
 
 /* Typography utilities */
@@ -139,66 +139,65 @@
 
 body { 
   -webkit-font-smoothing: antialiased; 
-  font-smooth: always; 
-  text-rendering: optimizeLegibility; 
 }
 
 .dark {
   /* ================================================================
-     KYLIO — Dark mode palette
+     ANKIE — Dark mode palette
   ================================================================= */
-  --color-bg: #0D0D0D;
-  --color-surface: #1B1B1B;
-  --color-surface-subtle: #2F2F2F;
-  --color-primary: #A38CFF;
-  --color-secondary: #64D2FF;
-  --color-text: #F9F6F2;
-  --color-text-muted: #C9C6E8;
-  --color-success: #30D158;
-  --color-warning: #FFD60A;
-  --color-danger: #FF453A;
-  
-  --background: #0D0D0D;
-  --foreground: #F9F6F2;
-  
-  --card: #1B1B1B;
-  --card-foreground: #F9F6F2;
-  --popover: #1B1B1B;
-  --popover-foreground: #F9F6F2;
-  
-  --primary: #A38CFF;
-  --primary-foreground: #0D0D0D;
-  
-  --secondary: #64D2FF;
-  --secondary-foreground: #0D0D0D;
-  
-  --muted: #1B1B1B;
-  --muted-foreground: #C9C6E8;
-  
-  --accent: #A38CFF;
-  --accent-foreground: #0D0D0D;
-  
-  --destructive: #FF453A;
-  --destructive-foreground: #FFFFFF;
-  
-  --border: #2F2F2F;
-  --input: #1B1B1B;
-  --ring: #64D2FF;
-  
-  --chart-1: #A38CFF;
-  --chart-2: #64D2FF;
-  --chart-3: #30D158;
-  --chart-4: #FFD60A;
-  --chart-5: #FF453A;
-  
-  --sidebar: #0D0D0D;
-  --sidebar-foreground: #F9F6F2;
-  --sidebar-primary: #A38CFF;
-  --sidebar-primary-foreground: #0D0D0D;
-  --sidebar-accent: #1B1B1B;
-  --sidebar-accent-foreground: #C9C6E8;
-  --sidebar-border: #2F2F2F;
-  --sidebar-ring: #64D2FF;
+  --color-bg: #0B0B0F;
+  --color-surface: #1E1E28;
+  --color-surface-subtle: #2B2B3A;
+  --color-primary: #00B2FF;
+  --color-secondary: #6F00FF;
+  --color-accent-strong: #FF1EC8;
+  --color-text: #F5FAFF;
+  --color-text-muted: #B1B7D9;
+  --color-success: #33F896;
+  --color-warning: #FFC857;
+  --color-danger: #FF6A7D;
+
+  --background: #0B0B0F;
+  --foreground: #F5FAFF;
+
+  --card: #1E1E28;
+  --card-foreground: #F5FAFF;
+  --popover: #1E1E28;
+  --popover-foreground: #F5FAFF;
+
+  --primary: #00B2FF;
+  --primary-foreground: #04121A;
+
+  --secondary: #6F00FF;
+  --secondary-foreground: #F9F5FF;
+
+  --muted: #15151C;
+  --muted-foreground: #9AA0BF;
+
+  --accent: #FF1EC8;
+  --accent-foreground: #1A001D;
+
+  --destructive: #FF6A7D;
+  --destructive-foreground: #140006;
+
+  --border: #2E2E3C;
+  --input: #1E1E28;
+  --ring: #6F00FF;
+
+  --chart-1: #00B2FF;
+  --chart-2: #6F00FF;
+  --chart-3: #FF1EC8;
+  --chart-4: #33F896;
+  --chart-5: #FFC857;
+
+  --sidebar: #0B0B0F;
+  --sidebar-foreground: #F5FAFF;
+  --sidebar-primary: #00B2FF;
+  --sidebar-primary-foreground: #04121A;
+  --sidebar-accent: #1E1E28;
+  --sidebar-accent-foreground: #B1B7D9;
+  --sidebar-border: #2E2E3C;
+  --sidebar-ring: #6F00FF;
 }
 /* === UTILITY CLASSES KYLIO === */
 
@@ -768,22 +767,6 @@ label, .label-text {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.4s;
-}
-
-/* Pulse animation for badges */
-@keyframes subtle-pulse {
-  0%, 100% {
-    opacity: 0.8;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-}
-
-.badge-pulse {
-  animation: subtle-pulse 3s ease-in-out infinite;
 }
 
 /* Shimmer loading effect */

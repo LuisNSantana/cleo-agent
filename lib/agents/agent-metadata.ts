@@ -18,7 +18,7 @@ const customAgentCache = new Map<string, AgentMetadata>()
 export const AGENT_METADATA: Record<string, AgentMetadata> = {
   'cleo-supervisor': {
     id: 'cleo-supervisor',
-    name: 'Kylio',
+    name: 'Ankie',
     avatar: '/img/agents/cleo4.png',
     color: '#7C3AED',
     emoji: '🤖'

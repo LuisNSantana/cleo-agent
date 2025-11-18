@@ -5,13 +5,13 @@ import { AppInfoTrigger } from "@/app/components/layout/app-info/app-info-trigge
 import { ButtonNewChat } from "@/app/components/layout/button-new-chat"
 import { UserMenu } from "@/app/components/layout/user-menu"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
-import { CleoIcon } from "@/components/icons/cleo"
 import { Button } from "@/components/ui/button"
 import { APP_NAME } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
-import { Info, CheckSquare, ArrowsOut, Sidebar as SidebarIcon } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
+import { Info, ArrowsOut, Sidebar as SidebarIcon } from "@phosphor-icons/react"
 import Link from "next/link"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 import { NotificationBell } from "@/components/notifications/notification-bell"
@@ -49,53 +49,49 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         <div className="flex flex-1 items-center justify-between">
           <div className="-ml-0.5 flex flex-1 items-center gap-3 lg:-ml-2.5">
             <div className="flex flex-1 items-center gap-2">
-              <div className="flex items-center gap-2">
-                {canToggleSidebar && (
+              {canToggleSidebar && (
                   <HeaderSidebarTrigger className="size-9 border border-border/40 bg-background/80 shadow-sm backdrop-blur-sm" />
-                )}
+              )}
                 <Link
                   href="/"
                   className="group pointer-events-auto inline-flex items-center gap-2 text-xl font-medium tracking-tight"
                   onClick={() => resetMessages()}
                 >
                   {/* Simplified logo wrapper: remove backdrop blur, heavy border and shadow that created visual artifacts */}
-                  <div className="flex h-5 w-auto items-center justify-center rounded-md bg-transparent sm:h-6 md:h-7 lg:h-8 shrink-0">
-                    {!mounted ? (
-                      // ✅ Server-side & initial render: show neutral/light logo to avoid hydration mismatch
+                  <div className="flex h-6 w-auto items-center justify-center rounded-md bg-transparent sm:h-7 md:h-8 lg:h-9 shrink-0">
+                    <div className="flex items-center gap-2">
                       <Image
-                        src={`/img/kyliologo.png?v=${assetV}`}
-                        alt="Kylio"
-                        width={84}
-                        height={22}
-                        className="h-full w-auto object-contain select-none"
+                        src={`/img/logoankie.png?v=${assetV}`}
+                        alt="Ankie AI logo"
+                        width={92}
+                        height={28}
+                        className="h-6 sm:h-7 object-contain select-none"
                         priority
-                        sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
                       />
-                    ) : (
-                      // ✅ Client-side only: use theme-aware logo
-                      (() => {
-                        const isDark = (resolvedTheme ?? theme) === 'dark'
-                        const logoSrc = isDark
-                          ? `/img/kyliologodarkmode.png?v=${assetV}`
-                          : `/img/kyliologo.png?v=${assetV}`
-                        return (
-                          <Image
-                            src={logoSrc}
-                            alt="Kylio"
-                            width={84}
-                            height={22}
-                            className="h-full w-auto object-contain select-none"
-                            priority
-                            sizes="(max-width: 640px) 54px, (max-width: 768px) 68px, 84px"
-                          />
-                        )
-                      })()
-                    )}
+                      <div className="flex items-baseline gap-1 leading-none">
+                        {(() => {
+                          const isDarkMode = mounted && (resolvedTheme ?? theme) === 'dark'
+                          const wordmarkBase = cn(
+                            "font-black uppercase tracking-[0.4em] text-[0.65rem] sm:text-[0.72rem] transition-colors duration-300",
+                            isDarkMode ? "text-white" : "text-brand-ink"
+                          )
+                          const wordmarkAccent = cn(
+                            "font-semibold uppercase tracking-[0.25em] text-[0.6rem] sm:text-[0.7rem] transition-colors duration-300",
+                            isDarkMode ? "text-brand-cyan" : "text-brand-violet"
+                          )
+                          return (
+                            <>
+                              <span className={wordmarkBase}>ANKIE</span>
+                              <span className={wordmarkAccent}>AI</span>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </div>
                   </div>
                   {/* Only show the compact logo in the header; remove wordmark/BETA to keep header slim */}
                 </Link>
               </div>
-            </div>
           </div>
           <div />
           {!isLoggedIn ? (

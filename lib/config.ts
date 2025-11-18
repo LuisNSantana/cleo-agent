@@ -74,8 +74,8 @@ export const DISABLED_MODEL_IDS: string[] = [
   // Prefer Sky over Dusk in UI
   // "openrouter:openrouter/sonoma-dusk-alpha",
 ]
-export const APP_NAME = "Cleo"
-export const APP_DOMAIN = "https://cleo-agent.vercel.app"
+export const APP_NAME = "Ankie AI"
+export const APP_DOMAIN = "https://www.imcleo.com"
 
 export const SUGGESTIONS = [
   {

@@ -46,6 +46,19 @@ function inferPhase(step: PipelineStep): PipelinePhase {
       return 'plan'
   }
 }
+
+function resolveAgentId(step: PipelineStep): string {
+  return (
+    step.agent ||
+    step.metadata?.agentId ||
+    step.metadata?.agent ||
+    step.metadata?.targetAgentId ||
+    step.metadata?.delegatedAgentId ||
+    step.metadata?.assistantId ||
+    step.metadata?.ownerAgentId ||
+    'cleo-supervisor'
+  )
+}
   function resolveAgentName(step: PipelineStep): string | undefined {
     return step.agentName ||
       step.metadata?.agentName ||
@@ -386,9 +399,15 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
         }
       }
       
-      const mappedStep = {
+      const agentId = resolveAgentId(s)
+      const stepWithAgent: PipelineStep = {
         ...s,
-        agentName: resolveAgentName(s),
+        agent: agentId
+      }
+
+      const mappedStep = {
+        ...stepWithAgent,
+        agentName: resolveAgentName(stepWithAgent),
         action: mappedAction as PipelineStep['action'],
         timestamp: typeof s.timestamp === 'string' ? s.timestamp : s.timestamp.toISOString()
       }

@@ -2756,6 +2756,32 @@ const landingCopy: Record<Locale, LandingCopy> = {
   },
 }
 
+const BRAND_NAME = "Ankie AI"
+const BRAND_SHORT = "Ankie"
+
+function normalizeBrandTokens<T>(value: T): T {
+  if (typeof value === "string") {
+    return value
+      .replace(/Kylio AI/g, BRAND_NAME)
+      .replace(/Kylio/g, BRAND_SHORT)
+      .replace(/CLEO/g, BRAND_SHORT.toUpperCase()) as T
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeBrandTokens(item)) as T
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, entry]) => {
+      acc[key] = normalizeBrandTokens(entry)
+      return acc
+    }, {}) as T
+  }
+
+  return value
+}
+
 export function getLandingCopy(locale: Locale): LandingCopy {
-  return landingCopy[locale] ?? landingCopy.en
+  const copy = landingCopy[locale] ?? landingCopy.en
+  return normalizeBrandTokens(copy)
 }

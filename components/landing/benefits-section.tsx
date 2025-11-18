@@ -8,13 +8,13 @@ import { getLandingCopy } from '@/lib/i18n/landing-copy'
 import { useMemo } from 'react'
 
 const statIcons = [Rocket, Clock, ShieldCheck]
-const statColors = ['from-[#A38CFF] to-[#7E63F2]', 'from-[#64D2FF] to-[#4AA6FF]', 'from-[#30D158] to-[#0A9F41]']
+const statColors = ['from-brand-violet to-brand-magenta', 'from-brand-cyan to-brand-violet', 'from-brand-magenta to-brand-cyan']
 
 const useCaseAgents = [
   { name: 'Emma', avatar: '/img/agents/emma4.png' },
   { name: 'Toby', avatar: '/img/agents/toby4.png' },
   { name: 'Apu', avatar: '/img/agents/apu4.png' },
-  { name: 'Kylio', avatar: '/img/kyliologo.png' },
+  { name: 'Ankie', avatar: '/img/logoankie.png' },
 ]
 
 export function BenefitsSection() {
@@ -46,7 +46,7 @@ export function BenefitsSection() {
       data-landing-search
       data-landing-search-title="Benefits"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-[#F9F6F2] py-24 sm:py-36"
+  className="relative w-full overflow-hidden bg-background py-24 sm:py-36"
     >
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
         <motion.div
@@ -57,7 +57,7 @@ export function BenefitsSection() {
         >
           <div className="mb-16 text-center">
             <motion.div
-              className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-primary/30 bg-gradient-to-r from-[#A38CFF]/20 via-[#8E73FF]/15 to-[#64D2FF]/20 px-6 py-2.5 text-sm font-bold text-primary shadow-lg shadow-primary/20"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-brand-cyan/40 bg-gradient-to-r from-brand-cyan/20 via-brand-violet/15 to-brand-magenta/20 px-6 py-2.5 text-sm font-bold text-brand-cyan shadow-lg shadow-brand-cyan/20"
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
@@ -126,7 +126,7 @@ export function BenefitsSection() {
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
           <div className="mb-16 text-center">
             <motion.div
-              className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-primary/30 bg-gradient-to-r from-[#A38CFF]/20 via-[#8E73FF]/15 to-[#64D2FF]/20 px-6 py-2.5 text-sm font-bold text-primary shadow-lg shadow-primary/20"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-brand-cyan/40 bg-gradient-to-r from-brand-cyan/20 via-brand-violet/15 to-brand-magenta/20 px-6 py-2.5 text-sm font-bold text-brand-cyan shadow-lg shadow-brand-cyan/20"
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
@@ -155,13 +155,13 @@ export function BenefitsSection() {
                 transition={{ delay: index * 0.08 }}
                 whileHover={{ y: -8, scale: 1.02 }}
               >
-                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#A38CFF]/20 via-[#64D2FF]/20 to-[#30D158]/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-brand-cyan/20 via-brand-violet/20 to-brand-magenta/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
                 <div className="relative">
                   <div className="mb-6 flex items-center gap-4">
                     <motion.div whileHover={{ scale: 1.15, rotate: [0, -5, 5, 0] }} transition={{ duration: 0.4 }}>
-                      <Avatar className="h-14 w-14 border-2 border-background shadow-xl ring-2 ring-primary/20 transition-all duration-300 group-hover:ring-primary/40">
+                      <Avatar className="h-14 w-14 border-2 border-background shadow-xl ring-2 ring-brand-cyan/20 transition-all duration-300 group-hover:ring-brand-violet/40">
                         <AvatarImage src={useCase.agent.avatar} alt={useCase.agent.name} className="object-cover" loading="lazy" />
-                        <AvatarFallback className="bg-gradient-to-br from-[#A38CFF] to-[#64D2FF] text-base font-semibold text-white">
+                        <AvatarFallback className="bg-gradient-to-br from-brand-cyan to-brand-violet text-base font-semibold text-white">
                           {useCase.agent.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>

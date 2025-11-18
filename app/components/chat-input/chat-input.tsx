@@ -8,6 +8,7 @@ import {
   PromptInputTextarea,
 } from "@/components/prompt-kit/prompt-input"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { getModelInfo } from "@/lib/models"
 import { ArrowUpIcon, Stop } from "@phosphor-icons/react"
 import { useCallback, useMemo, useEffect, useRef, useState, useDeferredValue } from "react"
@@ -276,7 +277,7 @@ export function ChatInput({
                     Preparing your drawing...
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Converting sketch for Cleo
+                    Converting sketch for Ankie
                   </div>
                 </div>
                 <div className="flex-shrink-0">
@@ -297,7 +298,7 @@ export function ChatInput({
           
           <PromptInputTextarea
             ref={textareaRef}
-            placeholder={placeholder || "Ask Kylio..."}
+            placeholder={placeholder || "Ask Ankie anything..."}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
@@ -339,7 +340,12 @@ export function ChatInput({
               <Button
                 size="sm"
                 variant={status === 'streaming' ? 'destructive' : 'default'}
-                className="min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation glow-primary-hover scale-on-active"
+                className={cn(
+                  "min-w-[44px] min-h-[44px] w-11 h-11 md:size-9 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation glow-primary-hover scale-on-active",
+                  status === 'streaming'
+                    ? undefined
+                    : "bg-brand-cyan text-brand-ink hover:bg-[#0096DA]"
+                )}
                 disabled={(!value || isOnlyWhitespace(value)) && status !== "streaming"}
                 type="button"
                 onClick={handleSend}

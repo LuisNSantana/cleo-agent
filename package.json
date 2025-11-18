@@ -1,6 +1,6 @@
 {
-  "name": "Kylio",
-  "version": "1.0.0",
+  "name": "Ankie AI - Adaptive Agent Workspace",
+  "version": "1.5.0",
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "scripts": {

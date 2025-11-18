@@ -539,6 +539,28 @@ export class AgentOrchestrator {
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
+
+        const nodeId = data?.nodeId || data?.agentId
+        const markPriorStepCompleted = (collection?: ExecutionStep[]) => {
+          if (!collection || !nodeId) return
+          const existing = collection.find((s: any) => {
+            return (
+              s.metadata?.nodeId === nodeId &&
+              s.action !== 'completing'
+            )
+          })
+
+          if (existing) {
+            existing.progress = 100
+            existing.metadata = {
+              ...(existing.metadata || {}),
+              stage: 'completed',
+              completedAt: new Date(),
+              completionSource: 'node.completed'
+            }
+          }
+        }
+        markPriorStepCompleted(exec.steps)
         
         // ✅ Use step-builder to create completion step
         const completionStep = buildNodeCompletedStep({
@@ -559,7 +581,6 @@ export class AgentOrchestrator {
         }
         
         // ✅ FALLBACK: Check by nodeId+stage for older steps without UUID
-        const nodeId = data?.nodeId || data?.agentId
         const existingCompletedStep = exec.steps.find(
           (s: any) => 
             s.metadata?.nodeId === nodeId && 
@@ -588,6 +609,7 @@ export class AgentOrchestrator {
           const parentExec = this.executionRegistry.get(parentId)
           if (parentExec) {
             if (!parentExec.steps) parentExec.steps = []
+            markPriorStepCompleted(parentExec.steps)
             const mirroredStep = buildNodeCompletedStep({
               agentId: data?.agentId || exec.agentId,
               agentName: exec.agentName,

@@ -23,52 +23,62 @@ import { APU_AGENT } from '@/lib/agents/predefined/apu'
 import { ASTRA_AGENT } from '@/lib/agents/predefined/astra'
 import { getLandingCopy } from '@/lib/i18n/landing-copy'
 
-type AgentId = 'Kylio' | 'Emma' | 'Toby' | 'Nora' | 'Apu' | 'Astra'
+type AgentId = 'Ankie' | 'Emma' | 'Toby' | 'Nora' | 'Apu' | 'Astra'
+type CopyAgentId = 'Kylio' | 'Emma' | 'Toby' | 'Nora' | 'Apu' | 'Astra'
 
 const agentMeta: Record<
   AgentId,
   { avatar: string; icon: any; color: string; featured?: boolean }
 > = {
-  Kylio: {
-    avatar: '/img/agents/cleo4.png',
+  Ankie: {
+    avatar: '/img/agents/ankie4.png',
     icon: Sparkle,
-    color: 'from-[#A38CFF] to-[#7E63F2]',
+    color: 'from-brand-cyan to-brand-violet',
     featured: true,
   },
   Emma: {
     avatar: '/img/agents/emma4.png',
     icon: Megaphone,
-    color: 'from-[#64D2FF] to-[#4AA6FF]',
+    color: 'from-brand-magenta to-brand-cyan',
   },
   Toby: {
     avatar: '/img/agents/toby4.png',
     icon: Code,
-    color: 'from-[#30D158] to-[#0A9F41]',
+    color: 'from-brand-violet to-brand-cyan',
   },
   Nora: {
     avatar: '/img/agents/nora4.png',
     icon: FileText,
-    color: 'from-[#FFD60A] to-[#FFB800]',
+    color: 'from-brand-magenta to-brand-violet',
   },
   Apu: {
     avatar: '/img/agents/apu4.png',
     icon: UserIcon,
-    color: 'from-[#64D2FF] to-[#4AA6FF]',
+    color: 'from-brand-cyan to-brand-magenta',
   },
   Astra: {
     avatar: '/img/agents/astra4.png',
     icon: PaintBrush,
-    color: 'from-[#A38CFF] to-[#7E63F2]',
+    color: 'from-brand-violet to-brand-magenta',
   },
 }
 
 const configs: Record<AgentId, any> = {
-  Kylio: CLEO_AGENT,
+  Ankie: CLEO_AGENT,
   Emma: EMMA_AGENT,
   Toby: TOBY_AGENT,
   Nora: NORA_AGENT,
   Apu: APU_AGENT,
   Astra: ASTRA_AGENT,
+}
+
+const copyKeyByAgent: Record<AgentId, CopyAgentId> = {
+  Ankie: 'Kylio',
+  Emma: 'Emma',
+  Toby: 'Toby',
+  Nora: 'Nora',
+  Apu: 'Apu',
+  Astra: 'Astra',
 }
 
 export function AgentsSection() {
@@ -78,13 +88,21 @@ export function AgentsSection() {
   const [open, setOpen] = useState(false)
 
   const agents = useMemo(() => {
-    const order: AgentId[] = ['Kylio', 'Emma', 'Toby', 'Nora', 'Apu', 'Astra']
-    return order.map((id) => ({
-      id,
-      ...agentMeta[id],
-      role: copy.agents.cards[id].role,
-      skills: copy.agents.cards[id].skills,
-    }))
+    const order: AgentId[] = ['Ankie', 'Emma', 'Toby', 'Nora', 'Apu', 'Astra']
+    return order.map((id) => {
+      const copyKey = copyKeyByAgent[id]
+      const agentCopy = copy.agents.cards[copyKey as keyof typeof copy.agents.cards] as
+        | { role?: string; skills?: string[] }
+        | undefined
+
+      return {
+        id,
+        name: id,
+        ...agentMeta[id],
+        role: agentCopy?.role ?? '',
+        skills: (agentCopy?.skills ?? []) as string[],
+      }
+    })
   }, [copy, locale])
 
   return (
@@ -135,14 +153,14 @@ export function AgentsSection() {
             >
               <Card
                 data-landing-search
-                data-landing-search-title={agent.id}
+                data-landing-search-title={agent.name}
                 data-landing-search-type="agent"
                 role="button"
                 tabIndex={0}
                 onClick={() => {
                   const cfg = configs[agent.id]
                   setSelected({
-                    name: agent.id,
+                    name: agent.name,
                     role: agent.role,
                     description: cfg?.description || '',
                     avatar: agent.avatar,
@@ -188,13 +206,13 @@ export function AgentsSection() {
                           agent.featured ? 'h-24 w-24' : 'h-16 w-16'
                         }`}
                       >
-                        <AvatarImage src={agent.avatar} alt={agent.id} className="object-cover" loading="lazy" />
+                        <AvatarImage src={agent.avatar} alt={agent.name} className="object-cover" loading="lazy" />
                         <AvatarFallback
                           className={`bg-gradient-to-br ${agent.color} text-white font-bold ${
                             agent.featured ? 'text-2xl' : 'text-lg'
                           }`}
                         >
-                          {agent.id.substring(0, 2).toUpperCase()}
+                          {agent.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                     </div>
@@ -209,7 +227,7 @@ export function AgentsSection() {
 
                   <div className="relative flex-1">
                     <h3 className={`font-bold text-foreground ${agent.featured ? 'mb-2 text-2xl md:text-3xl' : 'mb-1 text-lg'}`}>
-                      {agent.id}
+                      {agent.name}
                     </h3>
                     <p
                       className={`bg-gradient-to-r ${agent.color} bg-clip-text font-medium text-transparent ${

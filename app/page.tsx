@@ -51,7 +51,7 @@ export default async function Home({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Kylio",
+    "name": "Ankie AI",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "Web",
     "offers": {
@@ -61,7 +61,7 @@ export default async function Home({
       "availability": "https://schema.org/InStock",
       "description": "Free sandbox access available"
     },
-    "description": "Kylio lets teams design, launch, and observe AI agents in under five minutes with built-in guardrails, live previews, and human-in-the-loop controls.",
+  "description": "Ankie AI lets teams design, launch, and observe AI agents in under five minutes with built-in guardrails, live previews, and human-in-the-loop controls.",
     "featureList": [
       "Visual Agent Studio",
       "Human-in-the-loop Guardrails",

@@ -26,7 +26,7 @@ export function HeroSection() {
 
   const onboardingSteps = useMemo(
     () => [
-      { avatar: '/img/agents/cleo4.png', name: 'Kylio', task: copy.hero.onboardingTasks.Kylio },
+      { avatar: '/img/logoankie.png', name: 'Ankie', task: copy.hero.onboardingTasks.Kylio },
       { avatar: '/img/agents/emma4.png', name: 'Emma', task: copy.hero.onboardingTasks.Emma },
       { avatar: '/img/agents/toby4.png', name: 'Toby', task: copy.hero.onboardingTasks.Toby },
     ],
@@ -51,17 +51,17 @@ export function HeroSection() {
       {/* Background gradients */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
-          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#A38CFF]/15 dark:bg-[#A38CFF]/8 blur-3xl"
+          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-brand-violet/15 dark:bg-brand-violet/10 blur-3xl"
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 8, repeat: Infinity }}
         />
         <motion.div
-          className="absolute -right-32 top-40 h-96 w-96 rounded-full bg-[#64D2FF]/15 dark:bg-[#64D2FF]/8 blur-3xl"
+          className="absolute -right-32 top-40 h-96 w-96 rounded-full bg-brand-cyan/15 dark:bg-brand-cyan/10 blur-3xl"
           animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 10, repeat: Infinity, delay: 1 }}
         />
         <motion.div
-          className="absolute bottom-32 left-1/3 h-96 w-96 rounded-full bg-[#30D158]/8 dark:bg-[#30D158]/5 blur-3xl"
+          className="absolute bottom-32 left-1/3 h-96 w-96 rounded-full bg-brand-magenta/10 dark:bg-brand-magenta/5 blur-3xl"
           animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
           transition={{ duration: 12, repeat: Infinity, delay: 2 }}
         />
@@ -78,31 +78,31 @@ export function HeroSection() {
           >
             {/* Badge */}
             <motion.div
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-[#A38CFF]/30 bg-[#A38CFF]/10 dark:bg-[#A38CFF]/5 px-4 py-1.5 text-sm font-medium text-[#1E255E] dark:text-[#A38CFF]"
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 dark:bg-brand-cyan/5 px-4 py-1.5 text-sm font-medium text-brand-ink dark:text-brand-cyan"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
             >
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#A38CFF] opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#A38CFF]" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-violet opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-violet" />
               </span>
               {copy.hero.badge}
             </motion.div>
 
             {/* Time badge */}
             <motion.div
-              className="inline-flex max-w-fit items-center gap-4 rounded-2xl border-2 border-[#A38CFF]/40 bg-gradient-to-r from-[#A38CFF]/15 via-[#8E73FF]/10 to-[#64D2FF]/15 dark:from-[#A38CFF]/8 dark:via-[#8E73FF]/5 dark:to-[#64D2FF]/8 px-8 py-4 shadow-xl shadow-[#A38CFF]/20 backdrop-blur-sm"
+              className="inline-flex max-w-fit items-center gap-4 rounded-2xl border-2 border-brand-cyan/40 bg-gradient-to-r from-brand-cyan/15 via-brand-violet/10 to-brand-magenta/15 dark:from-brand-cyan/8 dark:via-brand-violet/5 dark:to-brand-magenta/8 px-8 py-4 shadow-xl shadow-brand-cyan/20 backdrop-blur-sm"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3, type: 'spring' }}
             >
-              <CheckCircle weight="fill" className="h-10 w-10 shrink-0 text-[#A38CFF]" />
+              <CheckCircle weight="fill" className="h-10 w-10 shrink-0 text-brand-cyan" />
               <div>
-                <p className="text-sm font-bold uppercase tracking-widest text-[#1E255E]/70 dark:text-[#A38CFF]/70">
+                <p className="text-sm font-bold uppercase tracking-widest text-brand-ink/70 dark:text-brand-cyan/70">
                   {t.landing.deployTime}
                 </p>
-                <p className="text-4xl font-black text-[#1E255E] dark:text-[#F9F6F2]">
+                <p className="text-4xl font-black text-brand-ink dark:text-foreground">
                   {t.landing.under5Minutes}
                 </p>
               </div>
@@ -115,14 +115,14 @@ export function HeroSection() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
-              <span className="bg-gradient-to-r from-[#A38CFF] via-[#8E73FF] to-[#64D2FF] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta bg-clip-text text-transparent">
                 {t.landing.heroTitle}
               </span>
             </motion.h1>
 
             {/* Subtitle */}
             <motion.p
-              className="text-xl leading-relaxed text-[#1E255E]/80 dark:text-[#E5E5E5]"
+              className="text-xl leading-relaxed text-brand-ink/80 dark:text-foreground/80"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
@@ -139,7 +139,7 @@ export function HeroSection() {
               <Button
                 size="lg"
                 onClick={handleStartFree}
-                className="group h-14 bg-gradient-to-r from-[#A38CFF] via-[#8E73FF] to-[#64D2FF] px-8 text-base font-semibold text-white shadow-2xl shadow-[#A38CFF]/40 hover:scale-105 hover:shadow-3xl hover:shadow-[#A38CFF]/50"
+                className="group h-14 bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta px-8 text-base font-semibold text-white shadow-2xl shadow-brand-cyan/40 hover:scale-105 hover:shadow-3xl hover:shadow-brand-violet/40"
               >
                 <span className="flex items-center gap-2">
                   {t.landing.heroCta}
@@ -148,7 +148,7 @@ export function HeroSection() {
               </Button>
             </motion.div>
 
-            <p className="text-sm text-[#1E255E]/60 dark:text-[#E5E5E5]/60">{copy.hero.microcopy}</p>
+            <p className="text-sm text-brand-ink/60 dark:text-foreground/60">{copy.hero.microcopy}</p>
 
             {/* Trust badges */}
             <motion.div
@@ -160,10 +160,10 @@ export function HeroSection() {
               {copy.hero.trustBadges.map((badge, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 rounded-full border border-[#A38CFF]/20 bg-[#A38CFF]/10 dark:bg-[#A38CFF]/5 px-4 py-2"
+                  className="flex items-center gap-2 rounded-full border border-brand-cyan/20 bg-brand-cyan/10 dark:bg-brand-cyan/5 px-4 py-2"
                 >
-                  <CheckCircle weight="fill" className="h-4 w-4 text-[#A38CFF]" />
-                  <p className="text-sm font-medium text-[#1E255E] dark:text-[#F9F6F2]">{badge}</p>
+                  <CheckCircle weight="fill" className="h-4 w-4 text-brand-cyan" />
+                  <p className="text-sm font-medium text-brand-ink dark:text-foreground">{badge}</p>
                 </div>
               ))}
             </motion.div>
@@ -176,13 +176,13 @@ export function HeroSection() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            <div className="rounded-2xl border border-[#E5E5E5] dark:border-[#2F2F2F] bg-white/90 dark:bg-[#1B1B1B]/90 p-8 shadow-2xl backdrop-blur-xl">
+            <div className="rounded-2xl border border-border/50 bg-white/90 dark:bg-brand-surface/90 p-8 shadow-2xl backdrop-blur-xl">
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-[#1E255E] dark:text-[#F9F6F2]">
+                <h3 className="text-xl font-semibold text-brand-ink dark:text-foreground">
                   {copy.hero.onboardingTitle}
                 </h3>
-                <div className="flex items-center gap-2 rounded-full bg-[#30D158]/10 px-4 py-2 text-sm font-medium text-[#30D158]">
-                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#30D158]" />
+                <div className="flex items-center gap-2 rounded-full bg-brand-cyan/10 px-4 py-2 text-sm font-medium text-brand-cyan">
+                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-cyan" />
                   {copy.hero.onboardingActive}
                 </div>
               </div>
@@ -197,36 +197,36 @@ export function HeroSection() {
                       animate={{ scale: isActive ? 1.02 : 1, opacity: isCompleted ? 0.6 : 1 }}
                       className={`flex items-center gap-4 rounded-lg border p-4 transition-all ${
                         isActive
-                          ? 'border-[#A38CFF]/50 bg-[#A38CFF]/5'
+                          ? 'border-brand-violet/50 bg-brand-violet/5'
                           : isCompleted
-                            ? 'border-[#30D158]/30 bg-[#30D158]/5'
-                            : 'border-[#E5E5E5] dark:border-[#2F2F2F] bg-[#F9F6F2]/20 dark:bg-[#1B1B1B]/20'
+                            ? 'border-brand-cyan/30 bg-brand-cyan/5'
+                            : 'border-border/50 bg-background/20 dark:bg-brand-surface/20'
                       }`}
                     >
                       <div className="relative shrink-0">
-                        <Avatar className="h-12 w-12 border-2 border-white dark:border-[#1B1B1B] shadow-md">
+                        <Avatar className="h-12 w-12 border-2 border-white dark:border-brand-surface shadow-md">
                           <AvatarImage src={step.avatar} alt={step.name} />
-                          <AvatarFallback className="bg-gradient-to-br from-[#A38CFF] to-[#64D2FF] text-sm font-semibold text-white">
+                          <AvatarFallback className="bg-gradient-to-br from-brand-cyan to-brand-violet text-sm font-semibold text-white">
                             {step.name.substring(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         {isCompleted && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-[#30D158]/90">
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-cyan/90">
                             <CheckCircle weight="fill" className="h-6 w-6 text-white" />
                           </div>
                         )}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="text-base font-medium text-[#1E255E] dark:text-[#F9F6F2]">{step.name}</p>
-                        <p className="truncate text-sm text-[#1E255E]/60 dark:text-[#E5E5E5]/60">{step.task}</p>
+                        <p className="text-base font-medium text-brand-ink dark:text-foreground">{step.name}</p>
+                        <p className="truncate text-sm text-brand-ink/60 dark:text-foreground/60">{step.task}</p>
                       </div>
 
                       {isActive && !isCompleted && (
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                          className="h-6 w-6 shrink-0 rounded-full border-2 border-[#A38CFF] border-t-transparent"
+                          className="h-6 w-6 shrink-0 rounded-full border-2 border-brand-violet border-t-transparent"
                         />
                       )}
                     </motion.div>
@@ -234,20 +234,20 @@ export function HeroSection() {
                 })}
               </div>
 
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#E5E5E5] dark:bg-[#2F2F2F]">
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-border/50 dark:bg-brand-surface">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-[#A38CFF] via-[#8E73FF] to-[#64D2FF]"
+                  className="h-full bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta"
                   initial={{ width: '0%' }}
                   animate={{ width: `${((currentStep + 1) / onboardingSteps.length) * 100}%` }}
                   transition={{ duration: 0.5 }}
                 />
               </div>
 
-              <div className="mt-6 rounded-lg border border-[#E5E5E5] dark:border-[#2F2F2F] bg-[#F9F6F2]/30 dark:bg-[#1B1B1B]/30 p-4">
-                <p className="text-sm font-medium text-[#1E255E]/60 dark:text-[#E5E5E5]/60">
+              <div className="mt-6 rounded-lg border border-border/50 bg-background/30 dark:bg-brand-surface/30 p-4">
+                <p className="text-sm font-medium text-brand-ink/60 dark:text-foreground/60">
                   {copy.hero.currentTaskLabel}
                 </p>
-                <h4 className="text-lg font-semibold text-[#1E255E] dark:text-[#F9F6F2]">
+                <h4 className="text-lg font-semibold text-brand-ink dark:text-foreground">
                   {onboardingSteps[currentStep].task}
                 </h4>
               </div>

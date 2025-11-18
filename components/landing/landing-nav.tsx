@@ -50,7 +50,7 @@ export function LandingNav() {
   // Translations for buttons
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-[#E5E5E5] dark:border-[#2F2F2F] bg-[#FFFFFF]/95 dark:bg-[#0D0D0D]/95 backdrop-blur-xl"
+  className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/60 bg-background/95 dark:bg-[#050507]/95 backdrop-blur-xl"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
@@ -64,24 +64,16 @@ export function LandingNav() {
         >
           {/* Pure logo (no avatar chrome) */}
           <div className="flex h-3 w-auto items-center sm:h-4 md:h-5 lg:h-6 shrink-0">
-            {(() => {
-              const isDark = (resolvedTheme ?? theme) === 'dark'
-              const logoSrc = isDark
-                ? `/img/kyliologodarkmode.png?v=${assetV}`
-                : `/img/kyliologo.png?v=${assetV}`
-              return (
-                <Image
-                  src={logoSrc}
-                  alt="Kylio"
-                  width={84}
-                  height={22}
-                  priority
-                  className="h-full w-auto object-contain select-none"
-                  draggable={false}
-                  sizes="(max-width: 640px) 56px, (max-width: 768px) 72px, 84px"
-                />
-              )
-            })()}
+            <Image
+              src={`/img/logoankie.png?v=${assetV}`}
+              alt="Ankie AI"
+              width={84}
+              height={24}
+              priority
+              className="h-full w-auto object-contain select-none"
+              draggable={false}
+              sizes="(max-width: 640px) 56px, (max-width: 768px) 72px, 84px"
+            />
           </div>
           {/* Keep header compact: show only the logo image (no wordmark or subtitle) */}
         </motion.div>
@@ -90,25 +82,25 @@ export function LandingNav() {
         <div className="hidden items-center gap-3 xl:gap-5 lg:flex">
           <a
             href="#features"
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
+            className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-cyan"
           >
             {mounted ? copy.nav.features : 'Features'}
           </a>
           <a
             href="#agents"
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
+            className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-cyan"
           >
             {mounted ? copy.nav.agents : 'Agents'}
           </a>
           <a
             href="#pricing"
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
+            className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-cyan"
           >
             {mounted ? (locale === 'es' ? 'Precios' : locale === 'pt' ? 'Preços' : locale === 'fr' ? 'Tarifs' : 'Pricing') : 'Pricing'}
           </a>
           <a
             href="#benefits"
-            className="text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] transition-colors hover:text-[#A38CFF]"
+            className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-cyan"
           >
             {mounted ? copy.nav.benefits : 'Benefits'}
           </a>
@@ -165,14 +157,14 @@ export function LandingNav() {
               variant="ghost" 
               size="sm" 
               onClick={handleLogin}
-              className="text-[#1E255E] dark:text-[#E5E5E5] hover:bg-[#A38CFF]/10 h-9 text-xs lg:text-sm px-3 lg:px-4"
+              className="text-foreground hover:bg-brand-cyan/10 h-9 text-xs lg:text-sm px-3 lg:px-4"
             >
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
               size="sm"
               onClick={handleGetStarted}
-              className="bg-[#A38CFF] text-white shadow-lg shadow-[#A38CFF]/30 transition-all hover:scale-[1.02] hover:bg-[#8E73FF] hover:shadow-[#A38CFF]/50 h-9 text-xs lg:text-sm px-3 lg:px-4"
+              className="bg-brand-cyan text-[#04121A] shadow-lg shadow-brand-cyan/30 transition-all hover:scale-[1.02] hover:bg-[#0096DA] hover:shadow-brand-cyan/50 h-9 text-xs lg:text-sm px-3 lg:px-4"
             >
               {mounted ? copy.nav.getStarted : 'Get Started'}
             </Button>
@@ -193,7 +185,7 @@ export function LandingNav() {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <motion.div
-          className="border-t border-[#E5E5E5] dark:border-[#2F2F2F] bg-[#FFFFFF]/98 dark:bg-[#0D0D0D]/98 backdrop-blur-lg lg:hidden"
+          className="border-t border-border/60 bg-background/98 backdrop-blur-lg dark:bg-[#050507]/98 lg:hidden"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
@@ -216,33 +208,33 @@ export function LandingNav() {
                   }
                 }}
                 placeholder={mounted ? copy.nav.searchPlaceholder : 'Search content…'}
-                className="w-full rounded-lg border border-[#E5E5E5] dark:border-[#2F2F2F] bg-[#F9F6F2]/50 dark:bg-[#1B1B1B] px-3 py-2 text-sm text-[#1E255E] dark:text-[#E5E5E5] shadow-sm outline-none focus:border-[#A38CFF] focus:ring-2 focus:ring-[#A38CFF]/20"
+                className="w-full rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-sm text-foreground shadow-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20"
               />
             </div>
             <a
               href="#pricing"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-brand-cyan/10 hover:text-brand-cyan"
               onClick={() => setMobileMenuOpen(false)}
             >
               {mounted ? (locale === 'es' ? 'Precios' : locale === 'pt' ? 'Preços' : locale === 'fr' ? 'Tarifs' : 'Pricing') : 'Pricing'}
             </a>
             <a
               href="#features"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-brand-cyan/10 hover:text-brand-cyan"
               onClick={() => setMobileMenuOpen(false)}
             >
               Features
             </a>
             <a
               href="#agents"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-brand-cyan/10 hover:text-brand-cyan"
               onClick={() => setMobileMenuOpen(false)}
             >
               Agents
             </a>
             <a
               href="#benefits"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-[#1E255E]/80 dark:text-[#F5F5F5] hover:bg-[#A38CFF]/10 hover:text-[#A38CFF]"
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-brand-cyan/10 hover:text-brand-cyan"
               onClick={() => setMobileMenuOpen(false)}
             >
               Benefits
@@ -250,7 +242,7 @@ export function LandingNav() {
             <div className="my-4 border-t border-[#E5E5E5] dark:border-[#2F2F2F]" />
             <Button
               variant="outline"
-              className="w-full justify-start border-[#E5E5E5] dark:border-[#2F2F2F] text-[#1E255E] dark:text-[#E5E5E5] hover:bg-[#A38CFF]/10 hover:border-[#A38CFF]"
+              className="w-full justify-start border-border/70 text-foreground hover:bg-brand-cyan/10 hover:border-brand-cyan"
               onClick={() => {
                 handleLogin()
                 setMobileMenuOpen(false)
@@ -259,7 +251,7 @@ export function LandingNav() {
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
-              className="w-full bg-[#A38CFF] text-white hover:bg-[#8E73FF] shadow-lg shadow-[#A38CFF]/30"
+              className="w-full bg-brand-cyan text-[#04121A] hover:bg-[#0096DA] shadow-lg shadow-brand-cyan/30"
               onClick={() => {
                 handleGetStarted()
                 setMobileMenuOpen(false)

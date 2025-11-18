@@ -38,12 +38,12 @@ const appUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Kylio AI — Deploy Your Own Agents in Minutes",
-    template: "%s · Kylio AI",
+    default: "Ankie AI — Deploy Adaptive Agents in Minutes",
+    template: "%s · Ankie AI",
   },
   description:
-    "Deploy your own AI agents in under 5 minutes. Built on three pillars: Transparency, Personalization, and Simplicity. Free beta — no credit card required.",
-  applicationName: "Kylio AI",
+    "Ankie AI is the transparent multi-agent workspace for building, supervising, and shipping autonomous assistants in minutes.",
+  applicationName: "Ankie AI",
   generator: "Next.js",
   keywords: [
     // Primary keywords (high intent)
@@ -70,30 +70,31 @@ export const metadata: Metadata = {
     "business process automation",
     
     // Brand
-    "Kylio AI",
+    "Ankie AI",
     "Huminary Labs",
   ],
-  authors: [{ name: "Huminary Labs" }],
+  authors: [{ name: "Ankie AI · Huminary Labs" }],
   category: "productivity",
   verification: {
     google: "OXgtx8i5hp6cd3djciZSnVlPzvQDcEE_PnWMQh4iLhQ",
   },
   icons: {
     icon: [
-      { url: "/favicon.ico?v=2", type: "image/x-icon" },
-      { url: "/favicon-32x32.png?v=2", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16x16.png?v=2", sizes: "16x16", type: "image/png" },
+      { url: "/img/favicon.ico", type: "image/x-icon" },
+      { url: "/img/web-app-manifest-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/img/web-app-manifest-512x512.png", sizes: "512x512", type: "image/png" },
     ],
-    shortcut: ["/favicon.ico?v=2"],
-    apple: "/apple-touch-icon.png?v=2",
+    shortcut: ["/img/favicon.ico"],
+    apple: [{ url: "/img/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    other: [{ rel: "mask-icon", url: "/img/logo.svg", color: "#00B2FF" }],
   },
   manifest: "/site.webmanifest",
   openGraph: {
     type: "website",
-    siteName: "Kylio AI",
-    title: "Kylio AI — Deploy Your Own Agents in Minutes",
+    siteName: "Ankie AI",
+    title: "Ankie AI — Deploy Adaptive Agents in Minutes",
     description:
-      "Launch custom AI agents quickly with full transparency and simple controls. Try the free beta — no credit card required.",
+      "Launch custom AI agents with full transparency, supervision, and simple controls. Try the free beta — no credit card required.",
   url: appUrl,
     images: [
       {
@@ -101,16 +102,16 @@ export const metadata: Metadata = {
         url: "/opengraph-image?v=2",
         width: 1200,
         height: 630,
-        alt: "Kylio - AI Agents Platform",
+        alt: "Ankie AI — Multi-agent automation platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     creator: "@HuminaryLabs",
-    title: "Kylio AI — Deploy Your Own Agents in Minutes",
+    title: "Ankie AI — Deploy Adaptive Agents in Minutes",
     description:
-      "Build and deploy AI agents in under 5 minutes. Transparent by design. Free beta access.",
+      "Design and deploy AI agents in under 5 minutes with human-grade oversight and transparency.",
     // Keep in sync with openGraph.images and include cache-busting param
     images: ["/opengraph-image?v=2"],
   },
@@ -125,9 +126,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     // Warm, premium light tone
-    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
+    { media: "(prefers-color-scheme: light)", color: "#F5FAFF" },
     // Match premium neutral black used across the app
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0c" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B0B0F" },
   ],
   colorScheme: "light dark",
 }
@@ -155,10 +156,10 @@ export default async function RootLayout({
   <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         {/* Dynamic theme-color based on user's color scheme preference */}
-        <meta name="theme-color" content="#FAF9FF" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#14161C" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F5FAFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B0B0F" media="(prefers-color-scheme: dark)" />
         <link rel="manifest" href="/site.webmanifest" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+  <link rel="apple-touch-icon" href="/img/apple-icon.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}

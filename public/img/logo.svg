@@ -35,7 +35,10 @@
       <line class="link" x1="92" y1="165" x2="148" y2="165"/>
     </g>
     <g transform="translate(260,96)">
-      <text class="type" font-size="88">Ankie</text>
+      <text class="type" font-size="88" letter-spacing="3">
+        <tspan>ANKIE</tspan>
+        <tspan dx="32" fill="#0A84FF">AI</tspan>
+      </text>
     </g>
   </g>
 </svg>
