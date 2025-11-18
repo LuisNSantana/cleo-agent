@@ -22,10 +22,6 @@ export const NORA_AGENT: AgentConfig = {
     'serpNewsSearch',
     'serpGeneralSearch',
     'webSearch',
-    // Firecrawl for guidelines and PDFs (if configured)
-    'firecrawl_analyze_pdf',
-    'firecrawl_search',
-    'firecrawl_extract',
     // Reporting
     'createGoogleDoc',
     'updateGoogleDoc',

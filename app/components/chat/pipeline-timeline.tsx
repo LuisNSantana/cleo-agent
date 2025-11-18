@@ -14,6 +14,81 @@ import { ExpandableStep } from './expandable-step';
 import { getAgentMetadata } from "@/lib/agents/agent-metadata"
 import { CaretDownIcon, CaretUpIcon, CheckCircle } from "@phosphor-icons/react"
 
+type PipelinePhase = 'plan' | 'delegate' | 'execute' | 'verify' | 'complete'
+type StepWithPhase = PipelineStep & { phase: PipelinePhase }
+
+const PHASE_LABELS: Record<PipelinePhase, string> = {
+  plan: 'Planificación',
+  delegate: 'Delegación',
+  execute: 'Ejecución',
+  verify: 'Verificación',
+  complete: 'Finalizado'
+}
+
+function inferPhase(step: PipelineStep): PipelinePhase {
+  switch (step.action) {
+    case 'routing':
+    case 'analyzing':
+    case 'thinking':
+      return 'plan'
+    case 'delegating':
+    case 'delegation':
+      return 'delegate'
+    case 'executing':
+      return 'execute'
+    case 'responding':
+    case 'reviewing':
+    case 'supervising':
+      return 'verify'
+    case 'completing':
+      return 'complete'
+    default:
+      return 'plan'
+  }
+}
+  function resolveAgentName(step: PipelineStep): string | undefined {
+    return step.agentName ||
+      step.metadata?.agentName ||
+      step.metadata?.agentDisplayName ||
+      step.metadata?.targetAgentName ||
+      step.metadata?.delegatedAgentName ||
+      step.metadata?.assistantName
+  }
+
+  function isStepActive(step: PipelineStep): boolean {
+    if (!step) return false
+    if (step.action === 'completing') return false
+
+    const stage = step.metadata?.stage
+    const status = step.metadata?.status
+
+    if (stage === 'completed') return false
+    if (status === 'error' || status === 'failed') return false
+
+    if (step.metadata?.requiresApproval === true || step.metadata?.status === 'awaiting_approval' || step.metadata?.type === 'interrupt') {
+      return true
+    }
+
+    if (stage === 'started' || stage === 'in_progress' || stage === 'processing' || stage === 'researching') {
+      return true
+    }
+
+    if (status === 'in_progress') {
+      return true
+    }
+
+    if (step.action === 'thinking' && !stage) {
+      return true
+    }
+
+    if (typeof step.progress === 'number') {
+      return step.progress < 100
+    }
+
+    return false
+  }
+
+
 
 
 function formatTime(ts: string | Date) {
@@ -102,12 +177,23 @@ function calculateMetrics(steps: PipelineStep[]) {
   const lastStep = sortedSteps[sortedSteps.length - 1]
   const totalTime = new Date(lastStep.timestamp).getTime() - new Date(firstStep.timestamp).getTime()
   
-  const completedSteps = steps.filter(s => 
-    s.action === 'completing' || 
-    (typeof s.progress === 'number' && s.progress >= 100)
-  ).length
-  
-  const progress = steps.length > 0 ? (completedSteps / steps.length) * 100 : 0
+  const activeSteps = steps.filter(isStepActive)
+  const completedSteps = Math.max(0, steps.length - activeSteps.length)
+  let progress = steps.length > 0 ? (completedSteps / steps.length) * 100 : 0
+
+  if (activeSteps.length > 0) {
+    const activeContribution = activeSteps.reduce((sum, step) => {
+      if (typeof step.progress === 'number') {
+        return sum + Math.min(1, Math.max(0, step.progress / 100))
+      }
+      return sum
+    }, 0)
+    progress = ((completedSteps + activeContribution) / steps.length) * 100
+  }
+
+  if (isPipelineCompleted(steps)) {
+    progress = 100
+  }
   
   // ✅ Calculate total tokens from metadata
   const totalTokens = steps.reduce((sum, step) => {
@@ -302,6 +388,7 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
       
       const mappedStep = {
         ...s,
+        agentName: resolveAgentName(s),
         action: mappedAction as PipelineStep['action'],
         timestamp: typeof s.timestamp === 'string' ? s.timestamp : s.timestamp.toISOString()
       }
@@ -320,7 +407,8 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
       return mappedStep
     })
     
-    return mapped
+    // ✅ Orden cronológico estable para todas las operaciones posteriores
+    return mapped.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [steps])
 
   // ✅ IMPROVED: Smart deduplication that removes redundant steps
@@ -377,41 +465,35 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
     return Array.from(byId.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [normalized])
 
+  const stepsWithPhase = useMemo<StepWithPhase[]>(() => 
+    uniqueSteps.map(step => ({
+      ...step,
+      phase: inferPhase(step)
+    })),
+  [uniqueSteps])
+
   // Calculate pipeline metrics
   const metrics = useMemo(() => calculateMetrics(uniqueSteps), [uniqueSteps])
 
   // Identify the latest step overall for collapsed preview
   // Based on best practices from GitHub Actions, CircleCI, Airflow
-  const summaryStep = useMemo(() => {
-    if (!uniqueSteps.length) return null;
+  const summaryStep = useMemo<StepWithPhase | null>(() => {
+    if (!stepsWithPhase.length) return null;
 
     // Helper: Get latest timestamp
     const getTimestamp = (step: any) => new Date(step.timestamp).getTime()
     
-    // Helper: Check if a step is actively running (not completed)
-    const isStepActive = (s: any) => {
-      // Don't consider completing steps as active
-      if (s.action === 'completing') return false
-      
-      // A step is active if it's started or in progress (not completed)
-      return (
-        s.metadata?.stage === 'started' || 
-        s.metadata?.stage === 'in_progress' ||
-        s.metadata?.status === 'in_progress'
-      ) && s.metadata?.stage !== 'completed'
-    }
-    
-    const hasActiveSteps = uniqueSteps.some(isStepActive)
+    const hasActiveSteps = stepsWithPhase.some(isStepActive)
 
     // 🔴 PRIORITY 1: ERROR/FAILURE STATE (requires immediate attention)
-    const errorStep = uniqueSteps.find(s => 
+    const errorStep = stepsWithPhase.find(s => 
       s.metadata?.status === 'error' || 
       s.metadata?.status === 'failed'
     )
     if (errorStep) return errorStep
 
     // 🟡 PRIORITY 2: USER INPUT REQUIRED (awaiting human action)
-    const awaitingInput = uniqueSteps.find(s => 
+    const awaitingInput = stepsWithPhase.find(s => 
       s.metadata?.type === 'interrupt' ||
       s.metadata?.status === 'awaiting_approval' ||
       s.metadata?.requiresApproval === true
@@ -420,7 +502,7 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
 
     // 🔵 PRIORITY 3: BLOCKING STEP - Active delegation (critical path)
     // Delegation blocks progress until sub-agent completes
-    const activeDelegation = uniqueSteps
+    const activeDelegation = stepsWithPhase
       .filter(s => 
         s.action === 'delegating' && 
         (s.metadata?.status === 'in_progress' || 
@@ -433,14 +515,14 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
 
     // ✅ PRIORITY 4: COMPLETED (if completing step exists and no active work)
     // Show "completing" as soon as it appears and no tools are actively running
-    const completingStep = uniqueSteps.find(s => s.action === 'completing')
+    const completingStep = stepsWithPhase.find(s => s.action === 'completing')
     if (completingStep && !hasActiveSteps) {
       return completingStep
     }
 
     // 🟢 PRIORITY 5: MOST DOWNSTREAM RUNNING STEP (furthest in execution)
     // Show the most recent tool/action being executed (exclude completed ones)
-    const runningSteps = uniqueSteps
+    const runningSteps = stepsWithPhase
       .filter(s => {
         // Exclude steps that already completed
         if (s.metadata?.stage === 'completed') return false
@@ -455,7 +537,7 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
     if (runningSteps.length > 0) return runningSteps[0]
 
     // 🟢 PRIORITY 6: ROUTING/ANALYZING (initial stages)
-    const routingStep = uniqueSteps
+    const routingStep = stepsWithPhase
       .filter(s => s.action === 'routing' || s.action === 'analyzing')
       .sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
     
@@ -465,8 +547,10 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
     // Otherwise show most recent step
     if (completingStep) return completingStep
     
-    return uniqueSteps.sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
-  }, [uniqueSteps]);
+    return [...stepsWithPhase].sort((a, b) => getTimestamp(b) - getTimestamp(a))[0]
+  }, [stepsWithPhase]);
+
+  const currentPhaseLabel = summaryStep ? PHASE_LABELS[summaryStep.phase] : null
   
   // ✅ Progressive message based on elapsed time for long-running steps
   const [progressiveContent, setProgressiveContent] = useState<Record<string, string>>({})
@@ -494,9 +578,9 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
   }, [summaryStep])
 
   // Show all unique steps when expanded and keep a compact preview for collapsed mode
-  const hasSteps = uniqueSteps.length > 0
-  const visibleSteps = isExpanded ? uniqueSteps : []
-  const compactSteps = useMemo(() => uniqueSteps.slice(-3), [uniqueSteps])
+  const hasSteps = stepsWithPhase.length > 0
+  const visibleSteps: StepWithPhase[] = isExpanded ? stepsWithPhase : []
+  const compactSteps = useMemo(() => stepsWithPhase.slice(-3), [stepsWithPhase])
 
   const estimatedRemainingSeconds = useMemo(() => {
     if (!summaryStep) return null
@@ -546,6 +630,11 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
               ⛓️
             </motion.span>
             <span>Pipeline</span>
+            {currentPhaseLabel && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-muted-foreground/80">
+                • Fase {currentPhaseLabel}
+              </span>
+            )}
             {/* ✅ Step counter with completion ratio */}
             {uniqueSteps.length > 0 && (
               <>
@@ -646,6 +735,11 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
                   <p className="text-sm font-medium text-foreground">
                     {actionLabel(summaryStep.action)}
                   </p>
+                  {summaryStep.phase && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted/40 text-muted-foreground/80">
+                      {PHASE_LABELS[summaryStep.phase as PipelinePhase] || summaryStep.phase}
+                    </span>
+                  )}
                   {/* ✅ Step Type Badge in collapsed view */}
                   {(() => {
                     const badge = getStepTypeBadge(summaryStep)
@@ -730,6 +824,11 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
                 <span className="font-medium text-foreground/80">
                   {actionLabel(step.action)}
                 </span>
+                {step.phase && (
+                  <span className="text-[9px] uppercase tracking-wide text-muted-foreground/70 bg-muted/20 px-1 py-0.5 rounded-full">
+                    {PHASE_LABELS[step.phase as PipelinePhase] || step.phase}
+                  </span>
+                )}
                 <span className="text-[11px] truncate flex-1">
                   {step.agentName || getAgentMetadata(step.agent).name}
                 </span>

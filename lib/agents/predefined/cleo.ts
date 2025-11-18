@@ -1,5 +1,5 @@
 /**
- * Cleo - Advanced Emotional Intelligence Supervisor & Coordinator
+ * Ankie - Advanced Emotional Intelligence Supervisor & Coordinator
  * Primary agent with sophisticated emotional awareness and multi-agent orchestration.
  * Now with dynamic agent discovery and delegation capabilities.
  * 
@@ -35,9 +35,9 @@ const LEGACY_DELEGATION_TOOLS = [
 ]
 
 export const CLEO_AGENT: AgentConfig = {
-  id: 'cleo-supervisor', // Keep canonical ID for compatibility across orchestrator & persistence layers
-  name: 'Kylio',
-  description: 'Plataforma supervisora de inteligencia emocional y coordinación multi‑agente (anteriormente Cleo). Orquesta agentes especializados con empatía y precisión.',
+  id: 'cleo-supervisor', // Keep canonical ID for compatibility across orchestrator & persistence layers (legacy ID)
+  name: 'Ankie',
+  description: 'Plataforma supervisora de inteligencia emocional y coordinación multi‑agente. Ankie orquesta agentes especializados con empatía profunda, precisión y foco en el impacto real en la vida del usuario.',
   role: 'supervisor',
   model: 'grok-4-fast-reasoning',
   temperature: 0.5,

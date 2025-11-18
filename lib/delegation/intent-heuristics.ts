@@ -15,10 +15,12 @@ export interface DelegationIntentResult {
 // Keyword dictionary per agent (lowercase). Weight defaults to 1 unless specified.
 // Keep lists compact; we can enrich later.
 // This list is dynamically enriched at runtime with user-created agents
-const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> = {
+type KeywordEntry = string | { k: string; w?: number; match?: 'word' }
+
+const AGENT_KEYWORDS: Record<string, KeywordEntry[]> = {
   'ami-creative': [
     'agenda','agendar','calendario','calendar','schedule','scheduling','meeting','reunión','recordatorio','reminder',
-    'organiza','organización','follow up','minutes','acta'
+    'organiza','organización','follow up','minutes','acta','asistente','assistant','secretaria'
   ],
   'notion-agent': [
     'notion','workspace','página','page','database','db','tabla','base de datos','propiedad','properties','block'
@@ -36,6 +38,8 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     { k: 'archivo drive', w: 2 }
   ],
   'apu-support': [
+    // Support & troubleshooting, especially when user mentions tickets, incidencias, SLAs or soporte
+    'ticket','tickets','incidencia','incidencias','soporte','support','helpdesk','sla','cliente','clientes',
     'investiga','research','buscar','trend','tendencia','web','news','noticias','análisis','comparar','fuentes'
   ],
   'emma-ecommerce': [
@@ -84,8 +88,8 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
     { k: 'post facebook', w: 3 }, { k: 'publicar facebook', w: 3 },
     'programar facebook','schedule facebook','facebook insights','page insights',
     
-    // Telegram - MUY ALTA PRIORIDAD (evitar confusión con email)
-    { k: 'telegram', w: 4 }, { k: '@', w: 1 }, // @ indica canal de Telegram
+  // Telegram - MUY ALTA PRIORIDAD (evitar confusión con email)
+  { k: 'telegram', w: 4, match: 'word' },
     { k: 'canal telegram', w: 4 }, { k: 'channel telegram', w: 4 },
     { k: 'publicar telegram', w: 4 }, { k: 'enviar telegram', w: 4 },
     { k: 'broadcast telegram', w: 4 }, { k: 'mensaje telegram', w: 4 },
@@ -96,8 +100,14 @@ const AGENT_KEYWORDS: Record<string, Array<string | { k: string; w: number }>> =
   'iris-insights': [
     { k: 'insight', w: 2 }, { k: 'insights', w: 2 }, 'resumen ejecutivo','hallazgos','recomendaciones','riesgos','tendencias',
     'pdf','documento','doc','google doc','evidencia','referencias','sintetiza','analiza','analisis','análisis',
-    'informe','reporte','executive summary','mapa de evidencias','fuentes','citas'
+    'informe','reporte','executive summary','mapa de evidencias','fuentes','citas','briefing','executive brief'
   ],
+  'wex-intelligence': [
+    // Strategic / competitive / market intelligence
+    'insights de mercado','inteligencia competitiva','competitive intelligence','análisis de mercado','market analysis',
+    'competidores','competencia','posicionamiento','strategy','estrategia','swot','porter','moat','diferenciación',
+    'white space','oportunidades de mercado','tam','sam','som'
+  ]
 }
 
 // Optional penalties or boosts based on message length or structure
@@ -112,6 +122,25 @@ function normalizeScore(count: number, totalKeywords: number): number {
   if (count <= 0) return 0
   const ratio = count / Math.max(4, totalKeywords) // dampen very long lists
   return Math.min(1, ratio)
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function matchesKeyword(text: string, entry: KeywordEntry): boolean {
+  if (typeof entry === 'string') return text.includes(entry)
+  const keyword = entry.k.toLowerCase()
+  if (entry.match === 'word') {
+    const regex = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i')
+    return regex.test(text)
+  }
+  return text.includes(keyword)
+}
+
+function weightFor(entry: KeywordEntry): number {
+  if (typeof entry === 'string') return 1
+  return typeof entry.w === 'number' ? entry.w : 1
 }
 
 /**
@@ -151,6 +180,7 @@ export function scoreDelegationIntent(userMessage: string, opts?: { debug?: bool
   const text = userMessage.toLowerCase()
   const scores: Record<string, number> = {}
   const reasons: string[] = []
+  const keywordSelections: Record<string, KeywordEntry[]> = {}
 
   // Filter to only score available agents (performance optimization)
   const agentsToScore = opts?.availableAgents 
@@ -158,15 +188,23 @@ export function scoreDelegationIntent(userMessage: string, opts?: { debug?: bool
     : Object.keys(AGENT_KEYWORDS)
 
   for (const agentId of agentsToScore) {
-    const keywords = AGENT_KEYWORDS[agentId]
+    let keywords = AGENT_KEYWORDS[agentId]
     if (!keywords || keywords.length === 0) continue
-    
+
+    if (agentId === 'jenn-community' && !text.includes('telegram')) {
+      keywords = keywords.filter(entry => {
+        const keyword = typeof entry === 'string' ? entry : entry.k
+        return !keyword.includes('telegram')
+      })
+      if (!keywords.length) continue
+    }
+
+    keywordSelections[agentId] = keywords
+
     let hitCount = 0
     for (const entry of keywords) {
-      const k = typeof entry === 'string' ? entry : entry.k
-      const weight = typeof entry === 'string' ? 1 : entry.w
-      if (text.includes(k)) {
-        hitCount += weight
+      if (matchesKeyword(text, entry)) {
+        hitCount += weightFor(entry)
       }
     }
     const base = normalizeScore(hitCount, keywords.length)
@@ -186,11 +224,11 @@ export function scoreDelegationIntent(userMessage: string, opts?: { debug?: bool
 
   // Compose reasons (top 3 positive matches for the chosen agent)
   if (target) {
-    const kw = AGENT_KEYWORDS[target]
-    const matched = kw.filter(entry => {
-      const k = typeof entry === 'string' ? entry : entry.k
-      return text.includes(k)
-    }).slice(0, 3).map(e => (typeof e === 'string' ? e : e.k))
+    const kw = keywordSelections[target] || AGENT_KEYWORDS[target] || []
+    const matched = kw
+      .filter(entry => matchesKeyword(text, entry))
+      .slice(0, 3)
+      .map(e => (typeof e === 'string' ? e : e.k))
     if (matched.length) reasons.push(`matched: ${matched.join(', ')}`)
     reasons.push(`score:${best.toFixed(2)}`)
   }

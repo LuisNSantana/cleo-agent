@@ -38,11 +38,6 @@ export const ASTRA_AGENT: AgentConfig = {
     'shareDriveFile',
     // Research and context
     'webSearch',
-    // Firecrawl - Enhanced web & document analysis
-    'firecrawl_analyze_pdf',     // NEW: Analyze PDF attachments/documents
-    'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping
-    'firecrawl_search',           // NEW: Web search with extraction
-    'firecrawl_extract',          // Single page extraction
     'complete_task'
   ],
   tags: ['email', 'communication', 'writing', 'gmail'],

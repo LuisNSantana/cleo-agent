@@ -73,13 +73,6 @@ export const PETER_AGENT: AgentConfig = {
     'stockChartAndVolatility', // Chart candidates and volatility analysis
     'serpTrendsSearch',      // Market trends, crypto trends, financial search patterns
     'serpTrendingNow',       // Real-time trending financial topics and crypto discussions
-    // Firecrawl - Document & web analysis
-    'firecrawl_analyze_pdf',     // NEW: Analyze financial PDFs (reports, statements)
-    'firecrawl_scrape_advanced',  // NEW: Dynamic content scraping
-    'firecrawl_search',           // NEW: Web search with extraction
-    'firecrawl_crawl',
-    'firecrawl_extract',
-    'firecrawl_sitemap_summarize',
     'cryptoPrices',              // CoinGecko fallback for crypto prices
     // Mathematical calculations
     'calculator',
