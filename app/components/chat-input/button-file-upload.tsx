@@ -29,6 +29,11 @@ type ButtonFileUploadProps = {
   model: string
 }
 
+const CONTROL_BUTTON_CLASSES =
+  "h-10 w-10 sm:h-9 sm:w-9 rounded-full border border-black/5 bg-white/90 text-slate-600 shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition-all duration-200 hover:border-brand-cyan hover:text-brand-cyan hover:shadow-brand-cyan/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:border-brand-cyan/70 dark:hover:bg-white/10"
+
+const DISABLED_CONTROL_CLASSES = "opacity-40 pointer-events-none"
+
 export function ButtonFileUpload({
   onFileUploadAction,
   isUserAuthenticated,
@@ -46,8 +51,8 @@ export function ButtonFileUpload({
         <TooltipTrigger asChild>
           <Button
             size="sm"
-            variant="secondary"
-            className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent opacity-50"
+            variant="ghost"
+            className={cn(CONTROL_BUTTON_CLASSES, "bg-white/60 text-slate-400", DISABLED_CONTROL_CLASSES)}
             type="button"
             aria-label="Add files (disabled: no vision support)"
             disabled
@@ -70,8 +75,8 @@ export function ButtonFileUpload({
             <PopoverTrigger asChild>
               <Button
                 size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                variant="ghost"
+                className={CONTROL_BUTTON_CLASSES}
                 type="button"
                 aria-label="Add files"
               >
@@ -100,7 +105,7 @@ export function ButtonFileUpload({
 
   return (
     <FileUpload
-  onFilesAdded={handleFilesAdded}
+      onFilesAdded={handleFilesAdded}
       multiple
       disabled={!isUserAuthenticated}
       accept=".txt,.md,.csv,.json,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/rtf,text/plain,text/markdown,application/json,text/csv,image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/heic,image/heif"
@@ -110,11 +115,8 @@ export function ButtonFileUpload({
           <FileUploadTrigger asChild>
             <Button
               size="sm"
-              variant="secondary"
-              className={cn(
-                "border-border dark:bg-secondary size-9 rounded-full border bg-transparent",
-                !isUserAuthenticated && "opacity-50"
-              )}
+              variant="ghost"
+              className={cn(CONTROL_BUTTON_CLASSES, !isUserAuthenticated && DISABLED_CONTROL_CLASSES)}
               type="button"
               disabled={!isUserAuthenticated}
               aria-label="Add files"
