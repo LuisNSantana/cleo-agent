@@ -303,6 +303,7 @@ export function useChatCore({
   // Refs and derived state  
   const hasSentFirstMessageRef = useRef(false)
   const prevChatIdRef = useRef<string | null>(chatId)
+  const pendingChatIdRef = useRef<string | null>(null)
   
   // Track if there was an active stream that was interrupted
   const wasStreamingRef = useRef(false)
@@ -523,7 +524,7 @@ export function useChatCore({
         }
 
         // Ensure chat exists if needed
-        let effectiveChatId = chatId
+        let effectiveChatId = chatId || pendingChatIdRef.current
         try {
           if (!effectiveChatId && ensureChatExists) {
             // Use text or fallback to "New Chat" for title generation
@@ -537,6 +538,11 @@ export function useChatCore({
         }
         if (!effectiveChatId) {
           throw new Error('Unable to create or locate a chat session')
+        }
+
+        // Reset any pending chat id once we've secured the session id
+        if (pendingChatIdRef.current) {
+          pendingChatIdRef.current = null
         }
 
   const endpoint = isAuthenticated ? API_ROUTE_CHAT : API_ROUTE_CHAT_GUEST
@@ -1599,14 +1605,14 @@ export function useChatCore({
     async (e: { preventDefault: () => void }) => {
       e.preventDefault()
 
-  // No debounced input to cancel; input updates are immediate
+      // No debounced input to cancel; input updates are immediate
 
       // 🔒 Early validation with logging
-  if (!isValidUserMessage(input, files)) {
+      if (!isValidUserMessage(input, files)) {
         return
       }
 
-  if (isSubmitting) {
+      if (isSubmitting) {
         return
       }
 
@@ -1625,7 +1631,8 @@ export function useChatCore({
       const submitStartTime = performance.now()
       let messageText = input.trim() // Guardar el texto antes de limpiar
       const currentFiles = [...files] // Guardar archivos antes de limpiar
-      
+      const hasFilesToUpload = currentFiles.length > 0
+
       // If no text but has files, use a descriptive message
       if (!messageText && currentFiles.length > 0) {
         const hasImages = currentFiles.some(f => isImageFile(f))
@@ -1638,11 +1645,11 @@ export function useChatCore({
         } else {
           messageText = currentFiles.length === 1 ? "Analiza este documento" : "Analiza estos documentos"
         }
-      }
-      
+  }
+
   // Start submission
 
-  setInput("") // Limpiar input inmediatamente
+      setInput("") // Limpiar input inmediatamente
       setFiles([]) // Limpiar archivos inmediatamente
       clearDraft() // Limpiar draft inmediatamente
       setIsSubmitting(true)
@@ -1651,7 +1658,12 @@ export function useChatCore({
         // Ensure we have a chatId BEFORE uploading documents so we can store
         // files under a stable path and avoid sending large base64 payloads.
         let effectiveChatIdForUploads: string | null = chatId
-        if (!effectiveChatIdForUploads && user?.id && ensureChatExists) {
+        if (
+          hasFilesToUpload &&
+          !effectiveChatIdForUploads &&
+          user?.id &&
+          ensureChatExists
+        ) {
           try {
             const titleForChat = messageText || "New Chat"
             effectiveChatIdForUploads = await ensureChatExists(user.id, titleForChat)
@@ -1659,6 +1671,10 @@ export function useChatCore({
             // If chat creation failed, continue without uploads (will fallback to data URLs)
             effectiveChatIdForUploads = null
           }
+        }
+
+        if (!chatId && effectiveChatIdForUploads) {
+          pendingChatIdRef.current = effectiveChatIdForUploads
         }
 
         // Preprocess images (compress/resize) before upload to reduce payload
@@ -1684,7 +1700,7 @@ export function useChatCore({
         if (currentFiles.length > 0) {
           // Build a set of successfully uploaded keys to avoid duplicates
           const uploadedKeySet = new Set(
-            supabaseAttachments.map((att) => `${att.name}|${att.contentType}`)
+            supabaseAttachments.map(att => `${att.name}|${att.contentType}`)
           )
 
           for (const file of processedFiles) {
@@ -1692,9 +1708,9 @@ export function useChatCore({
             if (uploadedKeySet.has(key)) continue // already uploaded
             
             // Convert to data URL for inline attachments (images work inline)
-            const dataUrl = await new Promise<string>((resolve) => {
+            const dataUrl = await new Promise<string>(resolve => {
               const reader = new FileReader()
-              reader.onload = (e) => resolve(e.target?.result as string)
+              reader.onload = e => resolve(e.target?.result as string)
               reader.readAsDataURL(file)
             })
             
@@ -1710,9 +1726,9 @@ export function useChatCore({
         // - Prefer Supabase URLs for documents (server stored)
         // - Keep data URLs for images (we don't upload images to Supabase here)
         const supaSet = new Set(
-          supabaseAttachments.map((att) => `${att.name}|${att.contentType}`)
+          supabaseAttachments.map(att => `${att.name}|${att.contentType}`)
         )
-        const supaMapped = supabaseAttachments.map((att) => ({
+        const supaMapped = supabaseAttachments.map(att => ({
           name: att.name,
           contentType: att.contentType,
           url: att.url,
