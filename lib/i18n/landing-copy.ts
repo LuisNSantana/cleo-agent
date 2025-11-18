@@ -1,5 +1,9 @@
 import { Locale } from "./translations"
 
+// Structured landing-page copy (card lists, stats, etc.) lives here so we can keep
+// `translations.ts` focused on short UI strings. Components consume it through the
+// memoized `useLandingCopy` hook to avoid re-render loops during hydration.
+
 type AgentId = "Kylio" | "Emma" | "Toby" | "Nora" | "Apu" | "Astra"
 
 type FeatureCard = {
@@ -478,7 +482,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
         },
       ],
       highlightHeadline: "Amplía con integraciones para bases de conocimiento, chat y automatización",
-      highlightCta: "Ver demo en vivo",
+  highlightCta: "Explora el estudio",
     },
     useCaseDemo: {
       badge: "Míralo en acción",

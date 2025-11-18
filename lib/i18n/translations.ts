@@ -419,7 +419,7 @@ const es: Translations = {
     useCasesTitle: 'Observa a tu Equipo de IA Trabajar',
   useCasesSubtitle: 'Mira cómo Kylio AI maneja tareas reales en tiempo real',
     
-    testimonialsTitle: 'Lo que Logran los Usuarios',
+  testimonialsTitle: 'Lo que logran los usuarios',
     testimonialsSubtitle: 'Los resultados hablan más que las promesas',
     
     securityTitle: 'Seguridad Empresarial Integrada',

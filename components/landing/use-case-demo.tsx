@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { CheckCircle, Clock, Sparkle } from '@phosphor-icons/react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { useI18n } from '@/lib/i18n'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 type Scenario = {
   agentName: string
@@ -22,7 +22,7 @@ type StepStatus = {
 
 export function UseCaseDemo() {
   const { locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   const scenarios = useMemo<Scenario[]>(
     () => [
@@ -96,7 +96,7 @@ export function UseCaseDemo() {
       data-landing-search
       data-landing-search-title="Live Demo"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-gradient-to-br from-[#F9F6F2] via-[#A38CFF]/10 to-[#64D2FF]/10 py-24 sm:py-32"
+  className="relative w-full overflow-hidden bg-gradient-to-br from-white via-[#EEF6FF] to-white py-24 text-foreground dark:from-[#070911] dark:via-[#0B0F1C] dark:to-[#05070D] sm:py-32"
     >
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
         <div className="mb-12 text-center">

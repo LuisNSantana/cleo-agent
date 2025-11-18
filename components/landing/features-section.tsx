@@ -6,7 +6,7 @@ import { Brain, Lightning, Users, Shield, Sparkle, Check, Rocket } from '@phosph
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useMemo } from 'react'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 const featureIcons = [Brain, Lightning, Users, Shield]
 const featureColors = [
@@ -35,7 +35,7 @@ const itemVariants = {
 
 export function FeaturesSection() {
   const { t, locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   const featureCards = useMemo(
     () =>
@@ -53,8 +53,12 @@ export function FeaturesSection() {
       data-landing-search
       data-landing-search-title="Features"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-[#F9F6F2] dark:bg-[#0D0D0D] py-16 sm:py-24 lg:py-32"
+      className="relative w-full overflow-hidden bg-gradient-to-b from-[#F9F6F2] via-white to-[#EEF2FF] dark:from-[#050507] dark:via-[#0B0D15] dark:to-[#050507] py-16 sm:py-24 lg:py-32"
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-brand-cyan/15 blur-3xl" />
+        <div className="absolute right-0 bottom-0 h-80 w-80 rounded-full bg-brand-violet/15 blur-[180px]" />
+      </div>
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
         <motion.div
           className="mb-12 sm:mb-16 lg:mb-20 text-center"
@@ -103,14 +107,14 @@ export function FeaturesSection() {
                 data-landing-search
                 data-landing-search-title={feature.title}
                 data-landing-search-type="feature"
-                className="group relative h-full overflow-hidden rounded-2xl border-2 border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-card/95 p-8 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/20"
+                className="group relative h-full overflow-hidden rounded-[28px] border border-white/40 bg-white/90 p-8 shadow-[0_20px_70px_rgba(9,13,30,0.12)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-2 hover:border-brand-cyan/40 hover:shadow-[0_30px_90px_rgba(6,10,25,0.18)] dark:border-white/10 dark:bg-white/5"
               >
                 <div
-                  className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 blur transition duration-500 group-hover:opacity-20`}
+                  className={`absolute inset-0 rounded-[28px] bg-gradient-to-br ${feature.color} opacity-0 transition duration-500 group-hover:opacity-20`}
                 />
                 <div className="relative">
                   <motion.div
-                    className={`mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-xl transition-transform duration-300 group-hover:scale-110`}
+                    className={`mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-xl ring-4 ring-white/60 transition-transform duration-300 group-hover:scale-110 dark:ring-white/10`}
                     whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                     transition={{ duration: 0.5 }}
                   >
@@ -156,7 +160,7 @@ export function FeaturesSection() {
           <div className="mt-8 flex items-center justify-center">
             <Button
               size="lg"
-              className="group rounded-full bg-[#A38CFF] px-8 py-6 text-base font-bold text-white shadow-xl shadow-primary/30 transition-all hover:shadow-2xl hover:shadow-primary/40"
+              className="group rounded-full bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta px-10 py-6 text-base font-bold text-white ring-2 ring-white/50 shadow-[0_20px_60px_rgba(23,20,73,0.35)] transition-all hover:scale-[1.02] dark:ring-white/10"
               asChild
             >
               <a href="/auth" className="flex items-center gap-2">

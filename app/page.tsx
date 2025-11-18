@@ -85,7 +85,7 @@ export default async function Home({
       
       <LandingNav />
       
-      <main className="pt-16">
+  <main className="pt-16 bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.12),_transparent_45%)] text-foreground dark:bg-[radial-gradient(circle_at_top,_rgba(100,210,255,0.08),_transparent_45%)]">
         {/* 1. Hero Section */}
         <HeroSection />
 

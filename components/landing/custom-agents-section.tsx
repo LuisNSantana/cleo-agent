@@ -15,12 +15,12 @@ import {
   Repeat,
 } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 import { Button } from '@/components/ui/button'
 
 export function CustomAgentsSection() {
   const { t, locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   const templates = useMemo(() => copy.customAgents.templates, [locale, copy])
   const setupSteps = useMemo(
@@ -151,7 +151,7 @@ export function CustomAgentsSection() {
       data-landing-search
       data-landing-search-title="Agent Builder"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-gradient-to-br from-[#F9F6F2] via-[#A38CFF]/10 to-[#64D2FF]/10 py-24 sm:py-36"
+  className="relative w-full overflow-hidden bg-gradient-to-br from-white via-[#EEF4FF] to-white py-24 text-foreground dark:from-[#070911] dark:via-[#0B0F1C] dark:to-[#05070D] sm:py-36"
     >
       <div className="absolute inset-0 -z-10">
         <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-primary/20 to-transparent" />

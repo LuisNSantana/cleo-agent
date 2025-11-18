@@ -2,11 +2,11 @@
 
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { useI18n } from '@/lib/i18n'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 export function LandingFooter() {
   const { locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   return (
   <footer className="border-t border-border/40 bg-brand-ink px-4 py-16 text-foreground sm:px-8 lg:px-12">

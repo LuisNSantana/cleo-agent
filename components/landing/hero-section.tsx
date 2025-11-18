@@ -7,12 +7,12 @@ import { useRouter } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
 import { useState, useEffect, useMemo } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 export function HeroSection() {
   const router = useRouter()
   const { t, locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   const floatingAgents = useMemo(
     () => [
@@ -26,7 +26,7 @@ export function HeroSection() {
 
   const onboardingSteps = useMemo(
     () => [
-      { avatar: '/img/logoankie.png', name: 'Ankie', task: copy.hero.onboardingTasks.Kylio },
+      { avatar: '/img/agents/ankie4.png', name: 'Ankie', task: copy.hero.onboardingTasks.Kylio },
       { avatar: '/img/agents/emma4.png', name: 'Emma', task: copy.hero.onboardingTasks.Emma },
       { avatar: '/img/agents/toby4.png', name: 'Toby', task: copy.hero.onboardingTasks.Toby },
     ],
@@ -47,27 +47,27 @@ export function HeroSection() {
   }
 
   return (
-  <section className="relative w-screen min-h-screen flex items-center overflow-hidden bg-background isolation-isolate py-20 md:py-0">
+  <section className="relative flex w-full min-h-screen items-center overflow-hidden bg-gradient-to-b from-[#F7FBFF] via-white to-[#ECF2FF] py-20 text-foreground dark:from-[#02040B] dark:via-[#060810] dark:to-[#010207] md:py-0">
       {/* Background gradients */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
-          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-brand-violet/15 dark:bg-brand-violet/10 blur-3xl"
+          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-brand-violet/15 dark:bg-brand-violet/20 blur-[160px]"
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 8, repeat: Infinity }}
         />
         <motion.div
-          className="absolute -right-32 top-40 h-96 w-96 rounded-full bg-brand-cyan/15 dark:bg-brand-cyan/10 blur-3xl"
+          className="absolute -right-32 top-40 h-96 w-96 rounded-full bg-brand-cyan/15 dark:bg-brand-cyan/25 blur-[160px]"
           animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 10, repeat: Infinity, delay: 1 }}
         />
         <motion.div
-          className="absolute bottom-32 left-1/3 h-96 w-96 rounded-full bg-brand-magenta/10 dark:bg-brand-magenta/5 blur-3xl"
+          className="absolute bottom-32 left-1/3 h-96 w-96 rounded-full bg-brand-magenta/10 dark:bg-brand-magenta/25 blur-[180px]"
           animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
           transition={{ duration: 12, repeat: Infinity, delay: 2 }}
         />
       </div>
 
-      <div className="container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
           {/* Left column - Content */}
           <motion.div
@@ -135,15 +135,36 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
+              className="flex flex-col gap-3 sm:flex-row"
             >
               <Button
                 size="lg"
                 onClick={handleStartFree}
-                className="group h-14 bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta px-8 text-base font-semibold text-white shadow-2xl shadow-brand-cyan/40 hover:scale-105 hover:shadow-3xl hover:shadow-brand-violet/40"
+                aria-label={t.landing.heroCta}
+                className="group h-14 flex-1 rounded-2xl px-8 text-base font-semibold text-white shadow-[0_18px_45px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#8F91FF 50%,#FF7AEA 100%)' }}
               >
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   {t.landing.heroCta}
                   <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
+                </span>
+              </Button>
+
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => {
+                  const section = document.getElementById('agents')
+                  if (section) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }}
+                aria-label={copy.features.highlightCta}
+                className="flex-1 rounded-2xl border border-border/70 bg-white/90 text-brand-ink shadow-[0_10px_26px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-transparent dark:text-white/90 dark:hover:bg-white/5"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  {copy.features.highlightCta}
+                  <ArrowRight weight="bold" className="text-brand-violet" />
                 </span>
               </Button>
             </motion.div>
@@ -167,6 +188,34 @@ export function HeroSection() {
                 </div>
               ))}
             </motion.div>
+
+            <motion.div
+              className="grid gap-4 pt-4 sm:grid-cols-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.1 }}
+            >
+              {floatingAgents.map((agent, index) => (
+                <motion.div
+                  key={agent.name}
+                  className="flex items-center gap-3 rounded-2xl border border-white/40 bg-white/80 p-4 shadow-lg shadow-brand-ink/5 backdrop-blur-xl dark:border-white/10 dark:bg-white/10"
+                  initial={{ opacity: 0, y: 10 * (index + 1) }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.1 + index * 0.1 }}
+                >
+                  <Avatar className="h-10 w-10 border border-white shadow-md">
+                    <AvatarImage src={agent.avatar} alt={agent.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-brand-cyan to-brand-magenta text-xs font-semibold text-white">
+                      {agent.name.substring(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-brand-ink dark:text-white">{agent.name}</p>
+                    <p className="truncate text-xs text-brand-ink/70 dark:text-white/70">{agent.action}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
 
           {/* Right column - Demo */}
@@ -176,13 +225,13 @@ export function HeroSection() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            <div className="rounded-2xl border border-border/50 bg-white/90 dark:bg-brand-surface/90 p-8 shadow-2xl backdrop-blur-xl">
+            <div className="rounded-3xl border border-border/50 bg-white/90 p-8 shadow-2xl shadow-brand-ink/10 backdrop-blur-xl dark:border-white/5 dark:bg-[#0C1020]/90">
               <div className="mb-6 flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-brand-ink dark:text-foreground">
                   {copy.hero.onboardingTitle}
                 </h3>
-                <div className="flex items-center gap-2 rounded-full bg-brand-cyan/10 px-4 py-2 text-sm font-medium text-brand-cyan">
-                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-cyan" />
+                <div className="flex items-center gap-2 rounded-full bg-brand-cyan/10 px-4 py-2 text-sm font-medium text-brand-cyan dark:bg-white/5 dark:text-white">
+                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-cyan dark:bg-white" />
                   {copy.hero.onboardingActive}
                 </div>
               </div>
@@ -195,16 +244,16 @@ export function HeroSection() {
                     <motion.div
                       key={step.name}
                       animate={{ scale: isActive ? 1.02 : 1, opacity: isCompleted ? 0.6 : 1 }}
-                      className={`flex items-center gap-4 rounded-lg border p-4 transition-all ${
+                      className={`flex items-center gap-4 rounded-2xl border p-4 transition-all ${
                         isActive
-                          ? 'border-brand-violet/50 bg-brand-violet/5'
+                          ? 'border-brand-violet/40 bg-brand-violet/10 dark:border-white/10 dark:bg-white/5'
                           : isCompleted
-                            ? 'border-brand-cyan/30 bg-brand-cyan/5'
-                            : 'border-border/50 bg-background/20 dark:bg-brand-surface/20'
+                            ? 'border-brand-cyan/30 bg-brand-cyan/5 dark:border-white/5 dark:bg-white/5'
+                            : 'border-border/50 bg-background/40 dark:border-white/5 dark:bg-white/2'
                       }`}
                     >
                       <div className="relative shrink-0">
-                        <Avatar className="h-12 w-12 border-2 border-white dark:border-brand-surface shadow-md">
+                        <Avatar className="h-12 w-12 border-2 border-white shadow-md dark:border-[#0C1020]">
                           <AvatarImage src={step.avatar} alt={step.name} />
                           <AvatarFallback className="bg-gradient-to-br from-brand-cyan to-brand-violet text-sm font-semibold text-white">
                             {step.name.substring(0, 2)}
@@ -219,14 +268,14 @@ export function HeroSection() {
 
                       <div className="min-w-0 flex-1">
                         <p className="text-base font-medium text-brand-ink dark:text-foreground">{step.name}</p>
-                        <p className="truncate text-sm text-brand-ink/60 dark:text-foreground/60">{step.task}</p>
+                        <p className="truncate text-sm text-brand-ink/60 dark:text-white/70">{step.task}</p>
                       </div>
 
                       {isActive && !isCompleted && (
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                          className="h-6 w-6 shrink-0 rounded-full border-2 border-brand-violet border-t-transparent"
+                          className="h-6 w-6 shrink-0 rounded-full border-2 border-brand-violet border-t-transparent dark:border-white/40"
                         />
                       )}
                     </motion.div>
@@ -234,7 +283,7 @@ export function HeroSection() {
                 })}
               </div>
 
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-border/50 dark:bg-brand-surface">
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-border/50 dark:bg-white/10">
                 <motion.div
                   className="h-full bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta"
                   initial={{ width: '0%' }}
@@ -243,11 +292,11 @@ export function HeroSection() {
                 />
               </div>
 
-              <div className="mt-6 rounded-lg border border-border/50 bg-background/30 dark:bg-brand-surface/30 p-4">
-                <p className="text-sm font-medium text-brand-ink/60 dark:text-foreground/60">
+              <div className="mt-6 rounded-2xl border border-border/50 bg-background/50 p-4 dark:border-white/5 dark:bg-white/5">
+                <p className="text-sm font-medium text-brand-ink/60 dark:text-white/60">
                   {copy.hero.currentTaskLabel}
                 </p>
-                <h4 className="text-lg font-semibold text-brand-ink dark:text-foreground">
+                <h4 className="text-lg font-semibold text-brand-ink dark:text-white">
                   {onboardingSteps[currentStep].task}
                 </h4>
               </div>

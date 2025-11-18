@@ -21,7 +21,7 @@ import { TOBY_AGENT } from '@/lib/agents/predefined/toby'
 import { NORA_AGENT } from '@/lib/agents/predefined/nora'
 import { APU_AGENT } from '@/lib/agents/predefined/apu'
 import { ASTRA_AGENT } from '@/lib/agents/predefined/astra'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 type AgentId = 'Ankie' | 'Emma' | 'Toby' | 'Nora' | 'Apu' | 'Astra'
 type CopyAgentId = 'Kylio' | 'Emma' | 'Toby' | 'Nora' | 'Apu' | 'Astra'
@@ -83,7 +83,7 @@ const copyKeyByAgent: Record<AgentId, CopyAgentId> = {
 
 export function AgentsSection() {
   const { t, locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
   const [selected, setSelected] = useState<any | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -111,7 +111,7 @@ export function AgentsSection() {
       data-landing-search
       data-landing-search-title="Agents"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-gradient-to-b from-background via-primary/10 to-background py-20 sm:py-32"
+  className="relative w-full overflow-hidden bg-gradient-to-b from-white via-[#E6F0FF] to-white py-20 text-foreground dark:from-[#060812] dark:via-[#0B0F1D] dark:to-[#05070D] sm:py-32"
     >
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
         <motion.div
@@ -283,10 +283,20 @@ export function AgentsSection() {
             {copy.agents.ctaHeadline}
           </p>
           <div className="mt-5 flex items-center justify-center gap-3">
-            <Button size="lg" className="rounded-full px-6" asChild>
+            <Button
+              size="lg"
+              className="rounded-full px-6 font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.25)]"
+              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#8F91FF 55%,#FF7AEA 100%)' }}
+              asChild
+            >
               <a href="/auth">{copy.agents.primaryCta}</a>
             </Button>
-            <Button size="lg" variant="outline" className="rounded-full px-6" asChild>
+            <Button
+              size="lg"
+              variant="secondary"
+              className="rounded-full border border-border bg-white/80 px-6 font-semibold text-foreground shadow-sm hover:bg-white dark:bg-[#0E111D] dark:text-white"
+              asChild
+            >
               <a href="/auth">{copy.agents.secondaryCta}</a>
             </Button>
           </div>

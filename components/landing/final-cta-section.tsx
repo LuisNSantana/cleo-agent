@@ -5,13 +5,13 @@ import { useI18n } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Rocket, Heart } from '@phosphor-icons/react'
 import { useRouter } from 'next/navigation'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 import { useMemo } from 'react'
 
 export function FinalCTASection() {
   const router = useRouter()
   const { t, locale } = useI18n()
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
 
   const philosophy = useMemo(() => copy.finalCta.philosophyCards, [copy, locale])
   const trustBullets = useMemo(() => copy.finalCta.trustBullets, [copy, locale])
@@ -22,7 +22,7 @@ export function FinalCTASection() {
 
   return (
     <>
-      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#F9F6F2] via-[#EDE8FF]/40 to-[#64D2FF]/10 dark:from-[#0D0D0D] dark:via-[#1B1B1B] dark:to-[#1E255E]/10 py-16 sm:py-24 lg:py-32">
+  <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#F7F5FF] via-[#F2F6FF] to-[#F7F5FF] py-16 text-foreground dark:from-[#080B16] dark:via-[#0D1324] dark:to-[#080B16] sm:py-24 lg:py-32">
         <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
           <motion.div
             className="mx-auto max-w-3xl text-center"
@@ -31,7 +31,7 @@ export function FinalCTASection() {
             viewport={{ once: true }}
           >
             <motion.div
-              className="mb-4 sm:mb-6 inline-flex items-center gap-2 rounded-full border border-[#A38CFF]/20 bg-gradient-to-r from-[#A38CFF]/20 via-[#8E73FF]/15 to-[#64D2FF]/20 dark:from-[#A38CFF]/10 dark:via-[#8E73FF]/8 dark:to-[#64D2FF]/10 px-4 py-1.5 text-xs sm:text-sm font-medium text-[#A38CFF]"
+              className="mb-4 sm:mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs sm:text-sm font-medium text-primary dark:border-white/10 dark:bg-white/5 dark:text-white"
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
@@ -54,7 +54,7 @@ export function FinalCTASection() {
               transition={{ delay: 0.2 }}
             >
               {philosophy.map((card) => (
-                <div key={card.title} className="rounded-xl border border-[#E5E5E5] dark:border-[#2F2F2F] bg-white/60 dark:bg-[#1B1B1B]/60 p-4 sm:p-6 backdrop-blur-sm">
+                <div key={card.title} className="rounded-xl border border-border/40 bg-white/70 p-4 sm:p-6 backdrop-blur dark:border-white/10 dark:bg-white/5">
                   <div className="mb-3 text-3xl sm:text-4xl">{card.emoji}</div>
                   <h3 className="mb-2 font-semibold text-[#1E255E] dark:text-[#F9F6F2]">{card.title}</h3>
                   <p className="text-xs sm:text-sm text-[#1E255E]/70 dark:text-[#E5E5E5]/70">{card.description}</p>
@@ -65,7 +65,7 @@ export function FinalCTASection() {
         </div>
       </section>
 
-      <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#1E255E] via-[#0D0D0D] to-[#1E255E] py-16 sm:py-24 lg:py-32">
+  <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#090D1D] via-[#0B1022] to-[#090D1D] py-16 sm:py-24 lg:py-32">
         <div className="absolute inset-0 -z-10">
           <motion.div
             className="absolute left-1/4 top-1/4 h-64 sm:h-96 w-64 sm:w-96 rounded-full bg-[#A38CFF]/25 blur-3xl"
@@ -80,7 +80,7 @@ export function FinalCTASection() {
         </div>
 
         <div className="relative mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
-          <div className="mx-auto max-w-4xl text-center">
+          <div className="mx-auto max-w-4xl text-center text-white">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
               <motion.div
                 className="mb-6 sm:mb-8 inline-flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm"
@@ -105,7 +105,7 @@ export function FinalCTASection() {
                 <Button
                   size="lg"
                   onClick={handleStartFree}
-                  className="group h-12 sm:h-14 bg-white px-6 sm:px-8 text-sm sm:text-base font-semibold text-[#1E255E] shadow-2xl hover:bg-white/90 hover:scale-105 transition-all"
+                  className="group h-12 sm:h-14 rounded-2xl bg-white px-6 sm:px-8 text-sm sm:text-base font-semibold text-[#0D1224] shadow-2xl shadow-black/30 transition hover:scale-105 hover:bg-white/90 dark:bg-gradient-to-r dark:from-[#64D2FF] dark:via-[#A38CFF] dark:to-[#FF8FD8] dark:text-[#05070D]"
                 >
                   <span className="flex items-center gap-2">
                     {t.landing.finalCta}
@@ -113,7 +113,7 @@ export function FinalCTASection() {
                   </span>
                 </Button>
 
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/80">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/85">
                   <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -122,7 +122,7 @@ export function FinalCTASection() {
               </motion.div>
 
               <motion.div
-                className="mt-8 sm:mt-12 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-white/70"
+                className="mt-8 sm:mt-12 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-white/75"
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}

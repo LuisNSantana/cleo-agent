@@ -15,16 +15,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LandingSearch } from '@/components/landing/landing-search'
-import { getLandingCopy } from '@/lib/i18n/landing-copy'
+import { useLandingCopy } from '@/lib/i18n/use-landing-copy'
 
 export function LandingNav() {
   const router = useRouter()
-  const { t, locale, setLocale } = useI18n()
-  const { theme, resolvedTheme, setTheme } = useTheme()
+  const { locale, setLocale } = useI18n()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [mobileQuery, setMobileQuery] = useState("")
-  const copy = getLandingCopy(locale)
+  const copy = useLandingCopy(locale)
+  const searchPlaceholder = mounted ? copy.nav.searchPlaceholder : 'Search content…'
+  const currentTheme = resolvedTheme ?? 'light'
   // Cache-busting for logo assets (helps when replacing files with same name)
   const assetV = (process.env.NEXT_PUBLIC_ASSET_VERSION as string) || '3'
 
@@ -33,50 +35,43 @@ export function LandingNav() {
     setMounted(true)
   }, [])
 
-  const handleLogin = () => {
-    router.push('/auth')
-  }
-
-  const handleStartFree = () => {
-    router.push('/auth')
-  }
-
-  const handleGetStarted = () => {
-    router.push('/auth')
-  }
+  const handleLogin = () => router.push('/auth')
+  const handlePrimaryCta = () => router.push('/auth')
 
   const currentLang = languages.find((lang) => lang.code === locale)
 
   // Translations for buttons
   return (
     <motion.header
-  className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/60 bg-background/95 dark:bg-[#050507]/95 backdrop-blur-xl"
+      className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/50 bg-white/85 text-foreground backdrop-blur-xl dark:bg-[#050507]/90"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <nav className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-[1920px]">
         {/* Logo */}
-        <motion.div
-          className="flex cursor-pointer items-center gap-2 sm:gap-3"
+        <motion.button
+          className="flex cursor-pointer items-center gap-3 rounded-full border border-transparent px-2 py-1 text-left transition hover:border-border/40"
           whileHover={{ scale: 1.02 }}
           onClick={() => router.push('/')}
+          aria-label="Ir al inicio"
         >
-          {/* Pure logo (no avatar chrome) */}
-          <div className="flex h-3 w-auto items-center sm:h-4 md:h-5 lg:h-6 shrink-0">
+          <div className="flex h-4 w-auto items-center sm:h-5 md:h-6 lg:h-7 shrink-0">
             <Image
               src={`/img/logoankie.png?v=${assetV}`}
-              alt="Ankie AI"
-              width={84}
-              height={24}
+              alt="Ankie AI logo"
+              width={96}
+              height={28}
               priority
-              className="h-full w-auto object-contain select-none"
+              className="h-full w-auto select-none object-contain"
               draggable={false}
-              sizes="(max-width: 640px) 56px, (max-width: 768px) 72px, 84px"
+              sizes="(max-width: 640px) 64px, (max-width: 768px) 84px, 96px"
             />
           </div>
-          {/* Keep header compact: show only the logo image (no wordmark or subtitle) */}
-        </motion.div>
+          <span className="hidden text-lg font-semibold tracking-tight text-foreground sm:inline">
+            Ankie AI
+          </span>
+        </motion.button>
 
         {/* Desktop Navigation */}
         <div className="hidden items-center gap-3 xl:gap-5 lg:flex">
@@ -108,7 +103,7 @@ export function LandingNav() {
 
         {/* Landing search (desktop) - more compact */}
         <div className="hidden lg:flex lg:ml-4 xl:ml-6">
-          <LandingSearch placeholder={copy.nav.searchPlaceholder} />
+          <LandingSearch placeholder={searchPlaceholder} />
         </div>
 
         {/* Right side actions */}
@@ -118,10 +113,11 @@ export function LandingNav() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="h-9 w-9 p-0"
+              aria-label="Cambiar tema"
+              onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}
+              className="h-9 w-9 p-0 text-foreground"
             >
-              {theme === 'dark' ? (
+              {currentTheme === 'dark' ? (
                 <Sun className="h-5 w-5" weight="duotone" />
               ) : (
                 <Moon className="h-5 w-5" weight="duotone" />
@@ -153,18 +149,19 @@ export function LandingNav() {
 
           {/* Desktop buttons */}
           <div className="hidden items-center gap-2 lg:flex">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleLogin}
-              className="text-foreground hover:bg-brand-cyan/10 h-9 text-xs lg:text-sm px-3 lg:px-4"
+              className="h-9 px-3 text-xs font-semibold text-foreground hover:bg-muted lg:px-4 lg:text-sm"
             >
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
               size="sm"
-              onClick={handleGetStarted}
-              className="bg-brand-cyan text-[#04121A] shadow-lg shadow-brand-cyan/30 transition-all hover:scale-[1.02] hover:bg-[#0096DA] hover:shadow-brand-cyan/50 h-9 text-xs lg:text-sm px-3 lg:px-4"
+              onClick={handlePrimaryCta}
+              className="h-9 px-3 text-xs font-semibold text-white shadow-[0_12px_30px_rgba(13,12,34,0.25)] transition hover:scale-[1.02] lg:px-4 lg:text-sm"
+              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#A38CFF 55%,#FF7AEA 100%)' }}
             >
               {mounted ? copy.nav.getStarted : 'Get Started'}
             </Button>
@@ -207,7 +204,7 @@ export function LandingNav() {
                     }
                   }
                 }}
-                placeholder={mounted ? copy.nav.searchPlaceholder : 'Search content…'}
+                placeholder={searchPlaceholder}
                 className="w-full rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-sm text-foreground shadow-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20"
               />
             </div>
@@ -251,9 +248,10 @@ export function LandingNav() {
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
-              className="w-full bg-brand-cyan text-[#04121A] hover:bg-[#0096DA] shadow-lg shadow-brand-cyan/30"
+              className="w-full font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#A38CFF 55%,#FF7AEA 100%)' }}
               onClick={() => {
-                handleGetStarted()
+                handlePrimaryCta()
                 setMobileMenuOpen(false)
               }}
             >
