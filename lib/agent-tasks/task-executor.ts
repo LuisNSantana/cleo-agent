@@ -117,6 +117,15 @@ export interface TaskExecutionResult {
     end_time: string;
     duration_ms: number;
     memory_usage?: number;
+    // ✅ 2025 OPTIMIZATION: Delegation visibility for control center
+    delegations?: Array<{
+      to_agent: string;
+      task_description: string;
+      timestamp: string;
+      result?: string;
+    }>;
+    tool_calls?: number;
+    forward_message_used?: boolean;
   };
 }
 
@@ -178,7 +187,19 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
   const startTime = Date.now();
   const TIMEOUT_MS = getAgentTimeout(task.agent_id);
   
-  const execution_metadata = {
+  const execution_metadata: {
+    start_time: string
+    end_time: string
+    duration_ms: number
+    delegations?: Array<{
+      to_agent: string
+      task_description: string
+      timestamp: string
+      result?: string
+    }>
+    tool_calls?: number
+    forward_message_used?: boolean
+  } = {
     start_time: new Date().toISOString(),
     end_time: '',
     duration_ms: 0
@@ -215,16 +236,6 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     const { getAgentOrchestrator } = await import('@/lib/agents/agent-orchestrator');
     const orchestrator = await getAgentOrchestrator();
     
-    const initialMessage = {
-      role: 'user' as const,
-      content: taskPrompt,
-      metadata: {
-        isScheduledTask: true,
-        taskId: task.task_id,
-        taskTitle: task.title
-      }
-    };
-
     console.log(`🚀 Starting agent execution...`);
     console.log(`📋 Initial state:`, {
       userId: task.user_id,
@@ -233,15 +244,35 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
       taskId: task.task_id
     });
     
+    // ✅ CRITICAL: Update task status to 'running' before execution
+    // This ensures UI shows correct status during execution
+    const { updateAgentTaskAdmin } = await import('./tasks-db');
+    await updateAgentTaskAdmin(task.task_id, {
+      status: 'running',
+      started_at: new Date().toISOString(),
+      last_run_at: new Date().toISOString(),
+      error_message: null
+    });
+    console.log(`✅ Task status updated to 'running'`);
+    
     // Execute within user context with timeout protection
     const resultPromise = withRequestContext(
       { userId: task.user_id, requestId: `task-${task.task_id}` },
       async () => {
-        // Start execution with orchestrator (supports delegations)
+        // ✅ CRITICAL: Start execution with metadata to bypass approval
+        // The metadata.isScheduledTask flag tells approval-node.ts to auto-approve high-risk tools
         const execution = await orchestrator.startAgentExecutionWithHistory(
           taskPrompt,
           agent.id,
-          []
+          [{
+            role: 'user' as const,
+            content: taskPrompt,
+            metadata: {
+              isScheduledTask: true,  // Auto-approve tools (scheduled tasks are pre-authorized)
+              taskId: task.task_id,
+              taskTitle: task.title
+            }
+          }]
         );
         
         // Poll for completion
@@ -278,12 +309,61 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     // CRITICAL FIX: Extract result from orchestrator execution object
     const execution = result as AgentExecution;
     
+    // ✅ 2025 OPTIMIZATION: Extract delegation metadata for visibility in control center
+    // This allows UI to display which agents were involved and if forward_message was used
+    const delegations: typeof execution_metadata.delegations = [];
+    let forwardMessageUsed = false;
+    let toolCallCount = 0;
+
+    if (execution.messages) {
+      execution.messages.forEach(msg => {
+        if (msg.type === 'ai' && msg.toolCalls) {
+          toolCallCount += msg.toolCalls.length;
+          
+          msg.toolCalls.forEach(tc => {
+            // Detect delegation tools
+            if (tc.name?.startsWith('delegate_to_')) {
+              const toAgent = tc.name.replace('delegate_to_', '');
+              delegations.push({
+                to_agent: toAgent,
+                task_description: (tc.args as any)?.taskDescription || (tc.args as any)?.task || 'Unknown task',
+                timestamp: new Date().toISOString(),
+                result: tc.result ? String(tc.result).substring(0, 200) : undefined // Truncate for metadata
+              });
+            }
+            
+            // Detect forward_message usage (LangGraph 2025 best practice)
+            if (tc.name === 'forward_message') {
+              forwardMessageUsed = true;
+            }
+          });
+        }
+      });
+    }
+
+    execution_metadata.delegations = delegations.length > 0 ? delegations : undefined;
+    execution_metadata.tool_calls = toolCallCount;
+    execution_metadata.forward_message_used = forwardMessageUsed;
+
+    console.log(`📊 Execution metadata:`, {
+      delegations: delegations.length,
+      tool_calls: toolCallCount,
+      forward_message_used: forwardMessageUsed
+    });
+    
     // Check execution status
     if (execution.status === 'failed') {
       const errorMsg = typeof execution.error === 'string' 
         ? execution.error 
         : (execution.error as any)?.message || 'Execution failed';
       console.log(`❌ Task failed: ${errorMsg}`);
+      
+      // ✅ Update task status to 'failed' in database
+      await updateAgentTaskAdmin(task.task_id, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: errorMsg
+      });
       
       // Create failure notification
       await createTaskNotification({
@@ -364,6 +444,13 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     if (hasToolFailures) {
       console.log(`❌ Task failed due to tool failures: ${failureReasons.join(', ')}`);
       
+      // ✅ Update task status to 'failed' in database
+      await updateAgentTaskAdmin(task.task_id, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: failureReasons.join(', ')
+      });
+      
       // Create failure notification
       await createTaskNotification({
         user_id: task.user_id,
@@ -416,6 +503,16 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
         : false
     }).catch(err => console.error('Failed to create success notification:', err));
 
+    // ✅ CRITICAL: Update task status to 'completed' after successful execution
+    // This ensures UI shows the task as finished
+    await updateAgentTaskAdmin(task.task_id, {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      result_data: normalizedResult as any,
+      error_message: null
+    });
+    console.log(`✅ Task status updated to 'completed'`);
+
     return {
       success: true,
       result: normalizedResult,
@@ -433,6 +530,14 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     // Handle timeout specifically
     if (errorMessage === 'Task execution timeout') {
       console.error(`⏱️ Task timed out after ${TIMEOUT_MS/1000}s (agent: ${task.agent_id})`);
+      
+      // ✅ Update task status to 'failed' in database
+      const { updateAgentTaskAdmin } = await import('./tasks-db');
+      await updateAgentTaskAdmin(task.task_id, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: `Timeout after ${TIMEOUT_MS/1000}s`
+      });
       
       await createTaskNotification({
         user_id: task.user_id,
@@ -458,6 +563,14 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
     }
     
     console.error(`❌ Task execution failed: ${errorMessage}`);
+
+    // ✅ Update task status to 'failed' in database
+    const { updateAgentTaskAdmin } = await import('./tasks-db');
+    await updateAgentTaskAdmin(task.task_id, {
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      error_message: errorMessage
+    });
 
     // Create failure notification
     await createTaskNotification({
@@ -502,7 +615,6 @@ MULTI-STEP TASK EXECUTION:
 - CAREFULLY ANALYZE the task description for multiple steps or actions
 - Identify ALL steps that need to be completed (e.g., "research AND send email", "analyze AND create report")
 - Execute EVERY step in sequence - do NOT skip any steps
-- Use delegation tools when needed (e.g., delegate_to_astra for email sending, delegate_to_ami for calendar)
 - Wait for each step to complete before moving to the next
 - ONLY call complete_task after ALL steps are finished
 
@@ -573,32 +685,26 @@ Deliver: summary, actions taken, calendar events, next steps.
 Call complete_task with results.`;
 
     case 'cleo-supervisor':
-      // OPTIMIZATION: Compressed prompt from 73 lines to 35 lines (~50% reduction)
-      // Maintains all critical functionality while reducing token usage
+      // OPTIMIZATION (2025 LangGraph Best Practices):
+      // - Removed hardcoded delegation rules (Email→Astra, Calendar→Ami) to avoid conflicting with Cleo's native delegation system
+      // - Cleo already has DELEGATION_AND_SPEED rules in lib/prompts/index.ts with forward_message tool (95% cases)
+      // - Let Cleo's heuristics decide delegation naturally, preserving specialist responses via forward_message
+      // - Reduced from 35 lines to 18 lines (~49% reduction) by removing redundant instructions
       return `${basePrompt}
 
-As Cleo (Supervisor), this is a SCHEDULED TASK - execute immediately with available data.
+As Ankie (Supervisor), this is a SCHEDULED TASK - execute immediately with available data.
 
 EXECUTION PROTOCOL:
-1. ANALYZE: Identify required actions (research/email/calendar/etc)
-2. EXECUTE: Use appropriate tools or delegate
-3. COMPLETE: Call complete_task when done
+1. ANALYZE: Identify required actions from task description and task_config
+2. EXECUTE: Use your available tools or delegate to appropriate specialists
+3. PRESERVE: When specialists respond, use forward_message to preserve their exact response (95% of cases)
+4. COMPLETE: Call complete_task with execution summary
 
-DELEGATION RULES:
-• Email tasks → delegate_to_astra (you cannot send emails directly)
-• Calendar → delegate_to_ami
-• Research → webSearch tool
-• Documents → delegate_to_peter (Google Workspace)
-
-CRITICAL:
-- Never ask for clarification (automated task)
-- For emails: delegate_to_astra with format:
-  { task: "[action]", context: "[info]", requirements: "Recipient: ${task.task_config?.recipient || '[from description]'}" }
-- Wait for delegation responses before complete_task
-- Must call complete_task with summary when finished
-
-EXAMPLE (email task):
-1. webSearch → 2. delegate_to_astra → 3. Wait → 4. complete_task
+CRITICAL RULES:
+- Never ask for clarification (automated task with all required context provided)
+- Use your native delegation heuristics - choose the best specialist for each action
+- Wait for delegation responses before proceeding to next step
+- Must call complete_task when all actions are finished
 
 ⏰ Timeout: ${timeoutMs/1000}s. Execute efficiently without delays.
 

@@ -19,6 +19,8 @@ import remarkGfm from 'remark-gfm'
 import { DateTime } from 'luxon'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useUserTimezone } from '@/app/hooks/use-user-timezone'
+import { SimplifiedTaskForm } from './SimplifiedTaskForm'
+import { DelegationMetadata } from './DelegationMetadata'
 
 type AgentSummary = {
   id: string
@@ -88,7 +90,7 @@ export default function AgentsTasksPage() {
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [notifications, setNotifications] = useState<TaskNotification[]>([])
   const [agents, setAgents] = useState<AgentSummary[]>([
-    { id: DEFAULT_AGENT_ID, name: 'Cleo', icon: '🤖', color: '#6366f1' }
+    { id: DEFAULT_AGENT_ID, name: 'Ankie', icon: '🤖', color: '#6366f1' }
   ])
   const [loading, setLoading] = useState(true)
   const [notificationsLoading, setNotificationsLoading] = useState(true)
@@ -179,11 +181,12 @@ export default function AgentsTasksPage() {
       'peter': '/img/agents/peter4.png',
       'apu': '/img/agents/apu4.png',
       'ami': '/img/agents/ami4.png',
-      // fallback brand avatar
-      'cleo': '/img/kyliologo.png'
+      // Cleo was renamed to Ankie
+      'ankie': '/img/agents/ankie4.png',
+      'cleo': '/img/agents/ankie4.png'
     }
     const key = (agentName || '').toLowerCase().trim()
-    return map[key] || '/img/kyliologo.png'
+    return map[key] || '/img/agents/ankie4.png'  // Default to Ankie avatar
   }
 
   const formatDate = (dateString?: string, timezone?: string) => {
@@ -427,7 +430,7 @@ export default function AgentsTasksPage() {
       const agent = agents.find(a => a.id === effectiveAgentId)
       const body: any = {
         agent_id: effectiveAgentId,
-        agent_name: agent?.name || 'Cleo',
+        agent_name: agent?.name || 'Ankie',
         // Use proper avatar URL instead of icon text
         agent_avatar: getAgentAvatarUrl(agent?.name, agent?.icon),
         title: formTitle,
@@ -476,7 +479,7 @@ export default function AgentsTasksPage() {
       setFormCron('')
       setFormTimezone(userTimezone) // Usar timezone del usuario
       setFormTags('')
-  setFormAgentId(DEFAULT_AGENT_ID)
+      setFormAgentId(DEFAULT_AGENT_ID)
       await fetchTasks()
     } catch (e) {
       console.error('Create task error', e)
@@ -484,6 +487,50 @@ export default function AgentsTasksPage() {
       setCreating(false)
     }
   }
+
+  // ✅ NEW: Simplified form submit handler
+  const handleSimplifiedSubmit = async (taskData: any) => {
+    try {
+      setCreating(true);
+      
+      const agent = agents.find(a => a.id === taskData.agent_id);
+      
+      const body = {
+        ...taskData,
+        agent_name: agent?.name || 'Ankie',
+        agent_avatar: getAgentAvatarUrl(agent?.name, agent?.icon),
+        notify_on_completion: true,
+        notify_on_failure: true,
+      };
+
+      // Handle scheduled tasks timezone conversion
+      if (taskData.task_type === 'scheduled' && taskData.scheduled_at) {
+        const zoned = DateTime.fromISO(taskData.scheduled_at, { zone: taskData.timezone || 'UTC' });
+        body.scheduled_at = zoned.toUTC().toISO();
+      }
+
+      const res = await fetch('/api/agent-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      const data = await res.json();
+      if (!data.success) {
+        console.error('Failed to create task:', data.error);
+        throw new Error(data.error || 'Failed to create task');
+      }
+
+      // Close modal and refresh
+      setFormOpen(false);
+      await fetchTasks();
+    } catch (e) {
+      console.error('Create task error:', e);
+      // Show error to user (you can add toast notification here)
+    } finally {
+      setCreating(false);
+    }
+  };
 
   // Funciones para edición de tasks
   const openEditDialog = (task: AgentTask) => {
@@ -915,6 +962,17 @@ export default function AgentsTasksPage() {
                               {typeof task.execution_time_ms === 'number' && (
                                 <div className="mt-2 text-xs text-muted-foreground">Duration: {task.execution_time_ms} ms</div>
                               )}
+                              
+                              {/* ✅ NEW: Show delegation metadata */}
+                              {task.result_data?.execution_metadata && (
+                                <DelegationMetadata
+                                  delegations={task.result_data.execution_metadata.delegations}
+                                  toolCalls={task.result_data.execution_metadata.tool_calls}
+                                  forwardMessageUsed={task.result_data.execution_metadata.forward_message_used}
+                                  className="mt-3"
+                                />
+                              )}
+                              
                               <div className="mt-3 flex items-center gap-2">
                                 <Button
                                   onClick={() => continueChatWithTask(task)}
@@ -1195,169 +1253,15 @@ export default function AgentsTasksPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Create Task Modal */}
-        {formOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-background border border-border rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            >
-              <h2 className="text-xl font-semibold text-foreground mb-4">Create Agent Task</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Agent</label>
-                  <Select value={formAgentId} onValueChange={setFormAgentId}>
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue placeholder="Select an agent" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border-border">
-                      {agents.map(agent => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Tasks run through <span className="text-foreground/90 font-medium">Cleo</span> by default. Pick a specialist only when you already know who should own it.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Title</label>
-                  <Input
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Task title"
-                    className="bg-background border-border"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Description</label>
-                  <Textarea
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="Detailed task description"
-                    rows={3}
-                    className="bg-background border-border"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Task Type</label>
-                    <Select value={formTaskType} onValueChange={(value: any) => setFormTaskType(value)}>
-                      <SelectTrigger className="bg-background border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border-border">
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="recurring">Recurring</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Priority (1-10)</label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={formPriority}
-                      onChange={(e) => setFormPriority(parseInt(e.target.value) || 5)}
-                      className="bg-background border-border"
-                    />
-                  </div>
-                </div>
-
-                {formTaskType === 'scheduled' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-2">Scheduled At</label>
-                      <Input
-                        type="datetime-local"
-                        value={formScheduledAt}
-                        onChange={(e) => setFormScheduledAt(e.target.value)}
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-2">
-                        Timezone {!timezoneLoading && (
-                          <span className="text-xs text-green-400 ml-1">
-                            (Auto: {getTimezoneDisplayName().split('(')[0].trim()})
-                          </span>
-                        )}
-                      </label>
-                      <Select value={formTimezone} onValueChange={setFormTimezone}>
-                        <SelectTrigger className="bg-background border-border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border-border">
-                          {!timezoneLoading && userTimezone !== 'UTC' && (
-                            <SelectItem value={userTimezone}>
-                              🌍 {getTimezoneDisplayName()} (Auto)
-                            </SelectItem>
-                          )}
-                          <SelectItem value="UTC">UTC</SelectItem>
-                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                          <SelectItem value="America/Chicago">Central Time</SelectItem>
-                          <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                          <SelectItem value="Europe/London">London</SelectItem>
-                          <SelectItem value="Europe/Madrid">Madrid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-
-                {formTaskType === 'recurring' && (
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Cron Expression</label>
-                    <Input
-                      value={formCron}
-                      onChange={(e) => setFormCron(e.target.value)}
-                      placeholder="0 9 * * *"
-                      className="bg-background border-border"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Tags (comma-separated)</label>
-                  <Input
-                    value={formTags}
-                    onChange={(e) => setFormTags(e.target.value)}
-                    placeholder="automation, web-scraping, daily"
-                    className="bg-background border-border"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setFormOpen(false)}
-                  className="border-border hover:bg-muted"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={submitCreate}
-                  disabled={creating || !formTitle || !formDescription}
-                  className="bg-foreground text-background hover:bg-foreground/90"
-                >
-                  {creating ? 'Creating...' : 'Create Task'}
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+        {/* ✅ NEW: Simplified Task Creation Form with Presets */}
+        <SimplifiedTaskForm
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSubmit={handleSimplifiedSubmit}
+          userTimezone={userTimezone}
+          timezoneDisplay={getTimezoneDisplayName()}
+          agents={agents}
+        />
 
         {/* Edit Task Modal */}
         {editOpen && editingTask && (

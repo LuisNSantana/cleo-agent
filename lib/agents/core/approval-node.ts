@@ -344,6 +344,14 @@ export function createToolApprovalNode() {
     // Scheduled tasks are pre-authorized when the user created the task.
     // Auto-approve high-risk tools so cron jobs can run headlessly.
     const isScheduledTask = state.metadata?.isScheduledTask === true
+    
+    console.log(`🔍 [APPROVAL-NODE] Checking scheduled task status:`, {
+      hasMetadata: !!state.metadata,
+      isScheduledTask: state.metadata?.isScheduledTask,
+      willAutoApprove: isScheduledTask,
+      metadataKeys: state.metadata ? Object.keys(state.metadata) : []
+    })
+    
     if (isScheduledTask) {
       console.log(`⚡ [APPROVAL-NODE] Scheduled task detected - auto-approving ${toolsRequiringApproval.length} tool(s)`)
       approvedSet.add(approvalKey)

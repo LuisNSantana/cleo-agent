@@ -376,6 +376,20 @@ export class DelegationCoordinator {
         task: delegationData.task.slice(0, 100)
       })
 
+      // ✅ CRITICAL: Inherit isScheduledTask flag from parent execution
+      // This ensures auto-approval bypasses HITL in delegated tasks (pre-authorized)
+      let inheritedIsScheduledTask = false
+      if (delegationData.sourceExecutionId) {
+        const sourceExecution = this.executionRegistry.get(delegationData.sourceExecutionId)
+        if (sourceExecution && (sourceExecution as any).metadata?.isScheduledTask === true) {
+          inheritedIsScheduledTask = true
+          logger.debug('🔑 [DELEGATION] Inherited isScheduledTask=true from parent execution', {
+            parentExecId: delegationData.sourceExecutionId,
+            childAgent: delegationData.targetAgent
+          })
+        }
+      }
+
       const delegationContext: ExecutionContext = {
         threadId: `delegation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: (preferredUserId || sourceUserId || contextUserId || NIL_UUID) as string,
@@ -389,7 +403,8 @@ export class DelegationCoordinator {
           parentExecutionId: delegationData.sourceExecutionId,
           originalHistoryLength: conversationHistory.length,
           filteredHistoryLength: recentHistory.length,
-          isSimpleTask
+          isSimpleTask,
+          isScheduledTask: inheritedIsScheduledTask  // ✅ Propagate to child
         }
       }
 

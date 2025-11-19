@@ -135,10 +135,11 @@ export async function createAgentTask(
         'peter': '/img/agents/peter4.png',
         'apu': '/img/agents/apu4.png',
         'ami': '/img/agents/ami4.png',
-        'cleo': '/img/kyliologo.png'
+        'ankie': '/img/agents/ankie4.png',
+        'cleo': '/img/agents/ankie4.png'  // Cleo was renamed to Ankie
       }
       const key = (name || '').toLowerCase().trim()
-      return map[key] || '/img/kyliologo.png'
+      return map[key] || '/img/agents/ankie4.png'  // Default to Ankie avatar
     }
 
     const DEFAULT_AGENT_ID = 'cleo-supervisor'
@@ -166,7 +167,7 @@ export async function createAgentTask(
 
     const rawAgentName = (taskData.agent_name || '').trim()
     const normalizedAgentId = normalizeAgentId(fallbackAgentId, rawAgentName || undefined)
-    const agentName = rawAgentName || getAgentDisplayName(normalizedAgentId) || 'Cleo'
+    const agentName = rawAgentName || getAgentDisplayName(normalizedAgentId) || 'Ankie'
     const avatarUrl = resolveAgentAvatar(agentName, taskData.agent_avatar)
 
     const insertPayload = {

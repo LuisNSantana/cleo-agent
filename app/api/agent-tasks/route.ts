@@ -13,6 +13,7 @@ import {
 } from '@/lib/agent-tasks/tasks-db';
 import type { AgentTaskStatus } from '@/lib/agent-tasks/types';
 import { getScheduler } from '@/lib/agent-tasks/scheduler';
+import { executeAgentTask } from '@/lib/agent-tasks/task-executor';
 import { resolveAgentCanonicalKey } from '@/lib/agents/alias-resolver';
 import { getAgentDisplayName } from '@/lib/agents/id-canonicalization';
 
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
       resolvedAgentId = 'cleo-supervisor';
     }
 
-    const resolvedAgentName = rawAgentName || getAgentDisplayName(resolvedAgentId) || 'Cleo';
+    const resolvedAgentName = rawAgentName || getAgentDisplayName(resolvedAgentId) || 'Ankie';
 
     const taskData: CreateAgentTaskInput = {
       agent_id: resolvedAgentId,
@@ -166,6 +167,22 @@ export async function POST(request: NextRequest) {
         { success: false, error: result.error },
         { status: 400 }
       );
+    }
+
+    // ✅ NEW: Execute manual tasks immediately (fire-and-forget)
+    if (result.task?.task_type === 'manual' && result.task?.status === 'pending') {
+      console.log(`⚡ Auto-executing manual task ${result.task.task_id} for user ${user.id}`);
+      
+      // Execute in background without blocking response
+      withRequestContext({ userId: user.id }, async () => {
+        try {
+          await executeAgentTask(result.task!);
+        } catch (error) {
+          console.error(`❌ Failed to execute manual task ${result.task!.task_id}:`, error);
+        }
+      }).catch((err: unknown) => {
+        console.error(`❌ Failed to set context for manual task ${result.task!.task_id}:`, err);
+      });
     }
 
     // Auto-start scheduler in dev/runtime when creating a scheduled task
