@@ -50,10 +50,16 @@ jest.mock('../lib/server/request-context', () => ({
   getCurrentUserId: jest.fn().mockReturnValue('test-user-id')
 }))
 
-describe('Agent Orchestrator - Critical Delegation & Execution Paths', () => {
-  let orchestrator: AgentOrchestrator
+const mockedSupabase = {
+  from: jest.fn()
+}
 
-  beforeEach(() => {
+let orchestrator: AgentOrchestrator
+
+describe('Agent Orchestrator - Critical Paths', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks()
+    
     // Configure mocks
     mockedSubAgentService.getSubAgents.mockResolvedValue([])
     mockedSubAgentService.getSubAgentStatistics.mockResolvedValue({
@@ -80,11 +86,8 @@ describe('Agent Orchestrator - Critical Delegation & Execution Paths', () => {
     })
     mockedSubAgentService.deleteSubAgent.mockResolvedValue(true)
 
-    const config: OrchestratorConfig = {
-      enableMetrics: true,
-      enableMemory: true
-    }
-    orchestrator = new AgentOrchestrator(config)
+    // Use getInstance (singleton pattern)
+    orchestrator = await AgentOrchestrator.getInstance()
   })
 
   afterEach(async () => {
@@ -99,8 +102,7 @@ describe('Agent Orchestrator - Critical Delegation & Execution Paths', () => {
     })
 
     it('maneja configuración mínima', async () => {
-      const minimalConfig: OrchestratorConfig = {}
-      const minimalOrchestrator = new AgentOrchestrator(minimalConfig)
+      const minimalOrchestrator = await AgentOrchestrator.getInstance()
       expect(minimalOrchestrator).toBeDefined()
       // Clean up this test-specific orchestrator
       await minimalOrchestrator.shutdown()

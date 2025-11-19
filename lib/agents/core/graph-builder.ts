@@ -365,14 +365,18 @@ export class GraphBuilder {
   }
 
   /**
-   * Build a simple agent graph with tool approval support
+   * Build a simple agent graph with tool approval support AND passthrough for forwarded messages
    * 
-   * Pattern follows official LangGraph HITL guidelines:
+   * Pattern follows official LangGraph HITL guidelines + forward_message optimization:
    * agent -> check_approval -> (conditional) tools -> agent (loop)
+   *                         -> passthrough (if forward_message used) -> END
    * 
    * The check_approval node uses interrupt() to pause execution when
    * tools requiring approval are detected. User can approve/reject/edit
    * via the resume endpoint.
+   * 
+   * The passthrough node bypasses synthesis when specialist response should
+   * be forwarded directly (LangGraph best practice from benchmarking research).
    */
   async buildGraph(agentConfig: AgentConfig): Promise<StateGraph<any>> {
     const graph = new StateGraph(GraphStateAnnotation)
@@ -386,13 +390,16 @@ export class GraphBuilder {
     // Add tool execution node
     graph.addNode('tools' as any, await this.createToolNode(agentConfig))
     
+    // Add passthrough node for forwarded messages (LangGraph best practice)
+    graph.addNode('passthrough' as any, this.createPassthroughNode())
+    
     // Routing: START -> agent
     graph.addEdge(START, 'agent' as any)
     
     // Routing: agent -> check_approval (always check after LLM response)
     graph.addEdge('agent' as any, 'check_approval' as any)
     
-    // Routing: check_approval -> tools (if has tool calls) or END (if done)
+    // Routing: check_approval -> tools (if has tool calls) or passthrough (if forward_message) or END
     graph.addConditionalEdges(
       'check_approval' as any,
       (state: GraphState) => {
@@ -401,6 +408,21 @@ export class GraphBuilder {
           'tool_calls' in lastMessage && 
           Array.isArray((lastMessage as any).tool_calls) &&
           (lastMessage as any).tool_calls.length > 0
+        
+        // Check if this is a forward_message call
+        if (hasToolCalls) {
+          const toolCalls = (lastMessage as any).tool_calls || []
+          const hasForwardMessage = toolCalls.some((tc: any) => 
+            tc?.name === 'forward_message' || tc?.function?.name === 'forward_message'
+          )
+          
+          if (hasForwardMessage) {
+            logger.info('📨 [GRAPH] Forward message detected -> passthrough', {
+              toolCallsCount: toolCalls.length
+            })
+            return 'passthrough'
+          }
+        }
         
         logger.debug('🔀 [GRAPH] Conditional edge decision', {
           hasToolCalls,
@@ -411,6 +433,7 @@ export class GraphBuilder {
       },
       {
         'tools': 'tools' as any,
+        'passthrough': 'passthrough' as any,
         '__end__': END
       }
     )
@@ -418,12 +441,72 @@ export class GraphBuilder {
     // Routing: tools -> agent (loop back for next iteration)
     graph.addEdge('tools' as any, 'agent' as any)
     
-    logger.debug('✅ Agent graph built with approval support', {
+    // Routing: passthrough -> END (no further processing needed)
+    graph.addEdge('passthrough' as any, END)
+    
+    logger.debug('✅ Agent graph built with approval + passthrough support', {
       agent: agentConfig.id,
-      nodes: ['agent', 'check_approval', 'tools']
+      nodes: ['agent', 'check_approval', 'tools', 'passthrough']
     })
     
     return graph
+  }
+
+  /**
+   * Create passthrough node for forwarded specialist messages
+   * 
+   * LangGraph Best Practice (from benchmark research):
+   * When supervisor uses forward_message tool, extract the specialist's response
+   * and return it directly WITHOUT synthesis/rewriting.
+   * 
+   * This prevents the "telephone game" translation loss that causes 50% performance drop.
+   */
+  private createPassthroughNode() {
+    return async (state: GraphState) => {
+      logger.info('📨 [PASSTHROUGH] Processing forwarded message')
+      
+      const lastMessage = state.messages[state.messages.length - 1]
+      const toolCalls = (lastMessage as any)?.tool_calls || []
+      
+      // Find forward_message tool call
+      const forwardCall = toolCalls.find((tc: any) => 
+        tc?.name === 'forward_message' || tc?.function?.name === 'forward_message'
+      )
+      
+      if (!forwardCall) {
+        logger.warn('⚠️ [PASSTHROUGH] No forward_message call found, returning empty')
+        return { messages: [] }
+      }
+      
+      // Extract arguments
+      const args = forwardCall.args || (forwardCall.function ? this.safeJsonParse(forwardCall.function.arguments) : {})
+      const { message, sourceAgent, confidence } = args
+      
+      if (!message || typeof message !== 'string') {
+        logger.error('❌ [PASSTHROUGH] Invalid message in forward_message call', { args })
+        return { messages: [] }
+      }
+      
+      logger.info('✅ [PASSTHROUGH] Forwarding specialist response', {
+        sourceAgent,
+        confidence,
+        messagePreview: message.slice(0, 100)
+      })
+      
+      // Create final AI message with the EXACT specialist response
+      // No synthesis, no paraphrasing - direct passthrough
+      const finalMessage = new AIMessage({
+        content: message,
+        additional_kwargs: {
+          forwarded: true,
+          sourceAgent,
+          confidence,
+          passthroughNode: true
+        }
+      })
+      
+      return { messages: [finalMessage] }
+    }
   }
 
   /**

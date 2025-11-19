@@ -17,6 +17,7 @@ const BASE_TOOLS = [
   'weatherInfo', // Weather data
   'randomFact', // Fun facts
   'extract_text_from_pdf', // ✅ PDF extraction for direct document analysis
+  'forward_message', // ✅ LangGraph best practice: forward specialist responses without rewriting
 ]
 
 // Legacy delegation tools for backward compatibility

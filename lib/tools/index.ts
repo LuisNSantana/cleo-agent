@@ -427,6 +427,16 @@ export const tools = {
 	...ingredientsTools,
 	...pdfTools,
 	
+	// Supervisor-only tool: forward specialist responses without rewriting
+	forward_message: (() => {
+		try {
+			const { forwardMessageTool } = require('./forward-message')
+			return forwardMessageTool
+		} catch {
+			return undefined
+		}
+	})(),
+	
 	// Twitter Advanced
 	postTweetWithMedia: postTweetWithMediaTool,
 	createTwitterThread: createTwitterThreadTool,
