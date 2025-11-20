@@ -73,11 +73,11 @@ export function TipOnboarding({ className }: { className?: string }) {
           Got it
         </Button>
         <a
-          href="/docs"
+          href="/prompts-library"
           className="text-xs text-primary hover:underline"
-          aria-label="Open Cleo documentation in a new page"
+          aria-label="Open the Cleo prompt library in a new page"
         >
-          Read the docs
+          Prompt Library
         </a>
       </div>
     </div>

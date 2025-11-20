@@ -20,7 +20,7 @@ export function ChatSessionProvider({
     if (!pathname) return null
     
     // Reset explícito al estar en Home u otras rutas que no son de chat
-    if (pathname === '/' || pathname === '/dashboard' || pathname === '/docs' || 
+  if (pathname === '/' || pathname === '/dashboard' || pathname === '/prompts-library' || 
         pathname === '/integrations' || pathname.startsWith('/agents/') || 
         pathname.startsWith('/p/') || pathname.startsWith('/auth/') || 
         pathname === '/privacy' || pathname === '/terms' || 

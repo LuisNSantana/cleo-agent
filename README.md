@@ -102,9 +102,9 @@ pnpm dev              # Start without Docker
 
 ## 📚 NotebookLM Integration
 
-- All docs in `/docs` are Markdown and ready for NotebookLM.
-- Upload Cleo’s docs to [NotebookLM](https://notebooklm.google.com/) for research, Q&A, and custom workflows.
-- Use up to 50 sources, 500k words each. Mix Cleo docs with your own for powerful knowledge graphs.
+- Explore the new Prompt Library UI at `http://localhost:3000/prompts-library` (or your deployed URL) for curated recipes, guest-ready prompts, and community packs.
+- All underlying reference docs still live in the `/docs` directory and remain Markdown-first, so they drop straight into NotebookLM.
+- Upload Cleo’s docs to [NotebookLM](https://notebooklm.google.com/) for research, Q&A, and custom workflows—mix them with your own sources (up to 50 files, 500k words each) for rich knowledge graphs.
 
 ---
 
@@ -118,9 +118,9 @@ pnpm dev              # Start without Docker
 
 ## 📝 Documentation & Guides
 
-- See `/docs/cleo-notebooklm-guide.md` for a full English guide to Cleo’s architecture, models, and NotebookLM usage.
-- See `/docs/langchain-integration.md` for technical details on LangChain orchestration.
-- All docs are NotebookLM-ready for easy import and Q&A.
+- Visit the Prompt Library (`/prompts-library`) for shareable prompt packs, guest flows, and launch-ready templates.
+- Need the raw Markdown? Grab it directly from `/docs/cleo-notebooklm-guide.md`, `/docs/langchain-integration.md`, and the rest of the `/docs` directory—everything stays NotebookLM-ready.
+
 
 ---
 
@@ -213,6 +213,7 @@ NEXT_PUBLIC_APP_URL=https://your-tunnel.ngrok-free.app
 
 ## 📚 Documentation
 
+- [✨ Prompt Library (web experience)](http://localhost:3000/prompts-library)
 - [📖 Installation Guide](./INSTALL.md)
 - [📋 Cleo User Guide](./docs/cleo-guide.md)  
 - [🏗️ Agent Architecture](./docs/multi-agent-architecture.md)

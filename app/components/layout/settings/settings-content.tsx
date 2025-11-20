@@ -216,29 +216,29 @@ export function SettingsContent({
             </TabsContent>
             <TabsContent value="docs" className="space-y-6 px-6 overflow-y-auto">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Link href="/docs#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
+                <Link href="/prompts-library#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
                   <h4 className="font-medium">Inicio</h4>
                   <p className="text-muted-foreground text-sm">Conceptos clave y tour rápido</p>
                 </Link>
-                <Link href="/docs#agents" className="rounded-lg border p-4 hover:bg-accent/40">
-                  <h4 className="font-medium">Control de Agentes</h4>
-                  <p className="text-muted-foreground text-sm">Cómo funcionan y cómo gestionarlos</p>
+                <Link href="/prompts-library#prompt-finder" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Prompt Finder</h4>
+                  <p className="text-muted-foreground text-sm">Filtra por casos, etiquetas y voces</p>
                 </Link>
-                <Link href="/docs#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
-                  <h4 className="font-medium">Crear Tareas</h4>
-                  <p className="text-muted-foreground text-sm">Flujos de trabajo y seguimiento</p>
+                <Link href="/prompts-library#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Banco de Prompts</h4>
+                  <p className="text-muted-foreground text-sm">Plantillas listas para copiar</p>
                 </Link>
-                <Link href="/docs#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
-                  <h4 className="font-medium">Crear Agentes</h4>
-                  <p className="text-muted-foreground text-sm">Perfiles, capacidades y herramientas</p>
+                <Link href="/prompts-library#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Prompt Packs</h4>
+                  <p className="text-muted-foreground text-sm">Playbooks multi-agente</p>
                 </Link>
-                <Link href="/docs#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
-                  <h4 className="font-medium">PWA & Notificaciones</h4>
-                  <p className="text-muted-foreground text-sm">Instalación y push en tiempo real</p>
+                <Link href="/prompts-library#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Guest Mode</h4>
+                  <p className="text-muted-foreground text-sm">Recetas para demos instantáneas</p>
                 </Link>
-                <Link href="/docs#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
-                  <h4 className="font-medium">Dashboard</h4>
-                  <p className="text-muted-foreground text-sm">Métricas, rendimiento y actividad</p>
+                <Link href="/prompts-library#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <h4 className="font-medium">Comunidad</h4>
+                  <p className="text-muted-foreground text-sm">Comparte y mide tus flujos</p>
                 </Link>
               </div>
             </TabsContent>
@@ -401,29 +401,29 @@ export function SettingsContent({
               </TabsContent>
               <TabsContent value="docs" className="mt-0 space-y-6">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <Link href="/docs#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
+                  <Link href="/prompts-library#getting-started" className="rounded-lg border p-4 hover:bg-accent/40">
                     <h4 className="font-medium">Inicio</h4>
                     <p className="text-muted-foreground text-sm">Conceptos clave y tour rápido</p>
                   </Link>
-                  <Link href="/docs#agents" className="rounded-lg border p-4 hover:bg-accent/40">
-                    <h4 className="font-medium">Control de Agentes</h4>
-                    <p className="text-muted-foreground text-sm">Cómo funcionan y cómo gestionarlos</p>
+                  <Link href="/prompts-library#prompt-finder" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Prompt Finder</h4>
+                    <p className="text-muted-foreground text-sm">Filtra por casos, etiquetas y voces</p>
                   </Link>
-                  <Link href="/docs#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
-                    <h4 className="font-medium">Crear Tareas</h4>
-                    <p className="text-muted-foreground text-sm">Flujos de trabajo y seguimiento</p>
+                  <Link href="/prompts-library#tasks" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Banco de Prompts</h4>
+                    <p className="text-muted-foreground text-sm">Plantillas listas para copiar</p>
                   </Link>
-                  <Link href="/docs#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
-                    <h4 className="font-medium">Crear Agentes</h4>
-                    <p className="text-muted-foreground text-sm">Perfiles, capacidades y herramientas</p>
+                  <Link href="/prompts-library#build-agents" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Prompt Packs</h4>
+                    <p className="text-muted-foreground text-sm">Playbooks multi-agente</p>
                   </Link>
-                  <Link href="/docs#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
-                    <h4 className="font-medium">PWA & Notificaciones</h4>
-                    <p className="text-muted-foreground text-sm">Instalación y push en tiempo real</p>
+                  <Link href="/prompts-library#pwa" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Guest Mode</h4>
+                    <p className="text-muted-foreground text-sm">Recetas para demos instantáneas</p>
                   </Link>
-                  <Link href="/docs#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
-                    <h4 className="font-medium">Dashboard</h4>
-                    <p className="text-muted-foreground text-sm">Métricas, rendimiento y actividad</p>
+                  <Link href="/prompts-library#dashboard" className="rounded-lg border p-4 hover:bg-accent/40">
+                    <h4 className="font-medium">Comunidad</h4>
+                    <p className="text-muted-foreground text-sm">Comparte y mide tus flujos</p>
                   </Link>
                 </div>
               </TabsContent>

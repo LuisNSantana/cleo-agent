@@ -53,7 +53,7 @@ export function LandingFooter() {
                 </a>
               </li>
               <li>
-                <a href="/docs" className="transition-colors hover:text-foreground">
+                <a href="/prompts-library" className="transition-colors hover:text-foreground">
                   {copy.footer.documentation}
                 </a>
               </li>

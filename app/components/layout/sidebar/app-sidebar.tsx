@@ -46,6 +46,7 @@ import {
   Folder as Folders,
   MaskHappy as MaskHappyIcon,
   CreditCard as CreditsIcon,
+  BookOpen as BookOpenIcon,
 } from "@phosphor-icons/react"
 import { useSettingsStore, type SettingsTab } from "@/lib/settings/store"
 import { SidebarVoiceButton } from "@/app/components/voice/sidebar-voice-button"
@@ -100,6 +101,7 @@ export function AppSidebar() {
     { href: "/agents/tasks", label: t.sidebar.tasks, icon: TasksIcon, iconWeight: "duotone" as const },
     { href: "/integrations", label: t.sidebar.integrations, icon: IntegrationsIcon, iconWeight: "duotone" as const },
     { href: "/dashboard", label: t.sidebar.dashboard, icon: DashboardIcon, iconWeight: "duotone" as const },
+    { href: "/prompts-library", label: t.sidebar.promptLibrary, icon: BookOpenIcon, iconWeight: "duotone" as const },
     { href: "/account", label: "Credits", icon: CreditsIcon, iconWeight: "duotone" as const },
   ], [t.sidebar])
 

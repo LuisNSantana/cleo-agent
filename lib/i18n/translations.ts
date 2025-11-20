@@ -25,6 +25,7 @@ export type Translations = {
     files: string
     newAgent: string
     generatePrompt: string
+    promptLibrary: string
   }
   
   // Time groupings
@@ -185,6 +186,7 @@ const en: Translations = {
     files: 'Files',
     newAgent: 'New Agent',
     generatePrompt: 'Generate Prompt',
+    promptLibrary: 'Prompt Library',
   },
   time: {
     today: 'Today',
@@ -322,6 +324,7 @@ const es: Translations = {
     files: 'Archivos',
     newAgent: 'Crear Agente',
     generatePrompt: 'Auto-generar Prompt',
+    promptLibrary: 'Biblioteca de Prompts',
   },
   time: {
     today: 'Hoy',
@@ -459,6 +462,7 @@ const pt: Translations = {
     files: 'Arquivos',
     newAgent: 'Novo Agente',
     generatePrompt: 'Gerar Prompt',
+    promptLibrary: 'Biblioteca de Prompts',
   },
   time: {
     today: 'Hoje',
@@ -595,6 +599,7 @@ const fr: Translations = {
     files: 'Fichiers',
     newAgent: 'Nouvel Agent',
     generatePrompt: 'Générer Prompt',
+    promptLibrary: 'Bibliothèque de Prompts',
   },
   time: {
     today: "Aujourd'hui",
@@ -731,6 +736,7 @@ const it: Translations = {
     files: 'File',
     newAgent: 'Nuovo Agente',
     generatePrompt: 'Genera Prompt',
+    promptLibrary: 'Libreria di Prompt',
   },
   time: {
     today: 'Oggi',
@@ -859,6 +865,7 @@ const de: Translations = {
     files: 'Dateien',
     newAgent: 'Neuer Agent',
     generatePrompt: 'Prompt Erstellen',
+    promptLibrary: 'Prompt-Bibliothek',
   },
   time: {
     today: 'Heute',
@@ -987,6 +994,7 @@ const ja: Translations = {
     files: 'ファイル',
     newAgent: '新しいエージェント',
     generatePrompt: 'プロンプト生成',
+    promptLibrary: 'プロンプトライブラリ',
   },
   time: {
     today: '今日',
@@ -1061,6 +1069,7 @@ const ko: Translations = {
     files: '파일',
     newAgent: '새 에이전트',
     generatePrompt: '프롬프트 생성',
+    promptLibrary: '프롬프트 라이브러리',
   },
   time: {
     today: '오늘',
@@ -1135,6 +1144,7 @@ const zh: Translations = {
     files: '文件',
     newAgent: '新建代理',
     generatePrompt: '生成提示',
+    promptLibrary: '提示库',
   },
   time: {
     today: '今天',
@@ -1209,6 +1219,7 @@ const ar: Translations = {
     files: 'الملفات',
     newAgent: 'وكيل جديد',
     generatePrompt: 'توليد موجه',
+    promptLibrary: 'مكتبة الموجهات',
   },
   time: {
     today: 'اليوم',

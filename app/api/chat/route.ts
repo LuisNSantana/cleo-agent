@@ -1225,6 +1225,8 @@ export async function POST(req: Request) {
             )
             const pollStartTime = Date.now()
             let hungWarningSent = false
+            let lastKeepAliveTime = Date.now()
+            const KEEP_ALIVE_INTERVAL_MS = 15000 // Send keep-alive every 15 seconds
 
             const closeStream = () => {
               if (streamClosed) return
@@ -1373,6 +1375,19 @@ export async function POST(req: Request) {
               }
 
               const elapsedMs = Date.now() - pollStartTime
+              
+              // 🔄 SSE Keep-Alive: Send periodic comment to prevent connection timeout
+              const timeSinceLastKeepAlive = Date.now() - lastKeepAliveTime
+              if (timeSinceLastKeepAlive >= KEEP_ALIVE_INTERVAL_MS) {
+                try {
+                  // Send SSE comment (lines starting with ':' are ignored by clients but keep connection alive)
+                  controller.enqueue(encoder.encode(`: keep-alive ${Date.now()}\n\n`))
+                  lastKeepAliveTime = Date.now()
+                  console.log('💓 [SSE KEEP-ALIVE] Sent ping to prevent timeout')
+                } catch (error) {
+                  console.warn('⚠️ [SSE KEEP-ALIVE] Failed to send ping:', error)
+                }
+              }
               
               // Update poll interval based on elapsed time
               const newPollMs = updatePollInterval(elapsedMs)

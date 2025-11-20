@@ -97,10 +97,10 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           {!isLoggedIn ? (
             <div className="pointer-events-auto flex flex-1 items-center justify-end gap-4">
               <Link
-                href="/docs"
+                href="/prompts-library"
                 className="font-base text-foreground/80 hover:text-foreground text-base transition-colors"
               >
-                Docs
+                Prompt Library
               </Link>
               <AppInfoTrigger
                 trigger={

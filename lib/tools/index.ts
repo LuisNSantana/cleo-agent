@@ -502,7 +502,13 @@ export type ToolName = keyof typeof tools
 
 // Dynamic delegation tool creation
 export function ensureDelegationToolForAgent(agentId: string, agentName: string): string {
-	const toolName = `delegate_to_${agentId.replace(/[^a-zA-Z0-9]/g, '_')}`
+	// ✅ FIX: Don't normalize UUID agent IDs - only normalize known agent slugs
+	// UUIDs should remain unchanged to avoid lookup issues
+	const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId)
+	const toolName = isUuid 
+		? `delegate_to_${agentId.replace(/-/g, '_')}` // UUIDs: only replace hyphens
+		: `delegate_to_${agentId.replace(/[^a-zA-Z0-9]/g, '_')}` // Slugs: full normalization
+		
 	if (!(toolName in tools)) {
 		const newTool = tool({
 			description: `Delegate tasks to ${agentName}.`,

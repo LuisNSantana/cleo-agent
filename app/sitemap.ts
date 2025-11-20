@@ -17,10 +17,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
-      url: `${appUrl}/docs`,
+      url: `${appUrl}/prompts-library`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.8,
+      priority: 0.85,
     },
     {
       url: `${appUrl}/dashboard`,
