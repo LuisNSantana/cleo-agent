@@ -26,14 +26,17 @@ const subAgentUpdateSchema = z.object({
   config: z.record(z.any()).optional()
 })
 
+import { verifyUserHasAccess } from '@/lib/server/auth'
+
 // Helper function to get user ID from session/auth
 async function getUserId(request: NextRequest): Promise<string | null> {
-  // TODO: Implement proper authentication with Supabase
-  // For now, using a header or query parameter for development
-  const userId = request.headers.get('x-user-id') || 
-                request.nextUrl.searchParams.get('userId')
-  
-  return userId
+  try {
+    // Use the centralized auth verification
+    const { userId } = await verifyUserHasAccess()
+    return userId
+  } catch (error) {
+    return null
+  }
 }
 
 // GET /api/agents/sub-agents?parentAgentId=xxx - List sub-agents for a parent

@@ -617,8 +617,8 @@ export function useChatCore({
         messages: convertedMessages,
       }),
       signal: abortControllerRef.current.signal,
-      // Avoid keepalive for large payloads (browser limit ~64KB causes TypeError: Failed to fetch)
-      keepalive: hasDataUrlPayload ? false : true,
+      // Disable keepalive to avoid 64KB limit which causes "Failed to fetch" on large chats
+      keepalive: false,
     })
   } catch (fetchError) {
     console.error('[CLIENT FETCH] Network error:', {

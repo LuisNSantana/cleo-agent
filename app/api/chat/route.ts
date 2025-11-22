@@ -471,6 +471,21 @@ export async function POST(req: Request) {
         provider as ProviderWithoutOllama
       )
       apiKey = maybeKey || undefined
+      
+      // ✅ CRITICAL FIX: Fail fast if no key is available (prevents downstream "failed fetch" or auth errors)
+      if (!apiKey && provider !== 'ollama' && !process.env.OPENROUTER_API_KEY) {
+         // Check if it's a provider that requires a key
+         const requiresKey = ['openai', 'anthropic', 'google', 'groq', 'xai'].includes(provider)
+         if (requiresKey) {
+            console.error(`[ChatAPI] Missing API key for provider ${provider}. User: ${userId}`)
+            return createErrorResponse({
+              code: 'MISSING_API_KEY',
+              message: `No valid API key found for ${provider}. Please check your settings or re-authenticate.`,
+              statusCode: 401
+            })
+         }
+      }
+
       // Lightweight debug (no secrets): confirm whether a key was resolved
   if (provider === 'openrouter') {
         const hasKey = Boolean(apiKey || process.env.OPENROUTER_API_KEY)

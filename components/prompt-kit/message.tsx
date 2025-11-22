@@ -63,8 +63,8 @@ const MessageContent = ({
 }: MessageContentProps) => {
   const base =
     variant === 'plain'
-      ? "prose dark:prose-invert break-words whitespace-normal"
-      : "rounded-lg p-2 text-foreground bg-secondary prose break-words whitespace-normal"
+      ? "prose prose-zinc dark:prose-invert break-words whitespace-normal"
+      : "rounded-lg p-2 bg-secondary prose prose-zinc break-words whitespace-normal"
 
   const classNames = cn(base, className)
 

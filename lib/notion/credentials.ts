@@ -180,7 +180,7 @@ export async function getActiveNotionKey(userId: string): Promise<string | null>
       .eq('service_id', SERVICE_ID)
       .eq('connected', true)
       .limit(1)
-      .single()
+      .maybeSingle()
     if (error || !data?.access_token) {
       console.warn('[Notion][getActiveNotionKey] No token found or error:', error)
       return null

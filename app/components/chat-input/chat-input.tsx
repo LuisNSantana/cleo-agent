@@ -256,10 +256,11 @@ export function ChatInput({
         onClick={() => textareaRef.current?.focus()}
       >
         <PromptInput
-          className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
+          className="relative z-10 p-0 pt-1 shadow-none bg-white dark:bg-zinc-950"
           maxHeight={200}
           value={value}
           onValueChange={handleValueChange}
+          animatedBorder={true}
         >
           <FileList files={files} onFileRemoveAction={onFileRemoveAction} />
           
@@ -302,7 +303,7 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={status === "streaming"}
-            className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+            className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base text-foreground placeholder:text-muted-foreground"
           />
           <PromptInputActions className="mt-3 w-full justify-between p-2">
             <div className="flex gap-2 items-center">

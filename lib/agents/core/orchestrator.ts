@@ -3,30 +3,45 @@
  * Extended with router logic, delegation, and tool execution
  */
 
-import { StateGraph, StateGraphArgs } from '@langchain/langgraph'
-import { BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
-import { AgentConfig, AgentExecution, AgentState, ExecutionResult, ExecutionStep } from '../types'
-import { safeSetState } from '@/lib/agents/execution-state'
-import { GraphBuilder } from './graph-builder'
-import { ExecutionManager } from './execution-manager'
-import { ModelFactory } from './model-factory'
-import { EventEmitter } from './event-emitter'
-import { globalErrorHandler, AgentErrorHandler } from './error-handler'
-import { MemoryManager } from './memory-manager'
-import { MetricsCollector } from './metrics-collector'
-import { getAgentMetadata } from '../agent-metadata'
-import { SubAgentManager, type SubAgent } from './sub-agent-manager'
-import { getAllAgents, getAgentById } from '../unified-config'
-import { canonicalizeAgentId, getAgentDisplayName } from '../id-canonicalization'
-import { getCurrentUserId } from '@/lib/server/request-context'
-import { getRuntimeConfig, type RuntimeConfig } from '../runtime-config'
-import logger from '@/lib/utils/logger'
-import { emitExecutionEvent } from '@/lib/agents/logging-events'
-import { withDelegationContext } from './delegation-context'
-import { ExecutionRegistry } from './execution-registry'
-import { DelegationCoordinator } from './delegation-coordinator'
-import { emitBrowserEvent } from '@/lib/utils/browser-events'
-import { buildNodeEnteredStep, buildNodeCompletedStep } from './step-builder'
+import { safeSetState } from "@/lib/agents/execution-state"
+import { emitExecutionEvent } from "@/lib/agents/logging-events"
+import { getCurrentUserId } from "@/lib/server/request-context"
+import { emitBrowserEvent } from "@/lib/utils/browser-events"
+import logger from "@/lib/utils/logger"
+import {
+  AIMessage,
+  BaseMessage,
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+} from "@langchain/core/messages"
+import { StateGraph, StateGraphArgs } from "@langchain/langgraph"
+import { getAgentMetadata } from "../agent-metadata"
+import {
+  canonicalizeAgentId,
+  getAgentDisplayName,
+} from "../id-canonicalization"
+import { getRuntimeConfig, type RuntimeConfig } from "../runtime-config"
+import {
+  AgentConfig,
+  AgentExecution,
+  AgentState,
+  ExecutionResult,
+  ExecutionStep,
+} from "../types"
+import { getAgentById, getAllAgents } from "../unified-config"
+import { withDelegationContext } from "./delegation-context"
+import { DelegationCoordinator } from "./delegation-coordinator"
+import { AgentErrorHandler, globalErrorHandler } from "./error-handler"
+import { EventEmitter } from "./event-emitter"
+import { ExecutionManager } from "./execution-manager"
+import { ExecutionRegistry } from "./execution-registry"
+import { GraphBuilder } from "./graph-builder"
+import { MemoryManager } from "./memory-manager"
+import { MetricsCollector } from "./metrics-collector"
+import { ModelFactory } from "./model-factory"
+import { buildNodeCompletedStep, buildNodeEnteredStep } from "./step-builder"
+import { SubAgentManager, type SubAgent } from "./sub-agent-manager"
 
 // Global counter for unique ID generation
 let orchestratorMessageIdCounter = 0
@@ -64,7 +79,7 @@ export interface ExecutionContext {
 
 export interface ExecutionOptions {
   timeout?: number
-  priority?: 'low' | 'normal' | 'high'
+  priority?: "low" | "normal" | "high"
   enableStreaming?: boolean
   maxTokens?: number
   temperature?: number
@@ -72,7 +87,7 @@ export interface ExecutionOptions {
 
 /**
  * Modular Agent Orchestrator
- * 
+ *
  * Core responsibilities:
  * - Agent execution coordination
  * - Module lifecycle management
@@ -91,11 +106,11 @@ export class AgentOrchestrator {
   private subAgentManager!: SubAgentManager
   private config: OrchestratorConfig
   private runtime: RuntimeConfig
-  
+
   // New modular components
   private executionRegistry!: ExecutionRegistry
   private delegationCoordinator!: DelegationCoordinator
-  
+
   // Track executions that performed at least one delegation
   private delegationsSeen: Set<string> = new Set()
 
@@ -114,27 +129,27 @@ export class AgentOrchestrator {
       enableMemory: true,
       memoryConfig: {
         // ✅ OPTIMIZED: Increased for modern models (GPT-4o 128k, Grok-4 128k, Claude 200k)
-        maxThreadMessages: 500,     // Was 100 - more generous for long conversations
-        maxContextTokens: 100000,   // Was 8000 - appropriate for modern LLMs
-        compressionThreshold: 0.9   // Was 0.8 - compress only at 90% capacity
+        maxThreadMessages: 500, // Was 100 - more generous for long conversations
+        maxContextTokens: 100000, // Was 8000 - appropriate for modern LLMs
+        compressionThreshold: 0.9, // Was 0.8 - compress only at 90% capacity
       },
       errorHandlerConfig: {
         maxRetries: 3,
         baseDelayMs: 1000,
-        enableCircuitBreaker: true
+        enableCircuitBreaker: true,
       },
-      ...config
+      ...config,
     }
 
     // Initialize execution registry
     this.executionRegistry = new ExecutionRegistry({
       maxExecutions: 100,
-      ttlMs: 1000 * 60 * 5 // 5 minutes
+      ttlMs: 1000 * 60 * 5, // 5 minutes
     })
-    
+
     this.runtime = getRuntimeConfig()
   }
-  
+
   /**
    * ✅ CRITICAL: Async initialization after constructor
    * Called by getInstance() to properly initialize async modules
@@ -142,15 +157,15 @@ export class AgentOrchestrator {
   private async initialize(): Promise<void> {
     // Initialize all async modules
     await this.initializeModules()
-    
+
     // Debug: Verify methods exist before binding
-    logger.info('🔍 [INIT] Verifying methods before DelegationCoordinator:', {
-      hasExecuteAgent: typeof this.executeAgent === 'function',
-      hasInitializeAgent: typeof this.initializeAgent === 'function',
+    logger.info("🔍 [INIT] Verifying methods before DelegationCoordinator:", {
+      hasExecuteAgent: typeof this.executeAgent === "function",
+      hasInitializeAgent: typeof this.initializeAgent === "function",
       eventEmitterOk: !!this.eventEmitter,
-      subAgentManagerOk: !!this.subAgentManager
+      subAgentManagerOk: !!this.subAgentManager,
     })
-    
+
     // Now that core modules are initialized, wire the DelegationCoordinator with dependencies
     this.delegationCoordinator = new DelegationCoordinator(
       this.eventEmitter,
@@ -162,11 +177,11 @@ export class AgentOrchestrator {
       {
         maxExecutionMsSpecialist: this.runtime.maxExecutionMsSpecialist,
         maxExecutionMsSupervisor: this.runtime.maxExecutionMsSupervisor,
-        delegationTimeoutMs: this.runtime.delegationTimeoutMs
+        delegationTimeoutMs: this.runtime.delegationTimeoutMs,
       }
     )
-    
-    logger.info('✅ [INIT] DelegationCoordinator created successfully')
+
+    logger.info("✅ [INIT] DelegationCoordinator created successfully")
   }
 
   private async initializeModules(): Promise<void> {
@@ -174,36 +189,39 @@ export class AgentOrchestrator {
     this.eventEmitter = new EventEmitter()
     this.errorHandler = globalErrorHandler
     this.modelFactory = new ModelFactory()
-    
+
     // ✅ TEMPORARY FIX: Use LangGraph's MemorySaver for now
     // TODO: Implement proper Supabase checkpointer later
-    const { MemorySaver } = await import('@langchain/langgraph')
+    const { MemorySaver } = await import("@langchain/langgraph")
     const sharedCheckpointer = new MemorySaver()
-    logger.info('✅ Shared MemorySaver initialized (temporary for beta)')
-    
+    logger.info("✅ Shared MemorySaver initialized (temporary for beta)")
+
     // ✅ OPTIMIZED: Initialize shared GraphCache
     // This eliminates 150-300ms per request from re-compilation
-    const { GraphCache } = await import('./graph-cache')
+    const { GraphCache } = await import("./graph-cache")
     const sharedGraphCache = new GraphCache(sharedCheckpointer)
-    
+
     // Use NIL UUID as a safe default to avoid non-UUID logs/DB errors; updated per-execution later
-    this.subAgentManager = new SubAgentManager('00000000-0000-0000-0000-000000000000', this.eventEmitter)
-    
+    this.subAgentManager = new SubAgentManager(
+      "00000000-0000-0000-0000-000000000000",
+      this.eventEmitter
+    )
+
     // ✅ Pass shared modules to ExecutionManager
     this.executionManager = new ExecutionManager({
       eventEmitter: this.eventEmitter,
       errorHandler: this.errorHandler,
       checkpointer: sharedCheckpointer,
-      graphCache: sharedGraphCache
+      graphCache: sharedGraphCache,
     })
-    
+
     // ✅ Pass shared modules to GraphBuilder
     this.graphBuilder = new GraphBuilder({
       modelFactory: this.modelFactory,
       eventEmitter: this.eventEmitter,
       executionManager: this.executionManager,
       checkpointer: sharedCheckpointer,
-      graphCache: sharedGraphCache
+      graphCache: sharedGraphCache,
     })
 
     // Initialize optional modules
@@ -221,25 +239,25 @@ export class AgentOrchestrator {
 
   private setupEventHandlers(): void {
     // Execution lifecycle events
-    this.eventEmitter.on('execution.started', (execution: AgentExecution) => {
+    this.eventEmitter.on("execution.started", (execution: AgentExecution) => {
       this.executionRegistry.set(execution.id, execution)
       this.metricsCollector?.recordExecutionStart(execution)
     })
 
-    this.eventEmitter.on('execution.completed', (execution: AgentExecution) => {
+    this.eventEmitter.on("execution.completed", (execution: AgentExecution) => {
       // Executions are now cleaned up explicitly when they complete
       // No automatic cleanup timeout needed
       this.metricsCollector?.recordExecutionComplete(execution)
-      
+
       // Emit browser event for UI
-      emitBrowserEvent('execution-completed', {
+      emitBrowserEvent("execution-completed", {
         executionId: execution.id,
         agentId: execution.agentId,
         result: execution.result,
         executionTime: execution.metrics?.executionTime,
-        tokensUsed: execution.metrics?.tokensUsed
+        tokensUsed: execution.metrics?.tokensUsed,
       })
-      
+
       // CRITICAL FIX: Notify Legacy Orchestrator of completion
       try {
         const legacyOrch = (globalThis as any).__cleoOrchestrator
@@ -247,129 +265,155 @@ export class AgentOrchestrator {
           legacyOrch.handleExecutionCompletion(execution)
         }
       } catch (error) {
-  logger.warn('Failed to notify legacy orchestrator of completion:', error)
+        logger.warn(
+          "Failed to notify legacy orchestrator of completion:",
+          error
+        )
       }
     })
 
-    this.eventEmitter.on('execution.failed', (execution: AgentExecution) => {
-  this.executionRegistry.delete(execution.id)
-  this.metricsCollector?.recordExecutionFailure(execution)
+    this.eventEmitter.on("execution.failed", (execution: AgentExecution) => {
+      this.executionRegistry.delete(execution.id)
+      this.metricsCollector?.recordExecutionFailure(execution)
     })
 
     // CRITICAL: Listen for interrupts from delegated executions
     // When a child execution (e.g., Astra) hits an interrupt, we need to propagate
     // the interrupt step to the parent execution (e.g., Cleo) immediately
     // so that the parent's polling can detect it and show the approval UI
-    this.eventEmitter.on('execution.interrupted', (interruptData: any) => {
+    this.eventEmitter.on("execution.interrupted", (interruptData: any) => {
       try {
-        logger.debug('🛑 [ORCHESTRATOR] Interrupt detected in execution:', {
+        logger.debug("🛑 [ORCHESTRATOR] Interrupt detected in execution:", {
           executionId: interruptData.executionId,
           agentId: interruptData.agentId,
           userId: interruptData.userId,
           action: interruptData.interrupt?.action_request?.action,
           hasStep: !!interruptData.step,
-          stepAction: interruptData.step?.action
+          stepAction: interruptData.step?.action,
         })
 
         // Find parent execution (typically cleo-supervisor) by checking all active executions
         // Strategy: Parent is cleo-supervisor OR any execution that started before the child
         // and is from the same user
         const allExecutions = Array.from(this.executionRegistry.values())
-        
+
         // First, try to find cleo-supervisor execution for this user
         let parentExecution = allExecutions.find(
-          (exec: any) => 
+          (exec: any) =>
             exec.id !== interruptData.executionId && // Not the child
-            exec.agentId === 'cleo-supervisor' && // Is Cleo
+            exec.agentId === "cleo-supervisor" && // Is Cleo
             exec.userId === interruptData.userId && // Same user
             exec.startTime && // Has started
-            (Date.now() - new Date(exec.startTime).getTime()) < 600000 // Within last 10 minutes
+            Date.now() - new Date(exec.startTime).getTime() < 600000 // Within last 10 minutes
         )
-        
+
         // Fallback: find any execution that started before the child and is still active
         if (!parentExecution) {
-          const childExec = allExecutions.find(e => e.id === interruptData.executionId)
+          const childExec = allExecutions.find(
+            (e) => e.id === interruptData.executionId
+          )
           if (childExec?.startTime) {
             parentExecution = allExecutions.find(
-              (exec: any) => 
+              (exec: any) =>
                 exec.id !== interruptData.executionId && // Not the child
                 exec.userId === interruptData.userId && // Same user
                 exec.startTime && // Has started
-                new Date(exec.startTime).getTime() < new Date(childExec.startTime).getTime() && // Started before child
-                (Date.now() - new Date(exec.startTime).getTime()) < 600000 // Within last 10 minutes
+                new Date(exec.startTime).getTime() <
+                  new Date(childExec.startTime).getTime() && // Started before child
+                Date.now() - new Date(exec.startTime).getTime() < 600000 // Within last 10 minutes
             )
           }
         }
-        
+
         if (parentExecution && interruptData.step) {
           // Propagate the interrupt step to the parent execution immediately (use steps, not snapshot)
-          if (!Array.isArray(parentExecution.steps)) (parentExecution as any).steps = []
+          if (!Array.isArray(parentExecution.steps))
+            (parentExecution as any).steps = []
           ;(parentExecution as any).steps.push(interruptData.step)
-          
-          logger.info('🔄 [ORCHESTRATOR] Propagated interrupt step from delegation to parent:', {
-            parentExecId: parentExecution.id,
-            parentAgent: parentExecution.agentId,
-            childExecId: interruptData.executionId,
-            childAgent: interruptData.agentId,
-            interruptAction: interruptData.interrupt?.action_request?.action,
-            parentStepsCount: (parentExecution as any).steps?.length,
-            propagatedStep: {
-              id: interruptData.step.id,
-              action: interruptData.step.action,
-              agent: interruptData.step.agent
+
+          logger.info(
+            "🔄 [ORCHESTRATOR] Propagated interrupt step from delegation to parent:",
+            {
+              parentExecId: parentExecution.id,
+              parentAgent: parentExecution.agentId,
+              childExecId: interruptData.executionId,
+              childAgent: interruptData.agentId,
+              interruptAction: interruptData.interrupt?.action_request?.action,
+              parentStepsCount: (parentExecution as any).steps?.length,
+              propagatedStep: {
+                id: interruptData.step.id,
+                action: interruptData.step.action,
+                agent: interruptData.step.agent,
+              },
             }
-          })
-          
+          )
+
           // CRITICAL DEBUG: Verify step is actually in the array
-          const found = (parentExecution as any).steps?.find((s: any) => s.id === interruptData.step.id)
+          const found = (parentExecution as any).steps?.find(
+            (s: any) => s.id === interruptData.step.id
+          )
           if (found) {
-            console.log('✅ [ORCHESTRATOR] VERIFIED: Interrupt step exists in parent.steps')
+            console.log(
+              "✅ [ORCHESTRATOR] VERIFIED: Interrupt step exists in parent.steps"
+            )
           } else {
-            console.error('❌ [ORCHESTRATOR] ERROR: Step not found after push!')
+            console.error("❌ [ORCHESTRATOR] ERROR: Step not found after push!")
           }
         } else {
           // DEBUG: Why didn't we propagate?
-          logger.warn('🔄 [ORCHESTRATOR] Could not find parent execution for interrupt:', {
-            childExecId: interruptData.executionId,
-            childAgent: interruptData.agentId,
-            parentExecutionFound: !!parentExecution,
-            stepExists: !!interruptData.step,
-            reason: !parentExecution ? 'NO_PARENT_FOUND' : 'NO_STEP_IN_EVENT_DATA',
-            activeExecutions: Array.from(this.executionRegistry.keys())
-          })
+          logger.warn(
+            "🔄 [ORCHESTRATOR] Could not find parent execution for interrupt:",
+            {
+              childExecId: interruptData.executionId,
+              childAgent: interruptData.agentId,
+              parentExecutionFound: !!parentExecution,
+              stepExists: !!interruptData.step,
+              reason: !parentExecution
+                ? "NO_PARENT_FOUND"
+                : "NO_STEP_IN_EVENT_DATA",
+              activeExecutions: Array.from(this.executionRegistry.keys()),
+            }
+          )
         }
-        
+
         // CRITICAL: Always propagate to external listeners (SSE streams) regardless of parent propagation
         // The event 'execution.interrupted' is listened to by chat/route.ts for SSE emission
         // DO NOT block or consume this event - multiple listeners need it
       } catch (error) {
-        logger.error('❌ [ORCHESTRATOR] Error handling execution.interrupted event:', error)
+        logger.error(
+          "❌ [ORCHESTRATOR] Error handling execution.interrupted event:",
+          error
+        )
       }
     })
 
     // Delegation events - handle multi-agent handoffs
-    this.eventEmitter.on('delegation.requested', async (delegationData: any) => {
-  await this.delegationCoordinator.handleDelegation(delegationData)
-    })
+    this.eventEmitter.on(
+      "delegation.requested",
+      async (delegationData: any) => {
+        await this.delegationCoordinator.handleDelegation(delegationData)
+      }
+    )
 
     // Listen to all delegation progress events and add them as steps for client tracking
-    this.eventEmitter.on('delegation.progress', (progressData: any) => {
+    this.eventEmitter.on("delegation.progress", (progressData: any) => {
       this.addDelegationProgressStep(progressData)
     })
 
     // 🔧 Tool execution events - add tool steps to pipeline for visual transparency
-    this.eventEmitter.on('tool.start', (toolData: any) => {
+    this.eventEmitter.on("tool.start", (toolData: any) => {
       try {
-        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        const execId =
+          toolData.executionId || ExecutionManager.getCurrentExecutionId()
         if (!execId) return
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        
+
         // Build tool execution start step
         const toolStep: ExecutionStep = {
           id: `tool_start_${toolData.toolCallId || Date.now()}`,
-          action: 'executing' as any,
+          action: "executing" as any,
           agent: toolData.agentId,
           agentName: exec.agentName,
           content: `🔧 Ejecutando: ${toolData.toolName}`,
@@ -379,33 +423,37 @@ export class AgentOrchestrator {
             toolName: toolData.toolName,
             toolCallId: toolData.toolCallId,
             parameters: toolData.parameters,
-            stage: 'started' as const
-          }
+            stage: "started" as const,
+          },
         }
-        
+
         exec.steps.push(toolStep)
-        logger.debug('🔧 [ORCHESTRATOR] Tool start step added:', {
+        logger.debug("🔧 [ORCHESTRATOR] Tool start step added:", {
           execId,
           toolName: toolData.toolName,
-          stepsCount: exec.steps.length
+          stepsCount: exec.steps.length,
         })
       } catch (error) {
-        logger.error('❌ [ORCHESTRATOR] Error handling tool.start event:', error)
+        logger.error(
+          "❌ [ORCHESTRATOR] Error handling tool.start event:",
+          error
+        )
       }
     })
 
-    this.eventEmitter.on('tool.result', (toolData: any) => {
+    this.eventEmitter.on("tool.result", (toolData: any) => {
       try {
-        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        const execId =
+          toolData.executionId || ExecutionManager.getCurrentExecutionId()
         if (!execId) return
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        
+
         // Build tool execution complete step
         const toolStep: ExecutionStep = {
           id: `tool_result_${toolData.toolCallId || Date.now()}`,
-          action: 'executing' as any,
+          action: "executing" as any,
           agent: toolData.agentId,
           agentName: exec.agentName,
           content: `✅ Completado: ${toolData.toolName}`,
@@ -415,33 +463,37 @@ export class AgentOrchestrator {
             toolName: toolData.toolName,
             toolCallId: toolData.toolCallId,
             result: toolData.result,
-            stage: 'completed' as const
-          }
+            stage: "completed" as const,
+          },
         }
-        
+
         exec.steps.push(toolStep)
-        logger.debug('✅ [ORCHESTRATOR] Tool result step added:', {
+        logger.debug("✅ [ORCHESTRATOR] Tool result step added:", {
           execId,
           toolName: toolData.toolName,
-          stepsCount: exec.steps.length
+          stepsCount: exec.steps.length,
         })
       } catch (error) {
-        logger.error('❌ [ORCHESTRATOR] Error handling tool.result event:', error)
+        logger.error(
+          "❌ [ORCHESTRATOR] Error handling tool.result event:",
+          error
+        )
       }
     })
 
-    this.eventEmitter.on('tool.error', (toolData: any) => {
+    this.eventEmitter.on("tool.error", (toolData: any) => {
       try {
-        const execId = toolData.executionId || ExecutionManager.getCurrentExecutionId()
+        const execId =
+          toolData.executionId || ExecutionManager.getCurrentExecutionId()
         if (!execId) return
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        
+
         // Build tool execution error step
         const toolStep: ExecutionStep = {
           id: `tool_error_${toolData.toolCallId || Date.now()}`,
-          action: 'executing' as any,
+          action: "executing" as any,
           agent: toolData.agentId,
           agentName: exec.agentName,
           content: `❌ Error: ${toolData.toolName}`,
@@ -451,37 +503,41 @@ export class AgentOrchestrator {
             toolName: toolData.toolName,
             toolCallId: toolData.toolCallId,
             error: toolData.error,
-            stage: 'failed' as const
-          }
+            stage: "failed" as const,
+          },
         }
-        
+
         exec.steps.push(toolStep)
-        logger.error('❌ [ORCHESTRATOR] Tool error step added:', {
+        logger.error("❌ [ORCHESTRATOR] Tool error step added:", {
           execId,
           toolName: toolData.toolName,
-          error: toolData.error
+          error: toolData.error,
         })
       } catch (error) {
-        logger.error('❌ [ORCHESTRATOR] Error handling tool.error event:', error)
+        logger.error(
+          "❌ [ORCHESTRATOR] Error handling tool.error event:",
+          error
+        )
       }
     })
 
     // Graph node lifecycle -> execution steps for graph UI
-    this.eventEmitter.on('node.entered', (data: any) => {
+    this.eventEmitter.on("node.entered", (data: any) => {
       try {
-        const execId = ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
+        const execId =
+          ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
         if (!execId) return
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
         if (!exec.steps) exec.steps = []
-        
+
         // ✅ Use step-builder to create humanized step (no more English technical messages)
         const humanizedStep = buildNodeEnteredStep({
           agentId: data?.agentId || exec.agentId,
-          agentName: exec.agentName,
-          metadata: { nodeId: data?.nodeId, stage: 'entered' }
+          agentName: getAgentDisplayName(data?.agentId || exec.agentId),
+          metadata: { nodeId: data?.nodeId, stage: "entered" },
         })
-        
+
         // ✅ IMPROVED DEDUPLICATION: Check by uniqueId (UUID) if present
         // This is the LangGraph recommended pattern for idempotent event handling
         if (humanizedStep.uniqueId) {
@@ -489,25 +545,29 @@ export class AgentOrchestrator {
             (s: any) => s.uniqueId === humanizedStep.uniqueId
           )
           if (isDuplicate) {
-            console.log(`🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${humanizedStep.uniqueId})`)
+            console.log(
+              `🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${humanizedStep.uniqueId})`
+            )
             return
           }
         }
-        
+
         // ✅ FALLBACK: Check by nodeId+stage for older steps without UUID
         const nodeId = data?.nodeId || data?.agentId
         const existingEnteredStep = exec.steps.find(
-          (s: any) => 
-            s.metadata?.nodeId === nodeId && 
-            s.metadata?.stage === 'entered' &&
+          (s: any) =>
+            s.metadata?.nodeId === nodeId &&
+            s.metadata?.stage === "entered" &&
             !s.uniqueId // Only check legacy steps without UUID
         )
-        
+
         if (existingEnteredStep) {
-          console.log(`🚫 [ORCHESTRATOR] Skipping duplicate node.entered for ${nodeId} (legacy check)`)
+          console.log(
+            `🚫 [ORCHESTRATOR] Skipping duplicate node.entered for ${nodeId} (legacy check)`
+          )
           return // Skip duplicate
         }
-        
+
         exec.steps.push(humanizedStep as any)
 
         // Mirror step to parent execution if present (quick exec UI watches parent)
@@ -518,13 +578,13 @@ export class AgentOrchestrator {
             if (!parentExec.steps) parentExec.steps = []
             const mirroredStep = buildNodeEnteredStep({
               agentId: data?.agentId || exec.agentId,
-              agentName: exec.agentName,
-              metadata: { 
-                nodeId: data?.nodeId, 
-                stage: 'entered', 
+              agentName: getAgentDisplayName(data?.agentId || exec.agentId),
+              metadata: {
+                nodeId: data?.nodeId,
+                stage: "entered",
                 mirroredFrom: execId,
-                isChildStep: true 
-              }
+                isChildStep: true,
+              },
             })
             parentExec.steps.push(mirroredStep as any)
           }
@@ -532,9 +592,10 @@ export class AgentOrchestrator {
       } catch {}
     })
 
-    this.eventEmitter.on('node.completed', (data: any) => {
+    this.eventEmitter.on("node.completed", (data: any) => {
       try {
-        const execId = ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
+        const execId =
+          ExecutionManager.getCurrentExecutionId() || data?.state?.executionId
         if (!execId) return
         const exec = this.executionRegistry.get(execId)
         if (!exec) return
@@ -544,63 +605,64 @@ export class AgentOrchestrator {
         const markPriorStepCompleted = (collection?: ExecutionStep[]) => {
           if (!collection || !nodeId) return
           const existing = collection.find((s: any) => {
-            return (
-              s.metadata?.nodeId === nodeId &&
-              s.action !== 'completing'
-            )
+            return s.metadata?.nodeId === nodeId && s.action !== "completing"
           })
 
           if (existing) {
             existing.progress = 100
             existing.metadata = {
               ...(existing.metadata || {}),
-              stage: 'completed',
+              stage: "completed",
               completedAt: new Date(),
-              completionSource: 'node.completed'
+              completionSource: "node.completed",
             }
           }
         }
         markPriorStepCompleted(exec.steps)
-        
+
         // ✅ Use step-builder to create completion step
         const completionStep = buildNodeCompletedStep({
           agentId: data?.agentId || exec.agentId,
-          agentName: exec.agentName,
-          metadata: { nodeId: data?.nodeId, stage: 'completed' }
+          agentName: getAgentDisplayName(data?.agentId || exec.agentId),
+          metadata: { nodeId: data?.nodeId, stage: "completed" },
         })
-        
+
         // ✅ IMPROVED DEDUPLICATION: Check by uniqueId (UUID) if present
         if (completionStep.uniqueId) {
           const isDuplicate = exec.steps.some(
             (s: any) => s.uniqueId === completionStep.uniqueId
           )
           if (isDuplicate) {
-            console.log(`🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${completionStep.uniqueId})`)
+            console.log(
+              `🚫 [ORCHESTRATOR] Skipping duplicate step (UUID: ${completionStep.uniqueId})`
+            )
             return
           }
         }
-        
+
         // ✅ FALLBACK: Check by nodeId+stage for older steps without UUID
         const existingCompletedStep = exec.steps.find(
-          (s: any) => 
-            s.metadata?.nodeId === nodeId && 
-            s.metadata?.stage === 'completed' &&
-            s.action === 'completing' &&
+          (s: any) =>
+            s.metadata?.nodeId === nodeId &&
+            s.metadata?.stage === "completed" &&
+            s.action === "completing" &&
             !s.uniqueId // Only check legacy steps
         )
-        
+
         if (existingCompletedStep) {
-          console.log(`🚫 [ORCHESTRATOR] Skipping duplicate node.completed for ${nodeId} (legacy check)`)
+          console.log(
+            `🚫 [ORCHESTRATOR] Skipping duplicate node.completed for ${nodeId} (legacy check)`
+          )
           return // Skip duplicate
         }
-        
+
         // ✅ Use step-builder to create humanized completion step
         const humanizedStep = buildNodeCompletedStep({
           agentId: data?.agentId || exec.agentId,
           agentName: exec.agentName,
-          metadata: { nodeId: data?.nodeId, stage: 'completed' }
+          metadata: { nodeId: data?.nodeId, stage: "completed" },
         })
-        
+
         exec.steps.push(humanizedStep as any)
 
         // Mirror to parent if applicable
@@ -612,13 +674,13 @@ export class AgentOrchestrator {
             markPriorStepCompleted(parentExec.steps)
             const mirroredStep = buildNodeCompletedStep({
               agentId: data?.agentId || exec.agentId,
-              agentName: exec.agentName,
-              metadata: { 
-                nodeId: data?.nodeId, 
-                stage: 'completed', 
+              agentName: getAgentDisplayName(data?.agentId || exec.agentId),
+              metadata: {
+                nodeId: data?.nodeId,
+                stage: "completed",
                 mirroredFrom: execId,
-                isChildStep: true 
-              }
+                isChildStep: true,
+              },
             })
             parentExec.steps.push(mirroredStep as any)
           }
@@ -628,13 +690,27 @@ export class AgentOrchestrator {
 
     // Memory management events
     if (this.memoryManager) {
-      this.eventEmitter.on('messages.loaded', (context: ExecutionContext) => {
-        this.memoryManager?.trackMessageLoad(context.threadId, context.messageHistory.length)
+      this.eventEmitter.on("messages.loaded", (context: ExecutionContext) => {
+        this.memoryManager?.trackMessageLoad(
+          context.threadId,
+          context.messageHistory.length
+        )
       })
 
-      this.eventEmitter.on('messages.compressed', (data: { threadId: string, originalCount: number, compressedCount: number }) => {
-        logger.debug('[Memory] Compressed messages', { threadId: data.threadId, original: data.originalCount, compressed: data.compressedCount })
-      })
+      this.eventEmitter.on(
+        "messages.compressed",
+        (data: {
+          threadId: string
+          originalCount: number
+          compressedCount: number
+        }) => {
+          logger.debug("[Memory] Compressed messages", {
+            threadId: data.threadId,
+            original: data.originalCount,
+            compressed: data.compressedCount,
+          })
+        }
+      )
     }
   }
 
@@ -654,7 +730,7 @@ export class AgentOrchestrator {
         activeExecutions: this.executionRegistry.size(),
         totalGraphs: this.graphs.size,
         memoryUsage: process.memoryUsage(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
       })
     }, 30000) // Every 30 seconds
     this.metricsIntervals.push(systemMetricsInterval)
@@ -669,29 +745,32 @@ export class AgentOrchestrator {
     }
 
     try {
-  // Ensure sub-agent manager is initialized (loads cache and registers tools)
-  await this.subAgentManager.initialize()
+      // Ensure sub-agent manager is initialized (loads cache and registers tools)
+      await this.subAgentManager.initialize()
 
-  // Dynamically include sub-agent delegation tools for this agent (if any)
-  // First, try cached tools; if empty, fetch sub-agents and build tools on the fly
-  let subAgentToolsMap = this.subAgentManager.getDelegationTools(agentConfig.id) || {}
-  if (Object.keys(subAgentToolsMap).length === 0) {
-    const subs = await this.subAgentManager.getSubAgents(agentConfig.id)
-    // getSubAgents will populate delegationTools internally
-    subAgentToolsMap = this.subAgentManager.getDelegationTools(agentConfig.id) || {}
-  }
-  const subAgentTools = Object.keys(subAgentToolsMap)
-  const uniqueTools = Array.from(new Set([...(agentConfig.tools || []), ...subAgentTools]))
-  const effectiveAgentConfig = { ...agentConfig, tools: uniqueTools }
+      // Dynamically include sub-agent delegation tools for this agent (if any)
+      // First, try cached tools; if empty, fetch sub-agents and build tools on the fly
+      let subAgentToolsMap =
+        this.subAgentManager.getDelegationTools(agentConfig.id) || {}
+      if (Object.keys(subAgentToolsMap).length === 0) {
+        const subs = await this.subAgentManager.getSubAgents(agentConfig.id)
+        // getSubAgents will populate delegationTools internally
+        subAgentToolsMap =
+          this.subAgentManager.getDelegationTools(agentConfig.id) || {}
+      }
+      const subAgentTools = Object.keys(subAgentToolsMap)
+      const uniqueTools = Array.from(
+        new Set([...(agentConfig.tools || []), ...subAgentTools])
+      )
+      const effectiveAgentConfig = { ...agentConfig, tools: uniqueTools }
 
-  const graph = await this.graphBuilder.buildGraph(effectiveAgentConfig)
+      const graph = await this.graphBuilder.buildGraph(effectiveAgentConfig)
       this.graphs.set(agentConfig.id, graph)
-      
-      this.eventEmitter.emit('agent.initialized', {
-        agentId: agentConfig.id,
-        agentName: agentConfig.name
-      })
 
+      this.eventEmitter.emit("agent.initialized", {
+        agentId: agentConfig.id,
+        agentName: agentConfig.name,
+      })
     } catch (error) {
       this.errorHandler.recordError(error as Error)
       throw new Error(`Failed to initialize agent ${agentConfig.id}: ${error}`)
@@ -708,17 +787,21 @@ export class AgentOrchestrator {
     options: ExecutionOptions = {}
   ): Promise<ExecutionResult> {
     // Use existing executionId from context if available, otherwise generate new one
-    const executionId = (context.metadata?.executionId as string) || `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+    const executionId =
+      (context.metadata?.executionId as string) ||
+      `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
     const execution: AgentExecution = {
       id: executionId,
       agentId: agentConfig.id,
       agentName: agentConfig.name,
       threadId: context.threadId,
       userId: context.userId,
-      status: 'running',
+      status: "running",
       startTime: new Date(),
-      input: String(context.messageHistory[context.messageHistory.length - 1]?.content || ''),
+      input: String(
+        context.messageHistory[context.messageHistory.length - 1]?.content || ""
+      ),
       result: undefined,
       messages: [],
       steps: [],
@@ -734,27 +817,27 @@ export class AgentOrchestrator {
         handoffsCount: 0,
         errorCount: 0,
         retryCount: 0,
-        cost: 0
-      }
+        cost: 0,
+      },
     }
 
-  // Track in active executions early for visibility
-  this.executionRegistry.set(execution.id, execution)
+    // Track in active executions early for visibility
+    this.executionRegistry.set(execution.id, execution)
 
     // If this is a delegation, emit the execution.started event for tracking
     if (context.metadata?.isDelegation) {
-      const sourceExecId = context.metadata.parentExecutionId || 'unknown'
-      const sourceAgent = context.metadata.sourceAgent || 'unknown'
+      const sourceExecId = context.metadata.parentExecutionId || "unknown"
+      const sourceAgent = context.metadata.sourceAgent || "unknown"
       const delegationKey = `${sourceExecId}:${sourceAgent}:${execution.agentId}`
-      
-      this.eventEmitter.emit('delegation.execution.started', {
+
+      this.eventEmitter.emit("delegation.execution.started", {
         delegationKey,
-        executionId: execution.id
+        executionId: execution.id,
       })
-      
-      logger.debug('DELEGATION', `Emitted execution.started for child`, {
+
+      logger.debug("DELEGATION", `Emitted execution.started for child`, {
         delegationKey,
-        childExecutionId: execution.id
+        childExecutionId: execution.id,
       })
     }
 
@@ -766,9 +849,12 @@ export class AgentOrchestrator {
       user_id: execution.userId,
       thread_id: execution.threadId,
       state: execution.status,
-      event: 'execution.start',
-      level: 'info',
-      data: { inputPreview: execution.input?.slice(0,200), mode: agentConfig.id === 'cleo-supervisor' ? 'supervisor' : 'direct' }
+      event: "execution.start",
+      level: "info",
+      data: {
+        inputPreview: execution.input?.slice(0, 200),
+        mode: agentConfig.id === "cleo-supervisor" ? "supervisor" : "direct",
+      },
     })
 
     // ✅ REMOVED: Legacy core_start step - now using canonical steps from step-builder.ts
@@ -778,111 +864,143 @@ export class AgentOrchestrator {
     return withDelegationContext(context.userId, executionId, () =>
       ExecutionManager.runWithExecutionId(executionId, async () => {
         try {
-        // Ensure SubAgentManager uses a valid UUID for this execution
-        {
-          const NIL_UUID = '00000000-0000-0000-0000-000000000000'
-          const isValidUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-          const ctxUserId = isValidUuid(context.userId) ? context.userId : (isValidUuid(getCurrentUserId()) ? (getCurrentUserId() as string) : NIL_UUID)
-          await this.subAgentManager.setUser(ctxUserId)
+          // Ensure SubAgentManager uses a valid UUID for this execution
+          {
+            const NIL_UUID = "00000000-0000-0000-0000-000000000000"
+            const isValidUuid = (v?: string) =>
+              !!v &&
+              /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+                v
+              )
+            const ctxUserId = isValidUuid(context.userId)
+              ? context.userId
+              : isValidUuid(getCurrentUserId())
+                ? (getCurrentUserId() as string)
+                : NIL_UUID
+            await this.subAgentManager.setUser(ctxUserId)
+          }
+
+          // Use routing logic for supervisor agent
+          if (agentConfig.id === "cleo-supervisor") {
+            return await this.executeWithRouting(
+              agentConfig,
+              context,
+              execution,
+              options
+            )
+          }
+
+          // Direct execution for specialist agents
+          await this.initializeAgent(agentConfig)
+
+          const processedContext = await this.prepareExecutionContext(context)
+
+          const result = await this.errorHandler.withRetry(
+            () =>
+              this.executionManager.executeWithHistory(
+                agentConfig,
+                this.graphs.get(agentConfig.id)!,
+                processedContext,
+                execution,
+                options
+              ),
+            `agent_execution_${agentConfig.id}`,
+            {
+              maxAttempts: this.config.errorHandlerConfig?.maxRetries || 3,
+              baseDelayMs: this.config.errorHandlerConfig?.baseDelayMs || 1000,
+            }
+          )
+
+          {
+            const prevState = (execution as any).status
+            const changedState = safeSetState(
+              execution as any,
+              "completed",
+              logger as any
+            )
+            if (changedState)
+              emitExecutionEvent({
+                trace_id: execution.id,
+                execution_id: execution.id,
+                agent_id: execution.agentId,
+                user_id: execution.userId,
+                thread_id: execution.threadId,
+                state: execution.status,
+                event: "state.change",
+                level: "debug",
+                data: { prev: prevState, next: execution.status },
+              })
+          }
+          emitExecutionEvent({
+            trace_id: execution.id,
+            execution_id: execution.id,
+            agent_id: execution.agentId,
+            user_id: execution.userId,
+            thread_id: execution.threadId,
+            state: execution.status,
+            event: "execution.complete",
+            level: "info",
+            data: {
+              steps: execution.steps?.length || 0,
+              messages: execution.messages?.length || 0,
+            },
+          })
+          execution.endTime = new Date()
+          execution.result = (result as ExecutionResult).content
+          execution.metrics.executionTimeMs =
+            execution.endTime.getTime() - execution.startTime.getTime()
+
+          // For normal executions, emit completion immediately
+          this.eventEmitter.emit("execution.completed", execution)
+
+          // Emit browser event for UI updates
+          emitBrowserEvent("execution-completed", {
+            executionId: execution.id,
+            status: "completed",
+            result: execution.result,
+            agentId: execution.agentId,
+            threadId: execution.threadId,
+          })
+
+          // Clean up execution context for completed execution
+          if (this.executionManager?.cleanupExecutionContext) {
+            this.executionManager.cleanupExecutionContext(execution.id)
+          }
+
+          // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
+          setTimeout(() => {
+            this.executionRegistry.delete(execution.id)
+            logger.debug(
+              "🧹 [CLEANUP] Removed completed execution from memory:",
+              execution.id
+            )
+          }, 60000) // 60 seconds
+
+          return result as ExecutionResult
+        } catch (error) {
+          logger.error("🔍 [DEBUG] Core executeAgent - Error caught:", error)
+          emitExecutionEvent({
+            trace_id: execution.id,
+            execution_id: execution.id,
+            agent_id: execution.agentId,
+            user_id: execution.userId,
+            thread_id: execution.threadId,
+            state: execution.status,
+            event: "execution.error",
+            level: "error",
+            data: {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          })
+          await this.errorHandler.handleExecutionError(
+            execution,
+            error as Error
+          )
+          this.eventEmitter.emit("execution.failed", execution)
+          throw error
         }
-
-        // Use routing logic for supervisor agent
-      if (agentConfig.id === 'cleo-supervisor') {
-        return await this.executeWithRouting(agentConfig, context, execution, options)
-      }
-
-      // Direct execution for specialist agents
-      await this.initializeAgent(agentConfig)
-      
-      const processedContext = await this.prepareExecutionContext(context)
-
-      const result = await this.errorHandler.withRetry(
-        () => this.executionManager.executeWithHistory(
-          agentConfig,
-          this.graphs.get(agentConfig.id)!,
-          processedContext,
-          execution,
-          options
-        ),
-        `agent_execution_${agentConfig.id}`,
-        {
-          maxAttempts: this.config.errorHandlerConfig?.maxRetries || 3,
-          baseDelayMs: this.config.errorHandlerConfig?.baseDelayMs || 1000
-        }
-      )
-
-  {
-      const prevState = (execution as any).status
-  const changedState = safeSetState(execution as any, 'completed', logger as any)
-  if (changedState) emitExecutionEvent({
-        trace_id: execution.id,
-        execution_id: execution.id,
-        agent_id: execution.agentId,
-        user_id: execution.userId,
-        thread_id: execution.threadId,
-        state: execution.status,
-        event: 'state.change',
-        level: 'debug',
-        data: { prev: prevState, next: execution.status }
       })
-    }
-      emitExecutionEvent({
-        trace_id: execution.id,
-        execution_id: execution.id,
-        agent_id: execution.agentId,
-        user_id: execution.userId,
-        thread_id: execution.threadId,
-        state: execution.status,
-        event: 'execution.complete',
-        level: 'info',
-        data: { steps: execution.steps?.length || 0, messages: execution.messages?.length || 0 }
-      })
-      execution.endTime = new Date()
-      execution.result = (result as ExecutionResult).content
-      execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
-
-      // For normal executions, emit completion immediately
-      this.eventEmitter.emit('execution.completed', execution)
-      
-      // Emit browser event for UI updates
-      emitBrowserEvent('execution-completed', {
-        executionId: execution.id,
-        status: 'completed',
-        result: execution.result,
-        agentId: execution.agentId,
-        threadId: execution.threadId
-      })
-      
-      // Clean up execution context for completed execution
-      if (this.executionManager?.cleanupExecutionContext) {
-        this.executionManager.cleanupExecutionContext(execution.id)
-      }
-      
-      // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
-      setTimeout(() => {
-  this.executionRegistry.delete(execution.id)
-  logger.debug('🧹 [CLEANUP] Removed completed execution from memory:', execution.id)
-      }, 60000) // 60 seconds
-      
-      return result as ExecutionResult
-      } catch (error) {
-  logger.error('🔍 [DEBUG] Core executeAgent - Error caught:', error)
-        emitExecutionEvent({
-          trace_id: execution.id,
-          execution_id: execution.id,
-          agent_id: execution.agentId,
-          user_id: execution.userId,
-          thread_id: execution.threadId,
-          state: execution.status,
-          event: 'execution.error',
-          level: 'error',
-          data: { error: error instanceof Error ? error.message : String(error) }
-        })
-        await this.errorHandler.handleExecutionError(execution, error as Error)
-        this.eventEmitter.emit('execution.failed', execution)
-        throw error
-      }
-    })) // Close AsyncLocalStorage context + delegation context
+    ) // Close AsyncLocalStorage context + delegation context
   }
 
   /**
@@ -896,19 +1014,21 @@ export class AgentOrchestrator {
     execution: AgentExecution,
     options: ExecutionOptions
   ): Promise<ExecutionResult> {
-    const userMessage = String(context.messageHistory[context.messageHistory.length - 1]?.content || '')
-    
+    const userMessage = String(
+      context.messageHistory[context.messageHistory.length - 1]?.content || ""
+    )
+
     // 🎯 Early Intent Detection - Provide routing hints to Cleo supervisor
-    const { detectEarlyIntent } = await import('../router')
+    const { detectEarlyIntent } = await import("../router")
     const routingHint = detectEarlyIntent(userMessage)
-    
+
     if (routingHint) {
       const hintPayload = {
-        type: 'routing-directive',
+        type: "routing-directive",
         directive: routingHint,
       }
       const hintMessage = `🎯 ROUTING DIRECTIVE ${JSON.stringify(hintPayload)}`
-      
+
       emitExecutionEvent({
         trace_id: execution.id,
         execution_id: execution.id,
@@ -916,9 +1036,9 @@ export class AgentOrchestrator {
         user_id: execution.userId,
         thread_id: execution.threadId,
         state: execution.status,
-        event: 'routing.hint_detected',
-        level: 'info',
-        data: { hint: routingHint, userMessage: userMessage.slice(0, 100) }
+        event: "routing.hint_detected",
+        level: "info",
+        data: { hint: routingHint, userMessage: userMessage.slice(0, 100) },
       })
 
       // Modify context to include routing hint
@@ -927,23 +1047,31 @@ export class AgentOrchestrator {
         messageHistory: [
           ...context.messageHistory.slice(0, -1),
           new SystemMessage(hintMessage),
-          context.messageHistory[context.messageHistory.length - 1] // Keep original user message last
-        ]
+          context.messageHistory[context.messageHistory.length - 1], // Keep original user message last
+        ],
       }
     }
-    
+
     // Set execution context for delegation tracking throughout supervisor execution
     if (this.executionManager?.setExecutionContext) {
       this.executionManager.setExecutionContext(execution.id)
     }
-    
+
     // Always execute Cleo as intelligent supervisor
     // He has delegation tools and will decide if specialist help is needed
     // Ensure SubAgentManager uses a valid UUID for this execution
     {
-      const NIL_UUID = '00000000-0000-0000-0000-000000000000'
-      const isValidUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(v)
-      const ctxUserId = isValidUuid(context.userId) ? context.userId : (isValidUuid(getCurrentUserId()) ? (getCurrentUserId() as string) : NIL_UUID)
+      const NIL_UUID = "00000000-0000-0000-0000-000000000000"
+      const isValidUuid = (v?: string) =>
+        !!v &&
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+          v
+        )
+      const ctxUserId = isValidUuid(context.userId)
+        ? context.userId
+        : isValidUuid(getCurrentUserId())
+          ? (getCurrentUserId() as string)
+          : NIL_UUID
       await this.subAgentManager.setUser(ctxUserId)
     }
 
@@ -953,81 +1081,89 @@ export class AgentOrchestrator {
     // CRITICAL FIX: LangGraph Orchestrator-Worker Pattern
     // According to LangGraph documentation, after a worker (specialist) completes,
     // the orchestrator should synthesize the worker's output with the CURRENT request.
-    // 
+    //
     // HOWEVER: For conversational context, we need the FULL thread history so Cleo
     // can answer questions about previous messages (e.g., "what was my first message?").
-    // 
+    //
     // Smart loader already optimizes context (token-aware), so we use ALL messages.
     // Only reduce context if there are ACTIVE delegation results (worker pattern).
-    const currentUserMessage = processedContext.messageHistory[processedContext.messageHistory.length - 1]
-    const systemMessage = processedContext.messageHistory.find(m => m._getType() === 'system')
-    
+    const currentUserMessage =
+      processedContext.messageHistory[
+        processedContext.messageHistory.length - 1
+      ]
+    const systemMessage = processedContext.messageHistory.find(
+      (m) => m._getType() === "system"
+    )
+
     // Find the most recent delegation completion messages (ToolMessages from this execution)
     const recentDelegationResults = processedContext.messageHistory
-      .filter(m => m._getType() === 'tool')
+      .filter((m) => m._getType() === "tool")
       .slice(-5) // Keep last 5 tool results max (usually 1-2 delegations)
-    
+
     // CRITICAL: Check if currentUserMessage has multimodal content (images)
     // If so, use the FULL message from processedContext, not just extracted reference
     const lastMessageContent = (currentUserMessage as any)?.content
-    const hasMultimodalContent = Array.isArray(lastMessageContent) 
-      && lastMessageContent.some((p: any) => p?.type === 'image_url')
-    
+    const hasMultimodalContent =
+      Array.isArray(lastMessageContent) &&
+      lastMessageContent.some((p: any) => p?.type === "image_url")
+
     // Build context: Use FULL history UNLESS we just completed a delegation
     // (in which case, focus on delegation result + current request)
     const hasDelegationResults = recentDelegationResults.length > 0
-    
+
     let focusedHistory: BaseMessage[]
     if (hasDelegationResults) {
       // Worker pattern: Focus on delegation result + current request
       focusedHistory = [
         ...(systemMessage ? [systemMessage] : []),
         ...recentDelegationResults,
-        currentUserMessage
+        currentUserMessage,
       ].filter(Boolean)
     } else {
       // Conversational mode: Use FULL context from smart loader
       focusedHistory = processedContext.messageHistory
     }
-    
-    logger.info('🎯 [SUPERVISOR] Focused context for orchestrator', {
+
+    logger.info("🎯 [SUPERVISOR] Focused context for orchestrator", {
       originalHistoryLength: processedContext.messageHistory.length,
       focusedHistoryLength: focusedHistory.length,
       hasDelegationResults: recentDelegationResults.length > 0,
       hasMultimodalContent,
-      lastMessageImageCount: hasMultimodalContent 
-        ? lastMessageContent.filter((p: any) => p?.type === 'image_url').length 
+      lastMessageImageCount: hasMultimodalContent
+        ? lastMessageContent.filter((p: any) => p?.type === "image_url").length
         : 0,
-      mode: hasDelegationResults ? 'worker-synthesis' : 'full-context'
+      mode: hasDelegationResults ? "worker-synthesis" : "full-context",
     })
-    
+
     processedContext = {
       ...processedContext,
-      messageHistory: focusedHistory
+      messageHistory: focusedHistory,
     }
 
     // CRITICAL FIX: Supervisor timeout should be long enough for HITL (approvals)
     // and should PAUSE while an active interrupt is waiting for user input.
     // Base timeout comes from runtime, but we manage it dynamically below.
     const supervisorTimeoutConfig = this.runtime.maxExecutionMsSupervisor
-    const SUPERVISOR_TIMEOUT = Number.isFinite(supervisorTimeoutConfig) && supervisorTimeoutConfig > 0
-      ? supervisorTimeoutConfig
-      : 0
-    
-    let result: ExecutionResult;
-    let timedOut = false;
-    
+    const SUPERVISOR_TIMEOUT =
+      Number.isFinite(supervisorTimeoutConfig) && supervisorTimeoutConfig > 0
+        ? supervisorTimeoutConfig
+        : 0
+
+    let result: ExecutionResult
+    let timedOut = false
+
     try {
       const supervisorPromise = this.errorHandler.withRetry(
-        () => this.executionManager.executeWithHistory(
-          supervisorConfig,
-          this.graphs.get(supervisorConfig.id)!,
-          processedContext,
-          execution,
-          options
-        ),
+        () =>
+          this.executionManager.executeWithHistory(
+            supervisorConfig,
+            this.graphs.get(supervisorConfig.id)!,
+            processedContext,
+            execution,
+            options
+          ),
         execution.id
-      );
+      )
 
       if (SUPERVISOR_TIMEOUT) {
         // Dynamic timeout that pauses while a child execution is waiting for approval
@@ -1042,12 +1178,13 @@ export class AgentOrchestrator {
             // Same user, and likely our parent execution (Cleo supervisor)
             if (interruptData?.userId === processedContext.userId) {
               waitingForApproval = true
-              lastKnownChildExecId = String(interruptData.executionId || '') || lastKnownChildExecId
+              lastKnownChildExecId =
+                String(interruptData.executionId || "") || lastKnownChildExecId
             }
           } catch {}
         }
 
-        this.eventEmitter?.on('execution.interrupted', pauseOnInterrupt)
+        this.eventEmitter?.on("execution.interrupted", pauseOnInterrupt)
 
         // Build a controllable timer that checks every second
         const startTime = Date.now()
@@ -1057,9 +1194,12 @@ export class AgentOrchestrator {
               // If we're in approval wait, verify via InterruptManager whether it's still pending
               if (waitingForApproval && lastKnownChildExecId) {
                 try {
-                  const { InterruptManager } = await import('../core/interrupt-manager')
-                  const state = await InterruptManager.getInterrupt(lastKnownChildExecId)
-                  if (!state || state.status !== 'pending') {
+                  const { InterruptManager } = await import(
+                    "../core/interrupt-manager"
+                  )
+                  const state =
+                    await InterruptManager.getInterrupt(lastKnownChildExecId)
+                  if (!state || state.status !== "pending") {
                     // Interrupt resolved or not found → resume timeout counting
                     waitingForApproval = false
                   }
@@ -1069,7 +1209,11 @@ export class AgentOrchestrator {
               const elapsed = Date.now() - startTime
               if (!waitingForApproval && elapsed >= SUPERVISOR_TIMEOUT) {
                 timedOut = true
-                reject(new Error(`Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT/1000}s (including all delegations)`))
+                reject(
+                  new Error(
+                    `Supervisor timeout: ${supervisorConfig.id} exceeded ${SUPERVISOR_TIMEOUT / 1000}s (including all delegations)`
+                  )
+                )
                 return
               }
             } finally {
@@ -1081,89 +1225,95 @@ export class AgentOrchestrator {
         })
 
         try {
-          result = await Promise.race([
+          result = (await Promise.race([
             supervisorPromise.finally(() => {
               if (intervalId) clearTimeout(intervalId)
-              this.eventEmitter?.off('execution.interrupted', pauseOnInterrupt)
+              this.eventEmitter?.off("execution.interrupted", pauseOnInterrupt)
             }),
-            dynamicTimeout
-          ]) as ExecutionResult
+            dynamicTimeout,
+          ])) as ExecutionResult
         } catch (err) {
           // Ensure listener cleanup on error
-          this.eventEmitter?.off('execution.interrupted', pauseOnInterrupt)
+          this.eventEmitter?.off("execution.interrupted", pauseOnInterrupt)
           if (intervalId) clearTimeout(intervalId)
           throw err
         }
       } else {
-        result = await supervisorPromise as ExecutionResult
+        result = (await supervisorPromise) as ExecutionResult
       }
     } catch (error) {
       // CRITICAL: Always return a response to user, even on error/timeout
-      logger.error('❌ [SUPERVISOR] Execution failed:', error);
-      
+      logger.error("❌ [SUPERVISOR] Execution failed:", error)
+
       // Mark execution as failed
-      safeSetState(execution as any, 'failed', logger as any);
-      execution.endTime = new Date();
-      execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime();
-      
+      safeSetState(execution as any, "failed", logger as any)
+      execution.endTime = new Date()
+      execution.metrics.executionTimeMs =
+        execution.endTime.getTime() - execution.startTime.getTime()
+
       // Emit failure events
-      this.eventEmitter.emit('execution.failed', execution);
-      emitBrowserEvent('execution-failed', {
+      this.eventEmitter.emit("execution.failed", execution)
+      emitBrowserEvent("execution-failed", {
         executionId: execution.id,
-        status: 'failed',
+        status: "failed",
         error: error instanceof Error ? error.message : String(error),
         agentId: execution.agentId,
-        threadId: execution.threadId
-      });
-      
+        threadId: execution.threadId,
+      })
+
       // Create error response for user
       const errorMessage = timedOut
-        ? `⏱️ Lo siento, la tarea excedió el tiempo máximo de ${SUPERVISOR_TIMEOUT/1000} segundos. Por favor, intenta con una solicitud más específica o divídela en partes más pequeñas.`
-        : `❌ Lo siento, ocurrió un error al procesar tu solicitud: ${error instanceof Error ? error.message : String(error)}`;
-      
+        ? `⏱️ Lo siento, la tarea excedió el tiempo máximo de ${SUPERVISOR_TIMEOUT / 1000} segundos. Por favor, intenta con una solicitud más específica o divídela en partes más pequeñas.`
+        : `❌ Lo siento, ocurrió un error al procesar tu solicitud: ${error instanceof Error ? error.message : String(error)}`
+
       result = {
         content: errorMessage,
         metadata: {
           sender: supervisorConfig.id,
           error: true,
           timedOut,
-          originalError: error instanceof Error ? error.message : String(error)
+          originalError: error instanceof Error ? error.message : String(error),
         },
         executionTime: execution.metrics.executionTimeMs,
         tokensUsed: 0,
-        messages: []
-      };
-      
-      execution.result = result.content;
-      
+        messages: [],
+      }
+
+      execution.result = result.content
+
       // Clean up and keep in memory briefly for polling
       if (this.executionManager?.cleanupExecutionContext) {
-        this.executionManager.cleanupExecutionContext(execution.id);
+        this.executionManager.cleanupExecutionContext(execution.id)
       }
       setTimeout(() => {
-        this.executionRegistry.delete(execution.id);
-      }, 60000);
-      
+        this.executionRegistry.delete(execution.id)
+      }, 60000)
+
       // Return error response instead of throwing
-      return result;
+      return result
     }
-    
+
     // For supervisor executions, mark as completed and clean up properly
-  {
-    const prevState = (execution as any).status
-  const changedState = safeSetState(execution as any, 'completed', logger as any)
-  if (changedState) emitExecutionEvent({
-      trace_id: execution.id,
-      execution_id: execution.id,
-      agent_id: execution.agentId,
-      user_id: execution.userId,
-      thread_id: execution.threadId,
-      state: execution.status,
-      event: 'state.change',
-      level: 'debug',
-      data: { prev: prevState, next: execution.status }
-    })
-  }
+    {
+      const prevState = (execution as any).status
+      const changedState = safeSetState(
+        execution as any,
+        "completed",
+        logger as any
+      )
+      if (changedState)
+        emitExecutionEvent({
+          trace_id: execution.id,
+          execution_id: execution.id,
+          agent_id: execution.agentId,
+          user_id: execution.userId,
+          thread_id: execution.threadId,
+          state: execution.status,
+          event: "state.change",
+          level: "debug",
+          data: { prev: prevState, next: execution.status },
+        })
+    }
     emitExecutionEvent({
       trace_id: execution.id,
       execution_id: execution.id,
@@ -1171,26 +1321,31 @@ export class AgentOrchestrator {
       user_id: execution.userId,
       thread_id: execution.threadId,
       state: execution.status,
-      event: 'execution.complete',
-      level: 'info',
-      data: { supervisor: true, steps: execution.steps?.length || 0, messages: execution.messages?.length || 0 }
+      event: "execution.complete",
+      level: "info",
+      data: {
+        supervisor: true,
+        steps: execution.steps?.length || 0,
+        messages: execution.messages?.length || 0,
+      },
     })
     execution.endTime = new Date()
     execution.result = (result as ExecutionResult).content
-    execution.metrics.executionTimeMs = execution.endTime.getTime() - execution.startTime.getTime()
+    execution.metrics.executionTimeMs =
+      execution.endTime.getTime() - execution.startTime.getTime()
 
-  // Emit completion for supervisor execution
-    this.eventEmitter.emit('execution.completed', execution)
-    
+    // Emit completion for supervisor execution
+    this.eventEmitter.emit("execution.completed", execution)
+
     // Emit browser event for UI updates when supervisor completes
-    emitBrowserEvent('execution-completed', {
+    emitBrowserEvent("execution-completed", {
       executionId: execution.id,
-      status: 'completed',
+      status: "completed",
       result: execution.result,
       agentId: execution.agentId,
-      threadId: execution.threadId
+      threadId: execution.threadId,
     })
-    
+
     // If no delegation occurred during this supervisor run, emit a clear UI signal
     if (!this.delegationsSeen.has(execution.id)) {
       // Add an explicit step to the execution timeline for visibility
@@ -1199,14 +1354,14 @@ export class AgentOrchestrator {
         id: `delegation_skipped_${Date.now()}`,
         timestamp: new Date(),
         agent: supervisorConfig.id,
-        action: 'delegating',
+        action: "delegating",
         content: `${supervisorConfig.name} handled directly (no delegation)`,
         progress: 100,
         metadata: {
-          status: 'skipped',
-          stage: 'decision',
-          reason: 'direct_or_clarify'
-        }
+          status: "skipped",
+          stage: "decision",
+          reason: "direct_or_clarify",
+        },
       } as any)
       emitExecutionEvent({
         trace_id: execution.id,
@@ -1215,20 +1370,24 @@ export class AgentOrchestrator {
         user_id: execution.userId,
         thread_id: execution.threadId,
         state: execution.status,
-        event: 'step.append',
-        level: 'debug',
-        data: { stepId: execution.steps[execution.steps.length-1].id, action: 'delegating', reason: 'skipped' }
+        event: "step.append",
+        level: "debug",
+        data: {
+          stepId: execution.steps[execution.steps.length - 1].id,
+          action: "delegating",
+          reason: "skipped",
+        },
       })
 
-      this.eventEmitter.emit('delegation.skipped', {
+      this.eventEmitter.emit("delegation.skipped", {
         executionId: execution.id,
         agentId: supervisorConfig.id,
-        reason: 'direct_or_clarify'
+        reason: "direct_or_clarify",
       })
-      emitBrowserEvent('delegation-skipped', {
+      emitBrowserEvent("delegation-skipped", {
         executionId: execution.id,
         agentId: supervisorConfig.id,
-        reason: 'direct_or_clarify'
+        reason: "direct_or_clarify",
       })
     } else {
       // Clear flag for next runs
@@ -1239,12 +1398,12 @@ export class AgentOrchestrator {
     if (this.executionManager?.cleanupExecutionContext) {
       this.executionManager.cleanupExecutionContext(execution.id)
     }
-    
+
     // Keep execution in activeExecutions for 60 seconds to allow polling to get final result
     setTimeout(() => {
       this.executionRegistry.delete(execution.id)
     }, 60000) // 60 seconds
-    
+
     return result
   }
 
@@ -1256,7 +1415,9 @@ export class AgentOrchestrator {
   /**
    * Prepare execution context with memory management
    */
-  private async prepareExecutionContext(context: ExecutionContext): Promise<ExecutionContext> {
+  private async prepareExecutionContext(
+    context: ExecutionContext
+  ): Promise<ExecutionContext> {
     const processedContext = { ...context }
 
     if (this.memoryManager) {
@@ -1267,17 +1428,17 @@ export class AgentOrchestrator {
       )
 
       if (optimizedMessages.length !== context.messageHistory.length) {
-        this.eventEmitter.emit('messages.compressed', {
+        this.eventEmitter.emit("messages.compressed", {
           threadId: context.threadId,
           originalCount: context.messageHistory.length,
-          compressedCount: optimizedMessages.length
+          compressedCount: optimizedMessages.length,
         })
       }
 
       processedContext.messageHistory = optimizedMessages
     }
 
-    this.eventEmitter.emit('messages.loaded', processedContext)
+    this.eventEmitter.emit("messages.loaded", processedContext)
     return processedContext
   }
 
@@ -1305,7 +1466,7 @@ export class AgentOrchestrator {
       errorMetrics: this.errorHandler.getErrorMetrics(),
       circuitBreakers: this.errorHandler.getCircuitBreakerStates(),
       memoryMetrics: this.memoryManager?.getMetrics(),
-      systemMetrics: this.metricsCollector?.getSystemMetrics()
+      systemMetrics: this.metricsCollector?.getSystemMetrics(),
     }
   }
 
@@ -1333,15 +1494,18 @@ export class AgentOrchestrator {
     }
 
     try {
-  safeSetState(execution as any, 'cancelled', logger as any)
+      safeSetState(execution as any, "cancelled", logger as any)
       execution.endTime = new Date()
-      
+
       this.executionRegistry.delete(executionId)
-      this.eventEmitter.emit('execution.cancelled', execution)
-      
+      this.eventEmitter.emit("execution.cancelled", execution)
+
       return true
     } catch (error) {
-  logger.error(`[Orchestrator] Failed to cancel execution ${executionId}:`, error)
+      logger.error(
+        `[Orchestrator] Failed to cancel execution ${executionId}:`,
+        error
+      )
       return false
     }
   }
@@ -1350,13 +1514,11 @@ export class AgentOrchestrator {
    * Cleanup resources and shutdown gracefully
    */
   async shutdown(): Promise<void> {
-  logger.info('[Orchestrator] Initiating shutdown...')
+    logger.info("[Orchestrator] Initiating shutdown...")
 
     // Cancel all active executions
     const activeExecutionIds = Array.from(this.executionRegistry.keys())
-    await Promise.all(
-      activeExecutionIds.map(id => this.cancelExecution(id))
-    )
+    await Promise.all(activeExecutionIds.map((id) => this.cancelExecution(id)))
 
     // Clear caches
     this.graphs.clear()
@@ -1372,12 +1534,12 @@ export class AgentOrchestrator {
     }
 
     // Clear all metrics intervals
-    this.metricsIntervals.forEach(interval => clearInterval(interval))
+    this.metricsIntervals.forEach((interval) => clearInterval(interval))
     this.metricsIntervals = []
 
     this.eventEmitter.removeAllListeners()
 
-  logger.info('[Orchestrator] Shutdown complete')
+    logger.info("[Orchestrator] Shutdown complete")
   }
 
   /**
@@ -1401,22 +1563,24 @@ export class AgentOrchestrator {
       tools?: string[]
       promptOverride?: string
     },
-    createdBy: string = 'user'
+    createdBy: string = "user"
   ): Promise<SubAgent> {
     const subAgentData = {
       name: subAgentSpec.name,
       description: subAgentSpec.description,
       parentAgentId,
-      systemPrompt: subAgentSpec.promptOverride || `You are a specialized sub-agent for ${subAgentSpec.specialization}. ${subAgentSpec.description}`,
+      systemPrompt:
+        subAgentSpec.promptOverride ||
+        `You are a specialized sub-agent for ${subAgentSpec.specialization}. ${subAgentSpec.description}`,
       model: subAgentSpec.model,
       config: {
         specialization: subAgentSpec.specialization,
         temperature: subAgentSpec.temperature,
         tools: subAgentSpec.tools,
-        createdBy
-      }
+        createdBy,
+      },
     }
-    
+
     return await this.subAgentManager.createSubAgent(subAgentData)
   }
 
@@ -1455,24 +1619,28 @@ export class AgentOrchestrator {
   private addDelegationProgressStep(progressData: any) {
     // Add delegation progress as execution step for client tracking
     // Fallback: infer executionId if missing (tolerant normalization)
-    const inferredExecId = progressData.sourceExecutionId || ExecutionManager.getCurrentExecutionId()
+    const inferredExecId =
+      progressData.sourceExecutionId || ExecutionManager.getCurrentExecutionId()
     if (inferredExecId) {
       const sourceExecution = this.executionRegistry.get(inferredExecId)
       if (sourceExecution) {
         if (!sourceExecution.steps) sourceExecution.steps = []
         const stepId = `delegation_progress_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
-        
+
         // Use agentName from progressData if available (preferred), fallback to getAgentDisplayName
         // This ensures custom agents show their friendly names
-        const targetDisplayName = progressData.agentName || getAgentDisplayName(progressData.targetAgent)
-        
+        const targetDisplayName =
+          progressData.agentName ||
+          getAgentDisplayName(progressData.targetAgent)
+
         const newStep = {
           id: stepId,
           timestamp: new Date(),
           agent: progressData.targetAgent,
           agentName: targetDisplayName, // ✅ Add friendly name for UI
-          action: 'delegating' as const,
-          content: progressData.message || `${targetDisplayName} working on task`,
+          action: "delegating" as const,
+          content:
+            progressData.message || `${targetDisplayName} working on task`,
           progress: progressData.progress || 0,
           metadata: {
             sourceAgent: progressData.sourceAgent,
@@ -1480,39 +1648,53 @@ export class AgentOrchestrator {
             task: progressData.task,
             status: progressData.status,
             stage: progressData.stage,
-            message: progressData.message
-          }
+            message: progressData.message,
+          },
         }
-  sourceExecution.steps.push(newStep)
-        
+        sourceExecution.steps.push(newStep)
+
         // Keep only essential logs
-        if (process.env.NODE_ENV !== 'production') {
-          logger.debug('📝 [DELEGATION] Progress step added:', progressData.stage, progressData.progress, 'Total steps:', sourceExecution.steps.length)
+        if (process.env.NODE_ENV !== "production") {
+          logger.debug(
+            "📝 [DELEGATION] Progress step added:",
+            progressData.stage,
+            progressData.progress,
+            "Total steps:",
+            sourceExecution.steps.length
+          )
         }
       } else {
-        logger.debug('⚠️ [ORCHESTRATOR] Could not find source execution or steps array for delegation progress:', {
-          sourceExecutionId: inferredExecId,
-          executionFound: !!sourceExecution,
-          hasStepsArray: Boolean(sourceExecution && (sourceExecution as any).steps)
-        })
+        logger.debug(
+          "⚠️ [ORCHESTRATOR] Could not find source execution or steps array for delegation progress:",
+          {
+            sourceExecutionId: inferredExecId,
+            executionFound: !!sourceExecution,
+            hasStepsArray: Boolean(
+              sourceExecution && (sourceExecution as any).steps
+            ),
+          }
+        )
       }
     } else {
       // Lower severity and avoid noise; many progress events are emitted from child contexts
-      logger.debug('⚠️ [ORCHESTRATOR] No executionId available for delegation progress (skipping step):', {
-        stage: progressData?.stage,
-        status: progressData?.status,
-        targetAgent: progressData?.targetAgent
-      })
+      logger.debug(
+        "⚠️ [ORCHESTRATOR] No executionId available for delegation progress (skipping step):",
+        {
+          stage: progressData?.stage,
+          status: progressData?.status,
+          targetAgent: progressData?.targetAgent,
+        }
+      )
     }
   }
 
   /**
    * Handle delegation requests from agents
    */
-  
+
   // ✅ Singleton pattern with async initialization
   private static instance: AgentOrchestrator | null = null
-  
+
   /**
    * Get or create the global AgentOrchestrator instance
    * ✅ ASYNC: Properly initializes all async modules (checkpointer, graphCache)

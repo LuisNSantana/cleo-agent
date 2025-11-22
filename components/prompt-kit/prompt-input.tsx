@@ -50,6 +50,7 @@ type PromptInputProps = {
   children: React.ReactNode
   className?: string
   disabled?: boolean
+  animatedBorder?: boolean
 }
 
 function PromptInput({
@@ -60,6 +61,7 @@ function PromptInput({
   onValueChange,
   onSubmit,
   children,
+  animatedBorder = false,
 }: PromptInputProps) {
   const [internalValue, setInternalValue] = useState(value || "")
 
@@ -78,13 +80,26 @@ function PromptInput({
         onSubmit,
       }}
     >
-      <div
-        className={cn(
-          "border-input bg-background rounded-3xl border p-2 shadow-xs",
-          className
+      <div className="relative group rounded-3xl">
+        {/* Animated Border Background */}
+        {animatedBorder && (
+          <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 opacity-70 group-focus-within:opacity-100 transition-opacity duration-300 animate-gradient-xy group-focus-within:animate-gradient-xy-fast"></div>
         )}
-      >
-        {children}
+        {/* Glow effect on focus */}
+        {animatedBorder && (
+          <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-r from-cyan-400/0 via-blue-500/0 to-purple-600/0 group-focus-within:from-cyan-400/20 group-focus-within:via-blue-500/20 group-focus-within:to-purple-600/20 blur-md transition-all duration-300 opacity-0 group-focus-within:opacity-100"></div>
+        )}
+        
+        <div
+          className={cn(
+            "relative bg-background rounded-3xl p-2 shadow-xs transition-all",
+            // Animated border styles
+            animatedBorder && "bg-white/90 dark:bg-black/90 backdrop-blur-xl", 
+            className
+          )}
+        >
+          {children}
+        </div>
       </div>
     </PromptInputContext.Provider>
   )
@@ -132,7 +147,9 @@ function PromptInputTextarea({
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       className={cn(
-        "text-foreground min-h-[44px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+        "min-h-[44px] w-full resize-none bg-transparent shadow-none",
+        "border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:border-none", 
+        "placeholder:text-muted-foreground",
         "overflow-y-auto",
         className
       )}

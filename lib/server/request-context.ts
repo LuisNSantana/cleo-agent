@@ -119,3 +119,5 @@ export function getCurrentUserLocale(): 'en' | 'es' | 'fr' | 'de' | undefined {
   }
   return locale
 }
+
+
