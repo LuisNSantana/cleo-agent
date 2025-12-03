@@ -1,7 +1,7 @@
 import type { ModelConfig } from './types'
 import { normalizeModelId } from '@/lib/openproviders/provider-map'
 
-export const DEFAULT_FALLBACK_MODEL_ID = 'grok-4-fast-reasoning'
+export const DEFAULT_FALLBACK_MODEL_ID = 'grok-4-1-fast-reasoning'
 
 export function resolveModelFromList(
   requestedModel: string,
@@ -24,7 +24,7 @@ export function resolveModelFromList(
   }
 
   // Handle well-known aliases as direct (non-fallback) selections to satisfy callers/tests
-  // Reasoning is a runtime toggle for Grok-4 Fast; map the alias to the primary config when present.
+  // Reasoning is a runtime toggle for Grok models; map the alias to the primary config when present.
   if (normalized === 'grok-4-fast-reasoning') {
     const primary = models.find((m) => m.id === 'grok-4-fast')
     if (primary) {
@@ -32,6 +32,18 @@ export function resolveModelFromList(
         // Return a shallow-cloned config with the aliased id so downstream code sees the requested id
         modelConfig: { ...primary, id: 'grok-4-fast-reasoning' },
         normalizedModel: 'grok-4-fast-reasoning',
+        usedFallback: false,
+      }
+    }
+  }
+
+  // Handle grok-4-1-fast-reasoning alias (xAI direct model)
+  if (normalized === 'grok-4-1-fast-reasoning') {
+    const primary = models.find((m) => m.id === 'grok-4-1-fast-reasoning')
+    if (primary) {
+      return {
+        modelConfig: primary,
+        normalizedModel: 'grok-4-1-fast-reasoning',
         usedFallback: false,
       }
     }
@@ -55,6 +67,15 @@ export function resolveModelFromList(
     return {
       modelConfig: cloned,
       normalizedModel: cloned.id,
+      usedFallback: true,
+    }
+  }
+
+  // Handle grok-4-1-fast-reasoning fallback alias (xAI direct model)
+  if (normalizedFallback === 'grok-4-1-fast-reasoning' && fallback.id === 'grok-4-1-fast-reasoning') {
+    return {
+      modelConfig: fallback,
+      normalizedModel: fallback.id,
       usedFallback: true,
     }
   }

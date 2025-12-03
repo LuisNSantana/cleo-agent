@@ -23,6 +23,8 @@ import { TimeoutManager, type ExecutionBudget } from './timeout-manager'
 import { executeToolsInParallel, type ToolCall as ExecutorToolCall, type ToolExecutionResult } from './tool-executor'
 import { createToolApprovalNode } from './approval-node'
 import { getAgentDisplayName } from '../id-canonicalization' // Import display name helper
+import { doesModelSupportDelegation, doesCurrentModelSupportDelegation, getNonDelegationReason } from '@/lib/models/delegation-support'
+import { getCurrentModel } from '@/lib/server/request-context'
 import {
   filterStaleToolMessages,
   normalizeSystemFirst,
@@ -245,6 +247,25 @@ export class GraphBuilder {
         span.setAttribute('tool_calls.count', toolCalls.length)
         span.setAttribute('agent.id', agentConfig.id)
 
+        if (state.metadata?.toolsEnabled === false) {
+          const reason = 'Tools disabled for selected model'
+          logger.info('🚫 [TOOL-NODE] Skipping tool execution (tools disabled)', {
+            agent: agentConfig.id,
+            model: state.metadata?.model || agentConfig.model
+          })
+
+          const blockedMessages = toolCalls.map((call: any) => new ToolMessage({
+            tool_call_id: call.id || `blocked_${Date.now()}`,
+            content: JSON.stringify({
+              status: 'blocked',
+              reason,
+              message: 'Continuing without calling tools for this model.'
+            })
+          }))
+
+          return { messages: blockedMessages }
+        }
+
         // Get tool runtime from state metadata (passed from agent node)
         // CRITICAL FIX: Metadata may lose functions during serialization
         // Rebuild toolRuntime if it's missing the .run() method
@@ -261,15 +282,52 @@ export class GraphBuilder {
         const timeoutManager = new TimeoutManager(this.getExecutionBudget(agentConfig))
 
         // Filter delegation vs regular tools
-        const delegationCalls = toolCalls.filter((call: any) => this.isDelegationTool(call.name))
+        let delegationCalls = toolCalls.filter((call: any) => this.isDelegationTool(call.name))
         const regularCalls = toolCalls.filter((call: any) => !this.isDelegationTool(call.name))
+
+        const resultMessages: BaseMessage[] = []
+
+        // 🚫 Block delegation for free/uncensored models
+        // These models have limited tooling support, so Ankie responds directly
+        if (delegationCalls.length > 0 && !doesCurrentModelSupportDelegation()) {
+          const currentModel = getCurrentModel() || state.metadata?.model || 'unknown'
+          const reason = getNonDelegationReason(currentModel) || 'Model does not support delegation'
+          logger.info(`🚫 [DELEGATION BLOCKED] ${reason}`, {
+            agentId: agentConfig.id,
+            model: currentModel,
+            blockedTools: delegationCalls.map((c: any) => c.name)
+          })
+          
+          // Emit event for observability
+          this.eventEmitter.emit('delegation.blocked', {
+            agentId: agentConfig.id,
+            executionId: state.metadata?.executionId,
+            model: currentModel,
+            reason,
+            blockedTools: delegationCalls.map((c: any) => c.name),
+            timestamp: new Date().toISOString()
+          })
+          
+          // Convert delegation calls to tool responses indicating they were blocked
+          for (const call of delegationCalls) {
+            resultMessages.push(new ToolMessage({
+              tool_call_id: call.id || `blocked_${Date.now()}`,
+              content: JSON.stringify({
+                status: 'blocked',
+                reason: reason,
+                message: 'I\'ll handle this directly for you instead of delegating to a specialist.'
+              })
+            }))
+          }
+          
+          // Clear delegation calls since we've handled them
+          delegationCalls = []
+        }
 
         span.setAttributes({
           'tool_calls.delegation': delegationCalls.length,
           'tool_calls.regular': regularCalls.length
         })
-
-        const resultMessages: BaseMessage[] = []
 
         // Execute regular tools in parallel
         if (regularCalls.length > 0) {
@@ -716,13 +774,32 @@ export class GraphBuilder {
   }
 
   private async prepareModel(agentConfig: AgentConfig, state: GraphState, filteredMessages: BaseMessage[]) {
-    let enhancedConfig = agentConfig
+    // Allow per-execution overrides (model/prompt/tools) passed via state metadata
+    const modelOverride = state.metadata?.modelOverride || state.metadata?.model
+    const promptOverride = state.metadata?.promptOverride
+    const toolsEnabled = state.metadata?.toolsEnabled !== false
+
+    // 🔍 DEBUG: Log model resolution for delegation blocking
+    logger.info('🎯 [MODEL RESOLUTION] prepareModel called', {
+      agentId: agentConfig.id,
+      agentConfigModel: agentConfig.model,
+      stateMetadataModel: state.metadata?.model,
+      stateMetadataModelOverride: state.metadata?.modelOverride,
+      resolvedModelOverride: modelOverride,
+      willUseModel: modelOverride || agentConfig.model
+    })
+
+    let enhancedConfig = {
+      ...agentConfig,
+      ...(modelOverride ? { model: modelOverride } : {}),
+      ...(promptOverride ? { prompt: promptOverride } : {}),
+    }
 
     try {
       const { shouldUseDynamicDiscovery, enhanceAgentWithDynamicTools, registerDynamicTools } = await import('./dynamic-agent-enhancement')
       if (shouldUseDynamicDiscovery(agentConfig)) {
         await registerDynamicTools(state.userId)
-        enhancedConfig = await enhanceAgentWithDynamicTools(agentConfig, state.userId)
+        enhancedConfig = await enhanceAgentWithDynamicTools(enhancedConfig, state.userId)
         logger.info('🚀 Dynamic tool discovery applied', {
           agent: agentConfig.id,
           toolCount: enhancedConfig.tools.length
@@ -740,23 +817,38 @@ export class GraphBuilder {
       maxTokens: enhancedConfig.maxTokens
     })
 
-    const selectedTools = await applyToolHeuristics({
-      agentId: enhancedConfig.id,
-      userId: state.userId,
-      messages: filteredMessages,
-      selectedTools: enhancedConfig.tools || [],
-      executionId: state.metadata?.executionId
-    })
+    // Check if the current model supports tools based on its configuration
+    // Models like Dolphin Mistral (uncensored) don't support tool calling
+    // Use the actual model being used (enhancedConfig.model), not the request context
+    const modelSupportsTools = doesModelSupportDelegation(enhancedConfig.model)
+    
+    const selectedTools = toolsEnabled && modelSupportsTools
+      ? await applyToolHeuristics({
+          agentId: enhancedConfig.id,
+          userId: state.userId,
+          messages: filteredMessages,
+          selectedTools: enhancedConfig.tools || [],
+          executionId: state.metadata?.executionId
+        })
+      : []
 
     const toolRuntime = buildToolRuntime(selectedTools, enhancedConfig.model)
     
     // Only log tool counts, not full lists (reduce noise)
     const displayName = getAgentDisplayName(enhancedConfig.id)
-    logger.debug(`🛠️ ${displayName}: ${toolRuntime.lcTools.length} tools bound`)
+    if (!modelSupportsTools) {
+      logger.info(`🚫 ${displayName}: Tools disabled for this model (free/uncensored category)`)
+    } else {
+      logger.debug(`🛠️ ${displayName}: ${toolRuntime.lcTools.length} tools bound`)
+    }
     
-    // CRITICAL: Force tool usage with tool_choice for models that support it
-    // This prevents models from returning XML <function_call> instead of native tool calls
-    const model = typeof (baseModel as any).bindTools === 'function'
+    // CRITICAL: Only bind tools if the model supports them AND we have tools to bind
+    // Models in free/uncensored categories should NOT have tools bound
+    const shouldBindTools = modelSupportsTools && 
+                           toolRuntime.lcTools.length > 0 && 
+                           typeof (baseModel as any).bindTools === 'function'
+    
+    const model = shouldBindTools
       ? (baseModel as any).bindTools(toolRuntime.lcTools, { tool_choice: 'auto' })
       : baseModel
 
@@ -774,8 +866,10 @@ export class GraphBuilder {
     const isCleoSupervisor = (agentConfig.id === 'cleo-supervisor' || agentConfig.id === 'cleo')
     const isScheduledTask = state.metadata?.isScheduledTask === true
 
+    const promptBase = state.metadata?.promptOverride || agentConfig.prompt
+
     if (!isCleoSupervisor || isScheduledTask) {
-      return new SystemMessage(agentConfig.prompt)
+      return new SystemMessage(promptBase)
     }
 
     try {
@@ -790,7 +884,7 @@ export class GraphBuilder {
         requestId: state.metadata?.executionId || `exec_${Date.now()}`
       }, async () => {
         return buildFinalSystemPrompt({
-          baseSystemPrompt: agentConfig.prompt,
+          baseSystemPrompt: promptBase,
           model: agentConfig.model,
           messages: promptMessages,
           supabase: await createClient(),
@@ -806,7 +900,7 @@ export class GraphBuilder {
       return new SystemMessage(prompt)
     } catch (error) {
       logger.warn('⚠️ Failed to build dynamic system prompt; using static prompt', error)
-      return new SystemMessage(agentConfig.prompt)
+      return new SystemMessage(promptBase)
     }
   }
 
@@ -883,9 +977,52 @@ export class GraphBuilder {
     const { toolCalls, toolRuntime, agentConfig, state, timeoutManager } = params
     const messages: BaseMessage[] = []
 
-    const delegationCalls = toolCalls.filter((call) => this.isDelegationTool(call.name))
+    if (state.metadata?.toolsEnabled === false) {
+      const reason = 'Tools disabled for selected model'
+      logger.info('🚫 [TOOLS] Skipping tool execution in handler (tools disabled)', {
+        agent: agentConfig.id,
+        model: state.metadata?.model || agentConfig.model
+      })
+
+      for (const call of toolCalls) {
+        messages.push(new ToolMessage({
+          tool_call_id: call.id || `blocked_${Date.now()}`,
+          content: JSON.stringify({
+            status: 'blocked',
+            reason,
+            message: 'Continuing without calling tools for this model.'
+          })
+        }))
+      }
+      return messages
+    }
+
+    let delegationCalls = toolCalls.filter((call) => this.isDelegationTool(call.name))
     const regularCalls = toolCalls.filter((call) => !this.isDelegationTool(call.name))
 
+    // 🚫 Block delegation for free/uncensored models (same as tool-node)
+    if (delegationCalls.length > 0 && !doesCurrentModelSupportDelegation()) {
+      const currentModel = getCurrentModel() || state.metadata?.model || 'unknown'
+      const reason = getNonDelegationReason(currentModel) || 'Model does not support delegation'
+      logger.info(`🚫 [DELEGATION BLOCKED] ${reason}`, {
+        agentId: agentConfig.id,
+        model: currentModel,
+        blockedTools: delegationCalls.map((c) => c.name)
+      })
+      
+      // Convert delegation calls to blocked responses
+      for (const call of delegationCalls) {
+        messages.push(new ToolMessage({
+          tool_call_id: call.id || `blocked_${Date.now()}`,
+          content: JSON.stringify({
+            status: 'blocked',
+            reason: reason,
+            message: 'I\'ll handle this directly for you instead of delegating to a specialist.'
+          })
+        }))
+      }
+      delegationCalls = []
+    }
     if (regularCalls.length > 0) {
       logger.info('⚡ Executing regular tools in parallel', {
         agentId: agentConfig.id,

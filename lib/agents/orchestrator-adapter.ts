@@ -98,9 +98,15 @@ export async function getAgentOrchestrator() {
       threadId?: string,
       userId?: string,
       prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
-      _forceSupervised?: boolean
+      _forceSupervised?: boolean,
+      lastUserParts?: any[],
+      overrides?: { modelOverride?: string; promptOverride?: string; toolsEnabled?: boolean }
     ) {
-      return createAndRunExecution(input, agentId, prior || [], threadId, userId)
+      console.log('🎯 [ADAPTER] startAgentExecutionForUI called with overrides:', {
+        modelOverride: overrides?.modelOverride,
+        hasLastUserParts: !!lastUserParts?.length
+      })
+      return createAndRunExecution(input, agentId, prior || [], threadId, userId, lastUserParts, overrides)
     },
     // Execution getters for polling endpoints
     getExecution(executionId: string) {
@@ -229,7 +235,9 @@ function createAndRunExecution(
   agentId: string | undefined,
   prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: string; metadata?: any }>,
   threadId?: string,
-  userId?: string
+  userId?: string,
+  lastUserParts?: any[],
+  overrides?: { modelOverride?: string; promptOverride?: string; toolsEnabled?: boolean }
 ): AgentExecution {
   try {
     let legacy = (globalThis as any).__cleoOrchestrator
@@ -238,14 +246,17 @@ function createAndRunExecution(
       const mod = require('@/lib/agents/agent-orchestrator')
       legacy = mod.getAgentOrchestrator()
     }
-    // Prefer UI variant so we can pass ids
+    // Prefer UI variant so we can pass ids + overrides
     if (legacy && typeof legacy.startAgentExecutionForUI === 'function') {
       const exec = legacy.startAgentExecutionForUI(
         input,
         agentId,
         threadId,
         userId,
-        prior || []
+        prior || [],
+        false, // forceSupervised
+        lastUserParts,
+        overrides
       ) as AgentExecution
       // Ensure bootstrap step exists (idempotent)
       if (exec && Array.isArray(exec.steps) && exec.steps.length === 0) {

@@ -10,7 +10,7 @@ export const PETER_AGENT: AgentConfig = {
   name: 'Peter',
   description: 'Financial advisor and business strategist specializing in financial modeling, accounting, business strategy, and cryptocurrency analysis',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:qwen/qwen3-next-80b-a3b-instruct',
   temperature: 0.3,
   maxTokens: 32768,
   tools: [

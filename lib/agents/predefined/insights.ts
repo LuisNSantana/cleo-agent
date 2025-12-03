@@ -10,7 +10,7 @@ export const INSIGHTS_AGENT: AgentConfig = {
   name: 'Iris',
   description: 'Document Analysis & Insights Specialist: analyzes PDFs, documents, and attachments to extract structured insights, trends, risks, and recommendations with strong traceability.',
   role: 'specialist',
-  model: 'grok-4-fast',  // CRITICAL: Multimodal model required for PDF/document analysis
+  model: 'grok-4-1-fast-reasoning',  // xAI direct - multimodal model for PDF/document analysis
   temperature: 0.35,
   maxTokens: 32768,  // Increased for large documents
   tools: [

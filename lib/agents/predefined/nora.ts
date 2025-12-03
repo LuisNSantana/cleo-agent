@@ -10,7 +10,7 @@ export const NORA_AGENT: AgentConfig = {
   name: 'Nora',
   description: 'Medical information & triage assistant (non-diagnostic). Provides evidence-informed guidance, risk flags, and structured summaries with sources.',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'grok-4-1-fast-reasoning',
   temperature: 0.3,
   maxTokens: 32768,
   color: '#0EA5E9',

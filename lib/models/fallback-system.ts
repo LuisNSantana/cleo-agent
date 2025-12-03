@@ -3,8 +3,8 @@ import { grokModels } from "./data/grok"
 
 /**
  * Sistema de fallback simplificado
- * Solo mantenemos los dos modelos activos (grok-4-fast y grok-4-multimodal).
- * Cualquier id legacy (GPT-5, Claude, DeepSeek, etc.) hace fallback a grok-4-fast
+ * Solo mantenemos los modelos activos (grok-4-fast, grok-4-1-fast-reasoning, etc.).
+ * Cualquier id legacy (GPT-5, Claude, DeepSeek, etc.) hace fallback a grok-4-1-fast-reasoning
  * para no romper historiales de chat o referencias antiguas guardadas.
  */
 
@@ -15,12 +15,11 @@ const LEGACY_IDS = [
   'claude-3-7-sonnet-20250219', 'mistral-medium-2508', 'mistral-large-latest-fallback',
   'openrouter:deepseek/deepseek-chat-v3.1:free', 'openrouter:openai/gpt-oss-120b', 'gpt-oss-120b',
   'openrouter:openrouter/sonoma-sky-alpha', 'openrouter:z-ai/glm-4.5', 'grok-3', 'grok-4-fast-reasoning',
-  'grok-4-fast-non-reasoning'
-  , 'openrouter:x-ai/grok-4-fast'
+  'grok-4-fast-non-reasoning', 'openrouter:x-ai/grok-4-fast'
 ]
 
-// Sólo un fallback target por simplicidad
-const FALLBACK_TARGET = 'grok-4-fast'
+// Primary fallback target - now using grok-4-1-fast-reasoning
+const FALLBACK_TARGET = 'grok-4-1-fast-reasoning'
 
 const modelFallbacks: Record<string, string> = Object.fromEntries(
   LEGACY_IDS.map(id => [id, FALLBACK_TARGET])
@@ -82,7 +81,7 @@ export function getBestVisionModel(): string {
  * Get recommended model based on task requirements
  */
 export function getRecommendedModel(requirements: { needsVision?: boolean }): string {
-  return requirements?.needsVision ? 'grok-4-multimodal' : 'grok-4-fast'
+  return requirements?.needsVision ? 'grok-4-multimodal' : 'grok-4-1-fast-reasoning'
 }
 
 /**

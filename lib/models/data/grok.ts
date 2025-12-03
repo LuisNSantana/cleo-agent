@@ -3,7 +3,7 @@ import { getXAIModel } from "../../xai"
 import { openproviders } from "@/lib/openproviders"
 
 /**
- * Cleo Agent - Powered by Grok 4 Fast with Reasoning
+ * Cleo Agent - Powered by Grok 4.1 Fast with Reasoning
  * 
  * Cleo is an intelligent AI agent designed to:
  * - Analyze and create documents with deep understanding
@@ -14,7 +14,37 @@ import { openproviders } from "@/lib/openproviders"
  * - Handle function calls for external integrations
  */
 const grokModels: ModelConfig[] = [
-  // Faster: Grok 4 Fast con reasoning activado por defecto (xAI directo por defecto)
+  // NEW: Grok 4.1 Fast Reasoning - Latest xAI model with 2M context
+  {
+    id: "grok-4-1-fast-reasoning",
+    name: "Grok 4.1 Fast",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description: "Grok 4.1 Fast Reasoning: xAI's latest high-speed model with 2M token context. Optimized for fast inference while maintaining strong reasoning through thinking tokens. Supports vision, tool use, and JSON output.",
+    webSearch: true,
+    inputCost: 3.00, // $3.00 per 1M input tokens
+    outputCost: 15.00, // $15.00 per 1M output tokens
+    priceUnit: "per 1M tokens",
+    tags: ["xai", "grok", "reasoning", "fast", "vision", "tool-calling", "2m-context"],
+    contextWindow: 2000000, // 2M tokens - official xAI spec
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai",
+    apiDocs: "https://docs.x.ai/docs/models",
+    modelPage: "https://x.ai/news/grok-4-1",
+    releasedAt: "2025-11-17",
+    icon: "xai",
+    defaults: { temperature: 0.3, topP: 0.9, maxTokens: 32768 },
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-1-fast-reasoning", apiKey) as any,
+  },
+  // Faster: Grok 4.1 Fast Reasoning - Latest xAI model (renamed from grok-4-fast)
   {
     id: "grok-4-fast",
     name: "Faster",
@@ -22,61 +52,28 @@ const grokModels: ModelConfig[] = [
     providerId: "xai",
     modelFamily: "Grok",
     baseProviderId: "xai",
-    description: "Grok 4 Fast con reasoning activado. Modelo rápido y económico optimizado para tareas de texto, análisis y razonamiento.",
+    description: "Grok 4.1 Fast Reasoning: xAI's latest high-speed model with 2M token context. Optimized for fast inference with strong reasoning.",
     webSearch: true,
-    // Pricing pagado: ajusta si cambian tarifas oficiales
-    inputCost: 0.5,
-    outputCost: 0.5,
+    inputCost: 3.00, // Updated pricing for 4.1
+    outputCost: 15.00,
     priceUnit: "per 1M tokens",
-    tags: ["fast","tools","text","reasoning"],
-    contextWindow: 2000000, // Official xAI spec: 2M tokens (updated from 262144)
-    vision: true,
-    tools: true,
-    audio: false,
-    reasoning: true, // Activado por defecto
-    openSource: false,
-    speed: "Fast",
-    intelligence: "Medium",
-  website: "https://x.ai",
-  apiDocs: "https://docs.x.ai",
-  modelPage: "https://x.ai/grok",
-    releasedAt: "2025-09-27",
-    icon: "faster",
-    defaults: { temperature: 0.3, topP: 0.9, maxTokens: 32768 }, // Increased from 4096 to 32k for deep analysis
-    // Usar xAI directo; el provider-map permite fallback a OpenRouter si el toggle no está activo
-    apiSdk: (apiKey?: string) => getXAIModel("grok-4-fast-reasoning", apiKey) as any,
-  },
-  // Smarter: GPT-5 (modelo premium con límite diario)
-  {
-    id: "gpt-5",
-    name: "Smarter",
-    provider: "OpenAI",
-    providerId: "openai",
-    modelFamily: "GPT",
-    baseProviderId: "openai",
-    description: "GPT-5: modelo más inteligente y potente para tareas complejas. Límite: 30 mensajes por día.",
-    webSearch: false,
-    inputCost: 2.5,
-    outputCost: 10.0,
-    priceUnit: "per 1M tokens",
-    tags: ["premium","tools","vision","reasoning","smart"],
-    contextWindow: 128000,
+    tags: ["fast","tools","text","reasoning","vision","2m-context"],
+    contextWindow: 2000000, // Official xAI spec: 2M tokens
     vision: true,
     tools: true,
     audio: false,
     reasoning: true,
     openSource: false,
-    speed: "Medium",
+    speed: "Fast",
     intelligence: "High",
-    website: "https://openai.com",
-    apiDocs: "https://platform.openai.com/docs",
-    modelPage: "https://openai.com/gpt-5",
-    releasedAt: "2025-01-01",
-    icon: "smarter",
-    defaults: { temperature: 0.7, topP: 0.95 },
-    dailyLimit: 30, // Límite diario de mensajes
-    accessible: true, // Disponible para usuarios autenticados
-    apiSdk: (apiKey?: string) => openproviders("openai:gpt-4o", undefined, apiKey), // Usar gpt-4o como backend real
+    website: "https://x.ai",
+    apiDocs: "https://docs.x.ai",
+    modelPage: "https://x.ai/grok",
+    releasedAt: "2025-11-17",
+    icon: "faster",
+    defaults: { temperature: 0.3, topP: 0.9, maxTokens: 32768 },
+    // Now uses grok-4-1-fast-reasoning (latest)
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-1-fast-reasoning", apiKey) as any,
   },
   {
     id: "grok-3-mini",

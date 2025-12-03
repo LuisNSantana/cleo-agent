@@ -52,7 +52,12 @@ async function createAndRunExecution(
 	prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
 	threadId?: string,
 	userId?: string,
-	lastUserParts?: any[]
+	lastUserParts?: any[],
+	overrides?: {
+		modelOverride?: string
+		promptOverride?: string
+		toolsEnabled?: boolean
+	}
 ): Promise<AgentExecution> {
 	const core = await getGlobalOrchestrator()
 	
@@ -70,6 +75,22 @@ async function createAndRunExecution(
 	const allAgents = await getAllAgents(finalUserId)
 	const targetId = agentId || 'cleo-supervisor'
 	const target = allAgents.find(a => a.id === targetId) || allAgents.find(a => a.id === 'cleo-supervisor')!
+	
+	// 🔍 DEBUG: Log overrides being applied
+	logger.info('🎯 [ORCHESTRATOR] Model override check', {
+		targetAgentId: targetId,
+		targetAgentModel: target?.model,
+		overridesModelOverride: overrides?.modelOverride,
+		overridesPromptOverride: overrides?.promptOverride ? 'yes' : 'no',
+		willApplyModelOverride: !!overrides?.modelOverride
+	})
+	
+	const effectiveAgent: AgentConfig = {
+		...target,
+		...(overrides?.modelOverride ? { model: overrides.modelOverride } : {}),
+		...(overrides?.promptOverride ? { prompt: overrides.promptOverride } : {}),
+		...(overrides?.toolsEnabled === false ? { tools: [] } : {})
+	}
 	
 	// Create execution context
 	const baseMessages = toBaseMessages(prior || [])
@@ -178,6 +199,8 @@ async function createAndRunExecution(
 			: [...baseMessages, new HumanMessage(input as any)]
 	}
 	
+	const toolsEnabled = overrides?.toolsEnabled !== false
+
 	const ctx: ExecutionContext = {
 		threadId: threadId || `thread_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
 		userId: finalUserId,
@@ -186,7 +209,11 @@ async function createAndRunExecution(
 		metadata: { 
 			source: 'legacy-orchestrator', 
 			executionId: undefined,
-			threadId: threadId || null // ✅ CRITICAL: Pass thread for RAG isolation in graph state
+			threadId: threadId || null, // ✅ CRITICAL: Pass thread for RAG isolation in graph state
+			model: effectiveAgent.model,
+			modelOverride: overrides?.modelOverride,
+			promptOverride: overrides?.promptOverride,
+			toolsEnabled
 		}
 	}
 	
@@ -210,7 +237,7 @@ async function createAndRunExecution(
 	const HITL_SAFE_TIMEOUT_MS = 600_000 // 10 minutes
 	
 	// Start execution (don't await)
-	const executionPromise = core.executeAgent(target, ctx, { timeout: HITL_SAFE_TIMEOUT_MS })
+	const executionPromise = core.executeAgent(effectiveAgent, ctx, { timeout: HITL_SAFE_TIMEOUT_MS })
 	
 	// Get the execution ID that was just created (it's in activeExecutions now)
 	// CoreOrchestrator.executeAgent creates the execution synchronously before async work
@@ -285,17 +312,18 @@ export async function getAgentOrchestrator() {
 			return createAndRunExecution(input, agentId, [])
 		},
 
-		startAgentExecution(input: string, agentId?: string) {
-			return createAndRunExecution(input, agentId, [])
+		startAgentExecution(input: string, agentId?: string, overrides?: { modelOverride?: string; promptOverride?: string; toolsEnabled?: boolean }) {
+			return createAndRunExecution(input, agentId, [], undefined, undefined, undefined, overrides)
 		},
 
 		startAgentExecutionWithHistory(
 			input: string,
 			agentId: string | undefined,
 			prior: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
-			lastUserParts?: any[]
+			lastUserParts?: any[],
+			overrides?: { modelOverride?: string; promptOverride?: string; toolsEnabled?: boolean }
 		) {
-			return createAndRunExecution(input, agentId, prior, undefined, undefined, lastUserParts)
+			return createAndRunExecution(input, agentId, prior, undefined, undefined, lastUserParts, overrides)
 		},
 
 		// Dual-mode execution for UI with enhanced context
@@ -306,9 +334,10 @@ export async function getAgentOrchestrator() {
 			userId?: string, 
 			prior?: Array<{ role: 'user'|'assistant'|'system'|'tool'; content: any; metadata?: any }>,
 			forceSupervised?: boolean,
-			lastUserParts?: any[]
+			lastUserParts?: any[],
+			overrides?: { modelOverride?: string; promptOverride?: string; toolsEnabled?: boolean }
 		) {
-			return createAndRunExecution(input, agentId, prior || [], threadId, userId, lastUserParts)
+			return createAndRunExecution(input, agentId, prior || [], threadId, userId, lastUserParts, overrides)
 		},
 
 		// Execution getters - delegate to CoreOrchestrator (single source of truth)

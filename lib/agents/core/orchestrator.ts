@@ -115,6 +115,7 @@ export class AgentOrchestrator {
   private delegationsSeen: Set<string> = new Set()
 
   private graphs = new Map<string, StateGraph<AgentState>>()
+  private graphSignatures = new Map<string, string>()
   // Store interval references for cleanup
   private metricsIntervals: NodeJS.Timeout[] = []
 
@@ -736,14 +737,16 @@ export class AgentOrchestrator {
     this.metricsIntervals.push(systemMetricsInterval)
   }
 
+  private computeGraphSignature(agentConfig: AgentConfig, tools: string[]): string {
+    const toolKey = [...tools].sort().join(',')
+    const promptKey = (agentConfig.prompt || '').length
+    return `${agentConfig.id}|${agentConfig.model || ''}|${promptKey}|${toolKey}`
+  }
+
   /**
    * Initialize agent graph if not already cached
    */
   async initializeAgent(agentConfig: AgentConfig): Promise<void> {
-    if (this.graphs.has(agentConfig.id)) {
-      return // Already initialized
-    }
-
     try {
       // Ensure sub-agent manager is initialized (loads cache and registers tools)
       await this.subAgentManager.initialize()
@@ -764,8 +767,15 @@ export class AgentOrchestrator {
       )
       const effectiveAgentConfig = { ...agentConfig, tools: uniqueTools }
 
+      const signature = this.computeGraphSignature(effectiveAgentConfig, uniqueTools)
+      const existingSignature = this.graphSignatures.get(agentConfig.id)
+      if (this.graphs.has(agentConfig.id) && existingSignature === signature) {
+        return // Already initialized with same config
+      }
+
       const graph = await this.graphBuilder.buildGraph(effectiveAgentConfig)
       this.graphs.set(agentConfig.id, graph)
+      this.graphSignatures.set(agentConfig.id, signature)
 
       this.eventEmitter.emit("agent.initialized", {
         agentId: agentConfig.id,

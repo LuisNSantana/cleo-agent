@@ -2,6 +2,161 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { ModelConfig } from "../types"
 
 export const openrouterModels: ModelConfig[] = [
+  // xAI: Grok 4.1 Fast Reasoning - Latest and fastest reasoning model from xAI
+  {
+    id: "openrouter:x-ai/grok-4-1-fast-reasoning",
+    name: "Grok 4.1 Fast Reasoning",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Grok",
+    baseProviderId: "x-ai",
+    description:
+      "Grok 4.1 Fast Reasoning: xAI's latest high-speed variant with 2M token context, optimized for fast inference while maintaining strong reasoning through thinking tokens. Supports vision, tool use, and JSON output.",
+    tags: ["xai", "grok", "reasoning", "fast", "vision", "tool-calling", "2m-context"],
+    contextWindow: 2000000, // 2M tokens
+    inputCost: 3.00, // $3.00 per 1M input tokens
+    outputCost: 15.00, // $15.00 per 1M output tokens
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai",
+    apiDocs: "https://docs.x.ai/docs/models",
+    modelPage: "https://x.ai/news/grok-4-1",
+    releasedAt: "2025-11-17",
+    icon: "xai",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("x-ai/grok-4-1-fast-reasoning"),
+  },
+  // Qwen3-Next 80B A3B Instruct - Advanced Qwen model for instruct tasks
+  {
+    id: "openrouter:qwen/qwen3-next-80b-a3b-instruct",
+    name: "Qwen3-Next 80B Instruct",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Qwen",
+    baseProviderId: "qwen",
+    description:
+      "Qwen3-Next 80B A3B Instruct: next-generation Qwen model with advanced reasoning, tool calling, and strong instruction-following capabilities. Excellent for complex multi-step tasks.",
+    tags: ["qwen", "reasoning", "tool-calling", "instruct", "openrouter"],
+    contextWindow: 131072,
+    inputCost: 0.50,
+    outputCost: 2.00,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/qwen/qwen3-next-80b-a3b-instruct",
+    apiDocs: "https://openrouter.ai/qwen/qwen3-next-80b-a3b-instruct",
+    modelPage: "https://openrouter.ai/qwen/qwen3-next-80b-a3b-instruct",
+    releasedAt: "2025-11-01",
+    icon: "qwen",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("qwen/qwen3-next-80b-a3b-instruct"),
+  },
+  // GLM 4.5 Air (free) - Lightweight, free model for agent-centric apps
+  {
+    id: "openrouter:z-ai/glm-4.5-air:free",
+    name: "GLM 4.5 Air (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GLM",
+    baseProviderId: "z-ai",
+    description:
+      "GLM-4.5-Air: lightweight MoE model (106B params, 12B active) optimized for agent-centric applications. Features hybrid inference modes for reasoning and real-time interaction. 131K context window. Free tier available.",
+    tags: ["glm", "moe", "agent", "reasoning", "tool-calling", "openrouter", "free"],
+    category: "free",
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/z-ai/glm-4.5-air:free",
+    apiDocs: "https://openrouter.ai/z-ai/glm-4.5-air:free",
+    modelPage: "https://z.ai/blog/glm-4.5",
+    releasedAt: "2025-10-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("z-ai/glm-4.5-air:free"),
+  },
+  // Arcee AI Trinity Mini (free) - MoE model optimized for agents
+  {
+    id: "openrouter:arcee-ai/trinity-mini:free",
+    name: "Trinity Mini (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Trinity",
+    baseProviderId: "arcee-ai",
+    description:
+      "Trinity Mini: 26B-parameter sparse MoE model (3B active per token) with 131K shared context. Native function calling, tool orchestration, and JSON schema adherence. Optimized for agent workflows. Apache 2.0 licensed.",
+    tags: ["arcee", "moe", "agent", "reasoning", "tool-calling", "openrouter", "free", "function-calling"],
+    category: "free",
+    contextWindow: 131072, // 131K total context (shared between input+output)
+    maxOutputTokens: 32768, // Conservative: leave room for prompts/tools in shared context
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/arcee-ai/trinity-mini:free",
+    apiDocs: "https://docs.arcee.ai/language-models/trinity-mini",
+    modelPage: "https://www.arcee.ai/trinity",
+    releasedAt: "2025-11-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("arcee-ai/trinity-mini:free"),
+  },
   // xAI: Grok Code Fast 1 (nuevo, para tareas técnicas y de programación)
   {
     id: "openrouter:x-ai/grok-code-fast-1",
@@ -129,8 +284,9 @@ export const openrouterModels: ModelConfig[] = [
     modelFamily: "Mistral",
     baseProviderId: "cognitivecomputations",
     description:
-      "Venice Uncensored Dolphin Mistral 24B Venice Edition: steerable instruction model; minimal refusals. Use respectfully.",
+      "Venice Uncensored Dolphin Mistral 24B Venice Edition: steerable instruction model with minimal content restrictions. Use responsibly - you are fully responsible for any generated content.",
     tags: ["venice", "dolphin", "mistral", "uncensored", "tool-calling", "openrouter", "free"],
+    category: "uncensored",
     contextWindow: 131072,
     inputCost: 0,
     outputCost: 0,
@@ -141,6 +297,7 @@ export const openrouterModels: ModelConfig[] = [
     reasoning: false,
     webSearch: false,
     openSource: true,
+    uncensored: true,
     speed: "Fast",
     intelligence: "Medium",
     website: "https://openrouter.ai/cognitivecomputations/dolphin-mistral-24b-venice-edition:free",

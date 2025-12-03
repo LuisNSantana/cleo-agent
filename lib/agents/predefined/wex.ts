@@ -10,7 +10,7 @@ export const WEX_AGENT: AgentConfig = {
   name: 'Wex',
   description: 'Strategic market analysis & competitive intelligence specialist. Synthesizes multi-source research into actionable business insights, executive summaries, and strategic frameworks that help users make better decisions day to day.',
   role: 'specialist',
-  model: 'grok-4-fast', // FIXED: grok-4-fast-reasoning is not a real xAI model, use grok-4-fast
+  model: 'grok-4-1-fast-reasoning', // xAI direct - latest Grok 4.1 with 2M context
   temperature: 0.25,
   maxTokens: 32000,
   tools: (() => {

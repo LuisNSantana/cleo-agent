@@ -12,7 +12,7 @@ export const NOTION_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:qwen/qwen3-next-80b-a3b-instruct',
   temperature: 0.5,
   maxTokens: 16384,
   tools: [

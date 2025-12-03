@@ -10,7 +10,7 @@ export const APU_AGENT: AgentConfig = {
   name: 'Apu',
   description: 'Customer Success & Technical Support specialist focused on troubleshooting, documentation, service workflows, and customer satisfaction optimization.',
   role: 'specialist',
-  model: 'gpt-4o-mini',
+  model: 'openrouter:qwen/qwen3-next-80b-a3b-instruct',
   temperature: 0.4,
   maxTokens: 32768,
   tools: [

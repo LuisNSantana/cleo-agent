@@ -19,8 +19,9 @@ export const MAX_ATTACHMENTS_PER_MESSAGE = 5
 // Modelos disponibles sin autenticación (Fast tier + fallback)
 export const NON_AUTH_ALLOWED_MODELS = [
   // Guest mode: only validated tool-capable models
-  "openrouter:x-ai/grok-4-fast", // Replaced DeepSeek with Grok 4 Fast (better performance & still free)
-  "openrouter:z-ai/glm-4.5",
+  "grok-4-fast", // xAI direct - Grok 4 Fast (better performance)
+  "grok-4-1-fast-reasoning", // xAI direct - Latest Grok 4.1 with 2M context
+  "openrouter:z-ai/glm-4.5-air:free", // Free GLM 4.5 Air
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   // Keep one vision-capable emergency fallback
   "gpt-4o-mini",
@@ -29,26 +30,31 @@ export const NON_AUTH_ALLOWED_MODELS = [
 // Modelos gratuitos para usuarios autenticados (Fast + Balanced tiers + fallbacks)
 export const FREE_MODELS_IDS = [
   // Curated free/tool-capable list for authenticated users
-  // Top tier free models
-  "openrouter:x-ai/grok-4-fast",  // New Grok-4 fast model - excellent performance
+  // Top tier xAI models (direct)
+  "grok-4-fast",  // xAI direct - Grok-4 fast model
+  "grok-4-1-fast-reasoning", // xAI direct - Latest Grok 4.1 with 2M context
   "openai/gpt-4o-mini",
   "openrouter:mistralai/mistral-small-3.2-24b-instruct:free",
   "openrouter:deepseek/deepseek-chat-v3.1:free",
+  // Free tier models (open source)
+  "openrouter:z-ai/glm-4.5-air:free", // GLM 4.5 Air - free agent-centric model
+  "openrouter:qwen/qwen3-next-80b-a3b-instruct", // Qwen3-Next 80B
   // High-end free options
   // paid Nemotron is excluded from FREE list
   // Economical models for user variety
   "openrouter:google/gemini-2.5-flash-lite", // Multimodal fallback for grok-4-fast
   "gpt-5-nano",
+  // Uncensored models (user takes full responsibility)
+  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
   // Emergency fallback
   "gpt-4o-mini",
 ]
 
-// Default authenticated model: Grok 4 Fast (internamente usa grok-4-fast-reasoning en la API)
-// El modelo "grok-4-fast" en la UI mapea a "grok-4-fast-reasoning" en xAI vía apiSdk
-export const MODEL_DEFAULT = "grok-4-fast"
+// Default authenticated model: Grok 4.1 Fast Reasoning (xAI direct)
+export const MODEL_DEFAULT = "grok-4-1-fast-reasoning"
 
-// MODELO POR DEFECTO PARA GUESTS - Grok 4 Fast (con reasoning activado internamente)
-export const MODEL_DEFAULT_GUEST = "grok-4-fast"
+// MODELO POR DEFECTO PARA GUESTS - Grok 4.1 Fast Reasoning (xAI direct)
+export const MODEL_DEFAULT_GUEST = "grok-4-1-fast-reasoning"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [
@@ -70,7 +76,10 @@ export const DISABLED_MODEL_IDS: string[] = [
   "openrouter:google/gemma-3-27b-it:free",
   "openrouter:meta-llama/llama-4-maverick:free",
   "openrouter:meta-llama/llama-4-scout:free",
-  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  // Hide OpenRouter proxy of xAI models (we use xAI direct)
+  "openrouter:x-ai/grok-4-fast",
+  "openrouter:x-ai/grok-4-1-fast-reasoning",
+  // Note: dolphin-mistral-24b-venice-edition:free is now shown in Uncensored section
   // Prefer Sky over Dusk in UI
   // "openrouter:openrouter/sonoma-dusk-alpha",
 ]

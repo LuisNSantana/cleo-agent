@@ -25,7 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useModel } from "@/lib/model-store/provider"
-import { filterAndSortModels } from "@/lib/model-store/utils"
+import { filterAndSortModels, groupModelsByCategory } from "@/lib/model-store/utils"
 import { ModelConfig } from "@/lib/models/types"
 import { PROVIDERS } from "@/lib/providers"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
@@ -34,6 +34,7 @@ import {
   CaretDownIcon,
   MagnifyingGlassIcon,
   StarIcon,
+  WarningCircle,
 } from "@phosphor-icons/react"
 import { useRef, useState, useEffect, useMemo } from "react"
 import { ProModelDialog } from "./pro-dialog"
@@ -103,7 +104,8 @@ export function ModelSelector({
         key={getModelStableKey(model)}
         className={cn(
           "flex w-full items-center justify-between px-3 py-2",
-          selectedModelId === model.id && "bg-accent"
+          selectedModelId === model.id && "bg-accent",
+          model.uncensored && "border-l-2 border-l-amber-500/50"
         )}
         onClick={() => {
           if (isLocked) {
@@ -126,12 +128,19 @@ export function ModelSelector({
             <span className="text-sm">{model.name}</span>
           </div>
         </div>
-        {isLocked && (
-          <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-            <StarIcon className="size-2" />
-            <span>Locked</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {model.uncensored && (
+            <span className="text-[9px] px-1 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded">
+              18+
+            </span>
+          )}
+          {isLocked && (
+            <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+              <StarIcon className="size-2" />
+              <span>Locked</span>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -160,11 +169,16 @@ export function ModelSelector({
     return result
   }, [filteredModels])
 
+  // Group models by category for UI sections
+  const modelGroups = useMemo(() => {
+    return groupModelsByCategory(dedupedModels)
+  }, [dedupedModels])
+
   const trigger = (
     <Button
       variant="outline"
       className={cn(
-        "dark:bg-secondary dark:!text-gray-900 dark:hover:!text-gray-900",
+        "dark:bg-secondary dark:text-gray-100 dark:hover:text-white",
         // Guest users y desktop: botón completo. Mobile autenticado: círculo
         shouldShowFullButton ? "justify-between" : "size-9 p-0 rounded-full flex items-center justify-center",
         className
@@ -198,7 +212,7 @@ export function ModelSelector({
                 size="sm"
                 variant="secondary"
                 className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent justify-between dark:!text-gray-900 dark:hover:!text-gray-900",
+                  "border-border dark:bg-secondary text-accent-foreground h-9 border bg-transparent justify-between dark:text-gray-100 dark:hover:text-white",
                   className
                 )}
                 type="button"
@@ -254,8 +268,34 @@ export function ModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : dedupedModels.length > 0 ? (
-                dedupedModels.map((model) => renderModelItem(model))
+              ) : modelGroups.length > 0 ? (
+                modelGroups.map((group) => (
+                  <div key={group.id} className="mb-3">
+                    {/* Section header for mobile */}
+                    <div className="px-1 py-2 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          {group.label}
+                        </span>
+                        {group.id === "free" && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full">
+                            $0
+                          </span>
+                        )}
+                        {group.id === "uncensored" && (
+                          <WarningCircle className="size-3.5 text-amber-500" weight="fill" />
+                        )}
+                      </div>
+                      {group.warning && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 leading-tight">
+                          {group.warning}
+                        </p>
+                      )}
+                    </div>
+                    {/* Models in this group */}
+                    {group.models.map((model) => renderModelItem(model))}
+                  </div>
+                ))
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                   <p className="text-muted-foreground mb-2 text-sm">
@@ -333,55 +373,89 @@ export function ModelSelector({
                     Loading models...
                   </p>
                 </div>
-              ) : dedupedModels.length > 0 ? (
-                dedupedModels.map((model) => {
-                  const isLocked = !model.accessible
-                  const provider = PROVIDERS.find(
-                    (provider) => provider.id === model.icon
-                  )
-
-                  return (
-                    <DropdownMenuItem
-                      key={getModelStableKey(model)}
-                      className={cn(
-                        "flex w-full items-center justify-between px-3 py-2",
-                        selectedModelId === model.id && "bg-accent"
-                      )}
-                      onSelect={() => {
-                        if (isLocked) {
-                          setSelectedProModel(model.id)
-                          setIsProDialogOpen(true)
-                          return
-                        }
-
-                        setSelectedModelIdAction(model.id)
-                        setIsDropdownOpen(false)
-                      }}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        {provider?.icon && <provider.icon className="size-5" />}
-                        <div className="flex flex-col gap-0">
-                          <span className="text-sm">{model.name}</span>
-                        </div>
+              ) : modelGroups.length > 0 ? (
+                modelGroups.map((group) => (
+                  <div key={group.id} className="mb-1">
+                    {/* Section header */}
+                    <div className="sticky top-0 bg-popover px-3 py-1.5 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          {group.label}
+                        </span>
+                        {group.id === "free" && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full">
+                            $0
+                          </span>
+                        )}
+                        {group.id === "uncensored" && (
+                          <WarningCircle className="size-3.5 text-amber-500" weight="fill" />
+                        )}
                       </div>
-                      {isLocked && (
-                        <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                          <span>Locked</span>
-                        </div>
+                      {group.warning && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
+                          {group.warning}
+                        </p>
                       )}
-                    </DropdownMenuItem>
-                  )
-                })
+                    </div>
+                    {/* Models in this group */}
+                    {group.models.map((model) => {
+                      const isLocked = !model.accessible
+                      const provider = PROVIDERS.find(
+                        (provider) => provider.id === model.icon
+                      )
+
+                      return (
+                        <DropdownMenuItem
+                          key={getModelStableKey(model)}
+                          className={cn(
+                            "flex w-full items-center justify-between px-3 py-2",
+                            selectedModelId === model.id && "bg-accent",
+                            model.uncensored && "border-l-2 border-l-amber-500/50"
+                          )}
+                          onSelect={() => {
+                            if (isLocked) {
+                              setSelectedProModel(model.id)
+                              setIsProDialogOpen(true)
+                              return
+                            }
+
+                            setSelectedModelIdAction(model.id)
+                            setIsDropdownOpen(false)
+                          }}
+                          onFocus={() => {
+                            if (isDropdownOpen) {
+                              setHoveredModel(model.id)
+                            }
+                          }}
+                          onMouseEnter={() => {
+                            if (isDropdownOpen) {
+                              setHoveredModel(model.id)
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            {provider?.icon && <provider.icon className="size-5" />}
+                            <div className="flex flex-col gap-0">
+                              <span className="text-sm">{model.name}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {model.uncensored && (
+                              <span className="text-[9px] px-1 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded">
+                                18+
+                              </span>
+                            )}
+                            {isLocked && (
+                              <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                                <span>Locked</span>
+                              </div>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </div>
+                ))
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                   <p className="text-muted-foreground mb-1 text-sm">

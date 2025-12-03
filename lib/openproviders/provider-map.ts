@@ -1,6 +1,6 @@
 import type { Provider, SupportedModel } from "./types"
 
-// Decide the default provider for Grok-4-Fast at load time.
+// Decide the default provider for Grok models at load time.
 // Using xAI directly for better performance and lower latency
 const GROK_DEFAULT_PROVIDER: Provider =
   process.env.XAI_DIRECT_FOR_GROK === 'false' ? 'openrouter' : 'xai'
@@ -8,16 +8,27 @@ const GROK_DEFAULT_PROVIDER: Provider =
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Cleo simplified public models (added 2025-09-27)
-  // These are the only two user-selectable chat models now.
+  // These are the only user-selectable chat models now.
   // grok-4-fast default provider (toggleable via env)
   // Reasoning es un toggle en runtime; mantenemos alias de convenience
   "grok-4-fast": GROK_DEFAULT_PROVIDER,
   "grok-4-fast-reasoning": GROK_DEFAULT_PROVIDER,
+  // Grok 4.1 Fast Reasoning (latest with 2M context)
+  "grok-4-1-fast-reasoning": GROK_DEFAULT_PROVIDER,
   // Backward compatibility alias
   "grok-4-multimodal": "openrouter", // normalize to grok-4-fast alias upstream
   // OpenRouter models
   "openrouter:z-ai/glm-4.5": "openrouter",
   "z-ai/glm-4.5": "openrouter",
+  // GLM 4.5 Air Free model
+  "openrouter:z-ai/glm-4.5-air:free": "openrouter",
+  "z-ai/glm-4.5-air:free": "openrouter",
+  // Qwen3 Next 80B A3B Instruct
+  "openrouter:qwen/qwen3-next-80b-a3b-instruct": "openrouter",
+  "qwen/qwen3-next-80b-a3b-instruct": "openrouter",
+  // Dolphin Mistral 24B Venice Edition (uncensored)
+  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
+  "cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
   "openrouter:openai/gpt-oss-120b": "openrouter",
   "openrouter:openai/gpt-4.1-mini": "openrouter",
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
@@ -42,10 +53,9 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "meta-llama/llama-4-maverick:free": "openrouter",
   "openrouter:meta-llama/llama-4-scout:free": "openrouter",
   "meta-llama/llama-4-scout:free": "openrouter",
-  // Additional OpenRouter free models
-  "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
-  // X.AI Grok models
+  // X.AI Grok models via OpenRouter
   "openrouter:x-ai/grok-4-fast": "openrouter",
+  "openrouter:x-ai/grok-code-fast-1": "openrouter",
   // Claude 4 models
   "openrouter:anthropic/claude-sonnet-4": "openrouter",
   "anthropic/claude-sonnet-4": "openrouter",
@@ -101,6 +111,8 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "o4-mini": "openai",
   "o4-mini-2025-04-16": "openai",
   "gpt-5": "openai",
+  "gpt-5.1": "openai",
+  "gpt-5.1-2025-11-13": "openai",
   "gpt-5-nano": "openai",
   "gpt-5-mini-2025-08-07": "openai",
 

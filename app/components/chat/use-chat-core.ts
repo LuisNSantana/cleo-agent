@@ -550,7 +550,8 @@ export function useChatCore({
   // Validate selected model before sending. If the frontend has an unknown model id
   // (for example from legacy favorites or stale cached chats), fall back to the
   // application default model to avoid server-side 'Model not found' errors.
-  let resolvedModel = getModelInfo(selectedModel) ? normalizeModelId(selectedModel) : MODEL_DEFAULT
+  const modelInfoResult = getModelInfo(selectedModel)
+  let resolvedModel = modelInfoResult ? normalizeModelId(selectedModel) : MODEL_DEFAULT
   // Auto-upgrade to multimodal model when user attaches files and current is text-only grok-4-fast
   if (resolvedModel === 'grok-4-fast') {
     const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)

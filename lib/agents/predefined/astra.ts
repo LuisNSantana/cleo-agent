@@ -12,7 +12,7 @@ export const ASTRA_AGENT: AgentConfig = {
   role: 'specialist',
   isSubAgent: true,
   parentAgentId: 'ami-creative',
-  model: 'gpt-4o-mini',
+  model: 'grok-4-1-fast-reasoning',
   temperature: 0.6,
   maxTokens: 16384,
   tools: [

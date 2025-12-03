@@ -6,6 +6,7 @@ import '@/lib/suppress-warnings'
 // Configuration and prompts
 import { SYSTEM_PROMPT_DEFAULT } from '@/lib/config'
 import { buildFinalSystemPrompt } from '@/lib/chat/prompt'
+import { getCleoPrompt, sanitizeModelName } from '@/lib/prompts'
 
 // Models and providers
 import { getAllModels, MODELS } from '@/lib/models'
@@ -500,6 +501,12 @@ export async function POST(req: Request) {
   ;(globalThis as any).__currentUserId = realUserId
   ;(globalThis as any).__currentModel = normalizedModel
   ;(globalThis as any).__currentLocale = userLocale
+
+  const supervisorOverrides = {
+    modelOverride: normalizedModel,
+    promptOverride: getCleoPrompt(sanitizeModelName(normalizedModel), 'default'),
+    toolsEnabled: modelConfig?.tools !== false
+  }
 
   // ✅ DEBUG: Verify thread ID is set before RAG calls
   console.log(`🧵 [ROUTE] effectiveThreadId before buildFinalSystemPrompt: ${effectiveThreadId || 'NULL (will use GLOBAL)'}`)
@@ -1073,8 +1080,9 @@ export async function POST(req: Request) {
           realUserId || undefined,
           prior,
           true,
-          lastUserParts
-        ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor'))
+          lastUserParts,
+          supervisorOverrides
+        ) || orchestrator.startAgentExecution?.(userText, 'cleo-supervisor', supervisorOverrides))
 
   const execId: string | undefined = exec?.id
         const startedAt = Date.now()

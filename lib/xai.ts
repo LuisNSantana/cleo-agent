@@ -15,7 +15,7 @@ function createXaiProvider(apiKeyOverride?: string) {
 
 /**
  * Get an xAI model instance for the given model ID
- * @param modelId Internal model ID ("grok-4", "grok-4-fast-reasoning", etc.)
+ * @param modelId Internal model ID ("grok-4", "grok-4-fast-reasoning", "grok-4-1-fast-reasoning", etc.)
  * @returns xAI model instance
  */
 export function getXAIModel(modelId: string, apiKeyOverride?: string) {
@@ -31,6 +31,8 @@ export function getXAIModel(modelId: string, apiKeyOverride?: string) {
       ? "grok-4-fast-reasoning"
       : modelId === "grok-4-fast-non-reasoning"
       ? "grok-4-fast-non-reasoning"
+      : modelId === "grok-4-1-fast-reasoning"
+      ? "grok-4-1-fast-reasoning"
       : modelId
 
   // Crear proveedor con override cuando sea necesario

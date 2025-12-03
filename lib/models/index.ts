@@ -2,11 +2,16 @@ import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "../config"
 import { normalizeModelId } from "@/lib/openproviders/provider-map"
 import { ModelConfig } from "./types"
 import { grokModels } from "./data/grok"
+import { openrouterModels } from "./data/openrouter"
+import { openaiModels } from "./data/openai.clean"
 
 /**
- * Simplified unified model list
- * We expose only two clear options in the UI:
- * - Grok 4 Fast (🚀): single model via OpenRouter. Reasoning is a runtime toggle, not a separate id.
+ * Unified model list with multiple tiers
+ * - Grok 4 Fast (🚀): fast reasoning model (xAI direct)
+ * - Grok 4.1 Fast Reasoning: latest with 2M context (xAI direct)
+ * - Qwen3-Next 80B: advanced instruction following (OpenRouter)
+ * - GLM 4.5 Air (free): free agent-centric model (OpenRouter)
+ * - Dolphin Mistral Venice (uncensored): minimal restrictions model (OpenRouter)
  *
  * Old tiers and legacy models (Claude, GPT‑5, Mistral, Gemini, etc.) are hidden
  * to avoid duplication and noise. Historical ids are normalized upstream.
@@ -28,9 +33,19 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
-// Final list: Faster (grok-4-fast) y Smarter (gpt-5)
+// Final list for USER-FACING model selector:
+// - Standard: Faster (grok-4-fast), Smarter (gpt-5.1-2025-11-13)
+// - Free: GLM 4.5 Air, Trinity Mini
+// - Uncensored: Dolphin Mistral Venice
+// NOTE: grok-4-1-fast-reasoning and qwen3 are for INTERNAL agent use only, not shown in selector
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-fast', 'gpt-5'])
+  ...pickById(grokModels, ['grok-4-fast']),
+  ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
+  ...pickById(openrouterModels, [
+    'openrouter:z-ai/glm-4.5-air:free',
+    'openrouter:arcee-ai/trinity-mini:free',
+    'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+  ])
 ]
 
 // Post-processing rules to prevent confusing duplicates in selector.
@@ -114,6 +129,7 @@ export async function getModelsForUserProviders(
   return flatProviderModels
 }
 
+
 // Synchronous function to get model info for simple lookups
 export function getModelInfo(modelId: string): ModelConfig | undefined {
   return STATIC_MODELS.find((model) => model.id === modelId)
@@ -126,3 +142,10 @@ export const MODELS: ModelConfig[] = STATIC_MODELS
 export function refreshModelsCache(): void {
   // No cache to refresh since we only use static models
 }
+
+// Re-export delegation support utilities
+export { 
+  doesModelSupportDelegation, 
+  doesCurrentModelSupportDelegation, 
+  getNonDelegationReason 
+} from './delegation-support'

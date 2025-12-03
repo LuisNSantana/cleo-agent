@@ -1,5 +1,48 @@
 import { DISABLED_MODEL_IDS, FREE_MODELS_IDS } from "@/lib/config"
-import { ModelConfig } from "@/lib/models/types"
+import { ModelConfig, ModelCategory } from "@/lib/models/types"
+
+/**
+ * Model groups for UI display
+ */
+export interface ModelGroup {
+  id: ModelCategory | "standard"
+  label: string
+  description?: string
+  warning?: string
+  models: ModelConfig[]
+}
+
+/**
+ * Group models by category for the model selector
+ * @param models - All available models
+ * @returns Array of model groups with labels and descriptions
+ */
+export function groupModelsByCategory(models: ModelConfig[]): ModelGroup[] {
+  const groups: ModelGroup[] = [
+    {
+      id: "standard",
+      label: "Standard",
+      description: "Production-ready models for general use",
+      models: models.filter(m => !m.category || m.category === "standard"),
+    },
+    {
+      id: "free",
+      label: "Free",
+      description: "Open source models with no usage costs",
+      models: models.filter(m => m.category === "free"),
+    },
+    {
+      id: "uncensored",
+      label: "Unrestricted",
+      description: "Models with minimal content filters",
+      warning: "⚠️ Responsible use only. You are fully accountable for all generated content. This platform assumes no liability for misuse.",
+      models: models.filter(m => m.category === "uncensored"),
+    },
+  ]
+
+  // Only return groups that have models
+  return groups.filter(g => g.models.length > 0)
+}
 
 /**
  * Utility function to filter and sort models based on favorites, search, and visibility

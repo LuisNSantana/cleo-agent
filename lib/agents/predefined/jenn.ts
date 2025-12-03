@@ -10,7 +10,7 @@ export const JENN_AGENT: AgentConfig = {
   name: 'Jenn',
   description: 'Multi-platform Community Manager & Social Media specialist. Manages Twitter/X, Instagram, Facebook, and Telegram with advanced content creation, publishing, analytics, scheduling, and audience engagement capabilities across all channels.',
   role: 'specialist',
-  model: 'openrouter:x-ai/grok-4-fast',
+  model: 'grok-4-1-fast-reasoning',
   temperature: 0.7,
   maxTokens: 32768,
   color: '#E879F9',

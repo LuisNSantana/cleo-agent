@@ -40,14 +40,14 @@ export const CLEO_AGENT: AgentConfig = {
   name: 'Ankie',
   description: 'Plataforma supervisora de inteligencia emocional y coordinación multi‑agente. Ankie orquesta agentes especializados con empatía profunda, precisión y foco en el impacto real en la vida del usuario.',
   role: 'supervisor',
-  model: 'grok-4-fast-reasoning',
+  model: 'grok-4-1-fast-reasoning',
   temperature: 0.5,
   maxTokens: 131072, // Grok-4 supports 131k output tokens
   // Tools will be dynamically updated at runtime
   tools: [...BASE_TOOLS, ...LEGACY_DELEGATION_TOOLS],
   tags: ['supervisor', 'empathy', 'coordination', 'emotional-intelligence', 'delegation', 'dynamic'],
   // Prompt will be dynamically enhanced with discovered agents
-  prompt: getCleoPrompt(sanitizeModelName('grok-4-fast-reasoning'), 'default'),
+  prompt: getCleoPrompt(sanitizeModelName('grok-4-1-fast-reasoning'), 'default'),
   color: '#FF6B6B',
   icon: '❤️',
   immutable: true,

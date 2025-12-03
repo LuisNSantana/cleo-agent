@@ -66,16 +66,17 @@ const openaiModels: ModelConfig[] = [
     apiSdk: (apiKey?: string) => openproviders("gpt-5-mini-2025-08-07", undefined, apiKey),
   },
   {
-    id: "gpt-5",
-    name: "GPT-5",
+    id: "gpt-5.1-2025-11-13",
+    name: "Smarter",
     provider: "OpenAI",
     providerId: "openai",
     modelFamily: "GPT-5",
     baseProviderId: "openai",
-    description: "OpenAI's most advanced model with superior reasoning, multimodal capabilities, and 50% discount currently applied.",
-    tags: ["premium", "multimodal", "reasoning", "vision", "tools", "advanced"],
+    description: "GPT-5.1: OpenAI's flagship model for coding and agentic tasks with configurable reasoning. 400K context, 128K max output.",
+    tags: ["premium", "multimodal", "reasoning", "vision", "tools", "advanced", "coding", "agentic"],
     contextWindow: 400000,
-    inputCost: 1.25, // $1.25 per 1M tokens (50% discount applied)
+    maxOutputTokens: 128000,
+    inputCost: 1.25, // $1.25 per 1M tokens
     outputCost: 10.0, // $10 per 1M tokens  
     priceUnit: "per 1M tokens",
     vision: true,
@@ -83,15 +84,20 @@ const openaiModels: ModelConfig[] = [
     audio: false,
     reasoning: true,
     openSource: false,
-    speed: "Medium",
+    speed: "Fast",
     intelligence: "High",
     website: "https://platform.openai.com",
-    apiDocs: "https://platform.openai.com/docs/models",
-    modelPage: "https://platform.openai.com/docs/models/gpt-5",
-    releasedAt: "2025-08-07",
-    icon: "openai",
-    dailyLimit: 12, // Limited to 12 uses per day per user
-    apiSdk: (apiKey?: string) => openproviders("gpt-5", undefined, apiKey),
+    apiDocs: "https://platform.openai.com/docs/models/gpt-5.1",
+    modelPage: "https://platform.openai.com/docs/models/gpt-5.1",
+    releasedAt: "2025-11-13",
+    icon: "smarter",
+    dailyLimit: 30, // Limited to 30 uses per day per user
+    defaults: {
+      temperature: 0.5,
+      topP: 0.95,
+      // maxTokens not set - let clampMaxOutputTokens handle it (128K max)
+    },
+    apiSdk: (apiKey?: string) => openproviders("gpt-5.1-2025-11-13", undefined, apiKey),
   },
   {
     id: "gpt-5-nano",

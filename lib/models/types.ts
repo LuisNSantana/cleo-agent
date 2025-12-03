@@ -1,5 +1,7 @@
 import { LanguageModel } from "ai"
 
+type ModelCategory = "standard" | "free" | "uncensored"
+
 type ModelConfig = {
   id: string // "gpt-4.1-nano" // same from AI SDKs
   name: string // "GPT-4.1 Nano"
@@ -10,6 +12,7 @@ type ModelConfig = {
 
   description?: string // Short 1–2 line summary
   tags?: string[] // ["fast", "cheap", "vision", "OSS"]
+  category?: ModelCategory // "standard" | "free" | "uncensored" for UI grouping
 
   contextWindow?: number // in tokens
   inputCost?: number // USD per 1M input tokens
@@ -22,6 +25,7 @@ type ModelConfig = {
   reasoning?: boolean
   webSearch?: boolean
   openSource?: boolean
+  uncensored?: boolean // Model with minimal content restrictions - use responsibly
 
   speed?: "Fast" | "Medium" | "Slow"
   intelligence?: "Low" | "Medium" | "High"
@@ -52,4 +56,4 @@ type ModelConfig = {
   dailyLimit?: number
 }
 
-export type { ModelConfig }
+export type { ModelConfig, ModelCategory }
