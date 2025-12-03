@@ -243,6 +243,7 @@ export function ChatInput({
 
   return (
     <div className="relative flex w-full flex-col gap-4">
+      {/* Suggestions temporarily hidden per user request
       {showPromptSystem && (
         <PromptSystem
           onValueChangeAction={onValueChangeAction}
@@ -251,6 +252,7 @@ export function ChatInput({
           value={deferredValue}
         />
       )}
+      */}
       <div
         className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1"
         onClick={() => textareaRef.current?.focus()}

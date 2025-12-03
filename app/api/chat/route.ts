@@ -627,8 +627,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Reasoning toggle for Grok 4 Fast via OpenRouter (provider-level option simulated here)
-    if (normalizedModel === 'grok-4-fast') {
+    // Reasoning toggle for Grok 4.1 Fast Reasoning via OpenRouter (provider-level option simulated here)
+    if (normalizedModel === 'grok-4-1-fast-reasoning' || normalizedModel === 'grok-4-fast-reasoning') {
       providerOptions = {
         ...(providerOptions || {}),
         xai: {

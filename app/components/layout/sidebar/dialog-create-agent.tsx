@@ -66,11 +66,11 @@ const CATEGORY_ICONS: Record<string, any> = {
 }
 
 // Restricted model list for Quick Agent Creator
-// Only allow: gpt-4o-mini, gpt-5, grok-4-fast, gemini-2.5-flash-lite (OpenRouter)
+// Only allow: gpt-4o-mini, gpt-5, grok-4-1-fast-reasoning, gemini-2.5-flash-lite (OpenRouter)
 const MODEL_OPTIONS = [
   'gpt-4o-mini',
   'gpt-5',
-  'grok-4-fast',
+  'grok-4-1-fast-reasoning',
   'google/gemini-2.5-flash-lite', // available via OpenRouter
 ]
 

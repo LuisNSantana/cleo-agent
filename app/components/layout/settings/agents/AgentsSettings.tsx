@@ -914,7 +914,7 @@ function MiniAgentCrud({ agents, onCreate, onDelete }: MiniAgentCrudProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [role, setRole] = useState<AgentConfig["role"]>("specialist")
-  const [model, setModel] = useState("grok-4-fast")
+  const [model, setModel] = useState("grok-4-1-fast-reasoning")
   const [selectedAgentId, setSelectedAgentId] = useState<string>("")
 
   useEffect(() => {

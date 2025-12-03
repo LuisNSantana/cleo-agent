@@ -552,13 +552,12 @@ export function useChatCore({
   // application default model to avoid server-side 'Model not found' errors.
   const modelInfoResult = getModelInfo(selectedModel)
   let resolvedModel = modelInfoResult ? normalizeModelId(selectedModel) : MODEL_DEFAULT
-  // Auto-upgrade to multimodal model when user attaches files and current is text-only grok-4-fast
-  if (resolvedModel === 'grok-4-fast') {
-    const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)
-    if (hasAttachments) {
-      // Use canonical ID directly to avoid later normalization issues
-      resolvedModel = 'grok-4-fast-reasoning'
-    }
+  // Auto-upgrade to Nova 2 Lite when user attaches multimedia files (images, videos, documents)
+  // Nova 2 Lite is free and has 1M context + video/doc support
+  const hasAttachments = messages.some(m => Array.isArray((m as any).experimental_attachments) && (m as any).experimental_attachments.length > 0)
+  if (hasAttachments) {
+    // Use Nova 2 Lite for multimedia processing (free, 1M context, video/doc support)
+    resolvedModel = 'openrouter:amazon/nova-2-lite-v1:free'
   }
   if (resolvedModel !== selectedModel) {
     console.warn(`[ChatAPI] Invalid model requested: ${selectedModel}. Falling back to ${resolvedModel}`)
