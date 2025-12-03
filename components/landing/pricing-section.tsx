@@ -14,7 +14,7 @@ const tiers = [
     description: "Perfecto para empezar",
     features: [
       "1,000 créditos mensuales (Beta)",
-      "Chat básico con Kylio",
+      "Chat básico con Ankie",
       "3 agentes predefinidos",
       "Historial 7 días"
     ],
@@ -56,9 +56,10 @@ const tiers = [
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="relative py-24 md:py-32 overflow-hidden">
+    <section id="pricing" className="relative py-24 md:py-32 overflow-hidden bg-background">
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/20 to-background" />
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background pointer-events-none" />
       
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -114,14 +115,14 @@ export function PricingSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.1 + index * 0.1 }}
             >
-              <Card className={`relative h-full flex flex-col ${
+              <Card className={`relative h-full flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
                 tier.popular 
-                  ? "border-primary shadow-lg shadow-primary/20 scale-105" 
-                  : ""
-              }`}>
+                  ? "border-brand-violet/50 bg-card/80 shadow-xl shadow-brand-violet/10 scale-105 ring-1 ring-brand-violet/20" 
+                  : "border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-lg hover:border-border"
+              } backdrop-blur-xl`}>
                 {tier.popular && (
                   <Badge 
-                    className="absolute -top-3 left-1/2 -translate-x-1/2"
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-brand-cyan to-brand-violet border-0"
                     variant="default"
                   >
                     Más Popular
@@ -157,7 +158,7 @@ export function PricingSection() {
                   <Button
                     asChild
                     variant={tier.popular ? "default" : "outline"}
-                    className="w-full group"
+                    className={`w-full group ${tier.popular ? 'bg-gradient-to-r from-brand-cyan to-brand-violet hover:opacity-90 border-0' : ''}`}
                   >
                     <Link href={tier.href} className="flex items-center justify-center gap-2">
                       {tier.cta}

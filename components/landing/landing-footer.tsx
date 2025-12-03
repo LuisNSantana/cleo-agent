@@ -9,7 +9,7 @@ export function LandingFooter() {
   const copy = useLandingCopy(locale)
 
   return (
-  <footer className="border-t border-border/40 bg-brand-ink px-4 py-16 text-foreground sm:px-8 lg:px-12">
+  <footer className="border-t border-border/40 bg-muted/20 px-4 py-16 text-foreground sm:px-8 lg:px-12">
       <div className="mx-auto max-w-[1600px]">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -40,7 +40,7 @@ export function LandingFooter() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-sm font-semibold text-white">{copy.footer.product}</h3>
+            <h3 className="mb-4 text-sm font-semibold text-foreground">{copy.footer.product}</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a href="#features" className="transition-colors hover:text-foreground">
@@ -61,7 +61,7 @@ export function LandingFooter() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-sm font-semibold text-white">{copy.footer.company}</h3>
+            <h3 className="mb-4 text-sm font-semibold text-foreground">{copy.footer.company}</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a href="/privacy" className="transition-colors hover:text-foreground">
@@ -82,7 +82,7 @@ export function LandingFooter() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-sm font-semibold text-white">{copy.footer.connect}</h3>
+            <h3 className="mb-4 text-sm font-semibold text-foreground">{copy.footer.connect}</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a
@@ -118,7 +118,7 @@ export function LandingFooter() {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-white/10 pt-8">
+        <div className="mt-12 border-t border-border/40 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row">
             <p>© {new Date().getFullYear()} Ankie AI. {copy.footer.rights}</p>
             <p className="flex items-center gap-1">
@@ -127,7 +127,7 @@ export function LandingFooter() {
                 href="https://huminarylabs.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold text-white transition-colors hover:text-brand-cyan"
+                className="font-semibold text-foreground transition-colors hover:text-brand-cyan"
               >
                 {copy.footer.huminary}
               </a>

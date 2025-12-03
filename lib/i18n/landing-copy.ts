@@ -1,6 +1,6 @@
 import { Locale } from "./translations"
 
-type AgentId = "Kylio" | "Emma" | "Toby" | "Nora" | "Apu" | "Astra"
+type AgentId = "Ankie" | "Emma" | "Toby" | "Nora" | "Apu" | "Astra"
 
 type FeatureCard = {
   title: string
@@ -64,7 +64,7 @@ export type LandingCopy = {
     onboardingTitle: string
     onboardingActive: string
     onboardingTasks: {
-      Kylio: string
+      Ankie: string
       Emma: string
       Toby: string
     }
@@ -169,7 +169,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Ankie AI Agent Studio",
       onboardingActive: "Live",
       onboardingTasks: {
-        Kylio: "Orchestrating your automation roadmap",
+        Ankie: "Orchestrating your automation roadmap",
         Emma: "Personalizing the go-to-market narrative",
         Toby: "Reviewing your latest merge queue",
       },
@@ -265,7 +265,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       featuredBadge: "⭐ Lead orchestrator",
       featuredDescription: "Ankie AI delegates to specialists, safeguards your voice, and keeps every decision reviewable.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "Your AI Orchestrator",
           skills: ["Multi-agent coordination", "Task delegation", "Workflow automation", "Smart routing"],
         },
@@ -430,7 +430,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Onboarding de tu equipo IA",
       onboardingActive: "Activo",
       onboardingTasks: {
-        Kylio: "Coordinando tu equipo de agentes",
+        Ankie: "Coordinando tu equipo de agentes",
         Emma: "Personalizando tu estrategia de marketing",
         Toby: "Revisando tu base de código",
       },
@@ -483,7 +483,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "Míralo en acción",
       title: "Observa a tu equipo IA trabajar",
-      subtitle: "Escenarios en vivo que muestran cómo los agentes de Kylio resuelven flujos complejos sin supervisión.",
+      subtitle: "Escenarios en vivo que muestran cómo los agentes de Ankie resuelven flujos complejos sin supervisión.",
       currentTask: "Tarea actual",
       scenarios: [
         {
@@ -524,9 +524,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "Agentes IA",
       featuredBadge: "⭐ Orquestadora principal",
-      featuredDescription: "Kylio coordina a cada especialista, delega con criterio y te mantiene al mando.",
+      featuredDescription: "Ankie coordina a cada especialista, delega con criterio y te mantiene al mando.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "Tu orquestadora de IA",
           skills: ["Coordinación multiagente", "Delegación de tareas", "Automatización de flujos", "Enrutamiento inteligente"],
         },
@@ -577,7 +577,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "Responde más rápido con información precisa y cercana.",
         },
       ],
-      useCasesBadge: "Donde Kylio brilla",
+      useCasesBadge: "Donde Ankie brilla",
       useCases: [
         {
           title: "Marketing de contenidos",
@@ -675,7 +675,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Benefícios",
   docs: "Biblioteca de Prompts",
       signIn: "Entrar",
-      getStarted: "Experimente a Kylio grátis →",
+      getStarted: "Experimente a Ankie grátis →",
       searchPlaceholder: "Busque recursos, agentes, seções…",
     },
     hero: {
@@ -691,7 +691,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Onboarding da sua equipe de IA",
       onboardingActive: "Ativo",
       onboardingTasks: {
-        Kylio: "Coordenando sua equipe de agentes",
+        Ankie: "Coordenando sua equipe de agentes",
         Emma: "Personalizando sua estratégia de marketing",
         Toby: "Revisando sua base de código",
       },
@@ -744,7 +744,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "Veja na prática",
       title: "Observe sua equipe de IA trabalhando",
-      subtitle: "Cenários reais mostrando como os agentes da Kylio resolvem fluxos complexos sem supervisão.",
+      subtitle: "Cenários reais mostrando como os agentes da Ankie resolvem fluxos complexos sem supervisão.",
       currentTask: "Tarefa atual",
       scenarios: [
         {
@@ -785,9 +785,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "Agentes de IA",
       featuredBadge: "⭐ Orquestradora principal",
-      featuredDescription: "Kylio coordena cada especialista, delega com inteligência e mantém você no controle.",
+      featuredDescription: "Ankie coordena cada especialista, delega com inteligência e mantém você no controle.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "Sua orquestradora de IA",
           skills: ["Coordenação multiagente", "Delegação de tarefas", "Automação de fluxos", "Roteamento inteligente"],
         },
@@ -838,7 +838,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "Responda mais rápido com informações precisas e empáticas.",
         },
       ],
-      useCasesBadge: "Onde a Kylio brilha",
+      useCasesBadge: "Onde a Ankie brilha",
       useCases: [
         {
           title: "Marketing de conteúdo",
@@ -936,7 +936,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Avantages",
   docs: "Promptothèque",
       signIn: "Connexion",
-      getStarted: "Essayez Kylio gratuitement →",
+      getStarted: "Essayez Ankie gratuitement →",
       searchPlaceholder: "Recherchez fonctionnalités, agents, sections…",
     },
     hero: {
@@ -952,7 +952,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Onboarding de votre équipe IA",
       onboardingActive: "Actif",
       onboardingTasks: {
-        Kylio: "Coordonne votre équipe d'agents",
+        Ankie: "Coordonne votre équipe d'agents",
         Emma: "Personnalise votre stratégie marketing",
         Toby: "Passe en revue votre code",
       },
@@ -1005,7 +1005,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "Voyez-le en action",
       title: "Regardez votre équipe IA travailler",
-      subtitle: "Des scénarios réels montrant comment les agents Kylio gèrent des flux complexes sans assistance.",
+      subtitle: "Des scénarios réels montrant comment les agents Ankie gèrent des flux complexes sans assistance.",
       currentTask: "Tâche en cours",
       scenarios: [
         {
@@ -1046,9 +1046,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "Agents IA",
       featuredBadge: "⭐ Orchestratrice principale",
-      featuredDescription: "Kylio coordonne chaque spécialiste, délègue intelligemment et garde le contrôle entre vos mains.",
+      featuredDescription: "Ankie coordonne chaque spécialiste, délègue intelligemment et garde le contrôle entre vos mains.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "Votre orchestratrice IA",
           skills: ["Coordination multi-agents", "Délégation des tâches", "Automatisation des flux", "Routage intelligent"],
         },
@@ -1099,7 +1099,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "Répondez plus vite avec des informations fiables et humaines.",
         },
       ],
-      useCasesBadge: "Là où Kylio excelle",
+      useCasesBadge: "Là où Ankie excelle",
       useCases: [
         {
           title: "Marketing de contenu",
@@ -1197,7 +1197,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Vantaggi",
   docs: "Libreria di Prompt",
       signIn: "Accedi",
-      getStarted: "Prova Kylio gratis →",
+      getStarted: "Prova Ankie gratis →",
       searchPlaceholder: "Cerca funzionalità, agenti, sezioni…",
     },
     hero: {
@@ -1213,7 +1213,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Onboarding del tuo team IA",
       onboardingActive: "Attivo",
       onboardingTasks: {
-        Kylio: "Coordina il tuo team di agenti",
+        Ankie: "Coordina il tuo team di agenti",
         Emma: "Personalizza la strategia marketing",
         Toby: "Rivede il tuo codice",
       },
@@ -1266,7 +1266,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "Guardala in azione",
       title: "Guarda lavorare il tuo team IA",
-      subtitle: "Scenari reali che mostrano come gli agenti Kylio gestiscono flussi complessi senza supervisione.",
+      subtitle: "Scenari reali che mostrano come gli agenti Ankie gestiscono flussi complessi senza supervisione.",
       currentTask: "Attività corrente",
       scenarios: [
         {
@@ -1307,9 +1307,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "Agenti IA",
       featuredBadge: "⭐ Orchestratrice principale",
-      featuredDescription: "Kylio coordina ogni specialista, delega con intelligenza e ti lascia il controllo.",
+      featuredDescription: "Ankie coordina ogni specialista, delega con intelligenza e ti lascia il controllo.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "La tua orchestratrice IA",
           skills: ["Coordinamento multi-agente", "Delegazione delle attività", "Automazione dei flussi", "Instradamento intelligente"],
         },
@@ -1360,7 +1360,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "Rispondi più velocemente con informazioni precise e umane.",
         },
       ],
-      useCasesBadge: "Dove Kylio eccelle",
+      useCasesBadge: "Dove Ankie eccelle",
       useCases: [
         {
           title: "Content marketing",
@@ -1458,7 +1458,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "Vorteile",
   docs: "Prompt-Bibliothek",
       signIn: "Anmelden",
-      getStarted: "Teste Kylio gratis →",
+      getStarted: "Teste Ankie gratis →",
       searchPlaceholder: "Suche nach Funktionen, Agenten, Bereichen…",
     },
     hero: {
@@ -1474,7 +1474,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "Onboarding deines KI-Teams",
       onboardingActive: "Aktiv",
       onboardingTasks: {
-        Kylio: "Koordiniert dein Agententeam",
+        Ankie: "Koordiniert dein Agententeam",
         Emma: "Personalisiert deine Marketingstrategie",
         Toby: "Überprüft deinen Code",
       },
@@ -1527,7 +1527,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "So funktioniert es",
       title: "Sieh deinem KI-Team bei der Arbeit zu",
-      subtitle: "Live-Szenarien, wie Kylio-Agenten komplexe Workflows ohne Hilfe meistern.",
+      subtitle: "Live-Szenarien, wie Ankie-Agenten komplexe Workflows ohne Hilfe meistern.",
       currentTask: "Aktuelle Aufgabe",
       scenarios: [
         {
@@ -1568,9 +1568,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "KI-Agenten",
       featuredBadge: "⭐ Leitende Orchestratorin",
-      featuredDescription: "Kylio koordiniert alle Spezialisten, delegiert intelligent und hält dich am Steuerrad.",
+      featuredDescription: "Ankie koordiniert alle Spezialisten, delegiert intelligent und hält dich am Steuerrad.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "Deine KI-Orchestratorin",
           skills: ["Multi-Agenten-Koordination", "Aufgaben-Delegation", "Workflow-Automatisierung", "Smart Routing"],
         },
@@ -1621,7 +1621,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "Schnellere Antworten mit präzisen, freundlichen Ergebnissen.",
         },
       ],
-      useCasesBadge: "Wo Kylio glänzt",
+      useCasesBadge: "Wo Ankie glänzt",
       useCases: [
         {
           title: "Content Marketing",
@@ -1719,7 +1719,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "メリット",
   docs: "プロンプトライブラリ",
       signIn: "ログイン",
-      getStarted: "Kylio を無料で試す →",
+      getStarted: "Ankie を無料で試す →",
       searchPlaceholder: "機能・エージェント・セクションを検索…",
     },
     hero: {
@@ -1735,7 +1735,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "AIチームのオンボーディング",
       onboardingActive: "稼働中",
       onboardingTasks: {
-        Kylio: "AIチームをコーディネート",
+        Ankie: "AIチームをコーディネート",
         Emma: "マーケ戦略をパーソナライズ",
         Toby: "コードベースをレビュー",
       },
@@ -1788,7 +1788,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "実際の動作",
       title: "AIチームの働きをチェック",
-      subtitle: "Kylioエージェントが複雑なワークフローを自律的に処理するライブシナリオ。",
+      subtitle: "Ankieエージェントが複雑なワークフローを自律的に処理するライブシナリオ。",
       currentTask: "現在のタスク",
       scenarios: [
         {
@@ -1829,9 +1829,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "AIエージェント",
       featuredBadge: "⭐ メインオーケストレーター",
-      featuredDescription: "Kylioは専門家をまとめ、賢く委任し、あなたにコントロールを残します。",
+      featuredDescription: "Ankieは専門家をまとめ、賢く委任し、あなたにコントロールを残します。",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "AIオーケストレーター",
           skills: ["マルチエージェント連携", "タスクの委任", "ワークフロー自動化", "スマートルーティング"],
         },
@@ -1882,7 +1882,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "正確で温かい応答をこれまでより速く。",
         },
       ],
-      useCasesBadge: "Kylioが輝く領域",
+      useCasesBadge: "Ankieが輝く領域",
       useCases: [
         {
           title: "コンテンツマーケティング",
@@ -1980,7 +1980,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "혜택",
   docs: "프롬프트 라이브러리",
       signIn: "로그인",
-      getStarted: "Kylio 무료 체험 →",
+      getStarted: "Ankie 무료 체험 →",
       searchPlaceholder: "기능·에이전트·섹션 검색…",
     },
     hero: {
@@ -1996,7 +1996,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "AI 팀 온보딩",
       onboardingActive: "활성",
       onboardingTasks: {
-        Kylio: "AI 팀 전체 조율",
+        Ankie: "AI 팀 전체 조율",
         Emma: "마케팅 전략 개인화",
         Toby: "코드베이스 리뷰",
       },
@@ -2049,7 +2049,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "실제 동작",
       title: "AI 팀이 일하는 모습",
-      subtitle: "Kylio 에이전트가 복잡한 워크플로를 스스로 처리하는 라이브 시나리오.",
+      subtitle: "Ankie 에이전트가 복잡한 워크플로를 스스로 처리하는 라이브 시나리오.",
       currentTask: "현재 작업",
       scenarios: [
         {
@@ -2090,9 +2090,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "AI 에이전트",
       featuredBadge: "⭐ 메인 오케스트레이터",
-      featuredDescription: "Kylio는 전문가들을 조율하고 현명하게 위임하며 당신이 주도권을 잡도록 돕습니다.",
+      featuredDescription: "Ankie는 전문가들을 조율하고 현명하게 위임하며 당신이 주도권을 잡도록 돕습니다.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "AI 오케스트레이터",
           skills: ["멀티 에이전트 조율", "업무 위임", "워크플로 자동화", "스마트 라우팅"],
         },
@@ -2143,7 +2143,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "정확하고 따뜻한 응답을 누구보다 빠르게.",
         },
       ],
-      useCasesBadge: "Kylio가 빛나는 순간",
+      useCasesBadge: "Ankie가 빛나는 순간",
       useCases: [
         {
           title: "콘텐츠 마케팅",
@@ -2241,7 +2241,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "优势",
   docs: "提示模板库",
       signIn: "登录",
-      getStarted: "免费体验 Kylio →",
+      getStarted: "免费体验 Ankie →",
       searchPlaceholder: "搜索功能、智能体、章节…",
     },
     hero: {
@@ -2257,7 +2257,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "AI 团队入职",
       onboardingActive: "运行中",
       onboardingTasks: {
-        Kylio: "协调你的智能体团队",
+        Ankie: "协调你的智能体团队",
         Emma: "个性化营销策略",
         Toby: "审查代码库",
       },
@@ -2310,7 +2310,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "实际演示",
       title: "看看 AI 团队如何工作",
-      subtitle: "现场场景展示 Kylio 智能体如何独立完成复杂流程。",
+      subtitle: "现场场景展示 Ankie 智能体如何独立完成复杂流程。",
       currentTask: "当前任务",
       scenarios: [
         {
@@ -2351,9 +2351,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "AI 智能体",
       featuredBadge: "⭐ 主控协作者",
-      featuredDescription: "Kylio 统筹每位专家，智能分配任务，同时由你掌控全局。",
+      featuredDescription: "Ankie 统筹每位专家，智能分配任务，同时由你掌控全局。",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "你的 AI 指挥官",
           skills: ["多智能体协同", "任务委派", "流程自动化", "智能路由"],
         },
@@ -2404,7 +2404,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "更快地提供准确、友好的回复。",
         },
       ],
-      useCasesBadge: "Kylio 的闪光场景",
+      useCasesBadge: "Ankie 的闪光场景",
       useCases: [
         {
           title: "内容营销",
@@ -2502,7 +2502,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       benefits: "الفوائد",
   docs: "مكتبة البرومبتات",
       signIn: "تسجيل الدخول",
-      getStarted: "جرّب Kylio مجانًا ←",
+      getStarted: "جرّب Ankie مجانًا ←",
       searchPlaceholder: "ابحث عن مزايا أو وكلاء أو أقسام…",
     },
     hero: {
@@ -2518,7 +2518,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
       onboardingTitle: "تهيئة فريق الذكاء الاصطناعي",
       onboardingActive: "نشط",
       onboardingTasks: {
-        Kylio: "تنظم فريق الوكلاء",
+        Ankie: "تنظم فريق الوكلاء",
         Emma: "تخصص استراتيجية التسويق",
         Toby: "تراجع الشفرة البرمجية",
       },
@@ -2571,7 +2571,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
     useCaseDemo: {
       badge: "كيف تعمل فعليًا",
       title: "راقب فريقك الذكي أثناء العمل",
-      subtitle: "سيناريوهات مباشرة تُظهر كيف تنجز وكلاء Kylio المهام المعقدة دون إشراف.",
+      subtitle: "سيناريوهات مباشرة تُظهر كيف تنجز وكلاء Ankie المهام المعقدة دون إشراف.",
       currentTask: "المهمة الحالية",
       scenarios: [
         {
@@ -2612,9 +2612,9 @@ const landingCopy: Record<Locale, LandingCopy> = {
     agents: {
       badge: "وكلاء الذكاء الاصطناعي",
       featuredBadge: "⭐ المنسقة الرئيسية",
-      featuredDescription: "تُنسّق Kylio جميع المتخصصين، وتفوّض بذكاء، وتحافظ على مركز القيادة لديك.",
+      featuredDescription: "تُنسّق Ankie جميع المتخصصين، وتفوّض بذكاء، وتحافظ على مركز القيادة لديك.",
       cards: {
-        Kylio: {
+        Ankie: {
           role: "قائدتك الذكية",
           skills: ["تنسيق متعدد الوكلاء", "تفويض المهام", "أتمتة سير العمل", "توجيه ذكي"],
         },
@@ -2665,7 +2665,7 @@ const landingCopy: Record<Locale, LandingCopy> = {
           description: "استجب أسرع بإجابات دقيقة ودافئة.",
         },
       ],
-      useCasesBadge: "أين تتألق Kylio",
+      useCasesBadge: "أين تتألق Ankie",
       useCases: [
         {
           title: "تسويق المحتوى",
@@ -2762,8 +2762,8 @@ const BRAND_SHORT = "Ankie"
 function normalizeBrandTokens<T>(value: T): T {
   if (typeof value === "string") {
     return value
-      .replace(/Kylio AI/g, BRAND_NAME)
-      .replace(/Kylio/g, BRAND_SHORT)
+      .replace(/Ankie AI/g, BRAND_NAME)
+      .replace(/Ankie/g, BRAND_SHORT)
       .replace(/CLEO/g, BRAND_SHORT.toUpperCase()) as T
   }
 

@@ -46,8 +46,10 @@ export function BenefitsSection() {
       data-landing-search
       data-landing-search-title="Benefits"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-gradient-to-b from-background via-white/60 to-background dark:via-[#07070a]/70 py-24 sm:py-36"
+      className="relative w-full overflow-hidden bg-background py-24 sm:py-36"
     >
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
         <motion.div
           className="mb-24"
@@ -86,7 +88,7 @@ export function BenefitsSection() {
             {stats.map((benefit, index) => (
               <motion.div
                 key={benefit.title}
-                className="group relative overflow-hidden rounded-[28px] border border-white/50 bg-white/90 p-8 shadow-[0_20px_60px_rgba(4,14,39,0.08)] backdrop-blur-2xl transition-all hover:-translate-y-2 hover:border-brand-cyan/40 hover:shadow-[0_25px_80px_rgba(16,24,56,0.18)] dark:border-white/10 dark:bg-white/5 dark:shadow-brand-cyan/10"
+                className="group relative overflow-hidden rounded-[2rem] border border-border/60 bg-slate-50/50 p-8 shadow-sm transition-all hover:-translate-y-1 hover:border-brand-cyan/30 hover:shadow-lg dark:bg-card dark:shadow-none"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -96,7 +98,7 @@ export function BenefitsSection() {
                 <div className={`absolute inset-0 rounded-[28px] bg-gradient-to-br ${benefit.color} opacity-0 transition duration-500 group-hover:opacity-10`} />
                 <div className="relative z-10">
                   <motion.div
-                    className={`mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${benefit.color} p-3 shadow-xl ring-4 ring-white/60 dark:ring-white/10`}
+                    className={`mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${benefit.color} p-3 shadow-md ring-4 ring-background`}
                     whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }}
                     transition={{ duration: 0.5 }}
                   >
@@ -148,7 +150,7 @@ export function BenefitsSection() {
             {useCases.map((useCase, index) => (
               <motion.div
                 key={useCase.title}
-                className="group relative overflow-hidden rounded-2xl border border-white/40 bg-white/90 p-8 shadow-[0_15px_50px_rgba(4,14,39,0.08)] backdrop-blur-xl transition-all hover:-translate-y-2 hover:border-brand-cyan/40 hover:shadow-[0_25px_70px_rgba(8,20,45,0.16)] dark:border-white/10 dark:bg-white/5"
+                className="group relative overflow-hidden rounded-2xl border border-border/60 bg-slate-50/50 p-8 shadow-sm transition-all hover:-translate-y-1 hover:border-brand-cyan/30 hover:shadow-lg dark:bg-card"
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -159,7 +161,7 @@ export function BenefitsSection() {
                 <div className="relative">
                   <div className="mb-6 flex items-center gap-4">
                     <motion.div whileHover={{ scale: 1.15, rotate: [0, -5, 5, 0] }} transition={{ duration: 0.4 }}>
-                      <Avatar className="h-14 w-14 border-2 border-white/80 shadow-xl ring-2 ring-brand-cyan/20 transition-all duration-300 group-hover:ring-brand-violet/40 dark:border-white/10">
+                      <Avatar className="h-14 w-14 border-2 border-background shadow-md ring-2 ring-brand-cyan/20 transition-all duration-300 group-hover:ring-brand-violet/40">
                         <AvatarImage src={useCase.agent.avatar} alt={useCase.agent.name} className="object-cover" loading="lazy" />
                         <AvatarFallback className="bg-gradient-to-br from-brand-cyan to-brand-violet text-base font-semibold text-white">
                           {useCase.agent.name.substring(0, 2).toUpperCase()}

@@ -111,7 +111,7 @@ export function AgentsSection() {
       data-landing-search
       data-landing-search-title="Agents"
       data-landing-search-type="section"
-  className="relative w-full overflow-hidden bg-gradient-to-b from-white via-[#E6F0FF] to-white py-20 text-foreground dark:from-[#060812] dark:via-[#0B0F1D] dark:to-[#05070D] sm:py-32"
+  className="relative w-full overflow-hidden bg-gradient-to-b from-white via-[#E6F0FF] to-white py-16 text-foreground dark:from-[#060812] dark:via-[#0B0F1D] dark:to-[#05070D] sm:py-32"
     >
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
         <motion.div
@@ -133,7 +133,7 @@ export function AgentsSection() {
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             {t.landing.agentsTitle}
           </h2>
-          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">{t.landing.agentsSubtitle}</p>
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground px-4">{t.landing.agentsSubtitle}</p>
         </motion.div>
 
         <motion.div

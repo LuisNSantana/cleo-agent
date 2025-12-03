@@ -78,136 +78,126 @@
 
 :root {
   /* ================================================================
-     ANKIE — Core palette (light mode)
+     ANKIE — Core palette (Light Mode - Slate Foundation)
+     Clean, crisp, professional.
   ================================================================= */
-  --color-bg: #f5faff;
-  --color-surface: #ffffff;
-  --color-surface-subtle: #e7f0ff;
-  --color-primary: #00b2ff; /* Azul cian vivo */
-  --color-secondary: #6f00ff; /* Violeta eléctrico */
-  --color-accent-strong: #ff1ec8; /* Magenta de detalles */
-  --color-text: #000000; /* Pure black for maximum contrast */
-  /* Much darker gray for muted text */
-  --color-text-muted: #374151;
-  --color-success: #16a34a; /* Darker green */
-  --color-warning: #d97706; /* Darker yellow/orange */
-  --color-danger: #dc2626; /* Darker red */
-
-  --background: #ffffff; /* Pure white background */
-  --foreground: #000000;
+  --color-bg: #ffffff;
+  --color-surface: #f8fafc; /* Slate-50 */
+  --color-surface-subtle: #f1f5f9; /* Slate-100 */
+  
+  --color-primary: #00B2FF; /* Brand Cyan */
+  --color-secondary: #6F00FF; /* Brand Violet */
+  --color-accent-strong: #FF1EC8; /* Brand Magenta */
+  
+  --color-text: #0f172a; /* Slate-900 */
+  --color-text-muted: #475569; /* Slate-600 */
+  
+  --background: #ffffff;
+  --foreground: #0f172a; /* Slate-900 */
 
   --card: #ffffff;
-  --card-foreground: #000000;
+  --card-foreground: #0f172a;
+  
   --popover: #ffffff;
-  --popover-foreground: #000000;
+  --popover-foreground: #0f172a;
+  
   --primary: #00B2FF;
-  --primary-foreground: #010409;
+  --primary-foreground: #ffffff;
+  
   --secondary: #6F00FF;
-  --secondary-foreground: #FFFFFF;
-  --muted: #F3F4F6; /* Gray-100 */
-  /* Darker muted foreground */
-  --muted-foreground: #4B5563; /* Gray-600 */
-  --accent: #F3F4F6;
-  --accent-foreground: #00B2FF;
-
-  --destructive: #ff4d5a;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #f1f5f9; /* Slate-100 */
+  --muted-foreground: #64748b; /* Slate-500 */
+  
+  --accent: #f8fafc; /* Slate-50 */
+  --accent-foreground: #0f172a;
+  
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  /* Softened borders for cleaner look */
-  --border: #e5e9f2;
-  --input: #ffffff;
-  /* Removed harsh blue ring, made it softer */
+  --border: #e2e8f0; /* Slate-200 */
+  --input: #e2e8f0; /* Slate-200 for visible borders */
   --ring: rgba(0, 178, 255, 0.2);
 
-  --chart-1: #00b2ff;
-  --chart-2: #6f00ff;
-  --chart-3: #ff1ec8;
-  --chart-4: #30d158;
-  --chart-5: #ffc857;
+  --radius: 1rem; /* Slightly tighter radius for modern feel */
 
-  --radius: 1.25rem;
-
-  --sidebar: #f5faff;
-  --sidebar-foreground: #0b0b0f;
-  --sidebar-primary: #00b2ff;
-  --sidebar-primary-foreground: #010409;
-  --sidebar-accent: #e7f0ff;
-  --sidebar-accent-foreground: #4b4f6b;
-  /* Softened sidebar border */
-  --sidebar-border: #e5e9f2;
-  --sidebar-ring: rgba(111, 0, 255, 0.2);
-}
-
-/* Typography utilities */
-.leading-tight {
-  line-height: 1.15;
-}
-.tracking-wide-caps {
-  letter-spacing: 0.06em;
-}
-
-body {
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  --sidebar: #f8fafc; /* Slate-50 */
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #00B2FF;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e2e8f0; /* Slate-200 */
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: rgba(0, 178, 255, 0.2);
+  
+  /* Chart Colors */
+  --chart-1: #00B2FF;
+  --chart-2: #6F00FF;
+  --chart-3: #FF1EC8;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
 }
 
 .dark {
   /* ================================================================
-     ANKIE — Dark mode palette
+     ANKIE — Dark Mode Palette (Zinc Foundation)
+     Deep, immersive, premium.
   ================================================================= */
-  --color-bg: #0b0b0f;
-  --color-surface: #1e1e28;
-  --color-surface-subtle: #2b2b3a;
-  --color-primary: #00b2ff;
-  --color-secondary: #6f00ff;
-  --color-accent-strong: #ff1ec8;
-  --color-text: #f5faff;
-  --color-text-muted: #b1b7d9;
-  --color-success: #33f896;
-  --color-warning: #ffc857;
-  --color-danger: #ff6a7d;
+  --color-bg: #09090b; /* Zinc-950 */
+  --color-surface: #18181b; /* Zinc-900 */
+  --color-surface-subtle: #27272a; /* Zinc-800 */
+  
+  --color-primary: #00B2FF;
+  --color-secondary: #6F00FF;
+  --color-accent-strong: #FF1EC8;
+  
+  --color-text: #fafafa; /* Zinc-50 */
+  --color-text-muted: #a1a1aa; /* Zinc-400 */
+  
+  --background: #09090b; /* Zinc-950 */
+  --foreground: #fafafa; /* Zinc-50 */
 
-  --background: #0b0b0f;
-  --foreground: #f5faff;
+  --card: #18181b; /* Zinc-900 */
+  --card-foreground: #fafafa;
+  
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
 
-  --card: #1e1e28;
-  --card-foreground: #f5faff;
-  --popover: #1e1e28;
-  --popover-foreground: #f5faff;
+  --primary: #00B2FF;
+  --primary-foreground: #ffffff;
 
-  --primary: #00b2ff;
-  --primary-foreground: #04121a;
+  --secondary: #6F00FF;
+  --secondary-foreground: #ffffff;
 
-  --secondary: #6f00ff;
-  --secondary-foreground: #f9f5ff;
+  --muted: #27272a; /* Zinc-800 */
+  --muted-foreground: #a1a1aa; /* Zinc-400 */
 
-  --muted: #15151c;
-  --muted-foreground: #9aa0bf;
+  --accent: #27272a; /* Zinc-800 */
+  --accent-foreground: #fafafa;
 
-  --accent: #ff1ec8;
-  --accent-foreground: #1a001d;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
 
-  --destructive: #ff6a7d;
-  --destructive-foreground: #140006;
+  --border: #27272a; /* Zinc-800 */
+  --input: #27272a;
+  --ring: rgba(0, 178, 255, 0.4);
 
-  --border: #2e2e3c;
-  --input: #1e1e28;
-  --ring: #6f00ff;
-
-  --chart-1: #00b2ff;
-  --chart-2: #6f00ff;
-  --chart-3: #ff1ec8;
-  --chart-4: #33f896;
-  --chart-5: #ffc857;
-
-  --sidebar: #0b0b0f;
-  --sidebar-foreground: #f5faff;
-  --sidebar-primary: #00b2ff;
-  --sidebar-primary-foreground: #04121a;
-  --sidebar-accent: #1e1e28;
-  --sidebar-accent-foreground: #b1b7d9;
-  --sidebar-border: #2e2e3c;
-  --sidebar-ring: #6f00ff;
+  --sidebar: #09090b; /* Zinc-950 */
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #00B2FF;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #27272a; /* Zinc-800 */
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: rgba(0, 178, 255, 0.4);
+  
+  /* Chart Colors */
+  --chart-1: #00B2FF;
+  --chart-2: #6F00FF;
+  --chart-3: #FF1EC8;
+  --chart-4: #34d399;
+  --chart-5: #fbbf24;
 }
 /* === UTILITY CLASSES KYLIO === */
 

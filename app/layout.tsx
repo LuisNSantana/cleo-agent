@@ -162,7 +162,7 @@ export default async function RootLayout({
   <link rel="apple-touch-icon" href="/img/apple-icon.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
         <TanstackQueryProvider>
           <LayoutClient />

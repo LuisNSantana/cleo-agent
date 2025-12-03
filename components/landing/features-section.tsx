@@ -48,6 +48,7 @@ export function FeaturesSection() {
         ...card,
         icon: featureIcons[index % featureIcons.length],
         color: featureColors[index % featureColors.length],
+        span: index === 0 || index === 3 ? "md:col-span-2" : "md:col-span-1",
       })),
     [filteredCards]
   )
@@ -58,11 +59,11 @@ export function FeaturesSection() {
       data-landing-search
       data-landing-search-title="Features"
       data-landing-search-type="section"
-      className="relative w-full overflow-hidden bg-gradient-to-b from-[#F9F6F2] via-white to-[#EEF2FF] dark:from-[#050507] dark:via-[#0B0D15] dark:to-[#050507] py-16 sm:py-24 lg:py-32"
+      className="relative w-full overflow-hidden bg-muted/30 py-16 sm:py-24 lg:py-32"
     >
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-brand-cyan/15 blur-3xl" />
-        <div className="absolute right-0 bottom-0 h-80 w-80 rounded-full bg-brand-violet/15 blur-[180px]" />
+        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-brand-cyan/10 blur-3xl" />
+        <div className="absolute right-0 bottom-0 h-80 w-80 rounded-full bg-brand-violet/10 blur-[180px]" />
       </div>
   <div className="mx-auto w-full max-w-[1800px] px-4 sm:px-8 lg:px-16">
         <motion.div
@@ -91,45 +92,39 @@ export function FeaturesSection() {
             {copy.features.badge}
           </motion.div>
 
-          <h2 className="mb-4 sm:mb-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[#1E255E] dark:text-[#F9F6F2]">
+          <h2 className="mb-4 sm:mb-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
             {t.landing.featuresTitle}
           </h2>
-          <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl xl:text-2xl text-[#1E255E]/80 dark:text-[#E5E5E5]">
+          <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl xl:text-2xl text-muted-foreground">
             {t.landing.featuresSubtitle}
           </p>
         </motion.div>
 
         <motion.div
-          className="grid gap-8 md:grid-cols-2 xl:grid-cols-4"
+          className="grid gap-6 md:grid-cols-3"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-100px' }}
         >
           {featureCards.map((feature, index) => (
-            <motion.div key={feature.title} variants={itemVariants}>
+            <motion.div key={feature.title} variants={itemVariants} className={feature.span}>
               <Card
                 data-landing-search
                 data-landing-search-title={feature.title}
                 data-landing-search-type="feature"
-                className="group relative h-full overflow-hidden rounded-[28px] border border-white/40 bg-white/90 p-8 shadow-[0_20px_70px_rgba(9,13,30,0.12)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-2 hover:border-brand-cyan/40 hover:shadow-[0_30px_90px_rgba(6,10,25,0.18)] dark:border-white/10 dark:bg-white/5"
+                className="group relative h-full overflow-hidden rounded-[2rem] border border-border/50 bg-card p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-brand-cyan/30 text-center md:text-left"
               >
                 <div
                   className={`absolute inset-0 rounded-[28px] bg-gradient-to-br ${feature.color} opacity-0 transition duration-500 group-hover:opacity-20`}
                 />
                 <div className="relative">
-                  <motion.div
-                    className={`mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-xl ring-4 ring-white/60 transition-transform duration-300 group-hover:scale-110 dark:ring-white/10`}
-                    whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <feature.icon weight="duotone" className="h-full w-full text-white" />
-                  </motion.div>
+
                   <h3 className="mb-3 text-xl font-bold text-foreground">{feature.title}</h3>
                   <p className="mb-6 text-base leading-relaxed text-muted-foreground">{feature.description}</p>
                   <ul className="space-y-2.5">
                     {feature.bullets.map((item: string, i: number) => (
-                      <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground justify-center md:justify-start">
                         <div
                           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${feature.color} p-1`}
                         >

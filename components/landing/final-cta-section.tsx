@@ -22,7 +22,7 @@ export function FinalCTASection() {
 
   return (
     <>
-  <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#F7F5FF] via-[#F2F6FF] to-[#F7F5FF] py-16 text-foreground dark:from-[#080B16] dark:via-[#0D1324] dark:to-[#080B16] sm:py-24 lg:py-32">
+  <section className="relative w-full overflow-hidden bg-background py-16 text-foreground sm:py-24 lg:py-32">
         <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
           <motion.div
             className="mx-auto max-w-3xl text-center"
@@ -40,11 +40,11 @@ export function FinalCTASection() {
               {copy.finalCta.philosophyBadge}
             </motion.div>
 
-            <h2 className="mb-4 sm:mb-6 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-[#1E255E] dark:text-[#F9F6F2]">
+            <h2 className="mb-4 sm:mb-6 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
               {t.landing.philosophyTitle}
             </h2>
 
-            <p className="text-base sm:text-lg lg:text-xl leading-relaxed text-[#1E255E]/80 dark:text-[#E5E5E5]">{t.landing.philosophySubtitle}</p>
+            <p className="text-base sm:text-lg lg:text-xl leading-relaxed text-muted-foreground">{t.landing.philosophySubtitle}</p>
 
             <motion.div
               className="mt-8 sm:mt-12 grid gap-4 sm:gap-6 sm:grid-cols-3"
@@ -54,10 +54,10 @@ export function FinalCTASection() {
               transition={{ delay: 0.2 }}
             >
               {philosophy.map((card) => (
-                <div key={card.title} className="rounded-xl border border-border/40 bg-white/70 p-4 sm:p-6 backdrop-blur dark:border-white/10 dark:bg-white/5">
+                <div key={card.title} className="rounded-xl border border-border/40 bg-card/50 p-4 sm:p-6 backdrop-blur">
                   <div className="mb-3 text-3xl sm:text-4xl">{card.emoji}</div>
-                  <h3 className="mb-2 font-semibold text-[#1E255E] dark:text-[#F9F6F2]">{card.title}</h3>
-                  <p className="text-xs sm:text-sm text-[#1E255E]/70 dark:text-[#E5E5E5]/70">{card.description}</p>
+                  <h3 className="mb-2 font-semibold text-foreground">{card.title}</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{card.description}</p>
                 </div>
               ))}
             </motion.div>
@@ -65,7 +65,7 @@ export function FinalCTASection() {
         </div>
       </section>
 
-  <section className="relative w-full overflow-hidden bg-gradient-to-br from-[#090D1D] via-[#0B1022] to-[#090D1D] py-16 sm:py-24 lg:py-32">
+  <section className="relative w-full overflow-hidden bg-[#09090b] py-16 sm:py-24 lg:py-32">
         <div className="absolute inset-0 -z-10">
           <motion.div
             className="absolute left-1/4 top-1/4 h-64 sm:h-96 w-64 sm:w-96 rounded-full bg-[#A38CFF]/25 blur-3xl"

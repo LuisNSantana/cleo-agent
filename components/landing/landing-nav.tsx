@@ -43,7 +43,7 @@ export function LandingNav() {
   // Translations for buttons
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/50 bg-white/85 text-foreground backdrop-blur-xl dark:bg-[#050507]/90"
+      className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/40 bg-background/80 text-foreground backdrop-blur-md"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
@@ -56,7 +56,7 @@ export function LandingNav() {
           onClick={() => router.push('/')}
           aria-label="Ir al inicio"
         >
-          <div className="flex h-4 w-auto items-center sm:h-5 md:h-6 lg:h-7 shrink-0">
+          <div className="flex h-5 w-auto items-center sm:h-5 md:h-6 lg:h-7 shrink-0">
             <Image
               src={`/img/logoankie.png?v=${assetV}`}
               alt="Ankie AI logo"
@@ -68,7 +68,7 @@ export function LandingNav() {
               sizes="(max-width: 640px) 64px, (max-width: 768px) 84px, 96px"
             />
           </div>
-          <span className="hidden text-lg font-semibold tracking-tight text-foreground sm:inline">
+          <span className="text-lg font-semibold tracking-tight text-foreground">
             Ankie AI
           </span>
         </motion.button>
@@ -150,18 +150,20 @@ export function LandingNav() {
           {/* Desktop buttons */}
           <div className="hidden items-center gap-2 lg:flex">
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={handleLogin}
-              className="h-9 px-3 text-xs font-semibold text-foreground hover:bg-muted lg:px-4 lg:text-sm"
+              className="h-9 px-4 text-sm font-semibold border-2 border-foreground/10 bg-foreground/5 text-foreground hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-200"
             >
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
               size="sm"
               onClick={handlePrimaryCta}
-              className="h-9 px-3 text-xs font-semibold text-white shadow-[0_12px_30px_rgba(13,12,34,0.25)] transition hover:scale-[1.02] lg:px-4 lg:text-sm"
-              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#A38CFF 55%,#FF7AEA 100%)' }}
+              className="h-9 px-4 text-sm font-semibold text-white shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              style={{
+                background: 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)',
+              }}
             >
               {mounted ? copy.nav.getStarted : 'Get Started'}
             </Button>
@@ -182,7 +184,7 @@ export function LandingNav() {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <motion.div
-          className="border-t border-border/60 bg-background/98 backdrop-blur-lg dark:bg-[#050507]/98 lg:hidden"
+          className="border-t border-border/40 bg-background/95 backdrop-blur-lg lg:hidden"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
@@ -239,7 +241,7 @@ export function LandingNav() {
             <div className="my-4 border-t border-[#E5E5E5] dark:border-[#2F2F2F]" />
             <Button
               variant="outline"
-              className="w-full justify-start border-border/70 text-foreground hover:bg-brand-cyan/10 hover:border-brand-cyan"
+              className="w-full justify-center border-2 border-foreground/10 bg-foreground/5 text-foreground font-semibold hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-200"
               onClick={() => {
                 handleLogin()
                 setMobileMenuOpen(false)
@@ -248,8 +250,7 @@ export function LandingNav() {
               {mounted ? copy.nav.signIn : 'Sign In'}
             </Button>
             <Button
-              className="w-full font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#A38CFF 55%,#FF7AEA 100%)' }}
+              className="w-full font-semibold text-white bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta shadow-lg"
               onClick={() => {
                 handlePrimaryCta()
                 setMobileMenuOpen(false)

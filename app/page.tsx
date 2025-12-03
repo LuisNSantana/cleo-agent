@@ -3,8 +3,7 @@ import { HeroSection } from "@/components/landing/hero-section"
 import { CustomAgentsSection } from "@/components/landing/custom-agents-section"
 import { FeaturesSection } from "@/components/landing/features-section"
 import { AgentsSection } from "@/components/landing/agents-section"
-import { UseCaseDemo } from "@/components/landing/use-case-demo"
-import { BenefitsSection } from "@/components/landing/benefits-section"
+import { IntegrationsSection } from "@/components/landing/integrations-section"
 import { TestimonialsSection } from "@/components/landing/testimonials-section"
 import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
@@ -100,9 +99,9 @@ export default async function Home({
             <CustomAgentsSection />
           </div>
 
-          {/* 3. Live demo – watch your AI team work */}
-          <div id="demo" data-landing-search data-landing-search-title="Demo" data-landing-search-type="section">
-            <UseCaseDemo />
+          {/* 3. Integrations */}
+          <div id="integrations" data-landing-search data-landing-search-title="Integrations" data-landing-search-type="section">
+            <IntegrationsSection />
           </div>
 
           {/* 4. Meet your specialized AI team */}
@@ -115,10 +114,7 @@ export default async function Home({
             <FeaturesSection />
           </div>
 
-          {/* 6. Benefits */}
-          <div id="benefits" data-landing-search data-landing-search-title="Benefits" data-landing-search-type="section">
-            <BenefitsSection />
-          </div>
+          {/* 6. Proof & Security */}
 
           {/* 7. Proof & Security */}
           <TestimonialsSection />

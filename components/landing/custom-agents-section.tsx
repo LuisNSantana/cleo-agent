@@ -186,7 +186,7 @@ export function CustomAgentsSection() {
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             {customAgents.title}
           </h2>
-          <p className="mx-auto max-w-3xl text-lg text-muted-foreground sm:text-xl">
+          <p className="mx-auto max-w-3xl text-lg text-muted-foreground sm:text-xl px-4 break-words">
             {customAgents.subtitle}
           </p>
         </motion.div>
@@ -230,7 +230,7 @@ export function CustomAgentsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-primary/70">
                     {customAgents.tagline}
@@ -271,7 +271,7 @@ export function CustomAgentsSection() {
                     {formData.capability}
                   </div>
                 </div>
-                <div className="flex items-end justify-end">
+                <div className="flex items-end justify-end sm:col-span-2">
                   <Button size="sm" className="rounded-full bg-[#64D2FF] px-5 text-[#0D0D0D] hover:bg-[#45BAF0]">
                     {customAgents.deploy}
                   </Button>
@@ -344,7 +344,7 @@ export function CustomAgentsSection() {
               <div className={`absolute -inset-0.5 bg-gradient-to-br ${benefit.color} opacity-0 blur-md transition duration-500 hover:opacity-20`} />
               <div className="relative">
                 <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${benefit.color}`}>
-                  <benefit.icon weight="duotone" className="h-6 w-6 text-primary" />
+                  <benefit.icon weight="duotone" className="h-6 w-6 text-primary dark:text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">{benefit.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{benefit.description}</p>
@@ -353,27 +353,7 @@ export function CustomAgentsSection() {
           ))}
         </motion.div>
 
-        <motion.div
-          className="mt-16 rounded-3xl border border-border/60 bg-card/60 p-8 backdrop-blur-sm"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
-          <h3 className="mb-6 text-2xl font-bold text-foreground">{customAgents.useCasesTitle}</h3>
-          <div className="grid gap-6 md:grid-cols-2">
-            {[customAgents.useCase1, customAgents.useCase2, customAgents.useCase3, customAgents.useCase4].map(
-              (useCase, index) => (
-                <motion.div
-                  key={index}
-                  className="rounded-2xl border border-border/40 bg-background/60 p-5"
-                  whileHover={{ y: -4 }}
-                >
-                  <p className="text-sm text-muted-foreground">{useCase}</p>
-                </motion.div>
-              )
-            )}
-          </div>
-        </motion.div>
+
       </div>
     </section>
   )
