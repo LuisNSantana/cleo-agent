@@ -141,6 +141,49 @@ export async function POST(req: Request) {
 
   const userMessage = messages[messages.length - 1]
 
+    // 📎 AUTO-MODEL SELECTION FOR MULTIMEDIA ATTACHMENTS
+    // When user attaches images, videos, or documents, auto-switch to Nova 2 Lite (free multimodal model)
+    const NOVA_2_LITE_MODEL = 'openrouter:amazon/nova-2-lite-v1:free'
+    const hasMultimediaAttachments = (() => {
+      try {
+        const anyUser = userMessage as any
+        // Check experimental_attachments array
+        const atts = Array.isArray(anyUser?.experimental_attachments) ? anyUser.experimental_attachments : []
+        // Check multimodal parts array
+        const parts = Array.isArray(anyUser?.parts) ? anyUser.parts : []
+        
+        // Detect multimedia content types (images, videos, PDFs, documents)
+        const multimediaTypes = ['image/', 'video/', 'pdf', 'application/msword', 'application/vnd.openxmlformats', 'application/vnd.ms-', 'text/']
+        
+        const hasMultimediaInAtts = atts.some((a: any) => {
+          const contentType = a?.contentType || a?.mimeType || ''
+          return multimediaTypes.some(t => contentType.toLowerCase().includes(t))
+        })
+        
+        const hasMultimediaInParts = parts.some((p: any) => {
+          if (p?.type === 'image' || p?.type === 'file') return true
+          const mediaType = p?.mediaType || p?.mimeType || ''
+          return multimediaTypes.some(t => mediaType.toLowerCase().includes(t))
+        })
+        
+        return hasMultimediaInAtts || hasMultimediaInParts
+      } catch {
+        return false
+      }
+    })()
+    
+    // Auto-switch to Nova 2 Lite for multimedia processing (unless user specifically chose a premium model)
+    const premiumModels = ['gpt-5.1', 'gpt-5.1-2025-11-13', 'grok-4-1-fast-reasoning']
+    const userChosePremium = premiumModels.some(pm => originalModel?.includes(pm))
+    
+    if (hasMultimediaAttachments && !userChosePremium) {
+      chatLogger.info('📎 Auto-switching to Nova 2 Lite for multimedia attachments', {
+        originalModel: normalizedModel,
+        newModel: NOVA_2_LITE_MODEL
+      })
+      normalizedModel = NOVA_2_LITE_MODEL
+    }
+
     // Extract text content from user message for image generation detection
     const userMessageText = userMessage?.role === "user" 
       ? messageProcessorService.extractUserText(userMessage)

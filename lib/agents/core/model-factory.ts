@@ -244,8 +244,8 @@ export class ModelFactory {
       }
       
   // Final fallback to internal fast model
-  logger.warn(`[ModelFactory] Using final fallback: grok-4-fast`)
-  const finalFallback = this.createModel('grok-4-fast', config)
+  logger.warn(`[ModelFactory] Using final fallback: grok-4-1-fast-reasoning`)
+  const finalFallback = this.createModel('grok-4-1-fast-reasoning', config)
       this.modelCache.set(cacheKey, finalFallback)
       return finalFallback
     }
@@ -337,13 +337,13 @@ export class ModelFactory {
       // Map UI model IDs to actual xAI API model names
       let actualModelName = cleanModelName
       
-      // Map grok-4-fast (UI) → grok-4-fast-reasoning (xAI API)
+      // Map grok-4-fast (UI) → grok-4-1-fast-reasoning (xAI API - latest with 2M context)
       if (cleanModelName === 'grok-4-fast' || cleanModelName === 'xai/grok-4-fast') {
-        actualModelName = 'grok-4-fast-reasoning'
-        logger.info(`[ModelFactory] Mapping ${cleanModelName} → grok-4-fast-reasoning (xAI API model)`)
+        actualModelName = 'grok-4-1-fast-reasoning'
+        logger.info(`[ModelFactory] Mapping ${cleanModelName} → grok-4-1-fast-reasoning (xAI API model)`)
       } else if (cleanModelName === 'grok-4-fast-reasoning' || cleanModelName === 'xai/grok-4-fast-reasoning') {
-        actualModelName = 'grok-4-fast-reasoning'
-        logger.info(`[ModelFactory] Using ${cleanModelName} directly (xAI API model)`)
+        actualModelName = 'grok-4-1-fast-reasoning'
+        logger.info(`[ModelFactory] Mapping ${cleanModelName} → grok-4-1-fast-reasoning (xAI API latest)`)
       }
 
       const hasXaiKey = !!(process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0)

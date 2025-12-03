@@ -27,6 +27,8 @@ export function clampMaxOutputTokens(modelId: string, requested?: number): numbe
   else if (id.includes('glm') || id.includes('z-ai/')) cap = 32768
   // Trinity Mini: 131K context is SHARED between input+output, so cap output at 32K to leave room for prompts/tools
   else if (id.includes('trinity')) cap = 32768
+  // Amazon Nova 2 Lite: 1M context, but cap output reasonably for shared context
+  else if (id.includes('nova') && id.includes('amazon')) cap = 32768
 
   const req = typeof requested === 'number' && requested > 0 ? requested : cap
   return Math.min(req, cap)

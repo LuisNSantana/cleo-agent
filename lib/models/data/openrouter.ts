@@ -130,7 +130,6 @@ export const openrouterModels: ModelConfig[] = [
     tags: ["arcee", "moe", "agent", "reasoning", "tool-calling", "openrouter", "free", "function-calling"],
     category: "free",
     contextWindow: 131072, // 131K total context (shared between input+output)
-    maxOutputTokens: 32768, // Conservative: leave room for prompts/tools in shared context
     inputCost: 0,
     outputCost: 0,
     priceUnit: "per 1M tokens",
@@ -156,6 +155,45 @@ export const openrouterModels: ModelConfig[] = [
         },
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("arcee-ai/trinity-mini:free"),
+  },
+  // Amazon Nova 2 Lite (free) - Multimodal model with 1M context, video/document support
+  {
+    id: "openrouter:amazon/nova-2-lite-v1:free",
+    name: "Nova 2 Lite (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Nova",
+    baseProviderId: "amazon",
+    description:
+      "Amazon Nova 2 Lite: Ultra-low-cost multimodal model with 1M context window. Processes images, videos (up to 90 min), and documents (400 pages). Built-in web grounding and code interpreter. Extended thinking (3 levels). 50% cheaper than GPT-4 Mini.",
+    tags: ["amazon", "nova", "multimodal", "vision", "video", "documents", "tool-calling", "openrouter", "free", "1m-context"],
+    category: "free",
+    contextWindow: 1000000, // 1M tokens
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: true, // Has web grounding built-in
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/amazon/nova-lite-v1:free",
+    apiDocs: "https://docs.aws.amazon.com/nova/latest/userguide/",
+    modelPage: "https://aws.amazon.com/ai/generative-ai/nova/",
+    releasedAt: "2025-11-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("amazon/nova-2-lite-v1:free"),
   },
   // xAI: Grok Code Fast 1 (nuevo, para tareas técnicas y de programación)
   {

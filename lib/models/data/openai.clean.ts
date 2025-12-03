@@ -75,7 +75,6 @@ const openaiModels: ModelConfig[] = [
     description: "GPT-5.1: OpenAI's flagship model for coding and agentic tasks with configurable reasoning. 400K context, 128K max output.",
     tags: ["premium", "multimodal", "reasoning", "vision", "tools", "advanced", "coding", "agentic"],
     contextWindow: 400000,
-    maxOutputTokens: 128000,
     inputCost: 1.25, // $1.25 per 1M tokens
     outputCost: 10.0, // $10 per 1M tokens  
     priceUnit: "per 1M tokens",

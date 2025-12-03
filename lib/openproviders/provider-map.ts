@@ -29,6 +29,12 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Dolphin Mistral 24B Venice Edition (uncensored)
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
   "cognitivecomputations/dolphin-mistral-24b-venice-edition:free": "openrouter",
+  // Amazon Nova 2 Lite (free multimodal with 1M context)
+  "openrouter:amazon/nova-2-lite-v1:free": "openrouter",
+  "amazon/nova-2-lite-v1:free": "openrouter",
+  // Arcee AI Trinity Mini (free agent-optimized)
+  "openrouter:arcee-ai/trinity-mini:free": "openrouter",
+  "arcee-ai/trinity-mini:free": "openrouter",
   "openrouter:openai/gpt-oss-120b": "openrouter",
   "openrouter:openai/gpt-4.1-mini": "openrouter",
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
