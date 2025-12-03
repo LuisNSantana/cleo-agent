@@ -84,34 +84,91 @@ export function AppSidebar() {
     [openSettings, isMobile, setOpenMobile]
   )
 
-  const quickActions = useMemo(() => [
-    {
-      id: "settings-files",
-      label: t.sidebar.files,
-      description: "Upload, organize, and share documents with your agents.",
-      icon: Folders,
-      action: () => handleOpenSettings("files"),
-    },
-  ], [handleOpenSettings, t.sidebar.files])
-
-  // OPTIMIZED: Grok-style navigation - cleaner without excessive badges
-  const primaryNav = useMemo(() => [
+  // Section 1: Platform (Core Navigation)
+  const platformNav = useMemo(() => [
     { href: "/", label: t.sidebar.home, icon: HouseIcon, iconWeight: "duotone" as const },
-    { href: "/agents/manage", label: t.sidebar.agents, icon: AgentsIcon, iconWeight: "duotone" as const },
-    { href: "/agents/tasks", label: t.sidebar.tasks, icon: TasksIcon, iconWeight: "duotone" as const },
-    { href: "/integrations", label: t.sidebar.integrations, icon: IntegrationsIcon, iconWeight: "duotone" as const },
     { href: "/dashboard", label: t.sidebar.dashboard, icon: DashboardIcon, iconWeight: "duotone" as const },
-    { href: "/prompts-library", label: t.sidebar.promptLibrary, icon: BookOpenIcon, iconWeight: "duotone" as const },
-    { href: "/account", label: "Credits", icon: CreditsIcon, iconWeight: "duotone" as const },
   ], [t.sidebar])
 
-  // Personality navigation item (opens settings with personality tab)
-  const personalityAction = useMemo(() => ({
-    label: t.sidebar.personality,
-    icon: MaskHappyIcon,
-    iconWeight: "duotone" as const,
-    action: () => handleOpenSettings("personality"),
-  }), [handleOpenSettings, t.sidebar.personality])
+  // Section 2: Workspace (Tools & Agents)
+  const workspaceNav = useMemo(() => [
+    { href: "/agents/manage", label: t.sidebar.agents, icon: AgentsIcon, iconWeight: "duotone" as const },
+    { href: "/agents/tasks", label: t.sidebar.tasks, icon: TasksIcon, iconWeight: "duotone" as const },
+  ], [t.sidebar])
+
+  // Section 3: Resources (Integrations & Library)
+  const resourcesNav = useMemo(() => [
+    { href: "/integrations", label: t.sidebar.integrations, icon: IntegrationsIcon, iconWeight: "duotone" as const },
+    { href: "/prompts-library", label: t.sidebar.promptLibrary, icon: BookOpenIcon, iconWeight: "duotone" as const },
+    { 
+      id: "files", 
+      label: t.sidebar.files, 
+      icon: Folders, 
+      iconWeight: "duotone" as const,
+      action: () => handleOpenSettings("files")
+    },
+  ], [t.sidebar, handleOpenSettings])
+
+  // Section 4: Settings (Account & Personality)
+  const settingsNav = useMemo(() => [
+    { href: "/account", label: "Credits", icon: CreditsIcon, iconWeight: "duotone" as const },
+    { 
+      id: "personality", 
+      label: t.sidebar.personality, 
+      icon: MaskHappyIcon, 
+      iconWeight: "duotone" as const,
+      action: () => handleOpenSettings("personality")
+    },
+  ], [t.sidebar, handleOpenSettings])
+
+  const renderNavItem = (item: any) => {
+    const isActive = item.href === "/" 
+      ? pathname === "/" 
+      : item.href && (pathname === item.href || pathname.startsWith(item.href + "/"))
+
+    if (item.action) {
+      return (
+        <SidebarMenuItem key={item.id || item.label}>
+          <SidebarMenuButton 
+            tooltip={item.label}
+            onClick={item.action}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <div className="flex items-center gap-3 w-full">
+              <item.icon className="size-[18px]" weight={item.iconWeight} />
+              <span className="text-[13.5px] font-medium">{item.label}</span>
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )
+    }
+
+    return (
+      <SidebarMenuItem key={item.href}>
+        <SidebarMenuButton 
+          asChild
+          isActive={isActive} 
+          tooltip={item.label}
+          className="text-muted-foreground hover:text-foreground data-[active=true]:text-foreground data-[active=true]:bg-sidebar-accent/50 transition-all duration-200"
+        >
+          <Link
+            href={item.href}
+            prefetch
+            className="flex items-center w-full group/nav-item"
+            onClick={() => {
+              if (item.href === "/") resetMessages()
+              if (isMobile) setOpenMobile(false)
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <item.icon className="size-[18px]" weight={item.iconWeight} />
+              <span className="text-[13.5px] font-medium">{item.label}</span>
+            </div>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    )
+  }
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
@@ -130,112 +187,54 @@ export function AppSidebar() {
           )}
         </div>
       </SidebarHeader>
+      
       <SidebarContent className="mask-t-from-98% mask-t-to-100% mask-b-from-98% mask-b-to-100% px-3">
         <ScrollArea className="flex h-full [&>div>div]:!block">
-          {/* Primary minimal navigation */}
-          <SidebarGroup className="mb-1">
-            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 tracking-wide mb-2">Navigation</SidebarGroupLabel>
-            <SidebarMenu className="space-y-1">
-              {/* Home first */}
-              {(() => {
-                const { href, label, icon: Icon, iconWeight } = primaryNav[0]
-                const isActive = pathname === "/"
-                return (
-                  <SidebarMenuItem key={href}>
-                    <SidebarMenuButton 
-                      asChild
-                      isActive={isActive} 
-                      tooltip={label}
-                    >
-                      <Link
-                        href={href}
-                        prefetch
-                        className="flex items-center w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
-                        onClick={() => {
-                          // Reset messages when clicking Home
-                          resetMessages()
-                          if (isMobile) {
-                            setOpenMobile(false)
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="size-[18px]" weight={iconWeight} />
-                          <span className="text-[13.5px]">{label}</span>
-                        </div>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })()}
-
-              {/* Crear Agente — subtle featured CTA directly under Home */}
+          
+          {/* Platform Section */}
+          <SidebarGroup className="mb-2">
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1 px-2">Platform</SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
+              {platformNav.map(renderNavItem)}
               <SidebarMenuItem>
                 <CreateAgentMenuItem
                   isMobile={isMobile}
                   closeSidebar={() => setOpenMobile(false)}
                 />
               </SidebarMenuItem>
-
-              {/* Rest of primary nav */}
-              {primaryNav.slice(1).map(({ href, label, icon: Icon, iconWeight }) => {
-                const isActive = href === "/"
-                  ? pathname === "/"
-                  : pathname === href || pathname.startsWith(href + "/")
-                return (
-                  <SidebarMenuItem key={href}>
-                    <SidebarMenuButton 
-                      asChild
-                      isActive={isActive} 
-                      tooltip={label}
-                    >
-                      <Link
-                        href={href}
-                        prefetch
-                        className="flex items-center w-full group/nav-item transition-all duration-200 hover:translate-x-0.5"
-                        onClick={() => {
-                          // Reset messages when clicking Home
-                          if (href === "/") {
-                            resetMessages()
-                          }
-                          if (isMobile) {
-                            setOpenMobile(false)
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="size-[18px]" weight={iconWeight} />
-                          <span className="text-[13.5px]">{label}</span>
-                        </div>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
             </SidebarMenu>
           </SidebarGroup>
-          
-          {/* Personality quick access */}
-          <SidebarGroup className="mb-1">
-            <SidebarMenu className="space-y-1">
-              <SidebarMenuItem>
-                <SidebarMenuButton 
-                  tooltip="Customize Kylio's personality"
-                  onClick={() => {
-                    personalityAction.action()
-                  }}
-                >
-                  <div className="flex items-center gap-3 w-full">
-                    <personalityAction.icon className="size-[18px]" weight={personalityAction.iconWeight} />
-                    <span className="text-[13.5px]">{personalityAction.label}</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+
+          {/* Workspace Section */}
+          <SidebarGroup className="mb-2">
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1 px-2">Workspace</SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
+              {workspaceNav.map(renderNavItem)}
+            </SidebarMenu>
+            <div className="mt-2">
+               <SidebarProject />
+            </div>
+          </SidebarGroup>
+
+          {/* Resources Section */}
+          <SidebarGroup className="mb-2">
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1 px-2">Resources</SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
+              {resourcesNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroup>
-          
-          <SidebarSeparator className="my-5 bg-gradient-to-r from-transparent via-border/30 to-transparent" />
 
+          {/* Settings Section */}
+          <SidebarGroup className="mb-2">
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 mb-1 px-2">Settings</SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
+              {settingsNav.map(renderNavItem)}
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarSeparator className="my-4 bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+
+          {/* Chat History Section */}
           <div className="mb-6 flex w-full flex-col items-start gap-1">
             <Link
               href="/"
@@ -271,8 +270,7 @@ export function AppSidebar() {
               hasPopover={false}
             />
           </div>
-          {/* OPTIMIZED: Quick links removed for Grok-style minimal sidebar */}
-          <SidebarProject />
+
           {isLoading ? (
             <div className="h-full" />
           ) : hasChats ? (
