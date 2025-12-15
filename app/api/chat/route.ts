@@ -89,6 +89,19 @@ export async function POST(req: Request) {
       debugRag,
     } = parsed.data as ChatRequest
 
+  // LangChain multi-model pipeline is an alternate endpoint.
+  // Avoid silently falling back to a different model when clients send a langchain:* id.
+  if (typeof model === 'string' && model.startsWith('langchain:')) {
+    return new Response(
+      JSON.stringify({
+        error: 'Unsupported model for /api/chat',
+        message: 'LangChain models must be called via POST /api/multi-model-chat (this route always uses the CoreOrchestrator).',
+        model,
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } },
+    )
+  }
+
   // Delegation heuristic debug flag (can be toggled via query param in future)
   const debugDelegation = process.env.DEBUG_DELEGATION_INTENT === 'true'
 
@@ -735,45 +748,6 @@ export async function POST(req: Request) {
   // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
   // leaking into the request body.
 
-  // Check for orchestrator-backed mode FIRST (before LangChain forwarding)
-  // Triggered when model id starts with 'agents:' or when env flag is set
-  // Also enable orchestrator-backed mode when the user message clearly implies delegation/sub-agents
-  let impliesDelegation = false
-  let intelligentDelegation: { agentId: string; toolName: string; confidence: number } | null = null
-  
-  try {
-    // Be robust to AI SDK v5: prefer parts[].text over content
-    const lastUserAny: any = [...messages].reverse().find((m) => m.role === 'user') as any
-    let lastUserText = ''
-    if (lastUserAny) {
-      if (Array.isArray(lastUserAny.parts)) {
-        lastUserText = (lastUserAny.parts.find((p: any) => p?.type === 'text')?.text || '')
-      }
-      if (!lastUserText && typeof lastUserAny.content === 'string') {
-        lastUserText = lastUserAny.content
-      }
-    }
-    
-    // Use intelligent delegation analyzer for better detection
-    const { analyzeDelegationIntent } = await import('@/lib/agents/delegation')
-    intelligentDelegation = analyzeDelegationIntent(lastUserText || '')
-    
-    // Basic regex fallback + intelligent analysis
-    const lm = String(lastUserText || '').toLowerCase()
-    const basicDelegation = /\bami\b|\bdeleg(a|ar|ate)\b|sub[- ]?agente|notion|workspace/.test(lm)
-  const intelligentFlag = !!intelligentDelegation && intelligentDelegation.confidence >= 0.6
-  impliesDelegation = basicDelegation || intelligentFlag
-    
-    if (intelligentDelegation && intelligentDelegation.confidence > 0.5) {
-      console.log('🎯 Intelligent delegation detected:', {
-        agent: intelligentDelegation.agentId,
-        tool: intelligentDelegation.toolName,
-        confidence: Math.round(intelligentDelegation.confidence * 100) + '%',
-        userMessage: lastUserText?.substring(0, 100) + '...'
-      })
-    }
-  } catch {}
-  
   // ✅ MIGRATION: Always use CoreOrchestrator (unified flow via LangGraph)
   // Removed dual-flow branching - HITL works consistently across all models
   const orchestratorBacked = true
@@ -788,106 +762,6 @@ export async function POST(req: Request) {
       console.log('[Delegation] Attachment-present hint added for Iris preference')
     }
   } catch {}
-
-  // If using LangChain orchestration models BUT no delegation implied, forward to multi-model endpoint and pipe SSE
-  if (originalModel && originalModel.startsWith('langchain:') && !orchestratorBacked) {
-      try {
-        // Build message payload for /api/multi-model-chat
-        const lastMsg: any = messages[messages.length - 1] || {}
-        let lcMessage: any = ''
-        let isMultimodal = false
-        if (Array.isArray(lastMsg.content)) {
-          lcMessage = lastMsg.content
-          isMultimodal = lcMessage.some((p: any) => p?.type === 'file')
-        } else if (Array.isArray(lastMsg.parts)) {
-          lcMessage = lastMsg.parts.map((p: any) =>
-            p?.type === 'file'
-              ? { type: 'file', name: p.name, mediaType: p.mimeType || p.mediaType || p.contentType, url: p.url }
-              : { type: 'text', text: p.text || p.content || '' }
-          )
-          isMultimodal = lcMessage.some((p: any) => p?.type === 'file')
-        } else if (typeof lastMsg.content === 'string') {
-          lcMessage = lastMsg.content
-        } else {
-          lcMessage = typeof lastMsg?.content === 'string' ? lastMsg.content : ''
-        }
-
-        // Determine explicit document open intent to restrict openDocument by default
-        const lastUserContent = (typeof lastMsg.content === 'string')
-          ? lastMsg.content
-          : (Array.isArray(lastMsg.parts)
-            ? (lastMsg.parts.find((p: any) => p.type === 'text')?.text || '')
-            : '')
-        const docIntentRegex = /\b(open|abrir|mostrar|ver|view|edit|editar|work on|continuar|colaborar)\b.*\b(doc|document|documento|archivo|file)\b/i
-        const explicitDocIntent = docIntentRegex.test(lastUserContent || '')
-
-        // Compute allowed tools (remove openDocument unless explicit intent)
-        let allowedTools: string[] | undefined = undefined
-        try {
-          const allToolNames = Object.keys(tools)
-          allowedTools = explicitDocIntent ? allToolNames : allToolNames.filter(n => n !== 'openDocument')
-        } catch {}
-
-        const baseUrl = new URL('/api/multi-model-chat', req.url)
-        // If running under a dev tunnel (ngrok) or mismatched protocol, prefer http for localhost
-        try {
-          const host = baseUrl.hostname
-          if (host === 'localhost' || host === '127.0.0.1') {
-            baseUrl.protocol = 'http:'
-          }
-        } catch {}
-        const forwardBody = {
-          message: lcMessage,
-          type: isMultimodal ? 'multimodal' : 'text',
-          options: { enableSearch },
-          metadata: {
-            chatId,
-            userId: realUserId,
-            isAuthenticated,
-            systemPrompt: effectiveSystemPrompt,
-            originalModel: originalModel,
-            message_group_id,
-            documentId,
-            projectId,
-            debugRag,
-            // Ensure RAG toggle is respected by multi-model endpoint
-            useRAG: enableSearch,
-            // Allowlist tools for safety
-            allowedTools,
-            // Extract router type from langchain model ID for proper routing
-            routerType: originalModel?.replace('langchain:', '').replace('-router', ''),
-          },
-        }
-
-        // Forward auth context (cookies, authorization) so Supabase in the downstream
-        // endpoint can read the session and satisfy RLS during tool execution
-        const originalCookie = req.headers.get('cookie') || ''
-        const originalAuth = req.headers.get('authorization') || undefined
-        const fRes = await fetch(baseUrl.toString(), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(originalCookie ? { cookie: originalCookie } : {}),
-            ...(originalAuth ? { authorization: originalAuth } : {}),
-          },
-          body: JSON.stringify(forwardBody),
-        })
-
-        // Pipe SSE back to client
-        const contentType = fRes.headers.get('Content-Type') || 'text/event-stream; charset=utf-8'
-        return new Response(fRes.body, {
-          status: fRes.status,
-          headers: {
-            'Content-Type': contentType,
-            'Cache-Control': fRes.headers.get('Cache-Control') || 'no-cache, no-transform',
-            'Connection': fRes.headers.get('Connection') || 'keep-alive',
-          },
-        })
-      } catch (e) {
-        console.error('[ChatAPI] Forward to /api/multi-model-chat failed:', e)
-        return new Response(JSON.stringify({ error: 'Failed to route LangChain model' }), { status: 500 })
-      }
-    }
 
   // Orchestrator-backed Cleo-supervised mode for global chat
     if (orchestratorBacked) {
@@ -1140,6 +1014,9 @@ export async function POST(req: Request) {
         let streamClosed = false
         let interruptListener: ((data: any) => void) | null = null
         let reasoningListener: ((data: any) => void) | null = null
+        let streamingListener: ((data: any) => void) | null = null
+        let textStreamStarted = false
+        let streamedContent = ''
         
         const stopPolling = () => {
           if (pollInterval) {
@@ -1156,6 +1033,12 @@ export async function POST(req: Request) {
             orchestrator.eventEmitter?.off('execution.reasoning', reasoningListener)
             reasoningListener = null
             console.log('🧹 [REASONING] Listener cleaned up')
+          }
+          // Clean up streaming listener
+          if (streamingListener) {
+            orchestrator.eventEmitter?.off('execution.streaming', streamingListener)
+            streamingListener = null
+            console.log('🧹 [STREAMING] Listener cleaned up')
           }
         }
         
@@ -1237,6 +1120,50 @@ export async function POST(req: Request) {
             // Register reasoning listener
             console.log('📡 [CHAT SSE] Registering reasoning listener for execution:', execId)
             orchestrator.eventEmitter?.on('execution.reasoning', reasoningListener)
+            
+            // ✅ STREAMING LISTENER: Stream tokens to UI as they're generated
+            // Uses shared scope variables: streamingListener, textStreamStarted, streamedContent
+            streamingListener = (streamData: any) => {
+              // Accept token streams from:
+              // - the root execution (execId)
+              // - delegated child executions that carry rootExecutionId pointing to execId
+              // - delegated child executions that only carry parentExecutionId pointing to execId
+              const rootId = typeof streamData?.rootExecutionId === 'string' ? streamData.rootExecutionId : undefined
+              const parentId = typeof streamData?.parentExecutionId === 'string' ? streamData.parentExecutionId : undefined
+              const eventExecId = typeof streamData?.executionId === 'string' ? streamData.executionId : undefined
+
+              const belongsToThisChat =
+                eventExecId === execId ||
+                rootId === execId ||
+                (!rootId && parentId === execId)
+
+              if (!belongsToThisChat) return
+              
+              const delta = streamData.delta
+              if (delta && typeof delta === 'string') {
+                // Start text stream on first token
+                if (!textStreamStarted) {
+                  send({ type: 'text-start' })
+                  textStreamStarted = true
+                  console.log('📝 [STREAMING] Started text stream for execution:', {
+                    execId,
+                    eventExecId,
+                    rootId,
+                    parentId,
+                    agentId: streamData?.agentId,
+                    agentName: streamData?.agentName,
+                  })
+                }
+                
+                // Send token delta immediately
+                send({ type: 'text-delta', delta })
+                streamedContent += delta
+              }
+            }
+            
+            // Register streaming listener
+            console.log('📡 [CHAT SSE] Registering streaming listener for execution:', execId)
+            orchestrator.eventEmitter?.on('execution.streaming', streamingListener)
             
             // Signal start
             send({ type: 'start', executionId: execId })
@@ -1775,10 +1702,58 @@ export async function POST(req: Request) {
                   })
 
                   // Send final assistant text
-                  send({ type: 'text-start' })
-                  if (finalText) {
-                    send({ type: 'text-delta', delta: finalText })
+                  // OPTIMIZATION: If text was already streamed via execution.streaming events,
+                  // only send the remaining part (if any) to avoid duplication
+                  const alreadyStreamed = streamedContent.length > 0
+                  const remainingText = alreadyStreamed 
+                    ? (finalText.startsWith(streamedContent) ? finalText.slice(streamedContent.length) : '')
+                    : finalText
+                  
+                  console.log('📝 [FINAL TEXT] Streaming status:', {
+                    alreadyStreamed,
+                    streamedLength: streamedContent.length,
+                    finalLength: finalText.length,
+                    remainingLength: remainingText.length
+                  })
+                  
+                  if (!alreadyStreamed) {
+                    // No real-time streaming occurred, use simulated streaming for better UX
+                    send({ type: 'text-start' })
+                    if (finalText) {
+                      // Split text into natural chunks (sentences or word groups)
+                      const CHUNK_SIZE = 15 // words per chunk for natural reading flow
+                      const words = finalText.split(/(\s+)/) // preserve whitespace
+                      const chunks: string[] = []
+                      let currentChunk = ''
+                      let wordCount = 0
+                      
+                      for (const word of words) {
+                        currentChunk += word
+                        if (!word.match(/^\s+$/)) wordCount++ // count non-whitespace only
+                        
+                        // Break at chunk size or natural breaks (sentence endings)
+                        if (wordCount >= CHUNK_SIZE || /[.!?]\s*$/.test(currentChunk)) {
+                          chunks.push(currentChunk)
+                          currentChunk = ''
+                          wordCount = 0
+                        }
+                      }
+                      if (currentChunk) chunks.push(currentChunk)
+                      
+                      // Stream chunks with minimal delay for smooth appearance
+                      for (let i = 0; i < chunks.length; i++) {
+                        send({ type: 'text-delta', delta: chunks[i] })
+                        // Add tiny delay between chunks (non-blocking, just for visual effect)
+                        if (i < chunks.length - 1) {
+                          await new Promise(resolve => setTimeout(resolve, 15))
+                        }
+                      }
+                    }
+                  } else if (remainingText) {
+                    // Real-time streaming happened but there's remaining text to send
+                    send({ type: 'text-delta', delta: remainingText })
                   }
+                  // Note: text-start was already sent by streaming listener if alreadyStreamed
                   send({ type: 'finish' })
 
                   // Persist assistant message

@@ -50,11 +50,14 @@ export const FREE_MODELS_IDS = [
   "gpt-4o-mini",
 ]
 
-// Default authenticated model: Grok 4.1 Fast Reasoning (xAI direct)
-export const MODEL_DEFAULT = "grok-4-1-fast-reasoning"
+// Default authenticated model shown in the user-facing selector.
+// IMPORTANT: This must be present in `lib/models/index.ts` (STATIC_MODELS), otherwise
+// the selector can't resolve it and will display "Select model".
+// "Faster" tier maps to `grok-4-fast` (xAI direct; internally routes to Grok 4.1 Fast Reasoning).
+export const MODEL_DEFAULT = "grok-4-fast"
 
-// MODELO POR DEFECTO PARA GUESTS - Grok 4.1 Fast Reasoning (xAI direct)
-export const MODEL_DEFAULT_GUEST = "grok-4-1-fast-reasoning"
+// Default model for guests (must be available in `/api/models` non-auth list).
+export const MODEL_DEFAULT_GUEST = "grok-4-fast"
 
 // Globally disabled model IDs (hide old models, keep only 3-tier optimized)
 export const DISABLED_MODEL_IDS: string[] = [

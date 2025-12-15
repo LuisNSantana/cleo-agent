@@ -12,6 +12,7 @@ import { TaskInput, TaskOutput, ModelConfig } from './types'
 import { getCleoPrompt, sanitizeModelName } from '@/lib/prompts'
 import { retrieveRelevant, buildContextBlock } from '@/lib/rag/retrieve'
 import { buildToolRuntime } from './tooling'
+import { emitPipelineEventExternal } from '@/lib/tools/delegation'
 
 export abstract class BaseAgent {
   protected model: any
@@ -25,12 +26,39 @@ export abstract class BaseAgent {
   abstract initializeModel(): void
   abstract process(input: TaskInput): Promise<TaskOutput>
 
+  // Streaming interface (best-effort). Subclasses can override for true token streaming.
+  async *stream(_input: TaskInput): AsyncGenerator<string, void, void> {
+    const out = await this.process(_input)
+    if (out?.result) {
+      yield String(out.result)
+    }
+  }
+
   protected calculateCost(inputTokens: number, outputTokens: number): number {
     // Simplified cost calculation - can be enhanced later
     const inputCost = inputTokens * 0.0000001  // $0.0001 per 1K tokens
     const outputCost = outputTokens * 0.0000003 // $0.0003 per 1K tokens
     return inputCost + outputCost
   }
+}
+
+function extractChunkText(chunk: any): string {
+  try {
+    const content = chunk?.content
+    if (Array.isArray(content)) {
+      return content
+        .map((p: any) => (typeof p === 'string' ? p : (p?.text ?? p?.content ?? '')))
+        .join('')
+    }
+    if (typeof content === 'string') return content
+    if (content != null) return String(content)
+  } catch {}
+  // LangChain sometimes nests text deltas under different keys
+  try {
+    const delta = chunk?.delta ?? chunk?.text ?? chunk?.content?.text
+    if (typeof delta === 'string') return delta
+  } catch {}
+  return ''
 }
 
 // --- Helper utilities for robust tool-call handling ---
@@ -246,9 +274,10 @@ export class GroqAgent extends BaseAgent {
       let finalUserContent = input.content
       if (input.metadata?.useRAG && input.metadata?.userId) {
         try {
+          const threadId = input.metadata?.threadId ?? input.metadata?.chatId ?? undefined
           const chunks = await retrieveRelevant({
             userId: input.metadata.userId,
-            threadId: input.metadata.threadId,  // ✅ Thread isolation
+            threadId,  // ✅ Thread isolation (fallback to chatId)
             query: input.content,
             documentId: input.metadata.documentId,
             projectId: input.metadata.projectId,
@@ -326,23 +355,25 @@ export class GroqAgent extends BaseAgent {
         }
         response = ai
       } else {
-        console.log('� Sending request to Groq model...')
+        console.log('📤 Sending request to Groq model...')
         response = await this.model.invoke(messages)
       }
       const processingTime = Date.now() - startTime
 
-  let textOut = Array.isArray(response.content) ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('') : String(response.content ?? '')
-  // Last-resort A: if model still prints a tool-call blob, show the tool result directly
-  if ((/<\/?function|CALL_TOOL\(|tool[_-]?call/i.test(textOut)) && lastToolResult) {
-    textOut = renderToolResultReadable(lastToolName, lastToolResult)
-  }
-  // Last-resort B: if empty output but we have a tool result, present it
-  if ((!textOut || !String(textOut).trim()) && lastToolResult) {
-    textOut = renderToolResultReadable(lastToolName, lastToolResult)
-  }
-  // Estimate token usage (rough approximation)
-  const inputTokens = Math.ceil(input.content.length / 4)
-  const outputTokens = Math.ceil(textOut.length / 4)
+      let textOut = Array.isArray(response.content)
+        ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+        : String(response.content ?? '')
+      // Last-resort A: if model still prints a tool-call blob, show the tool result directly
+      if ((/<\/?function|CALL_TOOL\(|tool[_-]?call/i.test(textOut)) && lastToolResult) {
+        textOut = renderToolResultReadable(lastToolName, lastToolResult)
+      }
+      // Last-resort B: if empty output but we have a tool result, present it
+      if ((!textOut || !String(textOut).trim()) && lastToolResult) {
+        textOut = renderToolResultReadable(lastToolName, lastToolResult)
+      }
+      // Estimate token usage (rough approximation)
+      const inputTokens = Math.ceil(input.content.length / 4)
+      const outputTokens = Math.ceil(textOut.length / 4)
       const cost = this.calculateCost(inputTokens, outputTokens)
 
       console.log('✅ GroqAgent processing completed:', {
@@ -373,6 +404,188 @@ export class GroqAgent extends BaseAgent {
         inputType: input.type
       })
       throw new Error(`GroqAgent processing failed: ${error}`)
+    }
+  }
+
+  override async *stream(input: TaskInput): AsyncGenerator<string, void, void> {
+    const modelId = this.config.id
+    const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
+    const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools
+
+    // Tools-enabled streaming: we emit tool call/result events immediately, then stream
+    // the final assistant response once tool results are available.
+    if (toolsEnabled) {
+      const emitEvent: (event: any) => void =
+        typeof (input.metadata as any)?.__emitSseEvent === 'function'
+          ? ((input.metadata as any).__emitSseEvent as any)
+          : emitPipelineEventExternal
+
+      const sysPromptBase = input.metadata?.systemPromptOverride ||
+        getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || 'default')
+      const langHint = /[ñáéíóúü]|\b(gracias|hola|por favor|necesito|quiero)\b/i.test(input.content)
+        ? 'Responde en el mismo idioma del usuario (español) salvo que se solicite explícitamente otro.'
+        : 'Respond in the same language as the user (English) unless another is explicitly requested.'
+      const toolHint = '\nTOOL USE: If the user asks for real-time info (weather, prices) or actions (search, calendar, docs, email), prefer calling available tools instead of guessing.'
+      const sysPrompt = `${sysPromptBase}\n\n${langHint}${toolHint}`
+
+      let finalUserContent = input.content
+      if (input.metadata?.useRAG && input.metadata?.userId) {
+        try {
+          const threadId = (input.metadata as any)?.threadId ?? (input.metadata as any)?.chatId ?? undefined
+          const chunks = await retrieveRelevant({
+            userId: (input.metadata as any).userId,
+            threadId,
+            query: input.content,
+            documentId: (input.metadata as any).documentId,
+            projectId: (input.metadata as any).projectId,
+            maxContextChars: (input.metadata as any).maxContextChars ?? 6000,
+            useHybrid: true,
+            useReranking: true,
+          })
+          const ctx = buildContextBlock(chunks, (input.metadata as any).maxContextChars ?? 6000)
+          if (ctx && ctx.trim().length > 0) {
+            finalUserContent = `${ctx}\n\nUSER QUESTION:\n${input.content}`
+          }
+        } catch (e) {
+          console.warn('[GroqAgent.stream/tools] RAG retrieval failed, proceeding without context:', (e as any)?.message || e)
+        }
+      }
+
+      const messages = [
+        new SystemMessage({ content: sysPrompt }),
+        new HumanMessage({ content: finalUserContent })
+      ]
+
+      const runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
+      const modelWithTools = (this.model as any).bindTools
+        ? (this.model as any).bindTools(runtime.lcTools)
+        : (this.model as any).bind({ tools: runtime.lcTools })
+
+      // Step 1: run tool-calls (bounded) via invoke to obtain structured tool_calls
+      let ai = await modelWithTools.invoke(messages)
+      let steps = 0
+      while ((ai as any).tool_calls && (ai as any).tool_calls.length && steps < 2) {
+        messages.push(ai)
+        for (const call of (ai as any).tool_calls) {
+          const toolCallId = call.id || `tool-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          const toolName = call.name
+          try {
+            emitEvent({
+              type: 'tool-invocation',
+              toolInvocation: {
+                state: 'call',
+                step: steps,
+                toolCallId,
+                toolName,
+                args: call.args || {},
+              },
+            })
+          } catch {}
+
+          try {
+            const toolResult = await runtime.run(toolName, call.args)
+            messages.push(new ToolMessage({ content: toolResult, tool_call_id: toolCallId }))
+            try {
+              emitEvent({
+                type: 'tool-invocation',
+                toolInvocation: {
+                  state: 'result',
+                  step: steps,
+                  toolCallId,
+                  toolName,
+                  result: safeJsonParse(toolResult) ?? toolResult,
+                },
+              })
+            } catch {}
+          } catch (err: any) {
+            const msg = `Tool ${toolName} failed: ${err?.message || String(err)}`
+            messages.push(new ToolMessage({ content: msg, tool_call_id: toolCallId }))
+            try {
+              emitEvent({
+                type: 'tool-invocation',
+                toolInvocation: {
+                  state: 'result',
+                  step: steps,
+                  toolCallId,
+                  toolName,
+                  result: { error: msg },
+                },
+              })
+            } catch {}
+          }
+        }
+        ai = await modelWithTools.invoke(messages)
+        steps++
+      }
+
+      // Step 2: stream the final answer after tool results are present
+      const streamFn = (modelWithTools as any)?.stream
+      if (typeof streamFn !== 'function') {
+        const resp = await modelWithTools.invoke(messages)
+        const text = Array.isArray(resp.content)
+          ? resp.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+          : String(resp.content ?? '')
+        if (text) yield text
+        return
+      }
+
+      const iterable = await (modelWithTools as any).stream(messages)
+      for await (const chunk of iterable as any) {
+        const delta = extractChunkText(chunk)
+        if (delta) yield delta
+      }
+      return
+    }
+
+    const sysPromptBase = input.metadata?.systemPromptOverride ||
+      getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || 'default')
+    const langHint = /[ñáéíóúü]|\b(gracias|hola|por favor|necesito|quiero)\b/i.test(input.content)
+      ? 'Responde en el mismo idioma del usuario (español) salvo que se solicite explícitamente otro.'
+      : 'Respond in the same language as the user (English) unless another is explicitly requested.'
+    const sysPrompt = `${sysPromptBase}\n\n${langHint}`
+
+    let finalUserContent = input.content
+    if (input.metadata?.useRAG && input.metadata?.userId) {
+      try {
+        const threadId = input.metadata?.threadId ?? input.metadata?.chatId ?? undefined
+        const chunks = await retrieveRelevant({
+          userId: input.metadata.userId,
+          threadId,
+          query: input.content,
+          documentId: input.metadata.documentId,
+          projectId: input.metadata.projectId,
+          maxContextChars: input.metadata.maxContextChars ?? 6000,
+          useHybrid: true,
+          useReranking: true,
+        })
+        const ctx = buildContextBlock(chunks, input.metadata.maxContextChars ?? 6000)
+        if (ctx && ctx.trim().length > 0) {
+          finalUserContent = `${ctx}\n\nUSER QUESTION:\n${input.content}`
+        }
+      } catch (e) {
+        console.warn('[GroqAgent.stream] RAG retrieval failed, proceeding without context:', (e as any)?.message || e)
+      }
+    }
+
+    const messages = [
+      new SystemMessage({ content: sysPrompt }),
+      new HumanMessage({ content: finalUserContent })
+    ]
+
+    const streamFn = (this.model as any)?.stream
+    if (typeof streamFn !== 'function') {
+      const response = await this.model.invoke(messages)
+      const text = Array.isArray(response.content)
+        ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+        : String(response.content ?? '')
+      if (text) yield text
+      return
+    }
+
+    const iterable = await (this.model as any).stream(messages)
+    for await (const chunk of iterable as any) {
+      const delta = extractChunkText(chunk)
+      if (delta) yield delta
     }
   }
 
@@ -416,9 +629,10 @@ export class OpenAIAgent extends BaseAgent {
   let userContent = this.formatMultimodalContent(input)
       if (input.metadata?.useRAG && input.metadata?.userId && typeof userContent === 'string') {
         try {
+          const threadId = input.metadata?.threadId ?? input.metadata?.chatId ?? undefined
           const chunks = await retrieveRelevant({
             userId: input.metadata.userId,
-            threadId: input.metadata.threadId,  // ✅ Thread isolation
+            threadId,  // ✅ Thread isolation (fallback to chatId)
             query: userContent,
             documentId: input.metadata.documentId,
             projectId: input.metadata.projectId,
@@ -455,8 +669,6 @@ export class OpenAIAgent extends BaseAgent {
       // Desactivar tools para modelos OpenRouter DeepSeek y Qwen2.5
       const modelId = this.config.id
       const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
-      // Validar nombres de función para Gemini
-      const isGemini = modelId.startsWith('gemini') || modelId.startsWith('google/gemini')
       let runtime = null
       if (Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools) {
         runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
@@ -506,21 +718,23 @@ export class OpenAIAgent extends BaseAgent {
         }
         response = ai
       } else {
-        console.log('�📤 Sending request to OpenAI model:', this.config.id)
+        console.log('📤 Sending request to OpenAI model:', this.config.id)
         response = await this.model.invoke(messages)
       }
       const processingTime = Date.now() - startTime
 
-  let textOut = Array.isArray(response.content) ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('') : String(response.content ?? '')
-  if ((/<\/?function|CALL_TOOL\(|tool[_-]?call/i.test(textOut)) && lastToolResult) {
-    textOut = renderToolResultReadable(lastToolName, lastToolResult)
-  }
-  if ((!textOut || !String(textOut).trim()) && lastToolResult) {
-    textOut = renderToolResultReadable(lastToolName, lastToolResult)
-  }
-  // Estimate token usage
-  const inputTokens = Math.ceil(input.content.length / 4)
-  const outputTokens = Math.ceil(textOut.length / 4)
+      let textOut = Array.isArray(response.content)
+        ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+        : String(response.content ?? '')
+      if ((/<\/?function|CALL_TOOL\(|tool[_-]?call/i.test(textOut)) && lastToolResult) {
+        textOut = renderToolResultReadable(lastToolName, lastToolResult)
+      }
+      if ((!textOut || !String(textOut).trim()) && lastToolResult) {
+        textOut = renderToolResultReadable(lastToolName, lastToolResult)
+      }
+      // Estimate token usage
+      const inputTokens = Math.ceil(input.content.length / 4)
+      const outputTokens = Math.ceil(textOut.length / 4)
       const cost = this.calculateCost(inputTokens, outputTokens)
 
       console.log('✅ OpenAIAgent processing completed:', {
@@ -553,6 +767,190 @@ export class OpenAIAgent extends BaseAgent {
         wasMultimodal: input.type === 'image' || input.type === 'document'
       })
       throw new Error(`OpenAIAgent processing failed: ${error}`)
+    }
+  }
+
+  override async *stream(input: TaskInput): AsyncGenerator<string, void, void> {
+    const modelId = this.config.id
+    const isOpenRouterNoTools = modelId === 'openrouter:deepseek/deepseek-r1:free' || modelId === 'openrouter:qwen/qwen2.5-32b-instruct'
+    const toolsEnabled = Boolean((input.metadata as any)?.enableTools) && !isOpenRouterNoTools
+
+    if (toolsEnabled) {
+      const emitEvent: (event: any) => void =
+        typeof (input.metadata as any)?.__emitSseEvent === 'function'
+          ? ((input.metadata as any).__emitSseEvent as any)
+          : emitPipelineEventExternal
+
+      const sysPromptBase = input.metadata?.systemPromptOverride ||
+        getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || 'default')
+      const langHint = /[ñáéíóúü]|\b(gracias|hola|por favor|necesito|quiero)\b/i.test(input.content)
+        ? 'Responde en el mismo idioma del usuario (español) salvo que se solicite explícitamente otro.'
+        : 'Respond in the same language as the user (English) unless another is explicitly requested.'
+      const toolHint = '\nTOOL USE: If the user asks for real-time info (weather, prices) or actions (search, calendar, docs, email), prefer calling available tools instead of guessing.'
+      const sysPrompt = `${sysPromptBase}\n\n${langHint}${toolHint}`
+
+      let userContent = this.formatMultimodalContent(input)
+      if (input.metadata?.useRAG && input.metadata?.userId && typeof userContent === 'string') {
+        try {
+          const threadId = (input.metadata as any)?.threadId ?? (input.metadata as any)?.chatId ?? undefined
+          const chunks = await retrieveRelevant({
+            userId: (input.metadata as any).userId,
+            threadId,
+            query: userContent,
+            documentId: (input.metadata as any).documentId,
+            projectId: (input.metadata as any).projectId,
+            maxContextChars: (input.metadata as any).maxContextChars ?? 6000,
+            useHybrid: true,
+            useReranking: true,
+          })
+          const ctx = buildContextBlock(chunks, (input.metadata as any).maxContextChars ?? 6000)
+          if (ctx && ctx.trim().length > 0) {
+            userContent = `${ctx}\n\nUSER QUESTION:\n${userContent}`
+          }
+        } catch (e) {
+          console.warn('[OpenAIAgent.stream/tools] RAG retrieval failed, proceeding without context:', (e as any)?.message || e)
+        }
+      }
+
+      const messages = [
+        new SystemMessage({ content: sysPrompt }),
+        new HumanMessage({
+          content: (input.metadata?.imageUrl && (input.type === 'image' || input.type === 'document'))
+            ? [
+                { type: 'text', text: typeof userContent === 'string' ? userContent : String(userContent) },
+                { type: 'image_url', image_url: { url: (input.metadata as any).imageUrl, detail: 'auto' } }
+              ]
+            : userContent
+        })
+      ]
+
+      const runtime = buildToolRuntime((input.metadata as any)?.allowedTools, this.config.id)
+      const modelWithTools = (this.model as any).bindTools
+        ? (this.model as any).bindTools(runtime.lcTools)
+        : (this.model as any).bind({ tools: runtime.lcTools })
+
+      let ai = await modelWithTools.invoke(messages)
+      let steps = 0
+      while ((ai as any).tool_calls && (ai as any).tool_calls.length && steps < 2) {
+        messages.push(ai)
+        for (const call of (ai as any).tool_calls) {
+          const toolCallId = call.id || `tool-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          const toolName = call.name
+          try {
+            emitEvent({
+              type: 'tool-invocation',
+              toolInvocation: {
+                state: 'call',
+                step: steps,
+                toolCallId,
+                toolName,
+                args: call.args || {},
+              },
+            })
+          } catch {}
+          try {
+            const toolResult = await runtime.run(toolName, call.args)
+            messages.push(new ToolMessage({ content: toolResult, tool_call_id: toolCallId }))
+            try {
+              emitEvent({
+                type: 'tool-invocation',
+                toolInvocation: {
+                  state: 'result',
+                  step: steps,
+                  toolCallId,
+                  toolName,
+                  result: safeJsonParse(toolResult) ?? toolResult,
+                },
+              })
+            } catch {}
+          } catch (err: any) {
+            const msg = `Tool ${toolName} failed: ${err?.message || String(err)}`
+            messages.push(new ToolMessage({ content: msg, tool_call_id: toolCallId }))
+            try {
+              emitEvent({
+                type: 'tool-invocation',
+                toolInvocation: {
+                  state: 'result',
+                  step: steps,
+                  toolCallId,
+                  toolName,
+                  result: { error: msg },
+                },
+              })
+            } catch {}
+          }
+        }
+        ai = await modelWithTools.invoke(messages)
+        steps++
+      }
+
+      const streamFn = (modelWithTools as any)?.stream
+      if (typeof streamFn !== 'function') {
+        const resp = await modelWithTools.invoke(messages)
+        const text = Array.isArray(resp.content)
+          ? resp.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+          : String(resp.content ?? '')
+        if (text) yield text
+        return
+      }
+
+      const iterable = await (modelWithTools as any).stream(messages)
+      for await (const chunk of iterable as any) {
+        const delta = extractChunkText(chunk)
+        if (delta) yield delta
+      }
+      return
+    }
+
+    const sysPromptBase = input.metadata?.systemPromptOverride ||
+      getCleoPrompt(sanitizeModelName(this.config.name), input.metadata?.systemPromptVariant || 'default')
+    const langHint = /[ñáéíóúü]|\b(gracias|hola|por favor|necesito|quiero)\b/i.test(input.content)
+      ? 'Responde en el mismo idioma del usuario (español) salvo que se solicite explícitamente otro.'
+      : 'Respond in the same language as the user (English) unless another is explicitly requested.'
+    const sysPrompt = `${sysPromptBase}\n\n${langHint}`
+
+    let userContent = this.formatMultimodalContent(input)
+    if (input.metadata?.useRAG && input.metadata?.userId && typeof userContent === 'string') {
+      try {
+        const threadId = input.metadata?.threadId ?? input.metadata?.chatId ?? undefined
+        const chunks = await retrieveRelevant({
+          userId: input.metadata.userId,
+          threadId,
+          query: userContent,
+          documentId: input.metadata.documentId,
+          projectId: input.metadata.projectId,
+          maxContextChars: input.metadata.maxContextChars ?? 6000,
+          useHybrid: true,
+          useReranking: true,
+        })
+        const ctx = buildContextBlock(chunks, input.metadata.maxContextChars ?? 6000)
+        if (ctx && ctx.trim().length > 0) {
+          userContent = `${ctx}\n\nUSER QUESTION:\n${userContent}`
+        }
+      } catch (e) {
+        console.warn('[OpenAIAgent.stream] RAG retrieval failed, proceeding without context:', (e as any)?.message || e)
+      }
+    }
+
+    const messages = [
+      new SystemMessage({ content: sysPrompt }),
+      new HumanMessage({ content: userContent })
+    ]
+
+    const streamFn = (this.model as any)?.stream
+    if (typeof streamFn !== 'function') {
+      const response = await this.model.invoke(messages)
+      const text = Array.isArray(response.content)
+        ? response.content.map((p: any) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('')
+        : String(response.content ?? '')
+      if (text) yield text
+      return
+    }
+
+    const iterable = await (this.model as any).stream(messages)
+    for await (const chunk of iterable as any) {
+      const delta = extractChunkText(chunk)
+      if (delta) yield delta
     }
   }
 

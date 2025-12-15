@@ -127,13 +127,24 @@ export class ExecutionManager {
       // ToolMessages must only follow same-turn tool_calls
       const filteredMessages = this.filterStaleToolMessages(context.messageHistory)
 
-      // Prepare initial state compatible with MessagesAnnotation
-      // IMPORTANT: include metadata so parentExecutionId and other flags propagate into the graph state
+      // IMPORTANT: include metadata so parentExecutionId/rootExecutionId propagate into the graph state
+      const computedRootExecutionId: string =
+        (context.metadata?.rootExecutionId as string) ||
+        (context.metadata?.parentExecutionId as string) ||
+        execution.id
+
       const initialState = {
         messages: filteredMessages,
         executionId: execution.id,
-        userId: context.userId, // Include userId for tool context propagation
-        metadata: context.metadata || {}
+        userId: context.userId,
+        metadata: {
+          ...(context.metadata || {}),
+          executionId: execution.id,
+          parentExecutionId: (context.metadata?.parentExecutionId as string) || undefined,
+          rootExecutionId: computedRootExecutionId,
+          threadId: context.threadId,
+          userId: context.userId,
+        },
       }
 
       // ✅ OPTIMIZED: Use cached compiled graph instead of recompiling
@@ -179,13 +190,133 @@ export class ExecutionManager {
 
           try {
             // Stream events from graph execution
+            // Use both 'values' for state updates AND 'messages' for token streaming
             const stream = await compiledGraph.stream(initialState, {
               ...threadConfig,
-              streamMode: 'values' // Get state updates
+              streamMode: ['values', 'messages'] as any // Get state updates + token streaming
             })
 
+            // Track streamed content for incremental emission
+            // Track streamed content for incremental emission
+            let lastStreamedContent = ''
+
             // Process stream events
+            // IMPORTANT: With streamMode: ['values', 'messages'], events come as tuples [mode, chunk]
+            // Per LangChain Dec 2025 docs:
+            // - 'messages' mode: ['messages', [token, metadata]] - token is AIMessageChunk with contentBlocks
+            // - 'values' mode: ['values', {messages: [...], metadata: {...}}] - full state after each step
+            // - 'updates' mode: ['updates', {nodeName: {messages: [...]}}] - only node updates
             for await (const event of stream) {
+              // DEBUG: Log raw event structure to diagnose message extraction issues
+              if (process.env.DEBUG_STREAM_EVENTS === 'true') {
+                console.log('🔍 [STREAM DEBUG] Raw event:', {
+                  isArray: Array.isArray(event),
+                  length: Array.isArray(event) ? event.length : 'N/A',
+                  firstElement: Array.isArray(event) ? event[0] : 'N/A',
+                  keys: event && typeof event === 'object' && !Array.isArray(event) ? Object.keys(event) : 'N/A'
+                })
+              }
+              
+              // Handle tuple events from multi-mode streaming
+              if (Array.isArray(event) && event.length === 2 && typeof event[0] === 'string') {
+                const [eventType, eventData] = event
+                
+                // Token streaming events: ['messages', [token, metadata]]
+                // Dec 2025 format: token has .contentBlocks or .content property
+                if (eventType === 'messages') {
+                  // LangGraph formats vary:
+                  // - ['messages', [AIMessageChunk, metadata]]
+                  // - ['messages', [messageId, AIMessageChunk]]
+                  // - ['messages', AIMessageChunk]
+                  const first = Array.isArray(eventData) ? eventData[0] : eventData
+                  const second = Array.isArray(eventData) ? eventData[1] : null
+
+                  // Prefer the element that actually looks like a message chunk
+                  const candidates = [first, second].filter(
+                    (v) => v && typeof v === 'object'
+                  ) as any[]
+                  const chunk = candidates.find(
+                    (c) =>
+                      (typeof c?.content === 'string') ||
+                      Array.isArray(c?.contentBlocks) ||
+                      Array.isArray(c?.content)
+                  )
+
+                  if (chunk && typeof chunk === 'object') {
+                    // Handle both .content (string) and .contentBlocks (array)
+                    let newContent = ''
+                    if ('content' in chunk && typeof (chunk as any).content === 'string') {
+                      newContent = (chunk as any).content
+                    } else if ('content' in chunk && Array.isArray((chunk as any).content)) {
+                      // Some LC message chunks carry content as an array of parts
+                      newContent = (chunk as any).content
+                        .filter((p: any) => p && p.type === 'text')
+                        .map((p: any) => p.text || '')
+                        .join('')
+                    } else if ('contentBlocks' in chunk && Array.isArray(chunk.contentBlocks)) {
+                      // Extract text from content blocks
+                      newContent = chunk.contentBlocks
+                        .filter((b: any) => b.type === 'text')
+                        .map((b: any) => b.text || '')
+                        .join('')
+                    }
+                    
+                    if (newContent && newContent !== lastStreamedContent) {
+                      // Calculate the delta (new content since last emission)
+                      const delta = newContent.startsWith(lastStreamedContent) 
+                        ? newContent.slice(lastStreamedContent.length)
+                        : newContent
+                      
+                      if (delta) {
+                        // Emit streaming token event for SSE
+                        this.eventEmitter.emit('execution.streaming', {
+                          executionId: execution.id,
+                          parentExecutionId: (context.metadata?.parentExecutionId as string) || undefined,
+                          rootExecutionId: (initialState as any)?.metadata?.rootExecutionId || computedRootExecutionId,
+                          agentId: agentConfig.id,
+                          agentName: agentConfig.name,
+                          delta,
+                          content: newContent,
+                          type: 'token'
+                        })
+                        lastStreamedContent = newContent
+                      }
+                    }
+                  }
+                  continue // Don't update result with messages events
+                }
+                
+                // State update events: ['values', stateObject] or ['updates', {nodeName: {...}}]
+                if ((eventType === 'values' || eventType === 'updates') && eventData && typeof eventData === 'object') {
+                  // For 'values' mode: eventData IS the state object with messages[]
+                  // For 'updates' mode: eventData is {nodeName: {messages: [...]}}
+                  if (eventType === 'values') {
+                    result = eventData
+                    if (process.env.DEBUG_STREAM_EVENTS === 'true') {
+                      console.log('📦 [STREAM] values event received:', {
+                        hasMessages: 'messages' in eventData,
+                        messagesCount: (eventData as any).messages?.length || 0
+                      })
+                    }
+                  } else if (eventType === 'updates') {
+                    // Merge updates into result
+                    const nodeUpdates = Object.values(eventData)[0] as any
+                    if (nodeUpdates && nodeUpdates.messages) {
+                      result = result || { messages: [] }
+                      if (!result.messages) result.messages = []
+                      result.messages.push(...nodeUpdates.messages)
+                      if (process.env.DEBUG_STREAM_EVENTS === 'true') {
+                        console.log('📦 [STREAM] updates event received:', {
+                          node: Object.keys(eventData)[0],
+                          newMessages: nodeUpdates.messages?.length || 0
+                        })
+                      }
+                    }
+                  }
+                  continue
+                }
+              }
+
               // Check for __interrupt__ event (human-in-the-loop)
               if (event && typeof event === 'object' && '__interrupt__' in event) {
                 const rawInterruptPayload = (event as any).__interrupt__
@@ -320,12 +451,90 @@ export class ExecutionManager {
                   
                   const resumeStream = await compiledGraph.stream(resumeCommand, {
                     ...threadConfig,
-                    streamMode: 'values'
+                    streamMode: ['values', 'messages'] as any // Get state updates + token streaming
                   })
 
-                  // Continue processing resumed stream
+                  // Continue processing resumed stream with token emission
+                  let resumeLastContent = ''
                   for await (const resumeEvent of resumeStream) {
-                    result = resumeEvent
+                    // Handle tuple events from multi-mode streaming
+                    if (Array.isArray(resumeEvent) && resumeEvent.length === 2 && typeof resumeEvent[0] === 'string') {
+                      const [eventType, eventData] = resumeEvent
+                      
+                      // Token streaming: ['messages', [token, metadata]] or ['messages', chunk]
+                      if (eventType === 'messages') {
+                        const first = Array.isArray(eventData) ? eventData[0] : eventData
+                        const second = Array.isArray(eventData) ? eventData[1] : null
+                        const candidates = [first, second].filter(
+                          (v) => v && typeof v === 'object'
+                        ) as any[]
+                        const chunk = candidates.find(
+                          (c) =>
+                            (typeof c?.content === 'string') ||
+                            Array.isArray(c?.contentBlocks) ||
+                            Array.isArray(c?.content)
+                        )
+                        
+                        if (chunk && typeof chunk === 'object') {
+                          let newContent = ''
+                          if ('content' in chunk && typeof (chunk as any).content === 'string') {
+                            newContent = (chunk as any).content
+                          } else if ('content' in chunk && Array.isArray((chunk as any).content)) {
+                            newContent = (chunk as any).content
+                              .filter((p: any) => p && p.type === 'text')
+                              .map((p: any) => p.text || '')
+                              .join('')
+                          } else if ('contentBlocks' in chunk && Array.isArray(chunk.contentBlocks)) {
+                            newContent = chunk.contentBlocks
+                              .filter((b: any) => b.type === 'text')
+                              .map((b: any) => b.text || '')
+                              .join('')
+                          }
+                          
+                          if (newContent && newContent !== resumeLastContent) {
+                            const delta = newContent.startsWith(resumeLastContent) 
+                              ? newContent.slice(resumeLastContent.length)
+                              : newContent
+                            if (delta) {
+                              this.eventEmitter.emit('execution.streaming', {
+                                executionId: execution.id,
+                                parentExecutionId: (context.metadata?.parentExecutionId as string) || undefined,
+                                rootExecutionId: (initialState as any)?.metadata?.rootExecutionId || computedRootExecutionId,
+                                agentId: agentConfig.id,
+                                agentName: agentConfig.name,
+                                delta,
+                                content: newContent,
+                                type: 'token'
+                              })
+                              resumeLastContent = newContent
+                            }
+                          }
+                        }
+                        continue
+                      }
+                      
+                      // State updates - extract state from tuple
+                      if ((eventType === 'values' || eventType === 'updates') && eventData && typeof eventData === 'object') {
+                        if (eventType === 'values') {
+                          result = eventData
+                        } else if (eventType === 'updates') {
+                          const nodeUpdates = Object.values(eventData)[0] as any
+                          if (nodeUpdates && nodeUpdates.messages) {
+                            result = result || { messages: [] }
+                            if (!result.messages) result.messages = []
+                            result.messages.push(...nodeUpdates.messages)
+                          }
+                        }
+                        continue
+                      }
+                    }
+                    
+                    // Non-tuple events (shouldn't happen in resume, but handle just in case)
+                    if (!Array.isArray(resumeEvent) && resumeEvent && typeof resumeEvent === 'object') {
+                      if ('messages' in resumeEvent || result === null) {
+                        result = resumeEvent
+                      }
+                    }
                   }
 
                   // Clear interrupt after successful resume
@@ -335,8 +544,14 @@ export class ExecutionManager {
                 }
               }
               
-              // Track latest state
-              result = event
+              // Track latest state for non-tuple events (interrupts, etc.)
+              // Note: Tuple events ['values', state] are handled above with continue
+              if (!Array.isArray(event) && event && typeof event === 'object' && !('__interrupt__' in event)) {
+                // Only update result if it's a state-like object (has messages or is the final state)
+                if ('messages' in event || result === null) {
+                  result = event
+                }
+              }
             }
 
             return result
@@ -415,16 +630,27 @@ export class ExecutionManager {
       const finalMessages = result.messages || []
       const lastMessage = finalMessages[finalMessages.length - 1]
       
+      // Calculate how many messages were NEW during this execution
+      // initialState.messages was the history BEFORE this execution started
+      const historyCount = filteredMessages.length
+      const newMessagesCount = Math.max(0, finalMessages.length - historyCount)
+      
       console.log('📋 [EXECUTION] Extracting final content from messages:', {
         totalMessages: finalMessages.length,
+        historyCount,
+        newMessagesCount,
         lastMessageType: lastMessage?.constructor?.name || lastMessage?._getType?.() || typeof lastMessage,
         lastMessageHasContent: !!lastMessage?.content,
         lastMessageContent: lastMessage?.content ? String(lastMessage.content).substring(0, 100) : 'EMPTY'
       })
       
-      // Try to find the last AIMessage with actual content
+      // CRITICAL FIX: Only search for content in NEWLY generated messages
+      // This prevents using stale responses from conversation history
+      const searchStartIndex = Math.max(0, finalMessages.length - newMessagesCount - 1)
+      
+      // Try to find the last AIMessage with actual content (only in new messages)
       let content = ''
-      for (let i = finalMessages.length - 1; i >= 0; i--) {
+      for (let i = finalMessages.length - 1; i >= searchStartIndex; i--) {
         const msg = finalMessages[i]
         const msgType = msg?.constructor?.name || msg?._getType?.() || ''
         
@@ -433,13 +659,13 @@ export class ExecutionManager {
           const textContent = typeof msg.content === 'string' ? msg.content : String(msg.content)
           if (textContent.trim()) {
             content = textContent
-            console.log(`✅ [EXECUTION] Found AIMessage with content at index ${i}:`, content.substring(0, 100))
+            console.log(`✅ [EXECUTION] Found AIMessage with content at index ${i} (new message):`, content.substring(0, 100))
             break
           }
         }
       }
       
-      // Fallback: If no AIMessage with content, try extracting from tool results
+      // Fallback: If no AIMessage with content in new messages, try extracting from tool results
       if (!content && lastMessage) {
         const msgType = lastMessage?.constructor?.name || lastMessage?._getType?.() || ''
         if (msgType === 'ToolMessage' || msgType === 'tool') {
@@ -453,16 +679,35 @@ export class ExecutionManager {
             console.log('✅ [EXECUTION] Extracted content from ToolMessage:', content)
           } catch {
             // Not JSON, use raw content
-            content = lastMessage.content as string || 'Task completed successfully'
-            console.log('✅ [EXECUTION] Using raw ToolMessage content:', content?.substring(0, 100))
+            content = lastMessage.content as string || ''
+            if (content) {
+              console.log('✅ [EXECUTION] Using raw ToolMessage content:', content?.substring(0, 100))
+            }
           }
         }
       }
       
-      // Final fallback
+      // CRITICAL: If NO new content was generated, provide a contextual fallback
+      // instead of using stale content from conversation history
       if (!content) {
-        content = lastMessage?.content as string || 'Task completed successfully'
-        console.log('⚠️ [EXECUTION] Using fallback content:', content)
+        // Check if the model was supposed to delegate but didn't
+        const lastUserMessage = finalMessages.filter((m: any) => {
+          const type = m?.constructor?.name || m?._getType?.() || ''
+          return type === 'HumanMessage' || type === 'human'
+        }).pop()
+        
+        const userQuery = lastUserMessage?.content 
+          ? (typeof lastUserMessage.content === 'string' ? lastUserMessage.content : String(lastUserMessage.content))
+          : ''
+        
+        // Generate a contextually appropriate fallback
+        if (userQuery.length > 10) {
+          content = `Lo siento, no pude procesar tu solicitud completamente. Por favor, intenta reformular tu pregunta o ser más específico. Tu consulta fue: "${userQuery.substring(0, 100)}${userQuery.length > 100 ? '...' : ''}"`
+          console.log('⚠️ [EXECUTION] No new content generated, using contextual fallback')
+        } else {
+          content = 'Lo siento, no pude completar la tarea. Por favor, intenta de nuevo con más detalles.'
+          console.log('⚠️ [EXECUTION] Using generic fallback content')
+        }
       }
       
       console.log('📤 [EXECUTION] Final extracted content:', content.substring(0, 200))

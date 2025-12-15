@@ -132,6 +132,7 @@ export class DelegationDetectionService {
 
   /**
    * Create delegation hint for system prompt
+   * CRITICAL: This hint must be strong enough to override model's tendency to answer directly
    */
   createDelegationHint(intent: DelegationIntent): string {
     if (!intent.detected || !intent.heuristicScore?.target || intent.heuristicScore.score < 0.55) {
@@ -141,8 +142,16 @@ export class DelegationDetectionService {
     const agentKey = intent.heuristicScore.target
     const normalized = agentKey.replace(/[^a-z0-9]+/g, '_')
     const toolName = `delegate_to_${normalized}`
+    const confidence = Math.round(intent.heuristicScore.score * 100)
 
-    return `\n\nINTERNAL DELEGATION HINT: The user's request likely maps to specialist agent '${agentKey}'. Consider calling tool ${toolName} if it would provide unique capabilities or faster resolution. If you delegate, briefly explain why.`
+    // Use stronger language when confidence is high
+    if (confidence >= 80) {
+      return `\n\n**MANDATORY DELEGATION** (${confidence}% confidence): The user's request REQUIRES specialist agent '${agentKey}'. You MUST call tool \`${toolName}\` immediately. DO NOT attempt to answer directly - this task requires specialized capabilities that only ${agentKey} can provide. Call the delegation tool NOW with the user's request as the task parameter.`
+    } else if (confidence >= 65) {
+      return `\n\n**STRONG DELEGATION RECOMMENDATION** (${confidence}% confidence): This request maps to specialist agent '${agentKey}'. Call tool \`${toolName}\` to provide the best response. The specialist has unique capabilities for this type of request. Delegate first, do not answer directly.`
+    } else {
+      return `\n\n**Delegation Hint** (${confidence}% confidence): The request likely maps to specialist '${agentKey}'. Consider calling \`${toolName}\` for specialized handling.`
+    }
   }
 }
 

@@ -62,7 +62,9 @@ export interface ExecutionStep {
 export interface DelegationProgress {
   id: string
   sourceAgent: string
+  sourceAgentName?: string
   targetAgent: string
+  targetAgentName?: string
   task: string
   status: DelegationStatus
   stage: DelegationStage

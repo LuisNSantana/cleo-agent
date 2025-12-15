@@ -86,7 +86,7 @@ export class MultiModelPipeline {
   /**
    * Optimize context and configuration based on the selected model's capabilities
    */
-  private optimizeContextForModel(metadata: any, modelId: string): any {
+  optimizeContextForModel(metadata: any, modelId: string): any {
     const isCloudModel = !modelId.startsWith('ollama:')
     const isBalancedOrFast = modelId.includes('balanced') || modelId.includes('fast')
     const isLlama31 = modelId.includes('llama3.1') || modelId.includes('llama-3.1')

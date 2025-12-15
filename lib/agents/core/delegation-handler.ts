@@ -19,7 +19,7 @@ import {
   deleteResolver,
   type DelegationResolver 
 } from './delegation-context'
-import { canonicalizeAgentId } from '../id-canonicalization'
+import { canonicalizeAgentId, getAgentDisplayName } from '../id-canonicalization'
 import { LRUCache } from 'lru-cache'
 
 export interface DelegationRequest {
@@ -142,11 +142,14 @@ export class DelegationHandler {
       })
 
       // Emit progress: starting (normalized payload)
+      const targetAgentName = getAgentDisplayName(request.targetAgent)
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'starting',
-        message: `Delegating to ${request.targetAgent}...`,
+        message: `Delegating to ${targetAgentName}...`,
+        agentName: targetAgentName,
+        targetAgentName,
         timestamp: new Date().toISOString(),
         sourceExecutionId: request.sourceExecutionId
       })
@@ -162,7 +165,9 @@ export class DelegationHandler {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'completed',
-        message: `${request.targetAgent} completed the task`,
+        message: `${targetAgentName} completed the task`,
+        agentName: targetAgentName,
+        targetAgentName,
         timestamp: new Date().toISOString(),
         sourceExecutionId: request.sourceExecutionId
       })
@@ -174,11 +179,14 @@ export class DelegationHandler {
       logger.error('DELEGATION', `Delegation failed: ${delegationKey}`, error)
 
       // Emit progress: failed (normalized payload)
+      const targetNameOnError = getAgentDisplayName(request.targetAgent)
       this.eventEmitter.emit('delegation.progress', {
         sourceAgent: request.sourceAgent,
         targetAgent: request.targetAgent,
         status: 'failed',
-        message: `${request.targetAgent} failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `${targetNameOnError} failed: ${error instanceof Error ? error.message : String(error)}`,
+        agentName: targetNameOnError,
+        targetAgentName: targetNameOnError,
         timestamp: new Date().toISOString(),
         sourceExecutionId: request.sourceExecutionId
       })

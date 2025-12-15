@@ -123,8 +123,8 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
             <AnimatePresence mode="popLayout">
               {activeSteps.map((step, index) => {
                 // Use agentName from step if available (from server), otherwise fallback to metadata lookup
-                const displayName = step.agentName || getAgentMetadata(step.agent).name
-                const meta = getAgentMetadata(step.agent)
+                const meta = getAgentMetadata(step.agent, step.agentName)
+                const displayName = step.agentName || meta.name
                 const isLatest = index === 0
                 
                 return (

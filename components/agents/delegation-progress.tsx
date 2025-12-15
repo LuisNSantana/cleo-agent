@@ -30,6 +30,9 @@ export function DelegationProgressComponent({
     return null
   }
 
+  const sourceMeta = getAgentMetadata(currentDelegation.sourceAgent, (currentDelegation as any).sourceAgentName)
+  const targetMeta = getAgentMetadata(currentDelegation.targetAgent, (currentDelegation as any).targetAgentName)
+
   const getStatusColor = (status: DelegationProgress['status']) => {
     switch (status) {
       case 'requested': return 'bg-blue-500'
@@ -44,7 +47,7 @@ export function DelegationProgressComponent({
   }
 
   const getStageMessage = (stage: DelegationProgress['stage'], targetAgent: string) => {
-    const targetMetadata = getAgentMetadata(targetAgent)
+    const targetMetadata = getAgentMetadata(targetAgent, (currentDelegation as any)?.targetAgentName)
     switch (stage) {
       case 'initializing': return `Preparando delegación a ${targetMetadata.name}...`
       case 'analyzing': return `${targetMetadata.name} está analizando la tarea...`
@@ -85,11 +88,11 @@ export function DelegationProgressComponent({
                   {/* Source Agent Avatar */}
                   <Avatar className="w-6 h-6">
                     <AvatarImage 
-                      src={getAgentMetadata(currentDelegation.sourceAgent).avatar} 
-                      alt={getAgentMetadata(currentDelegation.sourceAgent).name} 
+                      src={sourceMeta.avatar} 
+                      alt={sourceMeta.name} 
                     />
                     <AvatarFallback className="text-xs">
-                      {getAgentMetadata(currentDelegation.sourceAgent).emoji}
+                      {sourceMeta.emoji}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -98,17 +101,17 @@ export function DelegationProgressComponent({
                   {/* Target Agent Avatar */}
                   <Avatar className="w-6 h-6">
                     <AvatarImage 
-                      src={getAgentMetadata(currentDelegation.targetAgent).avatar} 
-                      alt={getAgentMetadata(currentDelegation.targetAgent).name} 
+                      src={targetMeta.avatar} 
+                      alt={targetMeta.name} 
                     />
                     <AvatarFallback className="text-xs">
-                      {getAgentMetadata(currentDelegation.targetAgent).emoji}
+                      {targetMeta.emoji}
                     </AvatarFallback>
                   </Avatar>
                 </div>
                 <div>
                   <CardTitle className="text-sm font-medium">
-                    {getAgentMetadata(currentDelegation.sourceAgent).name} → {getAgentMetadata(currentDelegation.targetAgent).name}
+                    {sourceMeta.name} → {targetMeta.name}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     {getStageMessage(currentDelegation.stage, currentDelegation.targetAgent)}

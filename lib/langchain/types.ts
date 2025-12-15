@@ -13,6 +13,8 @@ export interface TaskInput {
   // RAG / retrieval options
   userId?: string
   chatId?: string | null
+  // Thread isolation for memory/RAG (defaults to chatId when available)
+  threadId?: string | null
   documentId?: string
   projectId?: string
   useRAG?: boolean

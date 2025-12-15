@@ -7,6 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { MultiModelPipeline } from '@/lib/langchain/pipeline'
+import { ModelRouter } from '@/lib/langchain/router'
+import { AgentFactory } from '@/lib/langchain/agents'
 import { withRequestContext } from '@/lib/server/request-context'
 import { z } from 'zod'
 import {
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
 					messages: [{ role: 'user', content: typeof body.message === 'string' ? body.message : '' }],
 					supabase,
 					realUserId,
+					threadId: metadata.chatId || null,
 					enableSearch: options.enableSearch ?? false,
 					documentId: metadata.documentId,
 					projectId: metadata.projectId,
@@ -311,13 +314,14 @@ export async function POST(req: NextRequest) {
 		;(globalThis as any).__currentModel = metadata.originalModel || 'langchain:multi-model-smart'
 		;(globalThis as any).__requestId = reqId
 
-		const pipelineResult = await withRequestContext({ userId: realUserId || metadata.userId, model: metadata.originalModel || 'langchain:multi-model-smart', requestId: reqId }, async () => pipeline.process({
+		const taskInput = {
 			content: normalizedContent,
 			type: effectiveType,
 			metadata: {
 				...metadata,
 				...options,
 				...attachmentMeta,
+				threadId: metadata.chatId || null,
 				// Ensure agent uses the full personalized + RAG-augmented system prompt
 				systemPromptOverride: finalSystemPrompt,
 				// Map UI enableSearch to RAG toggle unless explicitly provided
@@ -328,14 +332,14 @@ export async function POST(req: NextRequest) {
 					? (metadata as any).allowedTools
 					: (allowedToolsAuto.length > 0 ? allowedToolsAuto : undefined),
 			},
-		}))
+		} as any
 
-		console.log('✅ LangChain processing complete:', {
-			model: pipelineResult.modelUsed,
-			tokensUsed: pipelineResult.tokens,
-			processingTime: pipelineResult.processingTime,
-			responseLength: (pipelineResult.result || '').substring(0, 100) + '...',
-		})
+		const toolsLikelyEnabled = Boolean(taskInput?.metadata?.enableTools)
+		console.log(
+			toolsLikelyEnabled
+				? '⚡ LangChain tools mode: streaming connection opened'
+				: '⚡ LangChain streaming mode (tools disabled): starting token stream',
+		)
 
 		// Log and store messages if authenticated and supabase is available
 		if (supabase && metadata.chatId && metadata.userId) {
@@ -350,52 +354,10 @@ export async function POST(req: NextRequest) {
 					message_group_id: metadata.message_group_id,
 					isAuthenticated: metadata.isAuthenticated || false,
 				})
-
-								// Store assistant response including tool-invocation parts for UI
-								const inv = Array.isArray(pipelineResult.toolInvocations) ? pipelineResult.toolInvocations : []
-								const assistantParts: any[] = []
-								for (const t of inv) {
-									assistantParts.push({
-										type: 'tool-invocation',
-										toolInvocation: {
-											state: 'call',
-											step: 0,
-											toolCallId: t.toolCallId,
-											toolName: t.toolName,
-											args: t.args || {},
-										}
-									})
-									assistantParts.push({
-										type: 'tool-invocation',
-										toolInvocation: {
-											state: 'result',
-											step: 0,
-											toolCallId: t.toolCallId,
-											toolName: t.toolName,
-											result: t.result !== undefined ? t.result : null,
-										}
-									})
-								}
-								assistantParts.push({ type: 'text', text: pipelineResult.result || '' })
-
-								await storeAssistantMessage({
-										supabase,
-										userId: metadata.userId,
-										chatId: metadata.chatId,
-										messages: [
-												{
-														role: 'assistant',
-														content: assistantParts,
-												},
-										],
-										message_group_id: metadata.message_group_id,
-										model: metadata.originalModel || 'langchain:multi-model-smart',
-										inputTokens: pipelineResult.tokens?.input,
-										outputTokens: pipelineResult.tokens?.output,
-								})
 			} catch (dbError) {
 				// Don't fail the entire request if logging fails
 			}
+
 		}
 
 		// Return streaming response compatible with frontend SSE parser
@@ -406,106 +368,138 @@ export async function POST(req: NextRequest) {
 					// Set up pipeline event controller for delegation events
 					setPipelineEventController(controller, encoder)
 
-					const fullText = pipelineResult.result || ''
-
 					// Notify start of text stream
-					const startEvent = { type: 'text-start' }
-					controller.enqueue(encoder.encode(`data: ${JSON.stringify(startEvent)}\n\n`))
+					controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text-start' })}\n\n`))
 
-							// Emit routing info for observability
+					// Unified: real token streaming via agent.stream() (works for tools-enabled too).
+					;(async () => {
+						let finalText = ''
+						const toolCallOrder: string[] = []
+						const toolCalls = new Map<string, { toolCallId: string; toolName: string; args?: any; result?: any }>()
+						try {
+							const router = new ModelRouter()
+							const routing = router.route(taskInput)
+							const usedModel = routing.selectedModel
+
+							const send = (obj: any) => {
+								controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
+								// Capture tool invocations for persistence
+								try {
+									if (obj?.type === 'tool-invocation' && obj?.toolInvocation?.toolCallId) {
+										const ti = obj.toolInvocation
+										const id = String(ti.toolCallId)
+										if (!toolCalls.has(id)) {
+											toolCallOrder.push(id)
+											toolCalls.set(id, { toolCallId: id, toolName: ti.toolName, args: ti.args, result: ti.result })
+										} else {
+											const existing = toolCalls.get(id)!
+											existing.toolName = ti.toolName || existing.toolName
+											if (ti.args !== undefined) existing.args = ti.args
+											if (ti.result !== undefined) existing.result = ti.result
+											toolCalls.set(id, existing)
+										}
+									}
+								} catch {}
+							}
+
+							// Emit routing/model info early (matches existing event contract)
+							send({
+								type: 'route',
+								selectedModel: routing.selectedModel,
+								fallbackModel: routing.fallbackModel,
+								reasoning: routing.reasoning,
+								confidence: routing.confidence,
+							})
+							send({ type: 'model', modelUsed: usedModel, fallback: false })
+
+							// Apply the same metadata optimization the pipeline uses
+							taskInput.metadata = pipeline.optimizeContextForModel(taskInput.metadata || {}, usedModel)
+							// Allow agents to emit tool events directly into this SSE stream
+							;(taskInput.metadata as any).__emitSseEvent = send
+							const agent = AgentFactory.getAgent(usedModel) as any
+
+							await withRequestContext(
+								{ userId: realUserId || metadata.userId, model: metadata.originalModel || 'langchain:multi-model-smart', requestId: reqId } as any,
+								async () => {
+									for await (const delta of agent.stream(taskInput)) {
+										finalText += delta
+										send({ type: 'text-delta', delta })
+									}
+								},
+							)
+
+							// If primary fails and fallback exists, attempt fallback streaming
+							// NOTE: streaming errors are caught by outer try/catch and will surface to UI.
+
+							const inputTokens = Math.ceil((normalizedContent || '').length / 4)
+							const outputTokens = Math.ceil((finalText || '').length / 4)
+							send({
+								type: 'finish',
+								text: finalText,
+								usage: {
+									promptTokens: inputTokens,
+									completionTokens: outputTokens,
+									totalTokens: inputTokens + outputTokens,
+								},
+							})
+							send({ type: '[DONE]' })
+							// Back-compat terminator for strict SSE clients
+							controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+
+							// Persist assistant message after stream completes
+							if (supabase && metadata.chatId && metadata.userId) {
+								try {
+									const assistantParts: any[] = []
+									for (const id of toolCallOrder) {
+										const t = toolCalls.get(id)
+										if (!t) continue
+										assistantParts.push({
+											type: 'tool-invocation',
+											toolInvocation: {
+												state: 'call',
+												step: 0,
+												toolCallId: t.toolCallId,
+												toolName: t.toolName,
+												args: t.args || {},
+											},
+										})
+										if (t.result !== undefined) {
+											assistantParts.push({
+												type: 'tool-invocation',
+												toolInvocation: {
+													state: 'result',
+													step: 0,
+													toolCallId: t.toolCallId,
+													toolName: t.toolName,
+													result: t.result,
+												},
+											})
+										}
+									}
+									assistantParts.push({ type: 'text', text: finalText })
+
+									await storeAssistantMessage({
+										supabase,
+										userId: metadata.userId,
+										chatId: metadata.chatId,
+										messages: [{ role: 'assistant', content: assistantParts }],
+										message_group_id: metadata.message_group_id,
+										model: usedModel,
+										inputTokens,
+										outputTokens,
+									})
+								} catch {}
+							}
+						} catch (err) {
+							console.error('❌ Streaming error (token stream path):', err)
 							try {
-								if ((pipelineResult as any).routing) {
-									const r = (pipelineResult as any).routing
-									const routeEvent = { type: 'route', selectedModel: r.selectedModel, fallbackModel: r.fallbackModel, reasoning: r.reasoning, confidence: r.confidence }
-									controller.enqueue(encoder.encode(`data: ${JSON.stringify(routeEvent)}\n\n`))
-								}
+								controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'finish', error: 'stream-failed' })}\n\n`))
+								controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
 							} catch {}
-
-									// Emit actual model used (detect fallback via suffix)
-									try {
-										const used = pipelineResult.modelUsed || ''
-										const modelEvent = { type: 'model', modelUsed: used, fallback: /\(fallback\)$/i.test(used) }
-										controller.enqueue(encoder.encode(`data: ${JSON.stringify(modelEvent)}\n\n`))
-									} catch {}
-
-										// Emit tool invocations for UI, if present
-										try {
-											const inv = pipelineResult.toolInvocations || []
-											for (const t of inv) {
-												// tool-call (optional preview)
-												const callEvent = {
-													type: 'tool-invocation',
-													toolInvocation: {
-														state: 'call',
-														step: 0,
-														toolCallId: t.toolCallId,
-														toolName: t.toolName,
-														args: t.args || {},
-													}
-												}
-												controller.enqueue(encoder.encode(`data: ${JSON.stringify(callEvent)}\n\n`))
-												// tool-result
-												if (t.result !== undefined) {
-													const resultEvent = {
-														type: 'tool-invocation',
-														toolInvocation: {
-															state: 'result',
-															step: 0,
-															toolCallId: t.toolCallId,
-															toolName: t.toolName,
-															result: t.result,
-														}
-													}
-													controller.enqueue(encoder.encode(`data: ${JSON.stringify(resultEvent)}\n\n`))
-													// If this tool result indicates a confirmation is required, emit dedicated event
-													try {
-														if (t.result && typeof t.result === 'object' && (t.result as any).needsConfirmation) {
-															const confEvent = {
-																type: 'tool-confirmation',
-																confirmation: {
-																	toolCallId: t.toolCallId,
-																	toolName: t.toolName,
-																	confirmationId: (t.result as any).confirmationId,
-																	preview: (t.result as any).preview,
-																	pendingAction: (t.result as any).pendingAction,
-																}
-															}
-															controller.enqueue(encoder.encode(`data: ${JSON.stringify(confEvent)}\n\n`))
-														}
-													} catch {}
-												}
-											}
-										} catch {}
-
-										// Stream text chunks as text-delta events expected by the UI (uses `delta` key)
-					const words = fullText.split(' ')
-					for (let i = 0; i < words.length; i++) {
-						const deltaEvent = {
-							type: 'text-delta',
-							delta: words[i] + (i < words.length - 1 ? ' ' : ''),
 						}
-						controller.enqueue(encoder.encode(`data: ${JSON.stringify(deltaEvent)}\n\n`))
-					}
-
-					// Finish event with usage
-					const finishEvent = {
-						type: 'finish',
-						text: fullText,
-						usage: {
-							promptTokens: pipelineResult.tokens?.input || 0,
-							completionTokens: pipelineResult.tokens?.output || 0,
-							totalTokens:
-								(pipelineResult.tokens?.input || 0) + (pipelineResult.tokens?.output || 0),
-						},
-					}
-					controller.enqueue(encoder.encode(`data: ${JSON.stringify(finishEvent)}\n\n`))
-					// SSE terminator for clients that expect it
-					controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
-					
-					// Clean up pipeline event controller
-					clearPipelineEventController()
-					
-					controller.close()
+						try { clearPipelineEventController() } catch {}
+						try { controller.close() } catch {}
+					})().catch(() => {})
 				} catch (streamError) {
 					console.error('❌ Streaming error:', streamError)
 					// Clean up pipeline event controller on error

@@ -156,6 +156,17 @@ export function getAgentMetadata(agentId: string, agentName?: string): AgentMeta
   if (defaultMeta) {
     return defaultMeta
   }
+
+  // 1.5. If the agentId is not recognized (often a UUID for dynamically loaded agents),
+  // fall back to resolving by name when it matches a known predefined agent.
+  // This fixes cases where delegation uses UUID agent IDs but still reports agentName.
+  if (agentName) {
+    const byName = resolveKnownAgentIdFromName(agentName)
+    if (byName) {
+      const metaByName = AGENT_METADATA[byName]
+      if (metaByName) return metaByName
+    }
+  }
   
   // 2. Check custom agent cache (for dynamic agents)
   const cachedMeta = customAgentCache.get(agentId)
@@ -171,10 +182,38 @@ export function getAgentMetadata(agentId: string, agentName?: string): AgentMeta
   }
 }
 
+function resolveKnownAgentIdFromName(agentName: string): string | null {
+  const key = (agentName || '').trim().toLowerCase()
+  if (!key) return null
+
+  const nameMap: Record<string, string> = {
+    ankie: 'cleo-supervisor',
+    cleo: 'cleo-supervisor',
+    apu: 'apu-support',
+    emma: 'emma-ecommerce',
+    toby: 'toby-technical',
+    ami: 'ami-creative',
+    peter: 'peter-financial',
+    wex: 'wex-intelligence',
+    iris: 'iris-insights',
+    astra: 'astra-email',
+    jenn: 'jenn-community',
+    nora: 'nora-medical',
+    luna: 'luna-content',
+    zara: 'zara-analytics',
+    viktor: 'viktor-publisher',
+  }
+
+  return nameMap[key] || null
+}
+
 /**
  * Normalize agent ID to standard format
  */
 function normalizeAgentId(agentId: string): string {
+  const raw = (agentId || '').trim()
+  if (!raw) return agentId
+
   // Map common variations to standard IDs
   const idMap: Record<string, string> = {
     'cleo': 'cleo-supervisor',
@@ -212,8 +251,11 @@ function normalizeAgentId(agentId: string): string {
   'notion': 'notion-agent',
   'notion-agent': 'notion-agent'
   }
-  
-  return idMap[agentId.toLowerCase()] || agentId
+
+  // Normalize common tool-name derived ids (underscored) back to hyphenated form
+  const key = raw.toLowerCase().replace(/_/g, '-')
+
+  return idMap[key] || raw
 }
 
 /**

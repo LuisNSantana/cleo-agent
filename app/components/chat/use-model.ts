@@ -1,6 +1,7 @@
 import { toast } from "@/components/ui/toast"
 import { Chats } from "@/lib/chat-store/types"
 import { MODEL_DEFAULT, MODEL_DEFAULT_GUEST } from "@/lib/config"
+import { useModel as useModelStore } from "@/lib/model-store/provider"
 import type { UserProfile } from "@/lib/user/types"
 import { useCallback, useState, useEffect } from "react"
 
@@ -26,6 +27,8 @@ export function useModel({
   updateChatModel,
   chatId,
 }: UseModelProps) {
+  const { models } = useModelStore()
+
   // Prevent hydration mismatch by using consistent default
   const [isMounted, setIsMounted] = useState(false)
   
@@ -55,12 +58,53 @@ export function useModel({
     null
   )
 
+  const getModelStorageKey = useCallback(() => {
+    const uid = user?.id
+    return `cleo:selectedModelId:${uid || "guest"}`
+  }, [user?.id])
+
+  // Restore last selected model for new chats (unless the chat has an explicit model).
+  useEffect(() => {
+    if (!isMounted) return
+    if (currentChat?.model) return // chat-specific model wins
+    if (localSelectedModel) return // explicit local override wins
+    if (!Array.isArray(models) || models.length === 0) return
+
+    try {
+      const key = getModelStorageKey()
+      const saved = localStorage.getItem(key)
+      if (!saved) return
+      const exists = models.some((m) => m.id === saved)
+      if (exists) {
+        setLocalSelectedModel(saved)
+      } else {
+        // Clean up stale values so we don't keep showing "Select model".
+        localStorage.removeItem(key)
+      }
+    } catch {
+      // ignore
+    }
+  }, [isMounted, currentChat?.model, localSelectedModel, models, getModelStorageKey])
+
+  // When navigating between chats, drop any temporary override so chat model can render.
+  useEffect(() => {
+    setLocalSelectedModel(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId])
+
   // The actual selected model: local override or computed effective model
   const selectedModel: string = localSelectedModel ?? getEffectiveModel()
 
   // Function to handle model changes with proper validation and error handling
   const handleModelChange = useCallback(
     async (newModel: string) => {
+      // Persist last chosen model so it becomes the default for future chats.
+      try {
+        localStorage.setItem(getModelStorageKey(), newModel)
+      } catch {
+        // ignore
+      }
+
       // For authenticated users without a chat, we can't persist yet
       // but we still allow the model selection for when they create a chat
       if (!user?.id && !chatId) {
@@ -76,8 +120,6 @@ export function useModel({
 
         try {
           await updateChatModel(chatId, newModel)
-          // Clear local override since it's now persisted in the chat
-          setLocalSelectedModel(null)
         } catch (err) {
           // Revert on error
           setLocalSelectedModel(null)
@@ -94,7 +136,7 @@ export function useModel({
         setLocalSelectedModel(newModel)
       }
     },
-    [chatId, updateChatModel, user?.id]
+    [chatId, updateChatModel, user?.id, getModelStorageKey]
   )
 
   return {

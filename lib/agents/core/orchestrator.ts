@@ -1654,7 +1654,11 @@ export class AgentOrchestrator {
           progress: progressData.progress || 0,
           metadata: {
             sourceAgent: progressData.sourceAgent,
+            sourceAgentName:
+              progressData.sourceAgentName ||
+              getAgentDisplayName(progressData.sourceAgent),
             delegatedTo: progressData.targetAgent,
+            targetAgentName: targetDisplayName,
             task: progressData.task,
             status: progressData.status,
             stage: progressData.stage,

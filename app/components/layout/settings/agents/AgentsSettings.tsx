@@ -426,7 +426,7 @@ export function AgentsSettings() {
             ) : (
               <div className="space-y-3">
                 {recentActivity.map((execution) => {
-                  const meta = getAgentMetadata(execution.agentId)
+                  const meta = getAgentMetadata(execution.agentId, (execution as any).agentName)
                   const status =
                     execution.status === "failed"
                       ? "error"

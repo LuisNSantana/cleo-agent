@@ -870,8 +870,8 @@ export const useClientAgentStore = create<ClientAgentStore>()(
       const now = new Date()
       
       // Get agent metadata for display names
-      const sourceMetadata = getAgentMetadata(delegation.sourceAgent)
-      const targetMetadata = getAgentMetadata(delegation.targetAgent)
+      const sourceMetadata = getAgentMetadata(delegation.sourceAgent, (delegation as any).sourceAgentName)
+      const targetMetadata = getAgentMetadata(delegation.targetAgent, (delegation as any).targetAgentName)
       
       const fullDelegation: DelegationProgress = {
         ...delegation,
@@ -1008,12 +1008,20 @@ export const useClientAgentStore = create<ClientAgentStore>()(
         // Create new delegation if this is the first step
         if (metadata.status === 'requested' && metadata.stage === 'initializing') {
           // Get agent metadata for display names
-          const sourceMetadata = getAgentMetadata(metadata.sourceAgent || step.agent)
-          const targetMetadata = getAgentMetadata(metadata.delegatedTo)
+          const sourceAgentId = metadata.sourceAgent || step.agent
+          const targetAgentId = metadata.delegatedTo
+
+          const sourceAgentName = metadata.sourceAgentName
+          const targetAgentName = metadata.targetAgentName || step.agentName
+
+          const sourceMetadata = getAgentMetadata(sourceAgentId, sourceAgentName)
+          const targetMetadata = getAgentMetadata(targetAgentId, targetAgentName)
           
           currentDelegationId = store.startDelegation({
-            sourceAgent: metadata.sourceAgent || step.agent,
-            targetAgent: metadata.delegatedTo,
+            sourceAgent: sourceAgentId,
+            sourceAgentName,
+            targetAgent: targetAgentId,
+            targetAgentName,
             task: metadata.task || step.content,
             status: 'requested',
             stage: 'initializing',

@@ -6,6 +6,7 @@ import { ChatCircleDots, Lightning, CheckCircle } from "@phosphor-icons/react"
 
 interface DelegationDisplayProps {
   targetAgent: string
+  targetAgentName?: string
   task: string
   context?: string
   outputFormat?: string
@@ -20,6 +21,7 @@ interface DelegationDisplayProps {
  */
 export function DelegationDisplay({
   targetAgent,
+  targetAgentName,
   task,
   context,
   outputFormat,
@@ -27,7 +29,7 @@ export function DelegationDisplay({
   isCompleted = false,
   className,
 }: DelegationDisplayProps) {
-  const agentMeta = getAgentMetadata(targetAgent)
+  const agentMeta = getAgentMetadata(targetAgent, targetAgentName)
 
   return (
     <div className={cn("space-y-3", className)}>

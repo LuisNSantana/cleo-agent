@@ -266,7 +266,9 @@ export class DelegationCoordinator {
             progress: 0,
             metadata: {
               sourceAgent: delegationData.sourceAgent,
+              sourceAgentName: sourceMetadata.name,
               delegatedTo: delegationData.targetAgent,
+              targetAgentName,
               task: delegationData.task,
               status: 'in_progress',
               stage: 'processing'
@@ -379,6 +381,7 @@ export class DelegationCoordinator {
       // ✅ CRITICAL: Inherit isScheduledTask flag from parent execution
       // This ensures auto-approval bypasses HITL in delegated tasks (pre-authorized)
       let inheritedIsScheduledTask = false
+      let inheritedRootExecutionId: string | undefined
       if (delegationData.sourceExecutionId) {
         const sourceExecution = this.executionRegistry.get(delegationData.sourceExecutionId)
         if (sourceExecution && (sourceExecution as any).metadata?.isScheduledTask === true) {
@@ -387,6 +390,15 @@ export class DelegationCoordinator {
             parentExecId: delegationData.sourceExecutionId,
             childAgent: delegationData.targetAgent
           })
+        }
+
+        // ✅ CRITICAL: Inherit rootExecutionId so UI can safely stream delegated tokens into the parent chat
+        // Falls back to the parent execution id (sourceExecutionId) when root is unknown.
+        try {
+          const meta = (sourceExecution as any).metadata
+          inheritedRootExecutionId = meta?.rootExecutionId || meta?.parentExecutionId || delegationData.sourceExecutionId
+        } catch {
+          inheritedRootExecutionId = delegationData.sourceExecutionId
         }
       }
 
@@ -401,6 +413,7 @@ export class DelegationCoordinator {
           delegationPriority: normalizedPriority,
           isSubAgentDelegation: isSubAgent,
           parentExecutionId: delegationData.sourceExecutionId,
+          rootExecutionId: inheritedRootExecutionId || delegationData.sourceExecutionId,
           originalHistoryLength: conversationHistory.length,
           filteredHistoryLength: recentHistory.length,
           isSimpleTask,

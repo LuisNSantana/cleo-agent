@@ -1231,7 +1231,8 @@ export function useChatCore({
                       const step = {
                         id: `delegation-start-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
-                        agent: data.agentName || data.agentId,
+                        agent: data.agentId || 'cleo-supervisor',
+                        agentName: data.agentName || undefined,
                         action: 'delegation' as const,
                         content: `Starting delegation to ${data.agentName}: ${data.task}`,
                         metadata: { 
@@ -1254,7 +1255,8 @@ export function useChatCore({
                       const step = {
                         id: `delegation-processing-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
-                        agent: data.agentName || data.agentId,
+                        agent: data.agentId || 'cleo-supervisor',
+                        agentName: data.agentName || undefined,
                         action: 'delegation' as const,
                         content: `${data.agentName} is processing the task...`,
                         metadata: { 
@@ -1277,7 +1279,8 @@ export function useChatCore({
                       const step = {
                         id: `delegation-progress-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
-                        agent: data.agentName || data.agentId,
+                        agent: data.agentId || 'cleo-supervisor',
+                        agentName: data.agentName || undefined,
                         action: 'delegation' as const,
                         content: `${data.agentName} progress: ${data.status}${data.progress ? ` (${data.progress}%)` : ''}`,
                         metadata: { 
@@ -1301,7 +1304,8 @@ export function useChatCore({
                       const step = {
                         id: `delegation-complete-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
-                        agent: data.agentName || data.agentId,
+                        agent: data.agentId || 'cleo-supervisor',
+                        agentName: data.agentName || undefined,
                         action: 'delegation' as const,
                         content: `${data.agentName} completed the task successfully`,
                         metadata: { 
@@ -1325,7 +1329,8 @@ export function useChatCore({
                       const step = {
                         id: `delegation-error-${data.agentId}-${Date.now()}`,
                         timestamp: data.timestamp || new Date().toISOString(),
-                        agent: data.agentName || data.agentId,
+                        agent: data.agentId || 'cleo-supervisor',
+                        agentName: data.agentName || undefined,
                         action: 'delegation' as const,
                         content: `${data.agentName} failed: ${data.error}`,
                         metadata: { 

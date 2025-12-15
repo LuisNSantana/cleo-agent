@@ -815,9 +815,12 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
                   })()}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <AgentAvatar agentId={summaryStep.agent} />
+                  <AgentAvatar
+                    agentId={resolveAgentId(summaryStep)}
+                    agentName={summaryStep.agentName || resolveAgentName(summaryStep)}
+                  />
                   <p className="text-xs text-muted-foreground truncate">
-                    {summaryStep.agentName || getAgentMetadata(summaryStep.agent).name}
+                    {summaryStep.agentName || getAgentMetadata(resolveAgentId(summaryStep), resolveAgentName(summaryStep)).name}
                   </p>
                 </div>
               </div>
@@ -849,7 +852,7 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
                   </span>
                 )}
                 <span className="text-[11px] truncate flex-1">
-                  {step.agentName || getAgentMetadata(step.agent).name}
+                  {step.agentName || getAgentMetadata(resolveAgentId(step), resolveAgentName(step)).name}
                 </span>
                 {step.metadata?.toolName && (
                   <code className="text-[10px] bg-background/80 px-1 py-0.5 rounded border border-border/40">
@@ -864,7 +867,9 @@ export function PipelineTimeline({ steps, className, onPause, onResume }: Pipeli
           <ul className="grid gap-1.5">
             <AnimatePresence initial={false}>
               {visibleSteps.map((s, index) => {
-                const meta = getAgentMetadata(s.agent, s.agentName)
+                const resolvedAgentId = resolveAgentId(s)
+                const resolvedAgentName = resolveAgentName(s)
+                const meta = getAgentMetadata(resolvedAgentId, resolvedAgentName)
                 const isActive = index === visibleSteps.length - 1 // Last step is active
                 
                 // Parse reasoning blocks if present
@@ -1046,9 +1051,19 @@ function StatusDot({ action }: { action: PipelineStep['action'] }) {
   )
 }
 
-function AgentAvatar({ agentId }: { agentId: string }) {
-  const meta = getAgentMetadata(agentId)
+function AgentAvatar({ agentId, agentName }: { agentId: string; agentName?: string }) {
+  const meta = getAgentMetadata(agentId, agentName)
   const size = 28
+  
+  // Debug: Log when avatar resolution fails
+  if (process.env.NODE_ENV === 'development' && !meta.avatar) {
+    console.log('🔍 [AgentAvatar] No avatar found for:', {
+      agentId,
+      metaReturned: meta,
+      hasAvatar: !!meta.avatar
+    })
+  }
+  
   return (
     <div
       className="flex-shrink-0 h-[28px] w-[28px] overflow-hidden rounded-full ring ring-border/60 flex items-center justify-center"

@@ -359,6 +359,26 @@ function SingleToolCard({
     return null
   }, [isCompleted, result, toolName])
 
+  const delegationAgentName: string | undefined = useMemo(() => {
+    try {
+      let pr: any = null
+      if (isCompleted && result) {
+        if (typeof result === 'object' && result !== null && 'content' in result) {
+          const textItem = (result as any).content?.find?.((i: any) => i?.type === 'text')
+          if (textItem?.text) {
+            try { pr = JSON.parse(textItem.text) } catch { pr = null }
+          }
+        } else if (typeof result === 'object' && result !== null) {
+          pr = result
+        }
+      }
+      const name = pr?.agentName || pr?.targetAgentName || pr?.agent || undefined
+      return typeof name === 'string' && name.trim() ? name.trim() : undefined
+    } catch {
+      return undefined
+    }
+  }, [isCompleted, result])
+
   // Parse the result JSON if available
   const { parsedResult, parseError } = useMemo(() => {
     if (!isCompleted || !result) return { parsedResult: null, parseError: null }
@@ -434,6 +454,7 @@ function SingleToolCard({
         return (
           <DelegationDisplay
             targetAgent={delegationInfo.targetAgent}
+            targetAgentName={delegationAgentName}
             task={delegationInfo.task}
             context={delegationInfo.context}
             outputFormat={delegationInfo.outputFormat}
@@ -645,7 +666,7 @@ function SingleToolCard({
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
           {delegationAgentId ? (() => {
-            const meta = getAgentMetadata(delegationAgentId)
+            const meta = getAgentMetadata(delegationAgentId, delegationAgentName)
             if (meta.avatar) {
                
               return (
@@ -682,7 +703,7 @@ function SingleToolCard({
           </Tooltip>
           {delegationAgentId ? (
             <span className="text-muted-foreground hidden text-sm sm:inline">
-              · {getAgentMetadata(delegationAgentId).name}
+              · {getAgentMetadata(delegationAgentId, delegationAgentName).name}
             </span>
           ) : null}
           <AnimatePresence mode="popLayout" initial={false}>

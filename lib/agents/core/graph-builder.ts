@@ -1271,8 +1271,19 @@ export class GraphBuilder {
   private deriveAgentIdFromToolName(toolName?: string, explicit?: string): string {
     if (explicit && typeof explicit === 'string') return explicit
     if (!toolName) return 'unknown-agent'
-    // Strip 'delegate_to_' prefix, preserve original ID format (UUIDs with hyphens)
-    return toolName.replace(/^delegate_to_/i, '').trim() || 'unknown-agent'
+    // Strip 'delegate_to_' prefix.
+    // NOTE: Tool names are normalized in the registry (hyphens -> underscores) to satisfy provider constraints.
+    // We must restore canonical agent ids for UI + metadata mapping.
+    const raw = toolName.replace(/^delegate_to_/i, '').trim()
+    if (!raw) return 'unknown-agent'
+
+    // UUIDs are generated as delegate_to_<uuid_with_underscores>
+    // Restore uuid hyphens.
+    const looksLikeUuidUnderscored = /^[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}$/i.test(raw)
+    if (looksLikeUuidUnderscored) return raw.replace(/_/g, '-')
+
+    // Slugs (e.g. toby-technical) become toby_technical
+    return raw.replace(/_/g, '-')
   }
 
   private safeJsonParse(value: string) {

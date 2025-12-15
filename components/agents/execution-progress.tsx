@@ -107,7 +107,7 @@ export function ExecutionProgress({
   const icon = getStageIcon(stage)
 
   // Get agent metadata if agentId is provided
-  const agentMetadata = agentId ? getAgentMetadata(agentId) : null
+  const agentMetadata = agentId ? getAgentMetadata(agentId, agentName) : null
   const displayName = agentName || agentMetadata?.name || 'Agent'
   const displayAvatar = agentAvatar || agentMetadata?.avatar
 
