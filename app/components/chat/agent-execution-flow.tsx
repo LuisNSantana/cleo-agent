@@ -164,7 +164,16 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-lg">{meta.emoji || '🤖'}</span>
+                              {meta.avatar ? (
+                                <img src={meta.avatar} alt={meta.name} className="h-6 w-6 rounded-full object-cover" />
+                              ) : (
+                                <span 
+                                  className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                                  style={{ backgroundColor: meta.color || '#6366f1' }}
+                                >
+                                  {meta.initials || meta.name?.slice(0, 2).toUpperCase() || '??'}
+                                </span>
+                              )}
                             )}
                           </div>
                           {isLatest && (

@@ -9,6 +9,7 @@ export interface AgentMetadata {
   avatar?: string
   color?: string
   emoji?: string
+  initials?: string // ✅ Initials for avatar fallback (e.g., "AT" for "Atliis")
 }
 
 // Cache for custom agents loaded dynamically
@@ -154,7 +155,10 @@ export function getAgentMetadata(agentId: string, agentName?: string): AgentMeta
   // 1. Check predefined agents
   const defaultMeta = AGENT_METADATA[normalizedId]
   if (defaultMeta) {
-    return defaultMeta
+    return {
+      ...defaultMeta,
+      initials: getInitials(defaultMeta.name)
+    }
   }
 
   // 1.5. If the agentId is not recognized (often a UUID for dynamically loaded agents),
@@ -164,21 +168,30 @@ export function getAgentMetadata(agentId: string, agentName?: string): AgentMeta
     const byName = resolveKnownAgentIdFromName(agentName)
     if (byName) {
       const metaByName = AGENT_METADATA[byName]
-      if (metaByName) return metaByName
+      if (metaByName) return {
+        ...metaByName,
+        initials: getInitials(metaByName.name)
+      }
     }
   }
   
   // 2. Check custom agent cache (for dynamic agents)
   const cachedMeta = customAgentCache.get(agentId)
   if (cachedMeta) {
-    return cachedMeta
+    return {
+      ...cachedMeta,
+      initials: getInitials(cachedMeta.name)
+    }
   }
   
   // 3. For unknown agents, use provided name or format from ID
+  const displayName = agentName || formatAgentName(agentId)
   return {
     id: agentId,
-    name: agentName || formatAgentName(agentId),
-    emoji: '🤖'
+    name: displayName,
+    emoji: '🤖',
+    initials: getInitials(displayName),
+    color: getAvatarColorFromName(displayName)
   }
 }
 
@@ -256,6 +269,60 @@ function normalizeAgentId(agentId: string): string {
   const key = raw.toLowerCase().replace(/_/g, '-')
 
   return idMap[key] || raw
+}
+
+/**
+ * Generate initials from a name (for avatar fallback)
+ * Examples: "Atliis" -> "AT", "John Doe" -> "JD", "Cleo Supervisor" -> "CS"
+ */
+export function getInitials(name: string): string {
+  if (!name || typeof name !== 'string') return '?'
+  
+  const cleaned = name.trim()
+  if (!cleaned) return '?'
+  
+  // Split by spaces or hyphens
+  const words = cleaned.split(/[\s-]+/).filter(Boolean)
+  
+  if (words.length === 1) {
+    // Single word: take first 2 characters
+    return cleaned.slice(0, 2).toUpperCase()
+  }
+  
+  // Multiple words: take first character of first two words
+  return words
+    .slice(0, 2)
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+}
+
+/**
+ * Generate a consistent color based on string hash (for avatar backgrounds)
+ * Returns a tailwind-compatible color class
+ */
+export function getAvatarColorFromName(name: string): string {
+  const colors = [
+    'bg-blue-500',
+    'bg-purple-500',
+    'bg-green-500',
+    'bg-orange-500',
+    'bg-pink-500',
+    'bg-cyan-500',
+    'bg-indigo-500',
+    'bg-teal-500',
+    'bg-rose-500',
+    'bg-amber-500',
+  ]
+  
+  // Simple hash function
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i)
+    hash = hash & hash // Convert to 32bit integer
+  }
+  
+  return colors[Math.abs(hash) % colors.length]
 }
 
 /**

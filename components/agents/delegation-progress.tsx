@@ -91,8 +91,11 @@ export function DelegationProgressComponent({
                       src={sourceMeta.avatar} 
                       alt={sourceMeta.name} 
                     />
-                    <AvatarFallback className="text-xs">
-                      {sourceMeta.emoji}
+                    <AvatarFallback 
+                      className="text-xs font-semibold text-white"
+                      style={{ backgroundColor: sourceMeta.color || '#6366f1' }}
+                    >
+                      {sourceMeta.initials || sourceMeta.name?.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -104,8 +107,11 @@ export function DelegationProgressComponent({
                       src={targetMeta.avatar} 
                       alt={targetMeta.name} 
                     />
-                    <AvatarFallback className="text-xs">
-                      {targetMeta.emoji}
+                    <AvatarFallback 
+                      className="text-xs font-semibold text-white"
+                      style={{ backgroundColor: targetMeta.color || '#6366f1' }}
+                    >
+                      {targetMeta.initials || targetMeta.name?.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </div>

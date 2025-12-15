@@ -47,7 +47,16 @@ export function DelegationDisplay({
               className="flex h-10 w-10 items-center justify-center rounded-full ring-2 ring-border/60"
               aria-label={agentMeta.name}
             >
-              <span className="text-2xl">{agentMeta.emoji || '🤖'}</span>
+              {agentMeta.avatar ? (
+                <img src={agentMeta.avatar} alt={agentMeta.name} className="h-8 w-8 rounded-full object-cover" />
+              ) : (
+                <div 
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white"
+                  style={{ backgroundColor: agentMeta.color || '#6366f1' }}
+                >
+                  {agentMeta.initials || agentMeta.name?.slice(0, 2).toUpperCase() || '??'}
+                </div>
+              )}
             </div>
           )}
         </div>

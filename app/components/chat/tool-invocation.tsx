@@ -683,7 +683,16 @@ function SingleToolCard({
                 aria-label={meta.name}
                 title={meta.name}
               >
-                <span className="text-base leading-6">{meta.emoji || '🤖'}</span>
+                {meta.avatar ? (
+                  <img src={meta.avatar} alt={meta.name} className="h-5 w-5 rounded-full object-cover" />
+                ) : (
+                  <span 
+                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
+                    style={{ backgroundColor: meta.color || '#6366f1' }}
+                  >
+                    {meta.initials || meta.name?.slice(0, 2).toUpperCase() || '??'}
+                  </span>
+                )}
               </div>
             )
           })() : null}

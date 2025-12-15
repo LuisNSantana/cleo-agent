@@ -111,11 +111,12 @@ export function ExpandableStep({
               />
             </div>
           ) : (
-            <div className={cn(
-              "h-7 w-7 rounded-full ring-1 ring-border/60 flex items-center justify-center text-xs font-semibold",
-              "bg-gradient-to-br from-primary/20 to-primary/5 text-foreground/80"
-            )}>
-              {agentMeta.emoji || getInitials(agentMeta.name || agentId)}
+            // ✅ INITIALS FALLBACK: Modern UX standard
+            <div 
+              className="h-7 w-7 rounded-full ring-1 ring-border/60 flex items-center justify-center text-xs font-semibold text-white"
+              style={{ backgroundColor: agentMeta.color || '#6366f1' }}
+            >
+              {agentMeta.initials || getInitials(agentMeta.name || agentId)}
             </div>
           )}
         </div>

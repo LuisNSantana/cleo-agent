@@ -213,41 +213,22 @@ function ConversationContent({
   latestMessage: MessageType
   chatInterrupts: InterruptState[]
 }) {
-  const { scrollToBottom, isAtBottom, state } = useStickToBottomContext()
-  const lastAutoscrollMessageRef = useRef<string | null>(null)
-
+  const { scrollToBottom, isAtBottom } = useStickToBottomContext()
+  const bottomRef = useRef<HTMLDivElement>(null)
+  
+  // ✅ SIMPLE AUTO-SCROLL: Let use-stick-to-bottom handle most cases
+  // We only need to help during streaming by computing a content fingerprint
+  const latestMessageContent = latestMessage ? extractTextFromMessage(latestMessage) : ""
+  const latestMessagePartsLen = (latestMessage as any)?.parts?.length ?? 0
+  
+  // Auto-scroll during streaming when user is at bottom
   useEffect(() => {
-    if (!latestMessage) return
-    const isAssistantDone = latestMessage.role === "assistant" && status !== "streaming"
-    if (!isAssistantDone) {
-      return
-    }
-
-    const nearBottom = state?.isNearBottom ?? isAtBottom
-    if (!nearBottom) {
-      return
-    }
-
-    const messageKey = `${latestMessage.id}:${(latestMessage as any)?.parts?.length ?? 0}`
-    if (lastAutoscrollMessageRef.current === messageKey) {
-      return
-    }
-
-    lastAutoscrollMessageRef.current = messageKey
-
-    const raf = requestAnimationFrame(() => {
-      scrollToBottom({
-        animation: {
-          damping: 0.75,
-          stiffness: 0.09,
-          mass: 1.1,
-        },
-        wait: 32,
-      })
-    })
-
-    return () => cancelAnimationFrame(raf)
-  }, [latestMessage, status, scrollToBottom, isAtBottom, state?.isNearBottom])
+    // Only auto-scroll during streaming when at bottom
+    if (status !== 'streaming' || !isAtBottom) return
+    
+    // Use the library's scroll function - it respects user intent
+    scrollToBottom()
+  }, [latestMessageContent.length, latestMessagePartsLen, status, isAtBottom, scrollToBottom])
 
   return (
     <ChatContainerContent
@@ -363,6 +344,13 @@ function ConversationContent({
 
           {/* Simple In-Chat Confirmation */}
           {/* Removed legacy InChatConfirmation (now handled via pendingToolConfirmation modal) */}
+
+          {/* ✅ SCROLL ANCHOR: Element at the very bottom */}
+          <div 
+            ref={bottomRef} 
+            className="h-px w-full shrink-0" 
+            aria-hidden="true"
+          />
 
           <div className="pointer-events-none sticky bottom-0 flex w-full max-w-4xl items-end justify-end gap-4 px-6 pb-2">
             <ScrollButton className="absolute top-[-50px] right-[30px]" />

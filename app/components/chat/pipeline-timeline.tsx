@@ -1055,15 +1055,6 @@ function AgentAvatar({ agentId, agentName }: { agentId: string; agentName?: stri
   const meta = getAgentMetadata(agentId, agentName)
   const size = 28
   
-  // Debug: Log when avatar resolution fails
-  if (process.env.NODE_ENV === 'development' && !meta.avatar) {
-    console.log('🔍 [AgentAvatar] No avatar found for:', {
-      agentId,
-      metaReturned: meta,
-      hasAvatar: !!meta.avatar
-    })
-  }
-  
   return (
     <div
       className="flex-shrink-0 h-[28px] w-[28px] overflow-hidden rounded-full ring ring-border/60 flex items-center justify-center"
@@ -1079,8 +1070,12 @@ function AgentAvatar({ agentId, agentName }: { agentId: string; agentName?: stri
           className="h-full w-full object-cover"
         />
       ) : (
-        <div className="bg-muted flex h-full w-full items-center justify-center text-[12px]">
-          {meta.emoji || '🤖'}
+        // ✅ INITIALS FALLBACK: Modern UX standard (like Slack, Teams, Linear)
+        <div 
+          className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-white"
+          style={{ backgroundColor: meta.color || '#6366f1' }}
+        >
+          {meta.initials || meta.name?.slice(0, 2).toUpperCase() || '??'}
         </div>
       )}
     </div>
