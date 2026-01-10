@@ -482,6 +482,30 @@ function SingleToolCard({
       )
     }
 
+    // Special-case: generateImage → render image
+    if (toolName === "generateImage" && parsedResult && typeof parsedResult === 'object') {
+      const pr: any = parsedResult
+      if (pr.success && pr.imageUrl) {
+        return (
+          <div className="space-y-3 my-2">
+            <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+              <img 
+                src={pr.imageUrl} 
+                alt={pr.title || "Generated image"}
+                className="w-full h-auto object-cover max-h-[500px]"
+                loading="lazy"
+              />
+            </div>
+            {pr.description && (
+              <p className="text-sm text-muted-foreground italic px-1">
+                {pr.description}
+              </p>
+            )}
+          </div>
+        )
+      }
+    }
+
     // Handle createDocumentTool specifically
     if (toolName === "createDocument" && parsedResult) {
       return <DocumentToolDisplay result={parsedResult} />
