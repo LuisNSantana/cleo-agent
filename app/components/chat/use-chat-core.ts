@@ -1683,7 +1683,8 @@ export function useChatCore({
         }
 
         // Preprocess images (compress/resize) before upload to reduce payload
-        const processedFiles = await preprocessImages(currentFiles, { maxBytes: 4 * 1024 * 1024, maxDimension: 2000 })
+        // P0 FIX: Aggressive compression to prevent token overflow (512KB ≈ 170K tokens vs 4MB ≈ 1.37M tokens)
+        const processedFiles = await preprocessImages(currentFiles, { maxBytes: 512 * 1024, maxDimension: 1024, quality: 0.75 })
 
         // Upload ALL files (images + documents) to Supabase when possible
         let supabaseAttachments: Attachment[] = []

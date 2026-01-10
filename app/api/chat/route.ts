@@ -17,7 +17,7 @@ import type { ProviderWithoutOllama } from '@/lib/user-keys'
 // Chat processing utilities
 import { convertUserMultimodalMessages } from '@/lib/chat/convert-messages'
 import { filterImagesByModelLimit } from '@/lib/chat/image-filter'
-import { MODEL_IMAGE_LIMITS } from '@/lib/image-management'
+import { MODEL_IMAGE_LIMITS, filterImagesByTokenBudget } from '@/lib/image-management'
 import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
 
 // Tools and delegation
@@ -513,6 +513,9 @@ export async function POST(req: Request) {
         limit: imageLimit 
       })
     }
+
+    // P1 FIX: Apply token budget filter to prevent context overflow
+    convertedMessages = filterImagesByTokenBudget(convertedMessages) as any
 
     if (convertedMultimodal.length > 0) {
       // reserved for future per-image diagnostics

@@ -27,6 +27,15 @@ export const MODEL_IMAGE_LIMITS: Record<string, ImageLimits> = {
   }
 }
 
+// P1 FIX: Token budget constants for preventing context overflow
+// Formula: base64 length / 4 ≈ tokens (conservative estimate)
+export const IMAGE_TOKEN_LIMITS = {
+  // Max total tokens for all images combined (500K leaves room for text/system prompt)
+  maxTotalImageTokens: 500_000,
+  // Tokens per character in base64 (1 token ≈ 4 chars)
+  tokensPerChar: 0.25,
+}
+
 export interface MessageWithImages {
   role: string
   content: Array<{ type: string; image?: string; text?: string; [key: string]: any }>
@@ -261,4 +270,88 @@ export async function optimizeImagesForModel(
   
   console.log(`[IMAGE MGMT] Optimization complete`)
   return optimized
+}
+
+/**
+ * P1 FIX: Filter images by total token budget
+ * Removes oldest images first when total estimated tokens exceed budget
+ * This prevents "maximum prompt length exceeded" errors
+ */
+export function filterImagesByTokenBudget(
+  messages: any[],
+  maxTokenBudget: number = IMAGE_TOKEN_LIMITS.maxTotalImageTokens
+): any[] {
+  // Collect all images with their estimated token counts
+  const imageData: Array<{
+    messageIndex: number
+    contentIndex: number
+    estimatedTokens: number
+    isRecent: boolean
+  }> = []
+
+  messages.forEach((msg, msgIdx) => {
+    if (Array.isArray(msg.content)) {
+      msg.content.forEach((part: any, partIdx: number) => {
+        if (part.type === 'image' && part.image) {
+          // Estimate tokens: base64 length / 4
+          const estimatedTokens = Math.ceil(part.image.length * IMAGE_TOKEN_LIMITS.tokensPerChar)
+          imageData.push({
+            messageIndex: msgIdx,
+            contentIndex: partIdx,
+            estimatedTokens,
+            isRecent: msgIdx >= messages.length - 2 // Last 2 messages are "recent"
+          })
+        }
+      })
+    }
+  })
+
+  const totalTokens = imageData.reduce((sum, img) => sum + img.estimatedTokens, 0)
+  
+  console.log(`[IMAGE MGMT] Token budget check: ${totalTokens.toLocaleString()} tokens from ${imageData.length} images (budget: ${maxTokenBudget.toLocaleString()})`)
+
+  if (totalTokens <= maxTokenBudget) {
+    return messages // No filtering needed
+  }
+
+  // Sort by priority: recent images first, then by message order
+  const prioritized = [...imageData].sort((a, b) => {
+    if (a.isRecent !== b.isRecent) return a.isRecent ? -1 : 1
+    return b.messageIndex - a.messageIndex // More recent messages first
+  })
+
+  // Keep images until we hit the budget
+  let usedTokens = 0
+  const keepSet = new Set<string>()
+  
+  for (const img of prioritized) {
+    if (usedTokens + img.estimatedTokens <= maxTokenBudget) {
+      keepSet.add(`${img.messageIndex}-${img.contentIndex}`)
+      usedTokens += img.estimatedTokens
+    }
+  }
+
+  console.log(`[IMAGE MGMT] Token budget filter: keeping ${keepSet.size}/${imageData.length} images (${usedTokens.toLocaleString()} tokens)`)
+
+  // Filter messages
+  return messages.map((msg, msgIdx) => {
+    if (!Array.isArray(msg.content)) return msg
+
+    const filteredContent = msg.content.map((part: any, partIdx: number) => {
+      if (part.type === 'image' && part.image) {
+        const key = `${msgIdx}-${partIdx}`
+        if (keepSet.has(key)) {
+          return part
+        } else {
+          return {
+            type: 'text' as const,
+            text: '[Image removed to stay within context limits]'
+          }
+        }
+      }
+      return part
+    })
+
+    return { ...msg, content: filteredContent }
+  })
 }
