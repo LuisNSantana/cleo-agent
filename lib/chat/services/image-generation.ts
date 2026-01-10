@@ -1,6 +1,11 @@
 /**
  * Image generation service
- * Handles AI image generation via multiple providers (FLUX, DALL-E, Gemini)
+ * Handles AI image generation via OpenAI (gpt-image-1-mini as primary, DALL-E 3 fallback)
+ * 
+ * COST OPTIMIZATION (Jan 2026):
+ * - gpt-image-1-mini: $0.005-0.036 per image (primary)
+ * - DALL-E 3: $0.04-0.12 per image (fallback)
+ * - Gemini via OpenRouter: removed (less reliable)
  */
 
 import { dailyLimits } from '@/lib/daily-limits'
@@ -23,17 +28,21 @@ interface ImageGenerationResult {
 
 export type { ImageGenerationResult }
 
+// Quality levels for gpt-image-1-mini
+type ImageQuality = 'low' | 'medium' | 'high'
+
 export class ImageGenerationService {
   /**
-   * Generate image using preferred provider with fallbacks
+   * Generate image using gpt-image-1-mini (cheapest) with DALL-E 3 fallback
    */
   async generateImage(
     prompt: string,
     userId?: string,
-    isAuthenticated?: boolean
+    isAuthenticated?: boolean,
+    quality: ImageQuality = 'medium'
   ): Promise<ImageGenerationResult> {
     try {
-      chatLogger.debug('Starting image generation', { prompt: prompt.slice(0, 50) })
+      chatLogger.debug('Starting image generation', { prompt: prompt.slice(0, 50), quality })
 
       // Get user from Supabase if authenticated
       let user = null
@@ -45,18 +54,22 @@ export class ImageGenerationService {
         }
       }
 
-      // Determine model ID
-      const preferredId = 'gemini-2.5-flash-image-preview'
-      const legacyId = 'openrouter:google/gemini-2.5-flash-image-preview'
-      const modelId = MODELS.find((m) => m.id === preferredId) ? preferredId : legacyId
-
+      // Primary model: gpt-image-1-mini
+      const modelId = 'gpt-image-1-mini'
       const modelConfig = MODELS.find((m) => m.id === modelId)
-      if (!modelConfig) {
-        throw new Error('Image generation model not found')
+      
+      // Fallback config if model not in registry
+      const effectiveModelConfig = modelConfig || {
+        id: modelId,
+        name: 'GPT Image 1 Mini',
+        maxCalls: 50,
+        provider: 'openai',
+        providerId: 'gpt-image-1-mini',
+        baseProviderId: 'openai',
       }
 
       // Check daily limits for authenticated users
-      if (user?.id) {
+      if (user?.id && modelConfig) {
         const limitCheck = await dailyLimits.canUseModel(user.id, modelId, modelConfig)
 
         if (!limitCheck.canUse) {
@@ -66,9 +79,9 @@ export class ImageGenerationService {
         }
       }
 
-      // Try providers in order: OpenRouter FLUX → OpenAI DALL-E → Mock fallback
-      const result = await this.tryOpenRouterFlux(prompt, user?.id, modelId)
-        .catch(() => this.tryOpenAIDallE(prompt, user?.id, modelId))
+      // Try providers in order: gpt-image-1-mini → DALL-E 3 → Mock fallback
+      const result = await this.tryGptImageMini(prompt, user?.id, modelId, quality)
+        .catch(() => this.tryOpenAIDallE(prompt, user?.id, 'dall-e-3'))
         .catch((err) => this.createMockFallback(prompt, user?.id, modelId, err))
 
       return result
@@ -77,62 +90,61 @@ export class ImageGenerationService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        model: 'openrouter:google/gemini-2.5-flash-image-preview',
+        model: 'gpt-image-1-mini',
       }
     }
   }
 
   /**
-   * Try OpenRouter FLUX.1 image generation
+   * Primary: OpenAI gpt-image-1-mini (cheapest option)
+   * Pricing: $0.005 (low) / $0.011 (medium) / $0.036 (high) per 1024x1024
    */
-  private async tryOpenRouterFlux(
+  private async tryGptImageMini(
     prompt: string,
     userId: string | undefined,
-    modelId: string
+    modelId: string,
+    quality: ImageQuality = 'medium'
   ): Promise<ImageGenerationResult> {
-    const openrouterApiKey = process.env.OPENROUTER_API_KEY
-    if (!openrouterApiKey) {
-      throw new Error('OpenRouter API key not configured')
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured')
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    chatLogger.info('Attempting image generation with gpt-image-1-mini', { quality })
+
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${openrouterApiKey}`,
+        Authorization: `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        'X-Title': 'Cleo Agent',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a high-quality image: ${prompt}`,
-          },
-        ],
-        modalities: ['image', 'text'],
-        max_tokens: 1000,
+        model: 'gpt-image-1-mini',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: quality,
       }),
     })
 
     if (!response.ok) {
       const errorData = await response.text()
-      throw new Error(`OpenRouter API error: ${response.status} - ${errorData}`)
+      chatLogger.warn('gpt-image-1-mini failed, trying fallback', { status: response.status })
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`)
     }
 
     const data = await response.json()
-    const imageData = data.choices?.[0]?.message?.images?.[0]
+    const imageUrl = data.data?.[0]?.url
 
-    if (!imageData?.image_url?.url) {
-      throw new Error('No image URL in OpenRouter response')
+    if (!imageUrl) {
+      throw new Error('No image URL received from gpt-image-1-mini')
     }
 
     const result = {
-      imageUrl: imageData.image_url.url,
+      imageUrl,
       title: `Generated Image: ${prompt.slice(0, 50)}`,
-      description: `AI-generated image using Gemini 2.5 Flash Image Preview: "${prompt}"`,
-      style: 'Gemini 2.5 Flash',
+      description: `AI-generated image using GPT Image 1 Mini: "${prompt}"`,
+      style: 'GPT Image Mini',
       dimensions: { width: 1024, height: 1024 },
     }
 
@@ -142,12 +154,13 @@ export class ImageGenerationService {
       })
     }
 
-    chatLogger.info('Image generated via OpenRouter FLUX')
+    chatLogger.info('Image generated via gpt-image-1-mini', { quality })
     return { success: true, result, model: modelId }
   }
 
   /**
-   * Try OpenAI DALL-E 3 as fallback
+   * Fallback: OpenAI DALL-E 3 (higher quality, higher cost)
+   * Pricing: $0.04 (standard) / $0.08-0.12 (HD) per 1024x1024
    */
   private async tryOpenAIDallE(
     prompt: string,
@@ -158,6 +171,8 @@ export class ImageGenerationService {
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured for fallback')
     }
+
+    chatLogger.info('Falling back to DALL-E 3')
 
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
@@ -183,7 +198,7 @@ export class ImageGenerationService {
     const imageUrl = data.data[0]?.url
 
     if (!imageUrl) {
-      throw new Error('No image URL received from OpenAI')
+      throw new Error('No image URL received from DALL-E 3')
     }
 
     const result = {
@@ -205,7 +220,7 @@ export class ImageGenerationService {
   }
 
   /**
-   * Create mock fallback when all providers fail
+   * Emergency fallback when all providers fail
    */
   private async createMockFallback(
     prompt: string,
@@ -234,3 +249,4 @@ export class ImageGenerationService {
 }
 
 export const imageGenerationService = new ImageGenerationService()
+

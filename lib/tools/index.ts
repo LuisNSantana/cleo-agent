@@ -11,6 +11,7 @@ import { createDocumentTool } from './create-document'
 import { openDocumentTool } from './open-document'
 import { memoryAddNoteTool } from './memory'
 import { leadResearchTool } from './lead-research'
+import { generateImageTool } from './generate-image'
 
 // Task management
 // Inline completeTaskTool (no separate file found)
@@ -314,6 +315,7 @@ export const tools = {
 	webSearch: webSearchTool,
 	memoryAddNote: memoryAddNoteTool,
 	leadResearch: leadResearchTool,
+	generateImage: generateImageTool, // ⭐ NEW: AI image generation tool
 
 	// Utilities
 	// Canonical keys
