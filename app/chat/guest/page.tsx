@@ -42,7 +42,7 @@ export default function GuestChatPage() {
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-border/40 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-3">
           <img 
-            src="/img/kyliologo.png" 
+            src="/img/agents/ankie4.png" 
             alt="Cleo" 
             className="h-8 w-8 rounded-lg border border-primary/20"
           />

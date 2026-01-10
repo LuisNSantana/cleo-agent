@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/tooltip"
 import { X } from "@phosphor-icons/react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
 
 type FileItemProps = {
   file: File
@@ -26,10 +26,29 @@ export function FileItem({ file, onRemove }: FileItemProps) {
   // Detectar si es un dibujo del canvas
   const isCanvasDrawing = file.name === 'canvas-drawing.png'
 
+  // PERFORMANCE FIX: Cache the object URL to prevent re-creation on every render
+  // This fixes the slow typing issue when images are attached
+  const imageUrl = useMemo(() => {
+    if (file.type.includes("image")) {
+      return URL.createObjectURL(file)
+    }
+    return null
+  }, [file])
+
+  // Cleanup object URL when component unmounts or file changes to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl)
+      }
+    }
+  }, [imageUrl])
+
   const handleRemove = () => {
     setIsRemoving(true)
     onRemove(file)
   }
+
 
   return (
     <div className="relative mr-2 mb-0 flex items-center">
@@ -52,10 +71,10 @@ export function FileItem({ file, onRemove }: FileItemProps) {
                 : 'bg-accent-foreground'
               }
             `}>
-              {file.type.includes("image") ? (
+              {file.type.includes("image") && imageUrl ? (
                 <>
                   <Image
-                    src={URL.createObjectURL(file)}
+                    src={imageUrl}
                     alt={file.name}
                     width={40}
                     height={40}
@@ -96,13 +115,15 @@ export function FileItem({ file, onRemove }: FileItemProps) {
           }
         `}>
           <div className="relative">
-            <Image
-              src={URL.createObjectURL(file)}
-              alt={file.name}
-              width={200}
-              height={200}
-              className="h-full w-full object-cover rounded-lg"
-            />
+            {imageUrl && (
+              <Image
+                src={imageUrl}
+                alt={file.name}
+                width={200}
+                height={200}
+                className="h-full w-full object-cover rounded-lg"
+              />
+            )}
             {isCanvasDrawing && (
               <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-blue-400 rounded-full"></div>

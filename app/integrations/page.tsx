@@ -558,7 +558,7 @@ export default function IntegrationsPage() {
               Integrations
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-              Connect your favorite accounts and services to supercharge Cleo Agent's capabilities with productivity, e-commerce, and automation tools
+              Connect your favorite accounts and services to supercharge Ankie's capabilities with productivity, e-commerce, and automation tools
             </p>
             
             {/* Botón de refresh */}
@@ -781,7 +781,7 @@ export default function IntegrationsPage() {
               <div>
                 <h4 className="font-medium mb-2">🤖 Smart Automation</h4>
                 <p className="text-sm text-muted-foreground">
-                  Enable Cleo Agent to interact directly with your favorite tools,
+                  Enable Ankie to interact directly with your favorite tools,
                   automating repetitive tasks and complex workflows.
                 </p>
               </div>
@@ -837,7 +837,7 @@ export default function IntegrationsPage() {
                   <div className="text-sm text-amber-800 dark:text-amber-200">
                     <p className="font-medium mb-1">What happens when you disconnect:</p>
                     <ul className="list-disc list-inside space-y-1 text-xs text-amber-700 dark:text-amber-300">
-                      <li>Cleo will no longer be able to access your {disconnectDialog.serviceName} account</li>
+                      <li>Ankie will no longer be able to access your {disconnectDialog.serviceName} account</li>
                       <li>Any scheduled automations using this integration will stop working</li>
                       <li>Your data remains safe in your {disconnectDialog.serviceName} account</li>
                     </ul>

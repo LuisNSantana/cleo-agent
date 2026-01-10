@@ -98,7 +98,7 @@ export function AgentsSettings() {
         <CardContent>
           <div className="flex gap-2">
             <Input
-              placeholder="Ingresa una consulta para ejecutar con Kylio..."
+              placeholder="Ingresa una consulta para ejecutar con Ankie..."
               value={quickInput}
               onChange={(e) => setQuickInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleExecuteQuick()}

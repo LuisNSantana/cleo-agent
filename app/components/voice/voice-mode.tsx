@@ -142,7 +142,7 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
       case 'listening':
         return 'Escuchando...'
       case 'speaking':
-        return 'Cleo está hablando...'
+        return 'Ankie está hablando...'
       case 'error':
         return 'Error en la conexión'
       default:
@@ -234,13 +234,13 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
             {/* Main content */}
             {!isActive ? (
               <div className="flex flex-col items-center space-y-6">
-                {/* Cleo Avatar */}
+                {/* Ankie Avatar */}
                 <div className="relative">
                   <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl" />
                   <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-600/10 backdrop-blur-sm flex items-center justify-center ring-4 ring-purple-500/20 overflow-hidden">
                     <img 
-                      src="/img/kyliologo.png" 
-                      alt="Cleo" 
+                      src="/img/agents/ankie4.png" 
+                      alt="Ankie" 
                       className="w-20 h-20 object-contain"
                     />
                   </div>
@@ -252,10 +252,10 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
                 {/* Title */}
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl font-bold text-white">
-                    Habla con Cleo
+                    Habla con Ankie
                   </h2>
                   <p className="text-sm text-zinc-400 max-w-xs">
-                    Inicia una conversación por voz. Cleo te escuchará y responderá como en una llamada.
+                    Inicia una conversación por voz. Ankie te escuchará y responderá como en una llamada.
                   </p>
                 </div>
 
@@ -343,7 +343,7 @@ export function VoiceMode({ chatId, onClose }: VoiceModeProps) {
 
                 {/* Hint */}
                 <p className="text-xs text-zinc-500 text-center">
-                  Habla naturalmente, Cleo te responderá
+                  Habla naturalmente, Ankie te responderá
                 </p>
               </div>
             )}

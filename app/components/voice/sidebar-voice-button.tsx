@@ -30,7 +30,7 @@ export function SidebarVoiceButton() {
       if (!user?.id) {
         toast({
           title: 'Activa tu cuenta para usar voz',
-          description: 'Inicia sesión o crea una cuenta para acceder al modo voz de Cleo.',
+          description: 'Inicia sesión o crea una cuenta para acceder al modo voz de Ankie.',
           status: 'info',
         })
       } else {
@@ -52,7 +52,7 @@ export function SidebarVoiceButton() {
 
     if (!isAuthenticated) {
       toast({
-        title: 'Inicia sesión para hablar con Cleo',
+        title: 'Inicia sesión para hablar con Ankie',
         description: 'El modo voz está disponible solo para cuentas registradas.',
         status: 'info',
       })

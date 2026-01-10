@@ -443,9 +443,9 @@ export function MultiChat() {
           >
             <h1
               className="mb-6 mt-4 text-3xl md:text-4xl font-semibold tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-indigo-700 dark:from-white dark:to-indigo-300 drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
-              aria-label="Let Kylio be with you."
+              aria-label="Let Ankie be with you."
             >
-              Let Kylio be with you.
+              Let Ankie be with you.
             </h1>
           </motion.div>
         ) : (
