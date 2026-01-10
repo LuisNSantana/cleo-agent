@@ -23,7 +23,7 @@ export function FinalCTASection() {
   return (
     <>
   <section className="relative w-full overflow-hidden bg-background py-16 text-foreground sm:py-24 lg:py-32">
-        <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
+        <div className="mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-12">
           <motion.div
             className="mx-auto max-w-3xl text-center"
             initial={{ opacity: 0, y: 20 }}
@@ -65,7 +65,7 @@ export function FinalCTASection() {
         </div>
       </section>
 
-  <section className="relative w-full overflow-hidden bg-[#09090b] py-16 sm:py-24 lg:py-32">
+  <section className="relative w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:bg-[#09090b] dark:from-[#09090b] dark:via-[#09090b] dark:to-[#09090b] py-16 sm:py-24 lg:py-32">
         <div className="absolute inset-0 -z-10">
           <motion.div
             className="absolute left-1/4 top-1/4 h-64 sm:h-96 w-64 sm:w-96 rounded-full bg-[#A38CFF]/25 blur-3xl"
@@ -79,7 +79,7 @@ export function FinalCTASection() {
           />
         </div>
 
-        <div className="relative mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-12">
+        <div className="relative mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-12">
           <div className="mx-auto max-w-4xl text-center text-white">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
               <motion.div
@@ -105,7 +105,7 @@ export function FinalCTASection() {
                 <Button
                   size="lg"
                   onClick={handleStartFree}
-                  className="group h-12 sm:h-14 rounded-2xl bg-white px-6 sm:px-8 text-sm sm:text-base font-semibold text-[#0D1224] shadow-2xl shadow-black/30 transition hover:scale-105 hover:bg-white/90 dark:bg-gradient-to-r dark:from-[#64D2FF] dark:via-[#A38CFF] dark:to-[#FF8FD8] dark:text-[#05070D]"
+                  className="group h-12 sm:h-14 rounded-2xl px-6 sm:px-8 text-sm sm:text-base font-semibold text-white shadow-2xl shadow-black/30 transition hover:scale-105 active:scale-[0.98] animate-shine border-none"
                 >
                   <span className="flex items-center gap-2">
                     {t.landing.finalCta}

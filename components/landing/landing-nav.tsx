@@ -48,7 +48,7 @@ export function LandingNav() {
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <nav className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-[1920px]">
+      <nav className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-[1800px]">
         {/* Logo */}
         <motion.button
           className="flex cursor-pointer items-center gap-3 rounded-full border border-transparent px-2 py-1 text-left transition hover:border-border/40"
@@ -58,7 +58,7 @@ export function LandingNav() {
         >
           <div className="flex h-5 w-auto items-center sm:h-5 md:h-6 lg:h-7 shrink-0">
             <Image
-              src={`/img/logoankie.png?v=${assetV}`}
+              src="/img/logoankie.png"
               alt="Ankie AI logo"
               width={96}
               height={28}
@@ -160,10 +160,7 @@ export function LandingNav() {
             <Button
               size="sm"
               onClick={handlePrimaryCta}
-              className="h-9 px-4 text-sm font-semibold text-white shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-              style={{
-                background: 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)',
-              }}
+              className="h-9 px-4 text-sm font-semibold text-white shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 animate-shine border-none"
             >
               {mounted ? copy.nav.getStarted : 'Get Started'}
             </Button>

@@ -71,7 +71,7 @@ export function HeroSection() {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay"></div>
       </div>
 
-    <div className="container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="container relative mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-12">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
           {/* Left column - Content */}
           <motion.div
@@ -91,7 +91,7 @@ export function HeroSection() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-cyan opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-cyan" />
               </span>
-              {copy.hero.badge}
+              <span suppressHydrationWarning>{copy.hero.badge}</span>
             </motion.div>
 
             {/* Time badge */}
@@ -145,8 +145,7 @@ export function HeroSection() {
                 size="lg"
                 onClick={handleStartFree}
                 aria-label={t.landing.heroCta}
-                className="group h-14 flex-1 rounded-2xl px-8 text-base font-semibold text-white shadow-[0_18px_45px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#8F91FF 50%,#FF7AEA 100%)' }}
+                className="group h-14 flex-1 rounded-2xl px-8 text-base font-semibold text-white shadow-[0_18px_45px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98] animate-shine border-none"
               >
                 <span className="flex items-center justify-center gap-2">
                   {t.landing.heroCta}

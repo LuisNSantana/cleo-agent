@@ -113,7 +113,7 @@ export function AgentsSection() {
       data-landing-search-type="section"
   className="relative w-full overflow-hidden bg-gradient-to-b from-white via-[#E6F0FF] to-white py-16 text-foreground dark:from-[#060812] dark:via-[#0B0F1D] dark:to-[#05070D] sm:py-32"
     >
-      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-[1800px] px-4 sm:px-8 lg:px-12">
         <motion.div
           className="mb-16 text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -217,9 +217,22 @@ export function AgentsSection() {
                       </Avatar>
                     </div>
                     <div
-                      className={`flex items-center justify-center rounded-xl bg-gradient-to-br ${agent.color} shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 ${
+                      className={`flex items-center justify-center rounded-xl shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 ${
                         agent.featured ? 'h-14 w-14' : 'h-11 w-11'
                       }`}
+                      style={{
+                        background: agent.color.includes('cyan') 
+                          ? 'linear-gradient(135deg, #00B2FF 0%, #6F00FF 100%)'
+                          : agent.color.includes('magenta') && agent.color.includes('cyan')
+                          ? 'linear-gradient(135deg, #FF1EC8 0%, #00B2FF 100%)'
+                          : agent.color.includes('violet') && agent.color.includes('cyan')
+                          ? 'linear-gradient(135deg, #6F00FF 0%, #00B2FF 100%)'
+                          : agent.color.includes('magenta') && agent.color.includes('violet')
+                          ? 'linear-gradient(135deg, #FF1EC8 0%, #6F00FF 100%)'
+                          : agent.color.includes('cyan') && agent.color.includes('magenta')
+                          ? 'linear-gradient(135deg, #00B2FF 0%, #FF1EC8 100%)'
+                          : 'linear-gradient(135deg, #6F00FF 0%, #FF1EC8 100%)'
+                      }}
                     >
                       <agent.icon weight="duotone" className={`text-white ${agent.featured ? 'h-7 w-7' : 'h-6 w-6'}`} />
                     </div>
@@ -285,8 +298,7 @@ export function AgentsSection() {
           <div className="mt-5 flex items-center justify-center gap-3">
             <Button
               size="lg"
-              className="rounded-full px-6 font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.25)]"
-              style={{ background: 'linear-gradient(135deg,#64D2FF 0%,#8F91FF 55%,#FF7AEA 100%)' }}
+              className="rounded-full px-6 font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.25)] animate-shine border-none"
               asChild
             >
               <a href="/auth">{copy.agents.primaryCta}</a>

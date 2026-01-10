@@ -160,11 +160,12 @@ export function FeaturesSection() {
           <div className="mt-8 flex items-center justify-center">
             <Button
               size="lg"
-              className="group rounded-full bg-gradient-to-r from-brand-cyan via-brand-violet to-brand-magenta px-10 py-6 text-base font-bold text-white ring-2 ring-white/50 shadow-[0_20px_60px_rgba(23,20,73,0.35)] transition-all hover:scale-[1.02] dark:ring-white/10"
+              className="group rounded-full px-10 py-6 text-base font-bold text-white shadow-[0_20px_60px_rgba(23,20,73,0.35)] transition-all hover:scale-[1.02]"
+              style={{ background: 'linear-gradient(135deg, #00B2FF 0%, #6F00FF 50%, #FF1EC8 100%)' }}
               asChild
             >
               <a href="#agents" className="flex items-center gap-2">
-                {copy.features.highlightCta}
+                <span suppressHydrationWarning>{copy.features.highlightCta}</span>
                 <Rocket weight="bold" className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </a>
             </Button>

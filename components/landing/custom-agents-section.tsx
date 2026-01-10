@@ -158,7 +158,7 @@ export function CustomAgentsSection() {
         <div className="absolute right-0 top-1/2 h-full w-px bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
       </div>
 
-      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-[1800px] px-4 sm:px-8 lg:px-12">
         <motion.div
           className="mb-16 text-center"
           initial={{ opacity: 0, y: 20 }}

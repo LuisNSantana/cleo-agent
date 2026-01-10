@@ -800,6 +800,29 @@ label,
   transform: scale(0.98);
 }
 
+/* Shine Animation for CTA Buttons */
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.animate-shine {
+  background: linear-gradient(
+    110deg,
+    #00C6FF 0%,
+    #0072FF 20%,
+    #ffffff 50%,
+    #0072FF 80%,
+    #00C6FF 100%
+  );
+  background-size: 200% auto;
+  animation: shine 4s linear infinite;
+}
+
 /* Typing indicator animation */
 @keyframes typing-bounce {
   0%,

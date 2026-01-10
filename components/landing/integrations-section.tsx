@@ -22,11 +22,28 @@ const icons = [
 ]
 
 export function IntegrationsSection() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+
+  // Inline translations for integrations section
+  const integrationsText = {
+    title: locale === 'es' ? 'Integra con tus herramientas favoritas' 
+         : locale === 'pt' ? 'Integre com suas ferramentas favoritas'
+         : 'Integrate with your favorite tools',
+    description: locale === 'es' 
+      ? 'Conecta Ankie con las apps que usas cada día. Automatiza flujos de trabajo en todo tu ecosistema.'
+      : locale === 'pt'
+      ? 'Conecte Ankie com os apps que você usa todos os dias. Automatize fluxos de trabalho em todo o seu ecossistema.'
+      : 'Connect Ankie with the apps you use every day. Automate workflows across your entire ecosystem.',
+    description2: locale === 'es'
+      ? 'Ya sea sincronizando documentos, gestionando emails o actualizando tu CRM, los agentes de Ankie trabajan perfectamente con tus herramientas existentes.'
+      : locale === 'pt'
+      ? 'Seja sincronizando documentos, gerenciando emails ou atualizando seu CRM, os agentes Ankie trabalham perfeitamente com suas ferramentas existentes.'
+      : "Whether it's syncing documents, managing emails, or updating your CRM, Ankie's agents work seamlessly with your existing tools.",
+  }
 
   return (
     <section className="relative w-full overflow-hidden bg-background py-24 sm:py-32">
-      <div className="container relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="container relative mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-8">
         <div className="mb-16 text-center">
           <motion.h2 
             className="mb-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl"
@@ -34,7 +51,7 @@ export function IntegrationsSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            Integrate with your favorite tools
+            <span suppressHydrationWarning>{integrationsText.title}</span>
           </motion.h2>
           <motion.p 
             className="mx-auto max-w-2xl text-lg text-muted-foreground"
@@ -43,9 +60,9 @@ export function IntegrationsSection() {
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
           >
-            Connect Ankie with the apps you use every day. Automate workflows across your entire ecosystem.
+            <span suppressHydrationWarning>{integrationsText.description}</span>
             <br className="hidden sm:block" />
-            Whether it's syncing documents, managing emails, or updating your CRM, Ankie's agents work seamlessly with your existing tools.
+            <span suppressHydrationWarning>{integrationsText.description2}</span>
           </motion.p>
         </div>
 

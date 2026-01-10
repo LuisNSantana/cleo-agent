@@ -14,18 +14,16 @@ const supabaseHost = supabaseUrl && supabaseUrl !== 'your_supabase_project_url' 
 const nextConfig: NextConfig = withBundleAnalyzer({
   // Only use standalone in production builds, not in development
   ...(isProd && { output: "standalone" }),
+  // Allow ngrok origins in development
   experimental: {
     // Speed up import resolution for large UI/icon libs
     optimizePackageImports: ["@phosphor-icons/react", "lucide-react"],
+    serverActions: {
+      allowedOrigins: !isProd
+        ? ["*.ngrok-free.app", "*.ngrok.app", "localhost:3000"]
+        : [],
+    },
   },
-  // Allow ngrok origins in development
-  ...(!isProd && {
-    allowedOrigins: [
-      "*.ngrok-free.app",
-      "*.ngrok.app", 
-      "localhost:3000"
-    ]
-  }),
   // Ensure server bundles don't try to include native/heavy packages
   serverExternalPackages: ["shiki", "vscode-oniguruma", "canvas", "jsdom", "@langchain/langgraph", "@langchain/core"],
     // Keep Webpack customization only for production builds to avoid Turbopack warnings in dev
