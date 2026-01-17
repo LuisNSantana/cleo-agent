@@ -763,7 +763,7 @@ export async function POST(req: Request) {
     console.log(`⚡ [SUPER ANKIE] Fast mode activated with ${SUPER_ANKIE_TOOL_COUNT} tools`)
     
     try {
-      const { streamText, ToolLoopAgent } = await import('ai')
+      const { streamText, Experimental_Agent: ToolLoopAgent } = await import('ai')
       const { openproviders } = await import('@/lib/openproviders')
       
       // Build Super Ankie system prompt
@@ -785,20 +785,17 @@ export async function POST(req: Request) {
       
       console.log(`⚡ [SUPER ANKIE] Using ToolLoopAgent...`)
       
-      // @ts-ignore
+      // Cast entire config to any due to AI SDK type version mismatch
       const agent = new ToolLoopAgent({
         model: modelSdk, 
         system: superAnkieSystemPrompt,
         messages: convertedMessages,
         tools: superAnkieTools,
-        // @ts-ignore
         toolChoice: 'auto',
-        // onFinish is supported so we use it for persistence!
         onFinish: async (event: any) => {
           try {
              let contentParts: any[] = [];
              
-             // Safest way: check event.steps (array of StepResult)
              if (event.steps && event.steps.length > 0) {
                 const lastStep = event.steps[event.steps.length - 1];
                 if (lastStep.text) {
@@ -834,7 +831,7 @@ export async function POST(req: Request) {
              console.error('❌ [SUPER ANKIE] Failed to persist in onFinish:', e);
           }
         }
-      })
+      } as any)
 
       
       // onFinish is defined in constructor, so we just call stream()
