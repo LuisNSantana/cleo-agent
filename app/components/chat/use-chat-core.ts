@@ -8,6 +8,7 @@ import { generatePersonalizedPrompt } from "@/lib/prompts/personality"
 import { getCleoPrompt, sanitizeModelName } from "@/lib/prompts"
 import { getModelInfo } from "@/lib/models"
 import { normalizeModelId } from "../../../lib/models/normalize"
+import type { AgentMode } from "@/app/api/chat/schema"
 import { MODEL_DEFAULT } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { API_ROUTE_CHAT, API_ROUTE_CHAT_GUEST } from "@/lib/routes"
@@ -206,6 +207,7 @@ type UseChatCoreProps = {
   selectedModel: string
   clearDraft: () => void
   bumpChat: (chatId: string) => void
+  agentMode?: AgentMode
 }
 
 export function useChatCore({
@@ -220,6 +222,7 @@ export function useChatCore({
   handleFileUploads,
   selectedModel,
   clearDraft,
+  agentMode = 'super',
 }: UseChatCoreProps) {
   // 🚀 Performance tracking
   const performanceRef = useRef({
@@ -615,6 +618,7 @@ export function useChatCore({
         systemPrompt,
         enableSearch,
         messages: convertedMessages,
+        agentMode,
       }),
       signal: abortControllerRef.current.signal,
       // Disable keepalive to avoid 64KB limit which causes "Failed to fetch" on large chats

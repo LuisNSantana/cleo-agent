@@ -24,12 +24,26 @@ interface AgentExecutionFlowProps {
 
 function getActionIcon(action: PipelineStep['action']) {
   switch (action) {
-    case 'thinking': return <Brain className="w-3.5 h-3.5" weight="fill" />
+    case 'thinking': return (
+      <motion.div
+        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Brain className="w-3.5 h-3.5" weight="fill" />
+      </motion.div>
+    )
     case 'analyzing': return <MagnifyingGlass className="w-3.5 h-3.5" weight="fill" />
     case 'responding': return <ChatCircleDots className="w-3.5 h-3.5" weight="fill" />
     case 'delegating': return <ArrowRight className="w-3.5 h-3.5" weight="fill" />
     case 'executing': return <Lightning className="w-3.5 h-3.5" weight="fill" />
-    default: return <Lightning className="w-3.5 h-3.5" weight="fill" />
+    default: return (
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+      >
+        <Lightning className="w-3.5 h-3.5" weight="fill" />
+      </motion.div>
+    )
   }
 }
 
@@ -280,15 +294,15 @@ export function AgentExecutionFlow({ steps, mode = 'direct' }: AgentExecutionFlo
 
 function getActionLabel(action: PipelineStep['action']): string {
   switch (action) {
-    case 'routing': return 'Routing'
-    case 'analyzing': return 'Analyzing'
-    case 'thinking': return 'Thinking'
-    case 'delegating': return 'Delegating'
-    case 'delegation': return 'Working'
-    case 'responding': return 'Responding'
-    case 'completing': return 'Completing'
-    case 'reviewing': return 'Reviewing'
-    case 'executing': return 'Executing'
-    default: return 'Processing'
+    case 'routing': return 'Enrutando...'
+    case 'analyzing': return 'Analizando...'
+    case 'thinking': return 'Pensando...'
+    case 'delegating': return 'Delegando...'
+    case 'delegation': return 'Trabajando...'
+    case 'responding': return 'Escribiendo...'
+    case 'completing': return 'Completando...'
+    case 'reviewing': return 'Revisando...'
+    case 'executing': return 'Ejecutando herramienta...'
+    default: return 'Pensando...'
   }
 }

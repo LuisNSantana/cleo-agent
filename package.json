@@ -102,7 +102,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@upstash/redis": "^1.35.5",
     "@vercel/analytics": "^1.5.0",
-    "ai": "^5.0.5",
+    "ai": "^6.0.39",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

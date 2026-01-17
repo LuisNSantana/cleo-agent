@@ -110,7 +110,7 @@ export function RealTimeExecutionMonitor() {
       case 'responding': return 'Respondiendo'
       case 'delegating': return 'Delegando'
       case 'completing': return 'Completando'
-      default: return 'Procesando'
+      default: return 'Ejecutando'
     }
   }
 

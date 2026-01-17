@@ -16,6 +16,8 @@ import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
 import { ButtonSearch } from "./button-search"
 import { ButtonVoice } from "./button-voice"
+import { ButtonAgentMode } from "./button-agent-mode"
+import type { AgentMode } from "@/app/api/chat/schema"
 import { FileList } from "./file-list"
 import { ImageSuggestions } from "./image-suggestions"
 import { isImageFile } from "@/lib/image-utils"
@@ -44,6 +46,8 @@ type ChatInputProps = {
   onShowPlaceholderAction?: (placeholder: string) => void
   hideModelSelector?: boolean
   onVoiceModeAction?: () => void
+  agentMode?: AgentMode
+  onAgentModeChangeAction?: (mode: AgentMode) => void
 }
 
 export function ChatInput({
@@ -68,6 +72,8 @@ export function ChatInput({
   onShowPlaceholderAction,
   hideModelSelector = false,
   onVoiceModeAction,
+  agentMode = 'super',
+  onAgentModeChangeAction,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -330,6 +336,13 @@ export function ChatInput({
                 />
               ) : null}
               */}
+              {onAgentModeChangeAction && (
+                <ButtonAgentMode
+                  agentMode={agentMode}
+                  onToggleAction={onAgentModeChangeAction}
+                  isAuthenticated={isUserAuthenticated}
+                />
+              )}
               {onVoiceModeAction && (
                 <ButtonVoice
                   onClick={onVoiceModeAction}

@@ -9,6 +9,7 @@ import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import type { AgentMode } from "@/app/api/chat/schema"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
@@ -39,6 +40,7 @@ const DialogAuth = dynamic(
 export function Chat() {
   const [mounted, setMounted] = useState(false)
   const [voiceModeOpen, setVoiceModeOpen] = useState(false)
+  const [agentMode, setAgentMode] = useState<AgentMode>('super') // Default to Super Ankie
   useEffect(() => setMounted(true), [])
   // Measure ChatInput height for dynamic bottom padding (mobile)
   const inputRef = useRef<HTMLDivElement | null>(null)
@@ -173,6 +175,7 @@ export function Chat() {
     selectedModel,
     clearDraft,
     bumpChat,
+    agentMode,
   })
 
   // Memoize the conversation props to prevent unnecessary rerenders
@@ -222,6 +225,8 @@ export function Chat() {
       onClearPlaceholderAction: handleClearPlaceholder,
       onShowPlaceholderAction: handleShowPlaceholder,
       onVoiceModeAction: isAuthenticated ? () => setVoiceModeOpen(true) : undefined,
+      agentMode,
+      onAgentModeChangeAction: setAgentMode,
     }),
     [
       input,
@@ -245,6 +250,7 @@ export function Chat() {
       placeholder,
       handleClearPlaceholder,
       handleShowPlaceholder,
+      agentMode,
     ]
   )
 

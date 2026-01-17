@@ -211,7 +211,7 @@ export const weatherTool = tool({
 		if (!apiKey) return { error: 'Weather API not configured' }
 		const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(loc)}&units=${unitsParam}&lang=en&appid=${apiKey}`
 		try {
-			const res = await fetch(url, { next: { revalidate: 600 } })
+			const res = await fetch(url)
 			if (!res.ok) return { error: res.status === 404 ? `Location "${loc}" not found` : `API error ${res.status}` }
 			const data = await res.json() as any
 			const result: WeatherResult = {
@@ -498,6 +498,16 @@ export const toolMeta = {
 	// Advanced Twitter tools (ensure X icon appears in UI)
 	createTwitterThread: { icon: '/icons/x_twitter.png', label: 'Create Thread' },
 	postTweetWithMedia: { icon: '/icons/x_twitter.png', label: 'Post with Media' },
+	// Super Ankie SerpAPI tools (Google icons)
+	newsSearch: { icon: '/icons/google.png', label: 'Google News' },
+	webSearch: { icon: '/icons/google.png', label: 'Google Search' },
+	serpGeneralSearch: { icon: '/icons/google.png', label: 'Google Search' },
+	serpNewsSearch: { icon: '/icons/google.png', label: 'Google News' },
+	serpScholarSearch: { icon: '/icons/google.png', label: 'Google Scholar' },
+	serpTrendsSearch: { icon: '/icons/google.png', label: 'Google Trends' },
+	serpTrendingNow: { icon: '/icons/google.png', label: 'Trending Now' },
+	stockQuote: { icon: '/icons/google.png', label: 'Stock Quote' },
+	marketNews: { icon: '/icons/google.png', label: 'Market News' },
 }
 
 export type ToolName = keyof typeof tools

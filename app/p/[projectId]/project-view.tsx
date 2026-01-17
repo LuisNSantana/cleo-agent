@@ -888,7 +888,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
                     <div className="truncate font-medium">{p.name}</div>
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full border divider-subtle bg-[--surface-1] px-2 py-0.5">
-                        {p.status === 'uploading' ? 'Subiendo…' : p.status === 'processing' ? 'Procesando…' : 'Error'}
+                        {p.status === 'uploading' ? 'Subiendo…' : p.status === 'processing' ? 'Analizando…' : 'Error'}
                       </span>
                       {isUploadingDocs && <span className="text-muted-foreground">(en curso)</span>}
                     </div>

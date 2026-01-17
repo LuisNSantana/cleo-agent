@@ -309,6 +309,46 @@ async function buildInternalDelegationHint(userMessage?: string, recommended?: R
         mappedTool = 'delegate_to_ami'
       }
     } catch {}
+    
+    // 🚨 CRITICAL: Detect pitch deck/presentation requests for MANDATORY delegation
+    const isPitchDeckRequest = userMessage && (
+      /\b(pitch\s*deck|pitch|slides|presentaci[oó]n|investor\s*deck|fundraising|levantamiento|pre[-\s]?seed|seed\s*round|series\s*[abc])\b/i.test(userMessage)
+    )
+    
+    // Check if delegating to Peter for pitch deck/presentation
+    const isDelegatingToPeter = (
+      recommended.agentName?.toLowerCase() === 'peter' || 
+      recommended.agentId === 'peter-financial' ||
+      mappedTool === 'delegate_to_peter' ||
+      mappedTool === 'delegate_to_peter_financial'
+    )
+    
+    // If Peter + pitch deck = MANDATORY delegation
+    if (isPitchDeckRequest && isDelegatingToPeter) {
+      console.log(`🚨 [MANDATORY DELEGATION] Pitch deck detected! Forcing delegation to Peter`)
+      
+      return `${base}
+
+🚨 **MANDATORY DELEGATION TO PETER** (Pitch Deck/Presentation Request):
+**CRITICAL**: The user is requesting a pitch deck or financial presentation.
+**YOU MUST**:
+1. Call ONLY the tool: ${mappedTool || 'delegate_to_peter'}
+2. DO NOT attempt to create presentations yourself
+3. DO NOT generate fake document URLs
+4. DO NOT say "Aquí está la presentación:" without calling the tool first
+5. Pass the FULL request details to Peter in the taskDescription parameter
+
+**Why MANDATORY**: 
+- Peter has Google Slides creation tools (createStructuredGoogleSlides)
+- Only Peter can generate REAL presentation URLs
+- Attempting to respond directly WILL result in hallucinated fake URLs
+- This is a 100% delegation scenario - NO EXCEPTIONS
+
+**After Peter responds**:
+- Use forward_message to pass his response to the user
+- DO NOT paraphrase or modify his response
+- The URL Peter provides is REAL - share it exactly as given`
+    }
 
     const hasRelativeTime = /\b(hoy|mañana|ayer|esta semana|esta noche|today|tomorrow|yesterday|tonight|this week)\b/i.test(userMessage || '')
     const needsTimeTool = canonicalTool === 'getCurrentDateTime'

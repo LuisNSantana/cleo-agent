@@ -48,6 +48,38 @@ function columnToLetter(column: number): string {
   return result
 }
 
+/**
+ * Escape sheet name for use in A1 notation ranges.
+ * 
+ * Google Sheets API requires sheet names with spaces or special characters
+ * to be enclosed in single quotes. This function handles:
+ * - Spaces
+ * - Special characters (!@#$%^&*()+=[]{}; etc.)
+ * - Names starting with numbers
+ * - Existing single quotes (by escaping them as '')
+ * 
+ * Examples:
+ * - "Sheet1" -> "Sheet1"
+ * - "ARR Projections" -> "'ARR Projections'"
+ * - "Q1'23 Data" -> "'Q1''23 Data'"
+ * 
+ * @param sheetTitle The sheet name to escape
+ * @returns Properly escaped sheet name for A1 notation
+ */
+export function escapeSheetName(sheetTitle: string): string {
+  // First, escape any existing single quotes by doubling them
+  const escaped = sheetTitle.replace(/'/g, "''")
+  
+  // Check if the name needs quoting (contains spaces, special chars, or starts with number)
+  const needsQuotes = /[\s!@#$%^&*()+=\[\]{};:'"<>,.?\/\\|`~-]/.test(sheetTitle) || /^\d/.test(sheetTitle)
+  
+  if (needsQuotes) {
+    return `'${escaped}'`
+  }
+  
+  return escaped
+}
+
 // Simple in-memory token cache (5 min expiry)
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
 
@@ -261,7 +293,7 @@ export const createGoogleSheetTool = tool({
             row.some((cell) => typeof cell === 'string' && cell.trim().startsWith('='))
           )
           const valueInputOption = containsFormula ? 'USER_ENTERED' : 'RAW'
-          const range = `${sheetTitle}!A1:${columnToLetter(columnCount)}${normalizedData.length}`
+          const range = `${escapeSheetName(sheetTitle)}!A1:${columnToLetter(columnCount)}${normalizedData.length}`
 
           const updateResult = await makeGoogleSheetsRequest(
             userId,
@@ -390,9 +422,9 @@ export const readGoogleSheetTool = tool({
         const infoResult = await makeGoogleSheetsRequest(userId, `/spreadsheets/${spreadsheetId}`)
         if (infoResult.success) {
           spreadsheetInfo = infoResult.data
-          // If no range specified, use the first sheet
+          // If no range specified, use the first sheet (with proper escaping)
           if (!range && spreadsheetInfo.sheets && spreadsheetInfo.sheets.length > 0) {
-            range = spreadsheetInfo.sheets[0].properties.title
+            range = escapeSheetName(spreadsheetInfo.sheets[0].properties.title)
           }
         }
       }

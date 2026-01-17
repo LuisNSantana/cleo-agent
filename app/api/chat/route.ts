@@ -22,6 +22,8 @@ import { sanitizeGeminiTools } from '@/lib/chat/gemini-tools'
 
 // Tools and delegation
 import { tools, ensureDelegationToolForAgent } from '@/lib/tools'
+import { superAnkieTools, SUPER_ANKIE_TOOL_COUNT } from '@/lib/tools/super-ankie'
+import { getSuperAnkiePrompt } from '@/lib/prompts/super-ankie'
 import { setPipelineEventController, clearPipelineEventController } from '@/lib/tools/delegation'
 
 // Agent orchestration
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
       documentId,
       projectId,
       debugRag,
+      agentMode = 'super', // Default to Super Ankie mode
     } = parsed.data as ChatRequest
 
   // LangChain multi-model pipeline is an alternate endpoint.
@@ -116,7 +119,8 @@ export async function POST(req: Request) {
   chatLogger.debug('Processing chat request', { 
     originalModel, 
     normalizedModel, 
-    isAuthenticated 
+    isAuthenticated,
+    agentMode // ✅ DEBUG: Log the agent mode
   })
 
     if (!messages || !chatId || !userId) {
@@ -751,8 +755,109 @@ export async function POST(req: Request) {
   // (lib/models/data/openrouter.ts). Do not inject them via providerOptions to avoid
   // leaking into the request body.
 
-  // ✅ MIGRATION: Always use CoreOrchestrator (unified flow via LangGraph)
-  // Removed dual-flow branching - HITL works consistently across all models
+  // ✅ SUPER ANKIE MODE: Fast direct execution without orchestrator
+  // Multi-Agent mode ('multi') uses the full CoreOrchestrator with delegation
+  const useSuperAnkieMode = agentMode === 'super'
+  
+  if (useSuperAnkieMode) {
+    console.log(`⚡ [SUPER ANKIE] Fast mode activated with ${SUPER_ANKIE_TOOL_COUNT} tools`)
+    
+    try {
+      const { streamText, ToolLoopAgent } = await import('ai')
+      const { openproviders } = await import('@/lib/openproviders')
+      
+      // Build Super Ankie system prompt
+      const superAnkieSystemPrompt = getSuperAnkiePrompt({ locale: userLocale }) + '\n\n' + finalSystemPrompt
+      
+      // Create model SDK using openproviders
+      const modelSdk = openproviders(normalizedModel as any, undefined, apiKey)
+      if (!modelSdk) {
+        throw new Error(`Model ${normalizedModel} could not be instantiated for Super Ankie mode`)
+      }
+      
+      console.log(`⚡ [SUPER ANKIE] Using model: ${normalizedModel}`)
+      
+      // Stream with streamText + onFinish for persistence
+      // @ts-ignore - maxSteps property depends on AI SDK version
+      // NOTE: streamText was previous implementation, now replacing with ToolLoopAgent
+      // but keeping it commented out in case we need to revert
+      // const result = streamText({...}) -> REPLACED BY ToolLoopAgent below
+      
+      console.log(`⚡ [SUPER ANKIE] Using ToolLoopAgent...`)
+      
+      // @ts-ignore
+      const agent = new ToolLoopAgent({
+        model: modelSdk, 
+        system: superAnkieSystemPrompt,
+        messages: convertedMessages,
+        tools: superAnkieTools,
+        // @ts-ignore
+        toolChoice: 'auto',
+        // onFinish is supported so we use it for persistence!
+        onFinish: async (event: any) => {
+          try {
+             let contentParts: any[] = [];
+             
+             // Safest way: check event.steps (array of StepResult)
+             if (event.steps && event.steps.length > 0) {
+                const lastStep = event.steps[event.steps.length - 1];
+                if (lastStep.text) {
+                    contentParts.push({ type: 'text', text: lastStep.text });
+                }
+             }
+             
+             const usage = event.totalUsage || { promptTokens: 0, completionTokens: 0 };
+             
+             if (contentParts.length > 0) {
+                 await storeAssistantMessage({
+                    supabase: supabase as any,
+                    chatId,
+                    messages: [
+                        ...(convertedMessages as any[]),
+                        {
+                            role: 'assistant',
+                            content: contentParts,
+                        }
+                    ], 
+                    message_group_id,
+                    model: normalizedModel,
+                    userId,
+                    inputTokens: usage.promptTokens,
+                    outputTokens: usage.completionTokens,
+                });
+                 console.log('✅ [SUPER ANKIE] Response saved to DB via ToolLoopAgent onFinish')
+             } else {
+                 console.warn('⚠️ [SUPER ANKIE] No content found in onFinish event to save.')
+             }
+
+          } catch (e) {
+             console.error('❌ [SUPER ANKIE] Failed to persist in onFinish:', e);
+          }
+        }
+      })
+
+      
+      // onFinish is defined in constructor, so we just call stream()
+      // @ts-ignore
+      const agentStreamResult = await agent.stream({})
+
+      // @ts-ignore
+      return agentStreamResult.toUIMessageStreamResponse({
+        headers: {
+          'X-Agent-Mode': 'super',
+          'X-Tool-Count': String(SUPER_ANKIE_TOOL_COUNT),
+        },
+      })
+      
+    } catch (error) {
+      console.error('[SUPER ANKIE] Error:', error)
+      // Fall back to orchestrator mode on error
+      console.log('[SUPER ANKIE] Falling back to orchestrator mode')
+    }
+  }
+
+  // 🧠 MULTI-AGENT MODE: Full CoreOrchestrator with delegation
+  console.log(`🧠 [MULTI-AGENT] Using orchestrator mode`)
   const orchestratorBacked = true
 
   // If the last message includes file attachments, hint the supervisor to prefer Iris for insights over web search

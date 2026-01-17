@@ -188,7 +188,7 @@ export function AgentThinkingVisualizer({
       {isLive && (
         <div className="flex items-center justify-center gap-2 text-sm text-green-600 bg-green-50 py-2 px-3 rounded-lg border border-green-200">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="font-medium">Procesando en tiempo real...</span>
+          <span className="font-medium">Analizando en tiempo real...</span>
         </div>
       )}
     </div>

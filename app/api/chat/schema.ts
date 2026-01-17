@@ -1,6 +1,8 @@
 import type { CoreMessage } from "ai"
 import { z } from "zod"
 
+export type AgentMode = 'super' | 'multi'
+
 export type ChatRequest = {
   messages: CoreMessage[]
   chatId: string
@@ -13,6 +15,7 @@ export type ChatRequest = {
   documentId?: string
   projectId?: string
   debugRag?: boolean
+  agentMode?: AgentMode // 'super' = fast direct execution, 'multi' = delegated multi-agent
 }
 
 export const ChatRequestSchema = z.object({
@@ -27,4 +30,5 @@ export const ChatRequestSchema = z.object({
   documentId: z.string().optional(),
   projectId: z.string().optional(),
   debugRag: z.boolean().optional(),
+  agentMode: z.enum(['super', 'multi']).optional().default('super'), // Default to Super Ankie
 })

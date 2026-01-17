@@ -79,7 +79,7 @@ export function LangChainFlowVisualizer({ execution, isVisible }: LangChainFlowV
           agent: execution.agentId,
           status: 'pending',
           timestamp: new Date(),
-          description: 'Procesando con modelo de lenguaje...',
+          description: 'Pensando...',
         },
         {
           id: 'generate',

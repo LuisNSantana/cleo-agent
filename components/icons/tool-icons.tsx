@@ -40,6 +40,10 @@ export const toolIconMap = {
   serpTrendsSearch: GoogleIcon,
   serpTrendingNowTool: GoogleIcon,
   serpTrendingNow: GoogleIcon,
+  // Super Ankie aliases
+  newsSearch: GoogleIcon,
+  stockQuote: GoogleIcon,
+  marketNews: GoogleIcon,
   // Google Calendar
   listCalendarEvents: GoogleCalendarIcon,
   createCalendarEvent: GoogleCalendarIcon,
@@ -51,6 +55,7 @@ export const toolIconMap = {
   uploadFileToDrive: GoogleDriveIcon,
   // Google Docs tools
   createGoogleDoc: GoogleDocsIcon,
+  createStructuredGoogleDoc: GoogleDocsIcon,
   readGoogleDoc: GoogleDocsIcon,
   updateGoogleDoc: GoogleDocsIcon,
   // Google Sheets tools
@@ -58,6 +63,9 @@ export const toolIconMap = {
   readGoogleSheet: GoogleSheetsIcon,
   updateGoogleSheet: GoogleSheetsIcon,
   appendGoogleSheet: GoogleSheetsIcon,
+  // Google Slides tools
+  createGoogleSlidesPresentation: GoogleSlidesIcon,
+  createStructuredGoogleSlides: GoogleSlidesIcon,
   // Gmail tools
   listGmailMessages: GmailIcon,
   getGmailMessage: GmailIcon,
@@ -145,6 +153,20 @@ export function GoogleSheetsIcon({ className }: { className?: string }) {
     <Image 
       src="/icons/sheets.png" 
       alt="Google Sheets"
+      className={className}
+      width={16}
+      height={16}
+      priority
+    />
+  )
+}
+
+// Custom Google Slides icon component using the official icon
+export function GoogleSlidesIcon({ className }: { className?: string }) {
+  return (
+    <Image 
+      src="/icons/slides.png" 
+      alt="Google Slides"
       className={className}
       width={16}
       height={16}

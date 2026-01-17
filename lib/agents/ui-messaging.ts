@@ -62,141 +62,82 @@ const AGENT_EXPERTISE: Record<string, string> = {
  */
 const ACTION_MESSAGES: Record<Action, MessageTemplate> = {
   routing: {
-    default: 'Analizando tu solicitud para determinar el mejor enfoque…',
+    default: 'Enrutando...',
     withContext: (ctx) => {
-      if (ctx.hasImages && ctx.hasFiles) {
-        return 'Procesando imágenes y documentos adjuntos para entender tu solicitud…'
-      }
-      if (ctx.hasImages) {
-        return 'Analizando las imágenes que compartiste y decidiendo cómo ayudarte…'
-      }
-      if (ctx.hasFiles) {
-        return 'Revisando los documentos adjuntos para comprender el contexto…'
-      }
-      if (ctx.documentId) {
-        return 'Abriendo el documento solicitado y preparando el análisis…'
-      }
-      return 'Entendiendo tu mensaje y planificando la mejor forma de ayudarte…'
+      if (ctx.hasImages || ctx.hasFiles) return 'Analizando adjuntos...'
+      return 'Planificando...'
     }
   },
   
   analyzing: {
-    default: 'Analizando la información disponible…',
+    default: 'Analizando...',
     withContext: (ctx) => {
-      if (ctx.searchEnabled) {
-        return 'Buscando información relevante en la web para darte la respuesta más actualizada…'
-      }
-      if (ctx.hasFiles) {
-        return 'Procesando el contenido de los archivos adjuntos…'
-      }
-      if (ctx.complexity === 'high') {
-        return 'Analizando múltiples factores para darte una respuesta completa…'
-      }
-      if (ctx.documentId) {
-        return 'Extrayendo información clave del documento…'
-      }
-      return 'Revisando el contexto de la conversación para entender mejor tu necesidad…'
+      if (ctx.searchEnabled) return 'Buscando información...'
+      if (ctx.hasFiles) return 'Leyendo archivos...'
+      if (ctx.documentId) return 'Leyendo documento...'
+      return 'Analizando contexto...'
     }
   },
   
   thinking: {
-    default: 'Pensando en la mejor solución…',
+    default: 'Pensando...',
     withContext: (ctx) => {
-      if (ctx.complexity === 'high') {
-        return 'Evaluando diferentes opciones para darte la mejor respuesta posible…'
-      }
-      if (ctx.isRetrying) {
-        return 'Replanteando el enfoque para obtener un mejor resultado…'
-      }
-      if (ctx.toolCount && ctx.toolCount > 3) {
-        return 'Coordinando múltiples herramientas para completar tu solicitud…'
-      }
-      return 'Formulando la respuesta más útil para ti…'
+      if (ctx.complexity === 'high') return 'Evaluando opciones...'
+      if (ctx.isRetrying) return 'Reintentando...'
+      return 'Razonando...'
     }
   },
   
   delegating: {
-    default: 'Conectando con un especialista del equipo…',
+    default: 'Delegando...',
     withContext: (ctx) => {
       if (ctx.targetAgent && ctx.targetAgentName) {
-        const expertise = ctx.expertise || AGENT_EXPERTISE[ctx.targetAgent] || 'esta área especializada'
-        return `Delegando a ${ctx.targetAgentName}, quien es experto en ${expertise}…`
+        return `Delegando a ${ctx.targetAgentName}...`
       }
-      if (ctx.complexity === 'high') {
-        return 'Esta solicitud requiere conocimiento especializado, buscando al experto apropiado…'
-      }
-      return 'Identificando al miembro del equipo más apropiado para esta tarea…'
+      return 'Buscando especialista...'
     }
   },
   
   delegation: {
-    default: 'Trabajando con el equipo especializado…',
+    default: 'Trabajando...',
     withContext: (ctx) => {
-      if (ctx.agentName) {
-        return `${ctx.agentName} está trabajando en tu solicitud…`
-      }
-      return 'El especialista está procesando tu solicitud…'
+      if (ctx.agentName) return `${ctx.agentName} trabajando...`
+      return 'Especialista trabajando...'
     }
   },
   
   executing: {
-    default: 'Ejecutando las acciones necesarias…',
+    default: 'Ejecutando...',
     withContext: (ctx) => {
       if (ctx.toolName) {
         const humanTool = humanizeToolName(ctx.toolName)
-        return `Usando ${humanTool} para procesar tu solicitud…`
+        return `Usando ${humanTool}...`
       }
-      if (ctx.toolCount && ctx.toolCount > 1) {
-        return `Ejecutando ${ctx.toolCount} herramientas en paralelo para acelerar el proceso…`
-      }
-      return 'Procesando tu solicitud con las herramientas apropiadas…'
+      return 'Ejecutando herramientas...'
     }
   },
   
   responding: {
-    default: 'Preparando la respuesta…',
+    default: 'Escribiendo...',
     withContext: (ctx) => {
-      if (ctx.delegationCompleted && ctx.agentName) {
-        return `${ctx.agentName} completó su análisis, organizando la información para ti…`
-      }
-      return 'Organizando la información para darte una respuesta clara…'
+      if (ctx.delegationCompleted && ctx.agentName) return `${ctx.agentName} terminó...`
+      return 'Generando respuesta...'
     }
   },
   
   reviewing: {
-    default: 'Revisando el resultado…',
-    withContext: (ctx) => {
-      if (ctx.delegationCompleted) {
-        return 'Validando la respuesta del especialista antes de compartirla contigo…'
-      }
-      if (ctx.complexity === 'high') {
-        return 'Verificando que la respuesta sea completa y precisa…'
-      }
-      return 'Haciendo una última verificación antes de responder…'
-    }
+    default: 'Revisando...',
+    withContext: (ctx) => 'Verificando respuesta...'
   },
   
   supervising: {
-    default: 'Supervisando calidad…',
-    withContext: (ctx) => {
-      if (ctx.delegationCompleted) {
-        return 'Cleo supervisando la calidad de la respuesta final…'
-      }
-      return 'Verificando precisión y completitud de la respuesta…'
-    }
+    default: 'Supervisando...',
+    withContext: (ctx) => 'Control de calidad...'
   },
   
   completing: {
-    default: 'Finalizando…',
-    withContext: (ctx) => {
-      if (ctx.delegationCompleted && ctx.agentName) {
-        return `${ctx.agentName} terminó su trabajo, preparando el resumen final…`
-      }
-      if (ctx.toolCount && ctx.toolCount > 1) {
-        return 'Consolidando resultados de múltiples herramientas…'
-      }
-      return 'Últimos ajustes antes de compartir la respuesta…'
-    }
+    default: 'Finalizando...',
+    withContext: (ctx) => 'Listo.'
   }
 }
 
@@ -282,7 +223,7 @@ export function getContextualMessage(
   
   if (!template) {
     console.warn(`[UI-Messaging] No template found for action: ${action}`)
-    return 'Procesando…'
+    return 'Pensando...'
   }
   
   // Usar mensaje contextual si hay contexto y función disponible
@@ -381,26 +322,26 @@ export function getProgressMessage(
   
   if (seconds < 15) {
     const messages: Record<Action, string> = {
-      routing: 'Casi listo, analizando las mejores opciones…',
-      analyzing: 'Procesando información, esto puede tomar unos segundos…',
-      thinking: 'Pensando cuidadosamente para darte la mejor respuesta…',
-      delegating: agentName ? `Esperando a ${agentName}…` : 'Esperando al especialista…',
-      delegation: agentName ? `${agentName} está trabajando en ello…` : 'El especialista está trabajando…',
-      executing: 'Ejecutando, casi terminamos…',
-      responding: 'Organizando la respuesta…',
-      reviewing: 'Revisando los detalles finales…',
-      supervising: 'Supervisando calidad de la respuesta…',
-      completing: 'Finalizando el proceso…'
+      routing: 'Planificando...',
+      analyzing: 'Analizando...',
+      thinking: 'Pensando...',
+      delegating: agentName ? `Esperando a ${agentName}...` : 'Esperando...',
+      delegation: agentName ? `${agentName} trabajando...` : 'Trabajando...',
+      executing: 'Ejecutando...',
+      responding: 'Escribiendo...',
+      reviewing: 'Revisando...',
+      supervising: 'Supervisando...',
+      completing: 'Finalizando...'
     }
     return messages[action] || getContextualMessage(action)
   }
   
   if (seconds < 30) {
     return agentName 
-      ? `${agentName} está trabajando en una tarea compleja, esto puede tomar un momento…`
-      : 'Esta solicitud está tomando más tiempo de lo usual, pero estamos en ello…'
+      ? `${agentName} sigue trabajando...`
+      : 'Esto está tomando un momento...'
   }
   
   // > 30 segundos
-  return 'Esta es una tarea compleja. Gracias por tu paciencia mientras trabajamos en ello…'
+  return 'Tarea compleja, gracias por esperar...'
 }

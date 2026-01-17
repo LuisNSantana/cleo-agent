@@ -149,7 +149,7 @@ const NODE_MESSAGES_ES: Record<string, (config: StepBuilderConfig) => string> = 
     if (expertise) {
       return `🤖 ${agentName} trabajando en ${expertise}… Esto podría tomar unos segundos`
     }
-    return `🤖 ${agentName} procesando tu solicitud… Un momento`
+    return `🤖 ${agentName} pensando...`
   },
   
   delegationAgent: (config) => {
@@ -178,7 +178,7 @@ const NODE_MESSAGES_ES: Record<string, (config: StepBuilderConfig) => string> = 
   
   // Fallback for unknown node types
   default: (config) => {
-    return `⚙️ Procesando: ${config.nodeType}…`
+    return `⚙️ Ejecutando: ${config.nodeType}...`
   }
 }
 

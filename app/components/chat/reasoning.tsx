@@ -41,7 +41,7 @@ export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
       >
         <span>Reasoning</span>
         {isStreaming && (
-          <span className="ml-1 text-[10px] opacity-70">Thinking…</span>
+          <span className="ml-1 text-[10px] opacity-70">Pensando...</span>
         )}
         <CaretDownIcon
           className={cn(

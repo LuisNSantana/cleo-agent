@@ -127,10 +127,15 @@ function parseSlides(content: string): SlideBlock[] {
 }
 
 export const createStructuredSlidesTool = tool({
-  description: `📽️ Create a Google Slides presentation from markdown-like content.
+  description: `📽️ **CREATE GOOGLE SLIDES PRESENTATION** - Use this for PRESENTATIONS, SLIDES, DIAPOSITIVAS, PITCH DECKS.
 
-Use cases: pitch decks, agendas, briefs, reports.
-Syntax: '# Title' (slide), '### Subtitle', '- bullet' items.
+⚠️ IMPORTANT: Use this tool (NOT Google Docs) when user asks for:
+- Pitch decks, investor presentations, demo slides
+- Any "presentación", "slides", "diapositivas" request
+- Visual presentations with multiple slides
+
+Creates real Google Slides with proper slide format.
+Syntax: '# Title' creates new slide, '### Subtitle', '- bullet' for lists.
 `,
   inputSchema: z.object({
     title: z.string().min(1),
@@ -154,6 +159,14 @@ Syntax: '# Title' (slide), '### Subtitle', '- bullet' items.
       // 3) Build batch requests
       const requests: any[] = []
 
+      // Professional color scheme
+      const COLORS = {
+        title: { red: 0.1, green: 0.1, blue: 0.2 },        // Dark navy
+        subtitle: { red: 0.3, green: 0.3, blue: 0.4 },     // Medium gray
+        bullet: { red: 0.15, green: 0.15, blue: 0.25 },    // Dark gray-blue
+        accent: { red: 0.2, green: 0.4, blue: 0.8 },       // Professional blue
+      }
+
       // Helper to create a slide with title, subtitle and bullets
       const addSlideRequests = (slideId: string | undefined, block: SlideBlock, isFirst: boolean) => {
         const workSlideId = isFirst && slideId ? slideId : `slide_${Date.now()}_${Math.floor(Math.random()*1000)}`
@@ -161,29 +174,119 @@ Syntax: '# Title' (slide), '### Subtitle', '- bullet' items.
           requests.push({ createSlide: { objectId: workSlideId } })
         }
 
-        // Title box
+        // Title box - Large, bold, professional
         if (block.title) {
           const titleBoxId = `title_${Date.now()}_${Math.floor(Math.random()*1000)}`
-          requests.push({ createShape: { objectId: titleBoxId, shapeType:'TEXT_BOX', elementProperties: { pageObjectId: workSlideId, size:{ width:{ magnitude:640, unit:'PT'}, height:{ magnitude:60, unit:'PT'}}, transform:{ scaleX:1, scaleY:1, translateX:40, translateY:30, unit:'PT'} } } })
-          requests.push({ insertText: { objectId: titleBoxId, insertionIndex:0, text: block.title } })
-          requests.push({ updateTextStyle: { objectId: titleBoxId, style: { bold:true, fontSize:{ magnitude: 28, unit:'PT'} }, fields:'bold,fontSize' } })
+          requests.push({ 
+            createShape: { 
+              objectId: titleBoxId, 
+              shapeType: 'TEXT_BOX', 
+              elementProperties: { 
+                pageObjectId: workSlideId, 
+                size: { width: { magnitude: 680, unit: 'PT' }, height: { magnitude: 70, unit: 'PT' } }, 
+                transform: { scaleX: 1, scaleY: 1, translateX: 20, translateY: 25, unit: 'PT' } 
+              } 
+            } 
+          })
+          requests.push({ insertText: { objectId: titleBoxId, insertionIndex: 0, text: block.title } })
+          requests.push({ 
+            updateTextStyle: { 
+              objectId: titleBoxId, 
+              style: { 
+                bold: true, 
+                fontSize: { magnitude: 36, unit: 'PT' },
+                fontFamily: 'Poppins',
+                foregroundColor: { opaqueColor: { rgbColor: COLORS.title } }
+              }, 
+              fields: 'bold,fontSize,fontFamily,foregroundColor' 
+            } 
+          })
+          // Center align titles
+          requests.push({
+            updateParagraphStyle: {
+              objectId: titleBoxId,
+              style: { alignment: 'START' },
+              fields: 'alignment'
+            }
+          })
         }
 
-        // Subtitle box
+        // Subtitle box - Italic, smaller, colored
         if (block.subtitle) {
           const subId = `sub_${Date.now()}_${Math.floor(Math.random()*1000)}`
-          requests.push({ createShape: { objectId: subId, shapeType:'TEXT_BOX', elementProperties: { pageObjectId: workSlideId, size:{ width:{ magnitude:640, unit:'PT'}, height:{ magnitude:40, unit:'PT'}}, transform:{ scaleX:1, scaleY:1, translateX:40, translateY:95, unit:'PT'} } } })
-          requests.push({ insertText: { objectId: subId, insertionIndex:0, text: block.subtitle } })
-          requests.push({ updateTextStyle: { objectId: subId, style: { italic:true, fontSize:{ magnitude: 16, unit:'PT'} }, fields:'italic,fontSize' } })
+          requests.push({ 
+            createShape: { 
+              objectId: subId, 
+              shapeType: 'TEXT_BOX', 
+              elementProperties: { 
+                pageObjectId: workSlideId, 
+                size: { width: { magnitude: 680, unit: 'PT' }, height: { magnitude: 40, unit: 'PT' } }, 
+                transform: { scaleX: 1, scaleY: 1, translateX: 20, translateY: 100, unit: 'PT' } 
+              } 
+            } 
+          })
+          requests.push({ insertText: { objectId: subId, insertionIndex: 0, text: block.subtitle } })
+          requests.push({ 
+            updateTextStyle: { 
+              objectId: subId, 
+              style: { 
+                italic: true, 
+                fontSize: { magnitude: 20, unit: 'PT' },
+                fontFamily: 'Open Sans',
+                foregroundColor: { opaqueColor: { rgbColor: COLORS.subtitle } }
+              }, 
+              fields: 'italic,fontSize,fontFamily,foregroundColor' 
+            } 
+          })
         }
 
-        // Bullet list
+        // Bullet list - Clean, readable, proper spacing
         if (block.bullets.length) {
           const listId = `list_${Date.now()}_${Math.floor(Math.random()*1000)}`
+          const bulletStartY = block.subtitle ? 150 : 120 // Adjust based on subtitle presence
           const text = block.bullets.join('\n')
-          requests.push({ createShape: { objectId: listId, shapeType:'TEXT_BOX', elementProperties: { pageObjectId: workSlideId, size:{ width:{ magnitude:700, unit:'PT'}, height:{ magnitude:360, unit:'PT'}}, transform:{ scaleX:1, scaleY:1, translateX:40, translateY:150, unit:'PT'} } } })
-          requests.push({ insertText: { objectId: listId, insertionIndex:0, text } })
-          requests.push({ createParagraphBullets: { objectId: listId, textRange: { type:'ALL' }, bulletPreset:'BULLET_DISC_CIRCLE_SQUARE' } })
+          requests.push({ 
+            createShape: { 
+              objectId: listId, 
+              shapeType: 'TEXT_BOX', 
+              elementProperties: { 
+                pageObjectId: workSlideId, 
+                size: { width: { magnitude: 680, unit: 'PT' }, height: { magnitude: 340, unit: 'PT' } }, 
+                transform: { scaleX: 1, scaleY: 1, translateX: 20, translateY: bulletStartY, unit: 'PT' } 
+              } 
+            } 
+          })
+          requests.push({ insertText: { objectId: listId, insertionIndex: 0, text } })
+          requests.push({ 
+            updateTextStyle: { 
+              objectId: listId, 
+              style: { 
+                fontSize: { magnitude: 18, unit: 'PT' },
+                fontFamily: 'Open Sans',
+                foregroundColor: { opaqueColor: { rgbColor: COLORS.bullet } }
+              }, 
+              fields: 'fontSize,fontFamily,foregroundColor' 
+            } 
+          })
+          requests.push({ 
+            createParagraphBullets: { 
+              objectId: listId, 
+              textRange: { type: 'ALL' }, 
+              bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE' 
+            } 
+          })
+          // Add line spacing for readability
+          requests.push({
+            updateParagraphStyle: {
+              objectId: listId,
+              style: { 
+                lineSpacing: 150, // 1.5x line height
+                spaceAbove: { magnitude: 6, unit: 'PT' },
+                spaceBelow: { magnitude: 6, unit: 'PT' }
+              },
+              fields: 'lineSpacing,spaceAbove,spaceBelow'
+            }
+          })
         }
       }
 
@@ -195,19 +298,58 @@ Syntax: '# Title' (slide), '### Subtitle', '- bullet' items.
         await slidesRequest(token, `presentations/${pres.presentationId}:batchUpdate`, { method:'POST', body: JSON.stringify({ requests }) })
       }
 
-      // Sharing if requested
+      // Sharing permissions
       let shareLink = `https://docs.google.com/presentation/d/${pres.presentationId}/edit`
+      let isPublic = false
+      
       if (shareSettings === 'public_read') {
         try {
-          const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files/${pres.presentationId}/permissions`, {
-            method:'POST', headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' }, body: JSON.stringify({ role:'reader', type:'anyone', allowFileDiscovery:false })
-          })
-          if (driveRes.ok) shareLink = `https://docs.google.com/presentation/d/${pres.presentationId}/edit?usp=sharing`
-        } catch {}
+          console.log('🔓 Setting presentation to public view...')
+          const driveRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${pres.presentationId}/permissions`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                role: 'reader',
+                type: 'anyone',
+                allowFileDiscovery: false
+              })
+            }
+          )
+          
+          if (!driveRes.ok) {
+            const errorText = await driveRes.text()
+            console.error('❌ Failed to set public permissions:', driveRes.status, errorText)
+          } else {
+            console.log('✅ Presentation is now public')
+            isPublic = true
+            // Use /preview for public presentations (better UX, no auth required)
+            shareLink = `https://docs.google.com/presentation/d/${pres.presentationId}/preview`
+          }
+        } catch (error) {
+          console.error('❌ Error setting sharing permissions:', error)
+        }
       }
 
-      await trackToolUsage(userId, 'slides.createStructured', { ok:true, execMs: Date.now()-started, params:{ blocks: blocks.length } })
-      return { success:true, message:'Presentation created from structured content', presentation: { id: pres.presentationId, title: pres.title, url: shareLink, slideCount: blocks.length } }
+      await trackToolUsage(userId, 'slides.createStructured', { ok:true, execMs: Date.now()-started, params:{ blocks: blocks.length, isPublic } })
+      
+      return { 
+        success: true, 
+        message: isPublic 
+          ? `Presentation created and shared publicly (${blocks.length} slides)` 
+          : `Presentation created with ${blocks.length} slides (private)`, 
+        presentation: { 
+          id: pres.presentationId, 
+          title: pres.title, 
+          url: shareLink, 
+          isPublic,
+          slideCount: blocks.length 
+        } 
+      }
     } catch (e:any) {
       await trackToolUsage(userId || 'unknown', 'slides.createStructured', { ok:false, execMs: Date.now()-started, errorType:'create_error' })
       return { success:false, message: e?.message || 'Failed to create structured slides', presentation:null }

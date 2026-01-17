@@ -95,7 +95,7 @@ export function Loader() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          Procesando...
+          Pensando...
         </motion.span>
         <motion.span 
           className="text-xs text-muted-foreground font-mono"

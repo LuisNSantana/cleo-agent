@@ -115,16 +115,16 @@ function formatTime(ts: string | Date) {
 
 function actionLabel(action: Action): string {
   switch (action) {
-    case 'routing': return '🎯 Routing'
-    case 'analyzing': return '🔍 Analyzing'
-    case 'thinking': return '🧠 Thinking'
-    case 'delegating': return '📋 Delegating'
-    case 'delegation': return '⚡ Working'
-    case 'responding': return '💬 Responding'
-    case 'completing': return '✅ Completing'
-    case 'reviewing': return '👁️ Reviewing'
-    case 'supervising': return '🔍 Supervising'
-    case 'executing': return '🔧 Executing'
+    case 'routing': return '🎯 Enrutando'
+    case 'analyzing': return '🔍 Analizando'
+    case 'thinking': return '🧠 Pensando'
+    case 'delegating': return '📋 Delegando'
+    case 'delegation': return '⚡ Trabajando'
+    case 'responding': return '💬 Respondiendo'
+    case 'completing': return '✅ Completando'
+    case 'reviewing': return '👁️ Revisando'
+    case 'supervising': return '🔍 Supervisando'
+    case 'executing': return '🔧 Ejecutando'
     default: return String(action).charAt(0).toUpperCase() + String(action).slice(1)
   }
 }

@@ -39,9 +39,14 @@ const AGENT_DELEGATION_RULES = {
     role: "Technical Specialist: Expert in software engineering, programming, debugging, and technical architecture."
   },
   Peter: {
-    keywords: ["finance", "financial", "budget", "accounting", "money", "investment", "business model", "roi", "profit", "revenue", "crypto", "cryptocurrency", "bitcoin", "tax", "finanzas", "financiero", "presupuesto", "contabilidad", "dinero", "inversión", "inversion", "criptomoneda", "impuestos"],
-    description: "Financial advisor, business strategy, accounting, investment analysis, crypto research, tax planning",
-    role: "Financial Advisor: Expert in financial modeling, business strategy, accounting support, and investment analysis."
+    keywords: [
+      // Financial core
+      "finance", "financial", "budget", "accounting", "money", "investment", "business model", "roi", "profit", "revenue", "crypto", "cryptocurrency", "bitcoin", "tax", "finanzas", "financiero", "presupuesto", "contabilidad", "dinero", "inversión", "inversion", "criptomoneda", "impuestos",
+      // Presentation & pitch deck creation
+      "slides", "presentation", "presentación", "pitch deck", "pitch", "investor deck", "deck", "fundraising", "levantamiento", "pre-seed", "seed", "series a", "valuation", "valorización", "financial model", "modelo financiero", "pro forma", "projections", "proyecciones"
+    ],
+    description: "Financial advisor, business strategy, accounting, investment analysis, crypto research, tax planning, AND financial presentations/pitch decks creation",
+    role: "Financial Advisor & Presentation Specialist: Expert in financial modeling, business strategy, accounting support, investment analysis, AND creating financial presentations/pitch decks with real Google Slides."
   },
   Emma: {
     keywords: ["shopify", "store", "products", "sales", "inventory", "ecommerce", "catalog", "analytics", "orders", "tienda", "productos", "ventas", "inventario", "e-commerce", "comercio electrónico"],
@@ -194,6 +199,15 @@ const TOOLS_INTEGRATION = `TOOL USAGE:
 
 
 const ANTI_HALLUCINATION = `ANTI-HALLUCINATION PROTOCOL:
+🚨 CRITICAL DOCUMENT CREATION RULES:
+❌ NEVER EVER invent fake document URLs or IDs (e.g., "https://docs.google.com/presentation/d/1ABCdefGHI...", "fake123", "example_id")
+❌ NEVER say "Aquí está la presentación:" or "Here's the document:" unless you actually called a creation tool
+❌ NEVER use placeholder text like "[link]" or "[URL]" or "simulado" 
+✅ ALWAYS delegate to the appropriate specialist (Peter for financial presentations/pitch decks)
+✅ ONLY share document links that come from REAL tool responses
+✅ If a specialist hasn't created the document yet, say "Let me have [Specialist] create that" and delegate
+
+GENERAL RULES:
 - Stick to facts; if uncertain, say: "I don't have enough information—verify via source."
 - Self-check outputs for consistency; favor concise examples.
 - Avoid speculation; ground in context or retrieval.
@@ -409,7 +423,7 @@ const STRICT_DELEGATION_HEURISTICS = `STRICT DELEGATION HEURISTICS:
 const ORCHESTRATION_CHAINS = `ORCHESTRATION CHAINS (INTERNAL):
 - Notion intent → Ami orchestrates → delegate_to_notion_agent (Notion Agent executes)
 - Email triage/review → Ami; email compose/send/draft → delegate_to_astra (Astra executes)
-- Financial analysis/Business planning → Peter
+- Financial analysis/Business planning/Pitch decks/Financial presentations → Peter (creates REAL Google Slides/Sheets/Docs)
 - Budgeting/Personal finance (presupuesto/finanzas personales) → Ami orchestrates → Khipu (Google Sheets) executes
 
 - SOCIAL MEDIA & MESSAGING PLATFORMS (ALL via Jenn):

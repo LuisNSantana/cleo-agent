@@ -225,58 +225,58 @@ function processListItems(
 
 /**
  * Build Google Docs API requests from content blocks
+ * 
+ * Strategy: Progressive Insertion (Google Docs API Best Practice)
+ * 1. Insert all text content in one batch at index 1
+ * 2. Calculate exact indices for each block
+ * 3. Apply formatting in ascending index order
+ * 
+ * This approach ensures predictable indices and correct style application.
  */
 function buildDocumentRequests(blocks: ContentBlock[]): any[] {
   const requests: any[] = []
-  let currentIndex = 1 // Google Docs starts at index 1
   
-  // Build requests in reverse order (Google Docs best practice)
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    const block = blocks[i]
-    const text = block.text + '\n'
-    
-    // Insert text
-    requests.push({
-      insertText: {
-        location: { index: 1 },
-        text: text
-      }
-    })
-    
-    const endIndex = text.length + 1
-    
-    // Apply paragraph style based on block type
-    let namedStyleType = 'NORMAL_TEXT'
-    
-    switch (block.type) {
-      case 'heading1':
-        namedStyleType = 'HEADING_1'
-        break
-      case 'heading2':
-        namedStyleType = 'HEADING_2'
-        break
-      case 'heading3':
-        namedStyleType = 'HEADING_3'
-        break
+  // Step 1: Build the complete text content
+  const fullText = blocks.map(b => b.text + '\n').join('')
+  
+  // Insert all text at once at the beginning of the document
+  requests.push({
+    insertText: {
+      location: { index: 1 },
+      text: fullText
     }
+  })
+  
+  // Step 2: Apply formatting in ascending index order
+  let currentIndex = 1
+  
+  for (const block of blocks) {
+    const textLength = block.text.length + 1 // +1 for the newline character
+    const endIndex = currentIndex + textLength
     
-    // Apply named style
-    if (namedStyleType !== 'NORMAL_TEXT') {
+    // Apply paragraph style for headings
+    if (block.type === 'heading1' || block.type === 'heading2' || block.type === 'heading3') {
+      const styleMapping = {
+        'heading1': 'HEADING_1',
+        'heading2': 'HEADING_2',
+        'heading3': 'HEADING_3'
+      }
+      
       requests.push({
         updateParagraphStyle: {
           range: {
-            startIndex: 1,
+            startIndex: currentIndex,
             endIndex: endIndex
           },
           paragraphStyle: {
-            namedStyleType: namedStyleType
+            namedStyleType: styleMapping[block.type]
           },
           fields: 'namedStyleType'
         }
       })
     }
     
-    // Apply text formatting if specified
+    // Apply text formatting (bold, italic, fontSize)
     if (block.formatting) {
       const textStyle: any = {}
       const fields: string[] = []
@@ -299,11 +299,12 @@ function buildDocumentRequests(blocks: ContentBlock[]): any[] {
         fields.push('fontSize')
       }
       
+      // Only add updateTextStyle if there are fields to update
       if (fields.length > 0) {
         requests.push({
           updateTextStyle: {
             range: {
-              startIndex: 1,
+              startIndex: currentIndex,
               endIndex: endIndex
             },
             textStyle: textStyle,
@@ -313,18 +314,23 @@ function buildDocumentRequests(blocks: ContentBlock[]): any[] {
       }
     }
     
-    // Create bullets for list items
+    // Create paragraph bullets for lists
     if (block.type === 'bullet_list' || block.type === 'numbered_list') {
       requests.push({
         createParagraphBullets: {
           range: {
-            startIndex: 1,
+            startIndex: currentIndex,
             endIndex: endIndex
           },
-          bulletPreset: block.type === 'bullet_list' ? 'BULLET_DISC_CIRCLE_SQUARE' : 'NUMBERED_DECIMAL_ALPHA_ROMAN'
+          bulletPreset: block.type === 'bullet_list' 
+            ? 'BULLET_DISC_CIRCLE_SQUARE' 
+            : 'NUMBERED_DECIMAL_ALPHA_ROMAN'
         }
       })
     }
+    
+    // Move to next block
+    currentIndex = endIndex
   }
   
   return requests
@@ -336,7 +342,11 @@ function buildDocumentRequests(blocks: ContentBlock[]): any[] {
 export const createStructuredGoogleDocTool = tool({
   description: `📝 Create a professionally formatted Google Document from markdown-like content. 
 
-IMPORTANT FORMATTING RULES:
+⚠️ NOT FOR PRESENTATIONS: If user asks for slides, pitch deck, presentación, or diapositivas, use createStructuredGoogleSlides instead!
+
+Use this for: text documents, reports, articles, essays, written content.
+
+FORMATTING RULES:
 - Use "# Title" for main headings (Heading 1)
 - Use "## Subtitle" for section headings (Heading 2)  
 - Use "### Subheading" for subsections (Heading 3)
