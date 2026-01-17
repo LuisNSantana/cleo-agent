@@ -1,4 +1,5 @@
-import type { CoreMessage } from "ai"
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 
 export async function convertUserMultimodalMessages(messages: CoreMessage[], model: string, modelVision: boolean): Promise<any[]> {
   // Count input images for diagnostics

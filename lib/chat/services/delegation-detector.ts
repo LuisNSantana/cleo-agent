@@ -3,7 +3,8 @@
  * Analyzes user messages to detect delegation intent and route to appropriate agents
  */
 
-import type { CoreMessage } from 'ai'
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 import { scoreDelegationIntent } from '@/lib/delegation/intent-heuristics'
 import { enrichKeywordsWithAgents } from '@/lib/delegation/intent-heuristics'
 import { analyzeDelegationIntent } from '@/lib/agents/delegation'

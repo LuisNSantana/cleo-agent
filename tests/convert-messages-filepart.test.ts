@@ -1,5 +1,6 @@
 import { convertUserMultimodalMessages } from '@/lib/chat/convert-messages'
-import type { CoreMessage } from 'ai'
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 
 describe('convertUserMultimodalMessages - file parts', () => {
   test('converts image file to image part when modelVision=true', async () => {

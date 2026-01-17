@@ -1,6 +1,9 @@
-import { generateText, type ImagePart, type CoreMessage } from "ai"
+import { generateText, type ImagePart } from "ai"
 import { openproviders } from "@/lib/openproviders"
 import { MODEL_DEFAULT } from "@/lib/config"
+
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 
 export type AnalyzeDrawingInput = {
   kind: "png" | "document"

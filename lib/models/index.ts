@@ -4,6 +4,7 @@ import { ModelConfig } from "./types"
 import { grokModels } from "./data/grok"
 import { openrouterModels } from "./data/openrouter"
 import { openaiModels } from "./data/openai.clean"
+import { smarterModels } from "./data/optimized-tiers"
 
 /**
  * Unified model list with multiple tiers
@@ -34,13 +35,18 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 }
 
 // Final list for USER-FACING model selector:
-// - Standard: Faster (grok-4-fast), Smarter (gpt-5.1-2025-11-13)
+// - Standard: Faster (grok-4-fast), Smarter (gpt-5.1), Gemini 3 Flash, Claude Haiku 4.5
 // - Free: GLM 4.5 Air, Trinity Mini
 // - Uncensored: Dolphin Mistral Venice
-// NOTE: grok-4-1-fast-reasoning and qwen3 are for INTERNAL agent use only, not shown in selector
 let STATIC_MODELS: ModelConfig[] = [
   ...pickById(grokModels, ['grok-4-fast']),
   ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
+  // Include Gemini 3 Flash and Claude Haiku 4.5 from smarterModels
+  ...pickById(smarterModels, [
+    'openrouter:google/gemini-3-flash-preview',
+    'openrouter:anthropic/claude-haiku-4.5',
+  ]),
+  // Free and uncensored models from OpenRouter
   ...pickById(openrouterModels, [
     'openrouter:z-ai/glm-4.5-air:free',
     'openrouter:arcee-ai/trinity-mini:free',

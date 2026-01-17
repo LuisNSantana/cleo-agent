@@ -1,4 +1,5 @@
-import type { CoreMessage } from "ai"
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 import { MODEL_IMAGE_LIMITS } from "@/lib/image-management"
 
 export function filterImagesByModelLimit(messages: CoreMessage[], model: string) {
@@ -7,7 +8,7 @@ export function filterImagesByModelLimit(messages: CoreMessage[], model: string)
   let totalImages = 0
   messages.forEach((msg) => {
     if (Array.isArray(msg.content)) {
-      totalImages += msg.content.filter((part) => (part as any).type === 'image').length
+      totalImages += msg.content.filter((part: any) => part.type === 'image').length
     }
   })
 

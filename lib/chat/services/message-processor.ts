@@ -3,7 +3,8 @@
  * Handles message conversion, multimodal content, and image filtering
  */
 
-import type { CoreMessage } from 'ai'
+// Message type for AI SDK compatibility - using any for maximum flexibility
+type CoreMessage = any
 import { convertUserMultimodalMessages } from '@/lib/chat/convert-messages'
 import { filterImagesByModelLimit } from '@/lib/chat/image-filter'
 import { MODEL_IMAGE_LIMITS } from '@/lib/image-management'

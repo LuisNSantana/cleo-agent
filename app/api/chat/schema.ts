@@ -1,10 +1,11 @@
-import type { CoreMessage } from "ai"
+// Message type for AI SDK compatibility
+type Message = { role: string; content: any }
 import { z } from "zod"
 
 export type AgentMode = 'super' | 'multi'
 
 export type ChatRequest = {
-  messages: CoreMessage[]
+  messages: Message[]
   chatId: string
   userId: string
   model: string

@@ -1,5 +1,6 @@
 // Core dependencies
-import type { CoreMessage } from 'ai'
+// Message type for AI SDK compatibility - using 'any' for maximum flexibility
+type Message = any
 import { randomUUID } from 'crypto'
 import '@/lib/suppress-warnings'
 
@@ -759,8 +760,39 @@ export async function POST(req: Request) {
   // Multi-Agent mode ('multi') uses the full CoreOrchestrator with delegation
   const useSuperAnkieMode = agentMode === 'super'
   
+  // Check if model supports tools - if not, Super Ankie will use streamText without tools
+  const modelSupportsTools = modelConfig?.tools !== false
+  
   if (useSuperAnkieMode) {
     console.log(`⚡ [SUPER ANKIE] Fast mode activated with ${SUPER_ANKIE_TOOL_COUNT} tools`)
+    
+    // If model doesn't support tools, fallback to simple streamText
+    if (!modelSupportsTools) {
+      console.log(`⚠️ [SUPER ANKIE] Model ${normalizedModel} doesn't support tools, using simple streaming`)
+      
+      try {
+        const { streamText } = await import('ai')
+        const { openproviders } = await import('@/lib/openproviders')
+        
+        const superAnkieSystemPrompt = getSuperAnkiePrompt({ locale: userLocale }) + '\n\n' + finalSystemPrompt
+        const modelSdk = openproviders(normalizedModel as any)
+        
+        const result = await streamText({
+          model: modelSdk,
+          system: superAnkieSystemPrompt,
+          messages: convertedMessages as any,
+        })
+        
+        return result.toTextStreamResponse({
+          headers: {
+            'X-Agent-Mode': 'super-no-tools',
+          },
+        })
+      } catch (e: any) {
+        console.error('❌ [SUPER ANKIE] Error in no-tools fallback:', e)
+        // Continue to orchestrator fallback below
+      }
+    }
     
     try {
       const { streamText, Experimental_Agent: ToolLoopAgent } = await import('ai')
