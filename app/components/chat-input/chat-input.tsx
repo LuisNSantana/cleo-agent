@@ -314,7 +314,8 @@ export function ChatInput({
             className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base text-foreground placeholder:text-muted-foreground"
           />
           <PromptInputActions className="mt-3 w-full justify-between p-2">
-            <div className="flex gap-2 items-center">
+            {/* Left side actions - reduced gap on mobile for send button space */}
+            <div className="flex gap-1 sm:gap-2 items-center flex-shrink min-w-0">
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
@@ -343,11 +344,14 @@ export function ChatInput({
                   isAuthenticated={isUserAuthenticated}
                 />
               )}
+              {/* Voice button - hidden on smallest screens to prioritize send button */}
               {onVoiceModeAction && (
-                <ButtonVoice
-                  onClick={onVoiceModeAction}
-                  isAuthenticated={isUserAuthenticated}
-                />
+                <div className="hidden sm:block">
+                  <ButtonVoice
+                    onClick={onVoiceModeAction}
+                    isAuthenticated={isUserAuthenticated}
+                  />
+                </div>
               )}
             </div>
             <PromptInputAction

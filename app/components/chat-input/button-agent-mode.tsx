@@ -21,11 +21,8 @@ type ButtonAgentModeProps = {
 /**
  * Enhanced toggle for switching between Super Ankie (fast) and Multi-Agent (deep) modes
  * 
- * UX Improvements:
- * - Segmented control style for clarity
- * - Both options visible at all times
- * - Clear visual indicator of active mode
- * - Descriptive tooltips for each mode
+ * Mobile-optimized: Icons only, no labels, no info button
+ * Desktop: Full labels and info button visible
  */
 export function ButtonAgentMode({
   agentMode,
@@ -36,13 +33,13 @@ export function ButtonAgentMode({
   
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex items-center gap-1">
-        {/* Segmented Control Container */}
+      <div className="flex items-center gap-0.5 sm:gap-1">
+        {/* Segmented Control Container - More compact on mobile */}
         <div className="relative flex items-center bg-secondary/50 rounded-full p-0.5 border border-border/50">
           {/* Sliding Background Indicator */}
           <motion.div
             className={cn(
-              "absolute h-7 rounded-full transition-colors duration-200",
+              "absolute h-6 sm:h-7 rounded-full transition-colors duration-200",
               isSuperMode 
                 ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30"
                 : "bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30"
@@ -61,7 +58,7 @@ export function ButtonAgentMode({
               <button
                 onClick={() => onToggleAction('super')}
                 className={cn(
-                  "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200",
+                  "relative z-10 flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all duration-200",
                   isSuperMode
                     ? "text-amber-600 dark:text-amber-400"
                     : "text-muted-foreground hover:text-foreground"
@@ -70,7 +67,7 @@ export function ButtonAgentMode({
               >
                 <Lightning 
                   className={cn(
-                    "h-3.5 w-3.5 transition-transform",
+                    "h-3.5 w-3.5 sm:h-3.5 sm:w-3.5 transition-transform",
                     isSuperMode && "animate-pulse"
                   )} 
                   weight={isSuperMode ? "fill" : "regular"} 
@@ -103,7 +100,7 @@ export function ButtonAgentMode({
               <button
                 onClick={() => onToggleAction('multi')}
                 className={cn(
-                  "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200",
+                  "relative z-10 flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all duration-200",
                   !isSuperMode
                     ? "text-purple-600 dark:text-purple-400"
                     : "text-muted-foreground hover:text-foreground"
@@ -112,7 +109,7 @@ export function ButtonAgentMode({
               >
                 <Brain 
                   className={cn(
-                    "h-3.5 w-3.5 transition-transform",
+                    "h-3.5 w-3.5 sm:h-3.5 sm:w-3.5 transition-transform",
                     !isSuperMode && "animate-pulse"
                   )} 
                   weight={!isSuperMode ? "fill" : "regular"} 
@@ -140,11 +137,11 @@ export function ButtonAgentMode({
           </Tooltip>
         </div>
 
-        {/* Info Button for overall explanation */}
+        {/* Info Button - Hidden on mobile to save space */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="p-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              className="hidden sm:block p-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               aria-label="¿Qué es esto?"
             >
               <Info className="h-3.5 w-3.5" />
@@ -170,3 +167,4 @@ export function ButtonAgentMode({
     </TooltipProvider>
   )
 }
+
