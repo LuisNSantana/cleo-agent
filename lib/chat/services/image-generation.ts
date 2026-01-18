@@ -8,6 +8,7 @@
  * - Gemini via OpenRouter: removed (less reliable)
  */
 
+import { OpenAI } from 'openai'
 import { dailyLimits } from '@/lib/daily-limits'
 import { createClient } from '@/lib/supabase/server'
 import { MODELS } from '@/lib/models'
@@ -55,17 +56,17 @@ export class ImageGenerationService {
         }
       }
 
-      // Primary model: openai/gpt-5-image-mini (via OpenRouter)
-      const modelId = 'openai/gpt-5-image-mini'
+      // Primary model: chatgpt-image-latest (Official OpenAI)
+      const modelId = 'chatgpt-image-latest'
       const modelConfig = MODELS.find((m) => m.id === modelId)
       
       // Fallback config if model not in registry
       const effectiveModelConfig = modelConfig || {
         id: modelId,
-        name: 'GPT-5 Image Mini',
+        name: 'ChatGPT Image Latest', 
         maxCalls: 50,
-        provider: 'openrouter',
-        providerId: 'gpt-5-image-mini',
+        provider: 'openai', 
+        providerId: 'chatgpt-image-latest',
         baseProviderId: 'openai',
       }
 
@@ -80,8 +81,8 @@ export class ImageGenerationService {
         }
       }
 
-      // Try providers in order: gpt-image-1-mini → DALL-E 3 → Mock fallback
-      const result = await this.tryGpt5ImageMiniOpenRouter(prompt, user?.id, modelId, quality)
+      // Try providers in order: gpt-image-1-mini (Official) → DALL-E 3 → Mock fallback
+      const result = await this.tryGptImage1MiniOfficial(prompt, user?.id, modelId, quality)
         .catch(() => this.tryOpenAIDallE(prompt, user?.id, 'dall-e-3'))
         .catch((err) => this.createMockFallback(prompt, user?.id, modelId, err))
 
@@ -97,70 +98,110 @@ export class ImageGenerationService {
   }
 
   /**
-   * Primary: OpenRouter openai/gpt-5-image-mini (Best quality/price ratio)
-   * Pricing: ~$0.01 per image (estimated)
+   * Helper: Upload Base64 image to Supabase Storage and get URL
+   * This prevents context window crashes by converting huge Base64 strings to short URLs.
    */
-  private async tryGpt5ImageMiniOpenRouter(
+  private async uploadBase64Image(base64Data: string): Promise<string> {
+    try {
+      const supabase = await createClient()
+      if (!supabase) throw new Error('Supabase client not available')
+
+      // Remove data:image/xxx;base64, prefix if present
+      const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, "")
+      const buffer = Buffer.from(base64Content, 'base64')
+
+      const fileName = `generated-images/${Date.now()}-${Math.random().toString(36).substring(7)}.png`
+
+      const { error } = await supabase.storage
+        .from('chat-attachments')
+        .upload(fileName, buffer, {
+          contentType: 'image/png',
+          upsert: false
+        })
+
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-attachments')
+        .getPublicUrl(fileName)
+
+      return publicUrl
+    } catch (error) {
+      chatLogger.error('Failed to upload generated image to storage', { error })
+      // Return original base64 as fallback, although it might crash context
+      // At least the user sees the image once before crash
+      return base64Data
+    }
+  }
+
+  /**
+   * Primary: OpenAI usage for chatgpt-image-latest (or gpt-image-1)
+   * Using official OpenAI SDK images.generate as per user example.
+   */
+  private async tryGptImage1MiniOfficial(
     prompt: string,
     userId: string | undefined,
     modelId: string,
     quality: ImageQuality = 'medium'
   ): Promise<ImageGenerationResult> {
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY
-    if (!openRouterApiKey) {
-      throw new Error('OpenRouter API key not configured')
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY not configured for official OpenAI usage')
     }
 
-    chatLogger.info('Attempting image generation with openai/gpt-5-image-mini via OpenRouter', { quality })
+    // User requested "test chatgpt-image-latest"
+    const actualModelId = 'chatgpt-image-latest'
+    
+    chatLogger.info(`Attempting image generation with ${actualModelId} via Official OpenAI SDK (images.generate)`)
 
-    // OpenRouter uses a similar endpoint structure but proxied
-    const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openRouterApiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        'X-Title': 'Ankie',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-5-image-mini', // The requested model
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: quality === 'low' ? 'standard' : 'hd', // Translate internal quality to API
-      }),
+    const openai = new OpenAI({
+      apiKey: apiKey,
+      dangerouslyAllowBrowser: true, 
     })
 
-    if (!response.ok) {
-      const errorData = await response.text()
-      chatLogger.warn('gpt-5-image-mini failed, trying fallback', { status: response.status })
-      throw new Error(`OpenRouter API error: ${response.status} - ${errorData}`)
+    try {
+      // Minimal payload as per user example
+      const response = await openai.images.generate({
+        model: actualModelId,
+        prompt: prompt,
+        n: 1, 
+        size: "1024x1024", 
+      });
+
+      let imageUrl = response.data?.[0]?.url;
+      
+      // Fallback to b64_json if url is missing (user example implies b64 usage)
+      if (!imageUrl && response.data?.[0]?.b64_json) {
+        // We MUST upload this to storage to avoid context crash
+        const base64Data = `data:image/png;base64,${response.data[0].b64_json}`;
+        imageUrl = await this.uploadBase64Image(base64Data);
+      }
+
+      if (!imageUrl) {
+        throw new Error(`No image URL or Base64 received from ${actualModelId}`)
+      }
+
+      const result = {
+        imageUrl,
+        title: `Generated Image: ${prompt.slice(0, 50)}`,
+        description: `AI-generated image using ${actualModelId}: "${prompt}"`,
+        style: 'ChatGPT Image Latest', 
+        dimensions: { width: 1024, height: 1024 }, 
+      }
+
+      if (userId) {
+        await dailyLimits.recordUsage(userId, modelId).catch((err) => {
+          chatLogger.error('Failed to record image usage', { userId, error: err })
+        })
+      }
+
+      chatLogger.info(`Image generated via ${actualModelId} (Official SDK)`)
+      return { success: true, result, model: actualModelId }
+
+    } catch (error: any) {
+      chatLogger.warn(`Official OpenAI SDK generation failed for ${actualModelId}`, { error: error.message })
+      throw error 
     }
-
-    const data = await response.json()
-    const imageUrl = data.data?.[0]?.url
-
-    if (!imageUrl) {
-      throw new Error('No image URL received from gpt-5-image-mini')
-    }
-
-    // Determine descriptive style name based on prompt analysis or default
-    const result = {
-      imageUrl,
-      title: `Generated Image: ${prompt.slice(0, 50)}`,
-      description: `AI-generated image using GPT-5 Image Mini: "${prompt}"`,
-      style: 'GPT-5 Image Mini', // Can be enhanced later
-      dimensions: { width: 1024, height: 1024 },
-    }
-
-    if (userId) {
-      await dailyLimits.recordUsage(userId, modelId).catch((err) => {
-        chatLogger.error('Failed to record image usage', { userId, error: err })
-      })
-    }
-
-    chatLogger.info('Image generated via openai/gpt-5-image-mini', { quality })
-    return { success: true, result, model: modelId }
   }
 
   /**
