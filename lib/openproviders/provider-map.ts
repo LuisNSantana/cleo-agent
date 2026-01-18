@@ -35,7 +35,6 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Arcee AI Trinity Mini (free agent-optimized)
   "openrouter:arcee-ai/trinity-mini:free": "openrouter",
   "arcee-ai/trinity-mini:free": "openrouter",
-  "openrouter:openai/gpt-oss-120b": "openrouter",
   "openrouter:openai/gpt-4.1-mini": "openrouter",
   "openrouter:deepseek/deepseek-chat-v3.1:free": "openrouter",
   "deepseek/deepseek-chat-v3.1:free": "openrouter",
@@ -78,6 +77,18 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   // Gemini 3 Flash Preview via OpenRouter
   "openrouter:google/gemini-3-flash-preview": "openrouter",
   "google/gemini-3-flash-preview": "openrouter",
+  
+  // 🔥 Hidden Gems - Strategic unique models via OpenRouter
+  "openrouter:xiaomi/mimo-v2-flash:free": "openrouter",
+  "xiaomi/mimo-v2-flash:free": "openrouter",
+  "openrouter:mistralai/devstral-2512:free": "openrouter",
+  "mistralai/devstral-2512:free": "openrouter",
+  "openrouter:deepseek/deepseek-v3.2": "openrouter",
+  "deepseek/deepseek-v3.2": "openrouter",
+  "openrouter:z-ai/glm-4.7": "openrouter",
+  "z-ai/glm-4.7": "openrouter",
+  // Note: gpt-oss-120b is routed via Groq below, OpenRouter version uses explicit prefix
+  "openrouter:openai/gpt-oss-120b": "openrouter",
 
   o1: "openai",
   "o1-2024-12-17": "openai",

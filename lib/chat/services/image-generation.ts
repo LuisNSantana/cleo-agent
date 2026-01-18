@@ -12,6 +12,7 @@ import { dailyLimits } from '@/lib/daily-limits'
 import { createClient } from '@/lib/supabase/server'
 import { MODELS } from '@/lib/models'
 import { chatLogger } from './logger'
+import { type User } from '@supabase/supabase-js'
 
 interface ImageGenerationResult {
   success: boolean
@@ -33,7 +34,7 @@ type ImageQuality = 'low' | 'medium' | 'high'
 
 export class ImageGenerationService {
   /**
-   * Generate image using gpt-image-1-mini (cheapest) with DALL-E 3 fallback
+   * Generate image using openai/gpt-5-image-mini (cheapest) with DALL-E 3 fallback
    */
   async generateImage(
     prompt: string,
@@ -45,7 +46,7 @@ export class ImageGenerationService {
       chatLogger.debug('Starting image generation', { prompt: prompt.slice(0, 50), quality })
 
       // Get user from Supabase if authenticated
-      let user = null
+      let user: User | null = null
       if (userId && isAuthenticated) {
         const supabase = await createClient()
         if (supabase) {
@@ -54,17 +55,17 @@ export class ImageGenerationService {
         }
       }
 
-      // Primary model: gpt-image-1-mini
-      const modelId = 'gpt-image-1-mini'
+      // Primary model: openai/gpt-5-image-mini (via OpenRouter)
+      const modelId = 'openai/gpt-5-image-mini'
       const modelConfig = MODELS.find((m) => m.id === modelId)
       
       // Fallback config if model not in registry
       const effectiveModelConfig = modelConfig || {
         id: modelId,
-        name: 'GPT Image 1 Mini',
+        name: 'GPT-5 Image Mini',
         maxCalls: 50,
-        provider: 'openai',
-        providerId: 'gpt-image-1-mini',
+        provider: 'openrouter',
+        providerId: 'gpt-5-image-mini',
         baseProviderId: 'openai',
       }
 
@@ -80,7 +81,7 @@ export class ImageGenerationService {
       }
 
       // Try providers in order: gpt-image-1-mini → DALL-E 3 → Mock fallback
-      const result = await this.tryGptImageMini(prompt, user?.id, modelId, quality)
+      const result = await this.tryGpt5ImageMiniOpenRouter(prompt, user?.id, modelId, quality)
         .catch(() => this.tryOpenAIDallE(prompt, user?.id, 'dall-e-3'))
         .catch((err) => this.createMockFallback(prompt, user?.id, modelId, err))
 
@@ -96,55 +97,59 @@ export class ImageGenerationService {
   }
 
   /**
-   * Primary: OpenAI gpt-image-1-mini (cheapest option)
-   * Pricing: $0.005 (low) / $0.011 (medium) / $0.036 (high) per 1024x1024
+   * Primary: OpenRouter openai/gpt-5-image-mini (Best quality/price ratio)
+   * Pricing: ~$0.01 per image (estimated)
    */
-  private async tryGptImageMini(
+  private async tryGpt5ImageMiniOpenRouter(
     prompt: string,
     userId: string | undefined,
     modelId: string,
     quality: ImageQuality = 'medium'
   ): Promise<ImageGenerationResult> {
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured')
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY
+    if (!openRouterApiKey) {
+      throw new Error('OpenRouter API key not configured')
     }
 
-    chatLogger.info('Attempting image generation with gpt-image-1-mini', { quality })
+    chatLogger.info('Attempting image generation with openai/gpt-5-image-mini via OpenRouter', { quality })
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    // OpenRouter uses a similar endpoint structure but proxied
+    const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${openaiApiKey}`,
+        Authorization: `Bearer ${openRouterApiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'Ankie',
       },
       body: JSON.stringify({
-        model: 'gpt-image-1-mini',
+        model: 'openai/gpt-5-image-mini', // The requested model
         prompt: prompt,
         n: 1,
         size: '1024x1024',
-        quality: quality,
+        quality: quality === 'low' ? 'standard' : 'hd', // Translate internal quality to API
       }),
     })
 
     if (!response.ok) {
       const errorData = await response.text()
-      chatLogger.warn('gpt-image-1-mini failed, trying fallback', { status: response.status })
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`)
+      chatLogger.warn('gpt-5-image-mini failed, trying fallback', { status: response.status })
+      throw new Error(`OpenRouter API error: ${response.status} - ${errorData}`)
     }
 
     const data = await response.json()
     const imageUrl = data.data?.[0]?.url
 
     if (!imageUrl) {
-      throw new Error('No image URL received from gpt-image-1-mini')
+      throw new Error('No image URL received from gpt-5-image-mini')
     }
 
+    // Determine descriptive style name based on prompt analysis or default
     const result = {
       imageUrl,
       title: `Generated Image: ${prompt.slice(0, 50)}`,
-      description: `AI-generated image using GPT Image 1 Mini: "${prompt}"`,
-      style: 'GPT Image Mini',
+      description: `AI-generated image using GPT-5 Image Mini: "${prompt}"`,
+      style: 'GPT-5 Image Mini', // Can be enhanced later
       dimensions: { width: 1024, height: 1024 },
     }
 
@@ -154,7 +159,7 @@ export class ImageGenerationService {
       })
     }
 
-    chatLogger.info('Image generated via gpt-image-1-mini', { quality })
+    chatLogger.info('Image generated via openai/gpt-5-image-mini', { quality })
     return { success: true, result, model: modelId }
   }
 

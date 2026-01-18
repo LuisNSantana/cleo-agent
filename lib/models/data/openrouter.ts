@@ -1671,4 +1671,287 @@ export const openrouterModels: ModelConfig[] = [
         }),
       }).chat("perplexity/sonar-deep-research"),
   },
+  
+  // ==========================================
+  // 🔥 HIDDEN GEMS - Strategic Unique Models
+  // ==========================================
+  
+  // 1. MiMo-V2-Flash (Xiaomi) - Hidden gem from China, performs like Claude Sonnet 4.5 at 3.5% cost
+  {
+    id: "openrouter:xiaomi/mimo-v2-flash:free",
+    name: "MiMo-V2-Flash (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "MiMo",
+    baseProviderId: "xiaomi",
+    description:
+      "Xiaomi's MiMo-V2-Flash: 309B MoE model (15B active), #1 open-source on SWE-bench. Claude Sonnet 4.5 performance at 3.5% of the cost. Excellent for coding, reasoning, and agent scenarios.",
+    tags: ["xiaomi", "mimo", "moe", "coding", "reasoning", "agent", "hidden-gem", "free", "swe-bench"],
+    category: "free",
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Verified: supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/xiaomi/mimo-v2-flash:free",
+    apiDocs: "https://openrouter.ai/xiaomi/mimo-v2-flash:free",
+    modelPage: "https://huggingface.co/XiaomiMoE/MiMo-V2-Flash",
+    releasedAt: "2025-09-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("xiaomi/mimo-v2-flash:free"),
+  },
+  
+  // 2. Devstral 2512 (Mistral) - Pro coding model, 123B dense, 256K context, agentic features
+  {
+    id: "openrouter:mistralai/devstral-2512:free",
+    name: "Devstral 2 (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Mistral",
+    baseProviderId: "mistralai",
+    description:
+      "Mistral's Devstral 2: 123B dense transformer, 256K context, MIT license. Best-in-class agentic coding model. Excellent for multi-file projects, code generation, and software engineering tasks.",
+    tags: ["mistral", "devstral", "coding", "agentic", "256k-context", "hidden-gem", "free", "mit-license"],
+    category: "free",
+    contextWindow: 262144, // 256K
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Verified: supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/mistralai/devstral-2512:free",
+    apiDocs: "https://openrouter.ai/mistralai/devstral-2512:free",
+    modelPage: "https://mistral.ai/products/devstral",
+    releasedAt: "2025-12-10",
+    icon: "mistral",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("mistralai/devstral-2512:free"),
+  },
+  
+  // 3. Llama 3.3 70B Instruct (free) - GPT-4 level performance, Meta's flagship open model
+  {
+    id: "openrouter:meta-llama/llama-3.3-70b-instruct:free",
+    name: "Llama 3.3 70B (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Llama 3.3",
+    baseProviderId: "meta-llama",
+    description:
+      "Meta's Llama 3.3 70B Instruct: pretrained and instruction-tuned multilingual LLM. GPT-4 level performance for free. Excellent general-purpose model for all tasks.",
+    tags: ["meta", "llama", "70b", "instruct", "multilingual", "gpt4-level", "free"],
+    category: "free",
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Verified: supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/meta-llama/llama-3.3-70b-instruct:free",
+    apiDocs: "https://openrouter.ai/meta-llama/llama-3.3-70b-instruct:free",
+    modelPage: "https://ai.meta.com/llama/",
+    releasedAt: "2024-12-06",
+    icon: "meta",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("meta-llama/llama-3.3-70b-instruct:free"),
+  },
+  
+  // 4. GLM-4.7 (Z.AI) - Enhanced agentic behavior, strong coding and reasoning
+  {
+    id: "openrouter:z-ai/glm-4.7",
+    name: "GLM 4.7",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GLM",
+    baseProviderId: "z-ai",
+    description:
+      "Z.AI's GLM-4.7: flagship model with enhanced programming and stable multi-step reasoning. Improved agentic task execution with natural conversational experiences.",
+    tags: ["glm", "z-ai", "coding", "reasoning", "agentic", "chinese"],
+    contextWindow: 131072,
+    inputCost: 0.14,
+    outputCost: 0.86,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Verified: supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/z-ai/glm-4.7",
+    apiDocs: "https://openrouter.ai/z-ai/glm-4.7",
+    modelPage: "https://huggingface.co/zai-org/GLM-4.7",
+    releasedAt: "2025-11-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("z-ai/glm-4.7"),
+  },
+  
+  // 5. Gemini 2.0 Flash Thinking (free) - Experimental with 1M context, fast multimodal
+  {
+    id: "openrouter:google/gemini-2.0-flash-thinking-exp:free",
+    name: "Gemini 2.0 Flash Thinking (free)",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Gemini",
+    baseProviderId: "google",
+    description:
+      "Google's Gemini 2.0 Flash Thinking: experimental model with 1M context, reasoning tokens, and multimodal capabilities. Fast and free for complex tasks.",
+    tags: ["google", "gemini", "multimodal", "1m-context", "thinking", "reasoning", "free"],
+    category: "free",
+    contextWindow: 1048576, // 1M tokens
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true, // Verified: supports function calling
+    audio: true,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/google/gemini-2.0-flash-thinking-exp:free",
+    apiDocs: "https://openrouter.ai/google/gemini-2.0-flash-thinking-exp:free",
+    modelPage: "https://ai.google.dev/gemini-api",
+    releasedAt: "2025-02-01",
+    icon: "gemini",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("google/gemini-2.0-flash-thinking-exp:free"),
+  },
+  
+  // DeepSeek V3.2 - Value King: 90% of GPT-5.1 performance at fraction of cost
+  {
+    id: "openrouter:deepseek/deepseek-v3.2",
+    name: "DeepSeek V3.2",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "DeepSeek",
+    baseProviderId: "deepseek",
+    description:
+      "DeepSeek V3.2: The 'Value King' - achieves ~90% of GPT-5.1 performance at a fraction of the cost. Excellent for coding, reasoning, and general tasks.",
+    tags: ["deepseek", "value", "coding", "reasoning", "cost-effective"],
+    contextWindow: 131072,
+    inputCost: 0.14,
+    outputCost: 0.28,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/deepseek/deepseek-v3.2",
+    apiDocs: "https://openrouter.ai/deepseek/deepseek-v3.2",
+    modelPage: "https://deepseek.com",
+    releasedAt: "2025-12-01",
+    icon: "deepseek",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("deepseek/deepseek-v3.2"),
+  },
+  
+  // GPT-OSS-120B - Open Source Power via OpenRouter
+  {
+    id: "openrouter:openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "GPT-OSS",
+    baseProviderId: "openai",
+    description:
+      "GPT-OSS 120B: Large open-source model with strong general capabilities. Good balance of performance and accessibility.",
+    tags: ["gpt-oss", "open-source", "general", "large"],
+    contextWindow: 131072,
+    inputCost: 0,
+    outputCost: 0,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true, // Supports function calling
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://openrouter.ai/openai/gpt-oss-120b",
+    apiDocs: "https://openrouter.ai/openai/gpt-oss-120b",
+    modelPage: "https://openrouter.ai/openai/gpt-oss-120b",
+    releasedAt: "2025-08-01",
+    icon: "openai",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("openai/gpt-oss-120b"),
+  },
 ]
+
+

@@ -2,7 +2,7 @@
 
 import { useUser } from "@/lib/user-store/provider"
 import { motion, AnimatePresence } from "framer-motion"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Sparkle, Code, PenNib, Brain, RocketLaunch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +11,48 @@ const FOCUS_OPTIONS = [
   { id: "writing", label: "Writing", icon: PenNib, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   { id: "brainstorm", label: "Planning", icon: Brain, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
   { id: "launch", label: "Shipping", icon: RocketLaunch, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+]
+
+// 🎨 Creative greeting templates with personality
+const GREETING_TEMPLATES = {
+  morning: [
+    (name: string) => `Buenos días, ${name}. ☀️`,
+    (name: string) => `Rise and shine, ${name}! 🌅`,
+    (name: string) => `¡Arriba, ${name}! El café está listo. ☕`,
+    (name: string) => `Good morning, ${name}. Ready to create? ✨`,
+    (name: string) => `Hey ${name}, let's make today count. 🚀`,
+    (name: string) => `Morning, ${name}! What shall we build? 🛠️`,
+  ],
+  afternoon: [
+    (name: string) => `Buenas tardes, ${name}. 🌤️`,
+    (name: string) => `Hey ${name}, how's the day going? 💪`,
+    (name: string) => `What's up, ${name}? Ready to ship? 📦`,
+    (name: string) => `Hola ${name}, ¿en qué te ayudo? 🤝`,
+    (name: string) => `Good afternoon, ${name}. Let's do this! ⚡`,
+    (name: string) => `${name}! Perfect timing. What's the mission? 🎯`,
+  ],
+  evening: [
+    (name: string) => `Buenas noches, ${name}. 🌙`,
+    (name: string) => `Evening, ${name}. Night owl mode? 🦉`,
+    (name: string) => `Hey ${name}, burning the midnight oil? 🔥`,
+    (name: string) => `Good evening, ${name}. Let's wrap up strong. 💫`,
+    (name: string) => `Hola ${name}, ¿una última cosa antes de dormir? 😴`,
+    (name: string) => `${name}! Still at it? I admire the hustle. 🌟`,
+  ],
+}
+
+// Sub-messages that appear after the greeting
+const SUB_MESSAGES = [
+  "Tu asistente AI está listo para ayudarte.",
+  "Ready when you are.",
+  "Let's turn ideas into reality.",
+  "Your AI copilot is here.",
+  "¿Qué construimos hoy?",
+  "The possibilities are endless.",
+  "Ask me anything.",
+  "Creatividad sin límites.",
+  "From concept to code.",
+  "Tu segundo cerebro.",
 ]
 
 export function WelcomeMessage() {
@@ -23,26 +65,38 @@ export function WelcomeMessage() {
   const firstName = user?.display_name?.split(" ")[0] || user?.email?.split("@")[0] || "Creator"
   const capitalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
 
+  // Select random greeting and sub-message (memoized to stay consistent during session)
+  const { selectedGreeting, subMessage } = useMemo(() => {
+    const hour = new Date().getHours()
+    let templates: ((name: string) => string)[]
+    
+    if (hour < 12) templates = GREETING_TEMPLATES.morning
+    else if (hour < 18) templates = GREETING_TEMPLATES.afternoon
+    else templates = GREETING_TEMPLATES.evening
+
+    const randomGreeting = templates[Math.floor(Math.random() * templates.length)]
+    const randomSubMessage = SUB_MESSAGES[Math.floor(Math.random() * SUB_MESSAGES.length)]
+    
+    return {
+      selectedGreeting: randomGreeting(capitalizedName),
+      subMessage: randomSubMessage,
+    }
+  }, [capitalizedName])
+
   // Typing effect logic
   useEffect(() => {
-    const hour = new Date().getHours()
-    let text = ""
-    if (hour < 12) text = `Good morning, ${capitalizedName}.`
-    else if (hour < 18) text = `Good afternoon, ${capitalizedName}.`
-    else text = `Good evening, ${capitalizedName}.`
-
     let i = 0
     const timer = setInterval(() => {
-      setGreeting(text.slice(0, i + 1))
+      setGreeting(selectedGreeting.slice(0, i + 1))
       i++
-      if (i === text.length) {
+      if (i === selectedGreeting.length) {
         clearInterval(timer)
         setTimeout(() => setShowFocus(true), 500)
       }
     }, 50)
 
     return () => clearInterval(timer)
-  }, [capitalizedName])
+  }, [selectedGreeting])
 
   return (
     <div className="flex flex-col items-center text-center space-y-8 mb-8 w-full max-w-2xl mx-auto">
@@ -58,6 +112,20 @@ export function WelcomeMessage() {
           </span>
           <span className="animate-pulse text-primary ml-1">|</span>
         </h1>
+        
+        {/* Sub-message with fade-in animation */}
+        <AnimatePresence>
+          {showFocus && (
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-muted-foreground text-lg mt-4 font-light"
+            >
+              {subMessage}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Interactive Focus Selector */}

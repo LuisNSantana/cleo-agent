@@ -20,7 +20,7 @@ type MessageProps = {
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   userMessage?: string // Para detección de archivos
-  userId?: string // For image generation
+
   model?: string // Optional model id for badges
 }
 
@@ -37,7 +37,6 @@ export function Message({
   parts,
   status,
   className,
-  userId,
   model,
 }: MessageProps) {
   // Remove copied state from here - let each component handle it locally
@@ -57,7 +56,6 @@ export function Message({
         hasScrollAnchor={hasScrollAnchor}
         attachments={attachments}
         className={className}
-        userId={userId}
       >
         {children}
       </MessageUser>

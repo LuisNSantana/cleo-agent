@@ -35,14 +35,14 @@ export function ButtonAgentMode({
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-0.5 sm:gap-1">
         {/* Segmented Control Container - More compact on mobile */}
-        <div className="relative flex items-center bg-secondary/50 rounded-full p-0.5 border border-border/50">
+        <div className="relative flex items-center bg-muted/80 dark:bg-secondary/50 rounded-full p-0.5 border border-border/80 dark:border-border/50 shadow-sm">
           {/* Sliding Background Indicator */}
           <motion.div
             className={cn(
-              "absolute h-6 sm:h-7 rounded-full transition-colors duration-200",
+              "absolute h-6 sm:h-7 rounded-full transition-colors duration-200 shadow-sm",
               isSuperMode 
-                ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30"
-                : "bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30"
+                ? "bg-gradient-to-r from-amber-400 to-orange-400 dark:from-amber-500/20 dark:to-orange-500/20 border border-amber-500/50 dark:border-amber-500/30"
+                : "bg-gradient-to-r from-purple-400 to-indigo-400 dark:from-purple-500/20 dark:to-indigo-500/20 border border-purple-500/50 dark:border-purple-500/30"
             )}
             initial={false}
             animate={{
@@ -60,8 +60,8 @@ export function ButtonAgentMode({
                 className={cn(
                   "relative z-10 flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all duration-200",
                   isSuperMode
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-white dark:text-amber-400"
+                    : "text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground"
                 )}
                 aria-label="Modo Rápido - Super Ankie"
               >
@@ -102,8 +102,8 @@ export function ButtonAgentMode({
                 className={cn(
                   "relative z-10 flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all duration-200",
                   !isSuperMode
-                    ? "text-purple-600 dark:text-purple-400"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-white dark:text-purple-400"
+                    : "text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground"
                 )}
                 aria-label="Modo Profundo - Multi-Agente"
               >

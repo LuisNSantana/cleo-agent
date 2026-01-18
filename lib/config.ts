@@ -46,6 +46,11 @@ export const FREE_MODELS_IDS = [
   "gpt-5-nano",
   // Uncensored models (user takes full responsibility)
   "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  // 🔥 Hidden Gems - Strategic unique free models
+  "openrouter:xiaomi/mimo-v2-flash:free", // Xiaomi's hidden gem, #1 SWE-bench
+  "openrouter:mistralai/devstral-2512:free", // Best agentic coding, 256K context
+  "openrouter:deepseek/deepseek-v3.2", // DeepSeek V3.2 - value king
+  "openrouter:openai/gpt-oss-120b", // GPT-OSS-120B - open source power
   // Emergency fallback
   "gpt-4o-mini",
 ]

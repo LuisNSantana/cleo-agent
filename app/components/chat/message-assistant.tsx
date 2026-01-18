@@ -206,6 +206,53 @@ export function MessageAssistant({
     }
   })()
   
+  // Extract generateImage result to display the image inline in the chat message
+  const generateImageResult = (() => {
+    try {
+      const imagePart = parts?.find(
+        (part: any) =>
+          part.type === 'tool-invocation' &&
+          part.toolInvocation?.state === 'result' &&
+          part.toolInvocation?.toolName === 'generateImage' &&
+          part.toolInvocation?.result
+      ) as any
+
+      if (!imagePart) return null
+      const result = imagePart.toolInvocation?.result
+
+      // Result can be a raw object or an object with AI-SDK style { content: [{ type: 'text', text }] }
+      if (Array.isArray(result)) return null
+
+      let parsed = result
+      if (result && typeof result === 'object' && 'content' in result) {
+        const textItem = (result as any).content?.find?.((i: any) => i?.type === 'text')
+        if (textItem?.text) {
+          try {
+            parsed = JSON.parse(textItem.text)
+          } catch {
+            return null
+          }
+        }
+      }
+
+      // Extract imageUrl from parsed result
+      if (parsed && typeof parsed === 'object') {
+        const imageUrl = parsed.imageUrl || parsed.image_url || parsed.url
+        const title = parsed.title || 'Generated Image'
+        const description = parsed.description || null
+        const model = parsed.model || 'AI'
+        
+        if (imageUrl && parsed.success !== false) {
+          return { imageUrl, title, description, model }
+        }
+      }
+      
+      return null
+    } catch {
+      return null
+    }
+  })()
+  
   // Handle AI SDK v5 reasoning parts
   const reasoningParts = parts?.filter((part: any) => part.type === "reasoning")
   const reasoningTextFromParts = (reasoningParts?.map((part: any) => (part as any).text).filter(Boolean).join("\n") || "")
@@ -324,6 +371,33 @@ export function MessageAssistant({
         {openDocumentResult ? (
           <div className="mb-3">
             <OpenDocumentToolDisplay result={openDocumentResult as any} />
+          </div>
+        ) : null}
+
+        {/* Show generated image inline in the assistant body */}
+        {generateImageResult ? (
+          <div className="mb-4">
+            <div className="overflow-hidden rounded-xl border border-border bg-gradient-to-br from-muted/30 to-muted/50 shadow-lg max-w-md">
+              <div className="relative">
+                <img 
+                  src={generateImageResult.imageUrl} 
+                  alt={generateImageResult.title}
+                  className="w-full h-auto object-contain max-h-[400px]"
+                  loading="lazy"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
+                  <p className="text-white text-sm font-medium truncate">{generateImageResult.title}</p>
+                  <p className="text-white/70 text-xs">{generateImageResult.model}</p>
+                </div>
+              </div>
+              {generateImageResult.description && (
+                <div className="px-4 py-3 bg-muted/20">
+                  <p className="text-sm text-muted-foreground italic">
+                    {generateImageResult.description}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
 

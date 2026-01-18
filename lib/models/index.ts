@@ -38,6 +38,7 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 // - Standard: Faster (grok-4-fast), Smarter (gpt-5.1), Gemini 3 Flash, Claude Haiku 4.5
 // - Free: GLM 4.5 Air, Trinity Mini
 // - Uncensored: Dolphin Mistral Venice
+// - Hidden Gems: MiMo-V2-Flash, Devstral 2, Llama 3.3 70B, GLM 4.7, Gemini 2.0 Flash Thinking
 let STATIC_MODELS: ModelConfig[] = [
   ...pickById(grokModels, ['grok-4-fast', 'grok-4-1-fast-reasoning']),
   ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
@@ -51,6 +52,12 @@ let STATIC_MODELS: ModelConfig[] = [
     'openrouter:z-ai/glm-4.5-air:free',
     'openrouter:arcee-ai/trinity-mini:free',
     'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+    // 🔥 Hidden Gems - Strategic unique models
+    'openrouter:xiaomi/mimo-v2-flash:free',           // Xiaomi's hidden gem, #1 SWE-bench
+    'openrouter:mistralai/devstral-2512:free',        // Best agentic coding, 256K context
+    'openrouter:deepseek/deepseek-v3.2',             // DeepSeek V3.2 - value king
+    'openrouter:z-ai/glm-4.7',                        // Enhanced agentic, strong coding
+    'openrouter:openai/gpt-oss-120b',                 // GPT-OSS-120B - open source power
   ])
 ]
 

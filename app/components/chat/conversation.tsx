@@ -167,7 +167,6 @@ export function Conversation({
           onDelete={onDelete}
           onEdit={onEdit}
           onReload={onReload}
-          userId={userId}
           messagePipelineSteps={messagePipelineSteps}
           currentMessageSteps={currentMessageSteps}
           metrics={metrics}
@@ -188,7 +187,6 @@ function ConversationContent({
   onDelete,
   onEdit,
   onReload,
-  userId,
   messagePipelineSteps,
   currentMessageSteps,
   metrics,
@@ -203,7 +201,6 @@ function ConversationContent({
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => void
   onReload: () => void
-  userId?: string
   messagePipelineSteps: Map<string, PipelineStep[]>
   currentMessageSteps: PipelineStep[]
   metrics: any
@@ -292,7 +289,6 @@ function ConversationContent({
                   parts={message.parts}
                   status={status}
                   userMessage={userMessage} // Pasar contexto del usuario
-                  userId={userId} // For image generation
                   model={(message as any)?.model}
                 >
                   {messageText}

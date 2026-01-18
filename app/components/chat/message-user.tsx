@@ -22,7 +22,6 @@ import Image from "next/image"
 import { useRef, useState, useCallback } from "react"
 import { AttachmentPreview } from "@/components/chat/attachment-preview"
 import { useAttachmentProcessing } from "@/hooks/use-attachment-processing"
-import { ImageGenerationHandler } from "@/components/chat/image-generation-handler"
 
 
 
@@ -43,7 +42,6 @@ export type MessageUserProps = {
   onDeleteAction: (id: string) => void
   id: string
   className?: string
-  userId?: string // For image generation
 }
 
 export function MessageUser({
@@ -57,7 +55,6 @@ export function MessageUser({
   onDeleteAction,
   id,
   className,
-  userId,
 }: MessageUserProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false) // Local state
@@ -250,12 +247,6 @@ export function MessageUser({
           >
             {textContent}
           </MessageContent>
-          
-          {/* Image Generation Handler - detects and shows generated images */}
-          <ImageGenerationHandler 
-            message={textContent}
-            userId={userId}
-          />
         </>
       )}
       <MessageActions className="message-actions flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">

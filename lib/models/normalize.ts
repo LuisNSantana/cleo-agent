@@ -49,6 +49,18 @@ const VALID_MODELS = new Set([
   // Uncensored models
   'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+  
+  // 🔥 Hidden Gems - Strategic unique models
+  'openrouter:xiaomi/mimo-v2-flash:free',
+  'xiaomi/mimo-v2-flash:free',
+  'openrouter:mistralai/devstral-2512:free',
+  'mistralai/devstral-2512:free',
+  'openrouter:deepseek/deepseek-v3.2',
+  'deepseek/deepseek-v3.2',
+  'openrouter:z-ai/glm-4.7',
+  'z-ai/glm-4.7',
+  'openrouter:openai/gpt-oss-120b',
+  'openai/gpt-oss-120b',
 ])
 
 const SMARTER_ALIASES = new Set([

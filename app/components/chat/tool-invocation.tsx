@@ -482,25 +482,46 @@ function SingleToolCard({
       )
     }
 
-    // Special-case: generateImage → render image
+    // Special-case: generateImage → render image prominently
     if (toolName === "generateImage" && parsedResult && typeof parsedResult === 'object') {
+      console.log('[DEBUG] generateImage parsedResult:', parsedResult)
       const pr: any = parsedResult
-      if (pr.success && pr.imageUrl) {
+      // Try multiple paths to find imageUrl
+      const imageUrl = pr.imageUrl || pr.image_url || pr.url || pr.result?.imageUrl
+      const title = pr.title || pr.result?.title || "Generated image"
+      const description = pr.description || pr.result?.description || null
+      const success = pr.success !== false // Default to true if not explicitly false
+      
+      console.log('[DEBUG] generateImage extracted:', { imageUrl, title, success })
+      
+      if (success && imageUrl) {
         return (
           <div className="space-y-3 my-2">
-            <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-muted/30 to-muted/50 shadow-lg">
               <img 
-                src={pr.imageUrl} 
-                alt={pr.title || "Generated image"}
-                className="w-full h-auto object-cover max-h-[500px]"
+                src={imageUrl} 
+                alt={title}
+                className="w-full h-auto object-contain max-h-[500px]"
                 loading="lazy"
               />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 py-2">
+                <p className="text-white text-sm font-medium truncate">{title}</p>
+              </div>
             </div>
-            {pr.description && (
+            {description && (
               <p className="text-sm text-muted-foreground italic px-1">
-                {pr.description}
+                {description}
               </p>
             )}
+          </div>
+        )
+      } else if (pr.error) {
+        // Handle error case
+        return (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+            <p className="font-medium">Error generating image:</p>
+            <p className="mt-1">{pr.error}</p>
+            {pr.suggestion && <p className="mt-2 text-muted-foreground">{pr.suggestion}</p>}
           </div>
         )
       }
