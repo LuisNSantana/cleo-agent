@@ -14,16 +14,30 @@ const LEGACY_TO_DEFAULT = new Set<string>([
   'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-5-sonnet-latest', 'claude-3-7-sonnet-20250219',
   'mistral-medium-2508', 'mistral-large-latest-fallback', 'openrouter:deepseek/deepseek-chat-v3.1:free',
   'openrouter:openai/gpt-oss-120b', 'gpt-oss-120b', 'openrouter:openrouter/sonoma-sky-alpha', 'openrouter:z-ai/glm-4.5',
-  'grok-3', 'grok-4-fast-non-reasoning', 'grok-4-fast'
+  'grok-3', 'grok-4-fast-non-reasoning'
 ])
 
 // All valid models that should pass through unchanged
 const VALID_MODELS = new Set([
+  // Grok models (xAI direct)
+  'grok-4-fast',
   'grok-4-fast-reasoning',
   'grok-4-1-fast-reasoning',
+  
   // Smarter tier (OpenAI GPT-5.1)
   'gpt-5.1-2025-11-13',
   'gpt-5.1',
+  
+  // Claude Haiku 4.5 (OpenRouter)
+  'openrouter:anthropic/claude-haiku-4.5',
+  'anthropic/claude-haiku-4.5',
+  'claude-haiku-4.5',
+  
+  // Gemini 3 Flash (OpenRouter)
+  'openrouter:google/gemini-3-flash-preview',
+  'google/gemini-3-flash-preview',
+  'gemini-3-flash-preview',
+  
   // Free tier models
   'openrouter:z-ai/glm-4.5-air:free',
   'z-ai/glm-4.5-air:free',
@@ -31,6 +45,7 @@ const VALID_MODELS = new Set([
   'arcee-ai/trinity-mini:free',
   'openrouter:amazon/nova-2-lite-v1:free',
   'amazon/nova-2-lite-v1:free',
+  
   // Uncensored models
   'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',

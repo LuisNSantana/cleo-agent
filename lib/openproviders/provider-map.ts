@@ -72,6 +72,12 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "google/gemini-2.5-flash-lite": "openrouter",
   // Removed deprecated Nemotron Ultra 253B mapping
   "openrouter:tngtech/deepseek-r1t-chimera:free": "openrouter",
+  // Claude Haiku 4.5 via OpenRouter
+  "openrouter:anthropic/claude-haiku-4.5": "openrouter",
+  "anthropic/claude-haiku-4.5": "openrouter",
+  // Gemini 3 Flash Preview via OpenRouter
+  "openrouter:google/gemini-3-flash-preview": "openrouter",
+  "google/gemini-3-flash-preview": "openrouter",
 
   o1: "openai",
   "o1-2024-12-17": "openai",

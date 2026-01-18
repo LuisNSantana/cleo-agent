@@ -144,6 +144,7 @@ export async function POST(req: Request) {
 
     // Resolve authenticated user early and enforce authorization (prevents spoofed userId)
     let realUserId: string = userId
+    let userName: string | undefined  // User's display name for personalization
     if (supabase && isAuthenticated) {
       const authResult = await authValidationService.validateUser(userId, isAuthenticated, supabase)
       
@@ -154,6 +155,7 @@ export async function POST(req: Request) {
       }
       
       realUserId = authResult.userId
+      userName = authResult.userName  // Extract userName for Super Ankie personalization
       chatLogger.setContext({ userId: realUserId })
     }
 
@@ -430,17 +432,34 @@ export async function POST(req: Request) {
     // Use reasoning-optimized prompt for GPT-5 models when no custom prompt
     let baseSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
     if (normalizedModel.startsWith('gpt-5') && !systemPrompt) {
-      const { getCleoPrompt } = await import("@/lib/prompts")
+          const { getCleoPrompt } = await import("@/lib/prompts")
       baseSystemPrompt = getCleoPrompt(normalizedModel, 'reasoning')
       chatLogger.debug('Using reasoning-optimized prompt for GPT-5')
     }
     
-  // Add delegation hint if strong intent detected
-  const delegationHint = delegationDetectionService.createDelegationHint(delegationIntent)
-  const effectiveSystemPrompt = baseSystemPrompt + delegationHint
+    // ✅ SUPER ANKIE MODE FIX: Always bypass default orchestrator prompt to prevent persona override
+    // The default prompt (28k+ chars) defines "Kylio" and complex delegation rules which confuses
+    // models in specific modes. For Super Ankie, we want a clean slate + RAG only.
+    // NOTE: We ALWAYS bypass in super mode, even if systemPrompt is passed from frontend
+    if (agentMode === 'super') {
+       chatLogger.debug('Super Ankie mode: Bypassing orchestrator system prompt (forced)')
+       baseSystemPrompt = '' // Empty string - Super Ankie prompt will be added later
+    }
+    
+    // Add delegation hint if strong intent detected (Skip for Super Ankie to keep prompt clean)
+    const delegationHint = agentMode === 'super' 
+      ? '' 
+      : delegationDetectionService.createDelegationHint(delegationIntent)
+      
+    const effectiveSystemPrompt = baseSystemPrompt + delegationHint
 
     // Attempt to parse personality type from system prompt for observability
     try {
+      // If prompt is empty (Super Ankie), default to 'friendly' for logging
+      if (!effectiveSystemPrompt && agentMode === 'super') {
+         // This catch block will handle it or we can just skip
+      }
+      
       const match = effectiveSystemPrompt.match(/Type:\s*(empathetic|playful|professional|creative|analytical|friendly)/i)
       const inferredPersonality = match?.[1]?.toLowerCase()
       if (inferredPersonality) {
@@ -774,7 +793,39 @@ export async function POST(req: Request) {
         const { streamText } = await import('ai')
         const { openproviders } = await import('@/lib/openproviders')
         
-        const superAnkieSystemPrompt = getSuperAnkiePrompt({ locale: userLocale }) + '\n\n' + finalSystemPrompt
+        // ✅ ENHANCED: Include context enhancements like the main path
+        const baseAnkiePrompt = getSuperAnkiePrompt({ locale: userLocale, userName })
+        let contextEnhancements = ''
+        
+        // Extract context from finalSystemPrompt if available
+        if (promptBuild?.usedContext && finalSystemPrompt) {
+          const contextMatch = finalSystemPrompt.match(/CONTEXT[\s\S]*?(?=\n\n[A-Z]|$)/i)
+          if (contextMatch) {
+            contextEnhancements += `\n\n<retrieved_context>\n${contextMatch[0]}\n</retrieved_context>`
+          }
+        }
+        if (finalSystemPrompt) {
+          const profileMatch = finalSystemPrompt.match(/USER PROFILE[\s\S]*?(?=\n\n[A-Z]|$)/i)
+          if (profileMatch) {
+            contextEnhancements += `\n\n<user_profile>\n${profileMatch[0]}\n</user_profile>`
+          }
+          
+          // Also extract personality and behavior flags for no-tools mode
+          const personalityPatterns = [
+            /CORE EMPATHETIC TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+            /CORE PLAYFUL TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+            /CORE PROFESSIONAL TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i
+          ]
+          for (const pattern of personalityPatterns) {
+            const match = finalSystemPrompt.match(pattern)
+            if (match) {
+              contextEnhancements += `\n\n<personality_style>\n${match[0]}\n</personality_style>`
+              break // Only include one personality type
+            }
+          }
+        }
+        
+        const superAnkieSystemPrompt = baseAnkiePrompt + contextEnhancements
         const modelSdk = openproviders(normalizedModel as any)
         
         const result = await streamText({
@@ -798,8 +849,74 @@ export async function POST(req: Request) {
       const { streamText, Experimental_Agent: ToolLoopAgent } = await import('ai')
       const { openproviders } = await import('@/lib/openproviders')
       
-      // Build Super Ankie system prompt
-      const superAnkieSystemPrompt = getSuperAnkiePrompt({ locale: userLocale }) + '\n\n' + finalSystemPrompt
+      // ✅ ENHANCED: Build Super Ankie prompt with FULL context integration
+      // 1. Base Super Ankie identity prompt (keeps Ankie identity strong)
+      const baseAnkiePrompt = getSuperAnkiePrompt({ locale: userLocale, userName })
+      
+      // 2. Extract useful context from finalSystemPrompt (RAG, user profile, personality)
+      // The finalSystemPrompt was already built earlier with all the RAG and personalization
+      // We extract only the contextual parts, not the identity parts
+      let contextEnhancements = ''
+      
+      // Extract RAG context block if present (contains conversation history and documents)
+      if (promptBuild?.usedContext && finalSystemPrompt) {
+        // Look for CONTEXT block in the finalSystemPrompt
+        const contextMatch = finalSystemPrompt.match(/CONTEXT[\s\S]*?(?=\n\n[A-Z]|$)/i)
+        if (contextMatch) {
+          contextEnhancements += `\n\n<retrieved_context>\n${contextMatch[0]}\n</retrieved_context>`
+        }
+      }
+      
+      // Extract USER PROFILE block if present
+      if (finalSystemPrompt) {
+        const profileMatch = finalSystemPrompt.match(/USER PROFILE[\s\S]*?(?=\n\n[A-Z]|$)/i)
+        if (profileMatch) {
+          contextEnhancements += `\n\n<user_profile>\n${profileMatch[0]}\n</user_profile>`
+        }
+        
+        // Extract Custom instructions if present
+        const customInstructionsMatch = finalSystemPrompt.match(/Custom instructions:([^\n]+)/i)
+        if (customInstructionsMatch) {
+          contextEnhancements += `\n\n<custom_instructions>\nThe user has specified: ${customInstructionsMatch[1].trim()}\nAlways respect and apply these instructions.\n</custom_instructions>`
+        }
+        
+        // Extract PERSONALITY settings if present (from generatePersonalizedPrompt)
+        // Look for various personality-related blocks
+        const personalityPatterns = [
+          /CORE EMPATHETIC TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+          /CORE PLAYFUL TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+          /CORE PROFESSIONAL TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+          /CORE BALANCED TRAITS:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+          /COMMUNICATION STYLE:[\s\S]*?(?=\n\n[A-Z]|$)/i,
+          /BEHAVIOR SETTINGS:[\s\S]*?(?=\n\n[A-Z]|$)/i
+        ]
+        
+        let personalityContent = ''
+        for (const pattern of personalityPatterns) {
+          const match = finalSystemPrompt.match(pattern)
+          if (match) {
+            personalityContent += match[0] + '\n'
+          }
+        }
+        
+        if (personalityContent.trim()) {
+          contextEnhancements += `\n\n<personality_style>\n${personalityContent.trim()}\n</personality_style>`
+        }
+        
+        // Also check for specific behavior flags (emojis, proactive mode, etc.)
+        const behaviorFlags: string[] = []
+        if (finalSystemPrompt.includes('Use emojis')) behaviorFlags.push('Use emojis appropriately')
+        if (finalSystemPrompt.includes('proactive')) behaviorFlags.push('Be proactive and suggest next steps')
+        if (finalSystemPrompt.includes('formal')) behaviorFlags.push('Maintain formal tone')
+        if (finalSystemPrompt.includes('creative')) behaviorFlags.push('Be creative in responses')
+        
+        if (behaviorFlags.length > 0) {
+          contextEnhancements += `\n\n<behavior_preferences>\n- ${behaviorFlags.join('\n- ')}\n</behavior_preferences>`
+        }
+      }
+      
+      // Combine: Ankie identity first (critical), then context enhancements
+      const superAnkieSystemPrompt = baseAnkiePrompt + contextEnhancements
       
       // Create model SDK using openproviders
       const modelSdk = openproviders(normalizedModel as any, undefined, apiKey)
@@ -807,7 +924,7 @@ export async function POST(req: Request) {
         throw new Error(`Model ${normalizedModel} could not be instantiated for Super Ankie mode`)
       }
       
-      console.log(`⚡ [SUPER ANKIE] Using model: ${normalizedModel}`)
+      console.log(`⚡ [SUPER ANKIE] Using model: ${normalizedModel}, prompt: ${superAnkieSystemPrompt.length} chars (base: ${baseAnkiePrompt.length}, context: ${contextEnhancements.length})`)
       
       // Stream with streamText + onFinish for persistence
       // @ts-ignore - maxSteps property depends on AI SDK version
@@ -820,7 +937,7 @@ export async function POST(req: Request) {
       // Cast entire config to any due to AI SDK type version mismatch
       const agent = new ToolLoopAgent({
         model: modelSdk, 
-        system: superAnkieSystemPrompt,
+        instructions: superAnkieSystemPrompt, // ✅ FIXED: ToolLoopAgent uses 'instructions' not 'system'
         messages: convertedMessages,
         tools: superAnkieTools,
         toolChoice: 'auto',

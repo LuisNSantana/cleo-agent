@@ -9,6 +9,7 @@ import { chatLogger } from './logger'
 export interface AuthValidationResult {
   success: boolean
   userId: string
+  userName?: string  // User's display name from auth metadata
   error?: string
 }
 
@@ -47,9 +48,17 @@ export class AuthValidationService {
         })
       }
 
+      // Extract user name from metadata (try multiple fields)
+      const userName = authData.user.user_metadata?.full_name || 
+                      authData.user.user_metadata?.name ||
+                      authData.user.user_metadata?.display_name ||
+                      authData.user.email?.split('@')[0] || // Fallback to email prefix
+                      undefined
+
       return {
         success: true,
         userId: authData.user.id, // Use authenticated ID
+        userName, // Include user's display name for personalization
       }
     } catch (error) {
       chatLogger.error('Failed to validate user', { error })

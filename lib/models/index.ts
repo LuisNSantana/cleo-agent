@@ -39,7 +39,7 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 // - Free: GLM 4.5 Air, Trinity Mini
 // - Uncensored: Dolphin Mistral Venice
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-fast']),
+  ...pickById(grokModels, ['grok-4-fast', 'grok-4-1-fast-reasoning']),
   ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
   // Include Gemini 3 Flash and Claude Haiku 4.5 from smarterModels
   ...pickById(smarterModels, [
