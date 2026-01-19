@@ -48,6 +48,8 @@ type ChatInputProps = {
   onVoiceModeAction?: () => void
   agentMode?: AgentMode
   onAgentModeChangeAction?: (mode: AgentMode) => void
+  // When in Profundo mode, only allow these models
+  profundoModels?: { faster: string; smarter: string }
 }
 
 export function ChatInput({
@@ -74,6 +76,7 @@ export function ChatInput({
   onVoiceModeAction,
   agentMode = 'super',
   onAgentModeChangeAction,
+  profundoModels,
 }: ChatInputProps) {
   const handleValueChange = useCallback((newValue: string) => {
     onValueChangeAction(newValue)
@@ -314,29 +317,23 @@ export function ChatInput({
             className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base text-foreground placeholder:text-muted-foreground"
           />
           <PromptInputActions className="mt-3 w-full justify-between p-2">
-            {/* Left side actions - reduced gap on mobile for send button space */}
-            <div className="flex gap-1 sm:gap-2 items-center flex-shrink min-w-0">
+            {/* Left side actions - scrollable on mobile when needed */}
+            <div className="flex gap-1 sm:gap-2 items-center flex-shrink min-w-0 overflow-x-auto scrollbar-hide">
               <ButtonFileUpload
                 onFileUploadAction={onFileUploadAction}
                 isUserAuthenticated={isUserAuthenticated}
                 model={selectedModel}
               />
+              {/* In Profundo mode, show model selector before the mode toggle */}
               {!hideModelSelector && (
                 <ModelSelector
                   selectedModelId={selectedModel}
                   setSelectedModelIdAction={onSelectModelAction}
                   isUserAuthenticated={isUserAuthenticated}
+                  profundoModels={profundoModels}
                 />
               )}
-              {/* Search button hidden per user request
-              {hasSearchSupport ? (
-                <ButtonSearch
-                  isSelected={enableSearch}
-                  onToggle={setEnableSearchAction}
-                  isAuthenticated={isUserAuthenticated}
-                />
-              ) : null}
-              */}
+              {/* Agent mode toggle */}
               {onAgentModeChangeAction && (
                 <ButtonAgentMode
                   agentMode={agentMode}
@@ -346,7 +343,7 @@ export function ChatInput({
               )}
               {/* Voice button - hidden on smallest screens to prioritize send button */}
               {onVoiceModeAction && (
-                <div className="hidden sm:block">
+                <div className="hidden sm:block flex-shrink-0">
                   <ButtonVoice
                     onClick={onVoiceModeAction}
                     isAuthenticated={isUserAuthenticated}

@@ -117,6 +117,45 @@ export function Chat() {
     chatId,
   })
 
+  // 🎯 PROFUNDO MODE: Only allow Smarter and Faster models for multi-agent delegation
+  // These models have reliable tool-calling needed for the delegation system
+  const PROFUNDO_MODELS = useMemo(() => ({
+    faster: 'openrouter:openai/gpt-oss-120b',
+    smarter: 'gpt-5.1-2025-11-13'
+  }), [])
+
+  // When in Profundo mode, force model to be either Faster or Smarter
+  const effectiveSelectedModel = useMemo(() => {
+    if (agentMode === 'multi') {
+      // Check if current model is a valid Profundo model
+      const isValidProfundoModel = 
+        selectedModel === PROFUNDO_MODELS.faster || 
+        selectedModel === PROFUNDO_MODELS.smarter
+      // If not, default to Faster
+      return isValidProfundoModel ? selectedModel : PROFUNDO_MODELS.faster
+    }
+    return selectedModel
+  }, [agentMode, selectedModel, PROFUNDO_MODELS])
+
+  // Wrapped model change handler that enforces Profundo mode restrictions
+  const handleModelChangeWithRestriction = useCallback(
+    async (newModel: string) => {
+      if (agentMode === 'multi') {
+        // Only allow Profundo-compatible models
+        const isValidProfundoModel = 
+          newModel === PROFUNDO_MODELS.faster || 
+          newModel === PROFUNDO_MODELS.smarter
+        if (!isValidProfundoModel) {
+          console.warn(`[PROFUNDO] Blocking model change to ${newModel}, only Faster/Smarter allowed`)
+          return
+        }
+      }
+      return handleModelChange(newModel)
+    },
+    [agentMode, handleModelChange, PROFUNDO_MODELS]
+  )
+
+
   // State to pass between hooks
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const [placeholder, setPlaceholder] = useState<string | undefined>()
@@ -172,7 +211,7 @@ export function Chat() {
     cleanupOptimisticAttachments,
     ensureChatExists,
     handleFileUploads,
-    selectedModel,
+    selectedModel: effectiveSelectedModel,
     clearDraft,
     bumpChat,
     agentMode,
@@ -214,8 +253,9 @@ export function Chat() {
   onFileRemoveAction: handleFileRemove,
       hasSuggestions:
         preferences.promptSuggestions && !chatId && messages.length === 0,
-  onSelectModelAction: handleModelChange,
-      selectedModel,
+  onSelectModelAction: handleModelChangeWithRestriction,
+      selectedModel: effectiveSelectedModel,
+      profundoModels: agentMode === 'multi' ? PROFUNDO_MODELS : undefined,
       isUserAuthenticated: isAuthenticated,
   stopAction: stop,
       status: chatInputStatus,
@@ -240,8 +280,9 @@ export function Chat() {
       preferences.promptSuggestions,
       chatId,
       messages.length,
-  handleModelChange,
-      selectedModel,
+  handleModelChangeWithRestriction,
+      effectiveSelectedModel,
+      PROFUNDO_MODELS,
       isAuthenticated,
   stop,
       chatInputStatus,

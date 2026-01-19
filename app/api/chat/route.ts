@@ -1485,6 +1485,18 @@ export async function POST(req: Request) {
 
             const computeFinalText = (snapshot: any) => {
               let finalText = ''
+              
+              // Helper: Strip internal reasoning blocks (thinking/reflection)
+              // These are model internal reasoning and should not be shown to users
+              const stripThinkingBlocks = (text: string): string => {
+                if (!text) return text
+                return text
+                  .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+                  .replace(/<reflection>[\s\S]*?<\/reflection>/gi, '')
+                  .replace(/^\s*<thinking>[\s\S]*$/gi, '') // Unclosed thinking at start
+                  .trim()
+              }
+              
               try {
                 if (!snapshot) {
                   return 'Task completed successfully'
@@ -1529,6 +1541,18 @@ export async function POST(req: Request) {
                   }
                 }
 
+                // ✅ FIX: Strip <thinking> and <reflection> blocks from final output
+                // These are model internal reasoning and should not be shown to users
+                const strippedText = stripThinkingBlocks(finalText)
+                
+                // Check if content was ONLY thinking blocks (no visible user content)
+                if (strippedText.length < 20 && finalText.includes('<thinking>')) {
+                  console.warn('⚠️ [RESPONSE] Content was only thinking blocks, applying fallback')
+                  finalText = 'Lo siento, no pude completar la tarea en modo profundo. Por favor, intenta reformular tu solicitud o usa el modo "Rápido" para respuestas directas.'
+                } else if (strippedText.length > 0) {
+                  finalText = strippedText
+                }
+
                 if (!finalText || finalText.trim().length === 0) {
                   finalText = 'Task completed successfully'
                 }
@@ -1547,6 +1571,7 @@ export async function POST(req: Request) {
               }
               return finalText
             }
+
 
             const finalizeHungExecution = async (snapshot: any) => {
               if (streamClosed) return

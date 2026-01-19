@@ -45,6 +45,8 @@ type ModelSelectorProps = {
   setSelectedModelIdAction: (modelId: string) => void
   className?: string
   isUserAuthenticated?: boolean
+  // When set, only show these two models (Profundo mode restriction)
+  profundoModels?: { faster: string; smarter: string }
 }
 
 export function ModelSelector({
@@ -52,7 +54,70 @@ export function ModelSelector({
   setSelectedModelIdAction,
   className,
   isUserAuthenticated = true,
+  profundoModels,
 }: ModelSelectorProps) {
+  // 🎯 PROFUNDO MODE: Show simplified two-button selector (mobile-optimized)
+  if (profundoModels) {
+    const isFaster = selectedModelId === profundoModels.faster
+    const isSmarter = selectedModelId === profundoModels.smarter
+    
+    return (
+      <div className={cn(
+        // Base container - responsive padding
+        "relative flex items-center gap-0.5 rounded-full p-0.5",
+        "bg-zinc-900/90 dark:bg-zinc-800/90",
+        "border border-zinc-700/50",
+        "shadow-sm",
+        className
+      )}>
+        {/* Faster Button */}
+        <button
+          onClick={() => setSelectedModelIdAction(profundoModels.faster)}
+          className={cn(
+            // Base styles with mobile-first sizing
+            "relative z-10 flex items-center justify-center gap-1",
+            "px-2.5 sm:px-3 py-1.5 sm:py-1",
+            "min-h-[32px] sm:min-h-0", // Minimum touch target
+            "text-[11px] sm:text-xs font-semibold",
+            "rounded-full transition-all duration-200",
+            "touch-manipulation", // Optimize for touch
+            // Active/selected state
+            isFaster 
+              ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
+              : "text-zinc-400 hover:text-zinc-200 active:scale-95"
+          )}
+          aria-pressed={isFaster}
+        >
+          <span className="hidden sm:inline">⚡</span>
+          <span>Faster</span>
+        </button>
+
+        {/* Smarter Button */}
+        <button
+          onClick={() => setSelectedModelIdAction(profundoModels.smarter)}
+          className={cn(
+            // Base styles with mobile-first sizing
+            "relative z-10 flex items-center justify-center gap-1",
+            "px-2.5 sm:px-3 py-1.5 sm:py-1",
+            "min-h-[32px] sm:min-h-0", // Minimum touch target
+            "text-[11px] sm:text-xs font-semibold",
+            "rounded-full transition-all duration-200",
+            "touch-manipulation", // Optimize for touch
+            // Active/selected state
+            isSmarter 
+              ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/30" 
+              : "text-zinc-400 hover:text-zinc-200 active:scale-95"
+          )}
+          aria-pressed={isSmarter}
+        >
+          <span className="hidden sm:inline">🧠</span>
+          <span>Smarter</span>
+        </button>
+      </div>
+    )
+  }
+
+
   const { models, isLoading: isLoadingModels, favoriteModels } = useModel()
   const { isModelHidden } = useUserPreferences()
 

@@ -4,22 +4,8 @@ import { motion, type Transition } from "framer-motion"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 
-// Style constants
-const DOT_SIZE = "size-2.5"
-const DOT_SPACING = "gap-1.5"
-
 // Animation constants
-const ANIMATION_DURATION = 0.8
-const DELAY_DOT_1 = 0
-const DELAY_DOT_2 = 0.15
-const DELAY_DOT_3 = 0.3
-
-// Animation settings
-const ANIMATION = {
-  y: ["0%", "-60%", "0%"],
-  opacity: [0.4, 1, 0.4],
-  scale: [1, 1.2, 1],
-}
+const ANIMATION_DURATION = 0.6
 
 const TRANSITION: Transition = {
   duration: ANIMATION_DURATION,
@@ -49,76 +35,77 @@ export function Loader() {
 
   return (
     <motion.div 
-      className="flex items-center gap-3 px-4 py-4 bg-gradient-to-r from-card/50 via-card/30 to-background/50 backdrop-blur-sm border border-border/40 rounded-lg"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      className="inline-flex items-center gap-2.5 pl-1 pr-3.5 py-1 bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-full shadow-lg shadow-black/20"
+      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
     >
-      {/* Ankie Avatar with pulse animation */}
-      <motion.div 
-        className="relative h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
-        animate={{ 
-          boxShadow: [
-            "0 0 0 0 rgba(168, 85, 247, 0.4)",
-            "0 0 0 10px rgba(168, 85, 247, 0)",
-          ]
-        }}
-        transition={{ 
-          duration: 1.5, 
-          repeat: Infinity,
-          ease: "easeInOut" 
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-full" />
-        <Image 
-          src="/img/agents/ankie4.png" 
-          alt="Ankie" 
-          width={40} 
-          height={40}
-          className="relative z-10 rounded-full"
-          priority
+      {/* Compact Avatar with subtle glow ring */}
+      <div className="relative flex-shrink-0">
+        {/* Animated glow ring */}
+        <motion.div
+          className="absolute inset-[-1.5px] rounded-full"
+          style={{
+            background: "linear-gradient(135deg, #06b6d4, #8b5cf6, #06b6d4)",
+            backgroundSize: "200% 200%",
+          }}
+          animate={{
+            backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+            opacity: [0.6, 0.9, 0.6]
+          }}
+          transition={{
+            backgroundPosition: { duration: 2, repeat: Infinity, ease: "linear" },
+            opacity: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
+          }}
         />
-      </motion.div>
-
-      {/* Animated dots */}
-      <div className={`flex items-center justify-center ${DOT_SPACING}`}>
-        <Dot delay={DELAY_DOT_1} />
-        <Dot delay={DELAY_DOT_2} />
-        <Dot delay={DELAY_DOT_3} />
+        <div className="relative w-7 h-7 rounded-full overflow-hidden ring-1 ring-zinc-800 bg-zinc-900">
+          <Image 
+            src="/img/agents/ankie4.png" 
+            alt="Ankie" 
+            width={28} 
+            height={28}
+            className="w-full h-full object-cover"
+            priority
+          />
+        </div>
       </div>
 
-      {/* Processing text with elapsed time */}
-      <div className="flex flex-col gap-0.5">
-        <motion.span 
-          className="text-sm font-medium text-foreground/90"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
+      {/* Minimal wave dots */}
+      <div className="flex items-center gap-[3px]">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="h-[5px] w-[5px] rounded-full"
+            style={{
+              background: "linear-gradient(135deg, #06b6d4, #8b5cf6)",
+            }}
+            animate={{
+              y: [0, -5, 0],
+              opacity: [0.4, 1, 0.4],
+            }}
+            transition={{
+              ...TRANSITION,
+              delay: i * 0.08,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Sleek text */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-[13px] font-medium text-zinc-200">
           Pensando...
-        </motion.span>
-        <motion.span 
-          className="text-xs text-muted-foreground font-mono"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {formatTime(elapsedTime)}
-        </motion.span>
+        </span>
+        {elapsedTime > 0 && (
+          <motion.span 
+            className="text-[11px] text-zinc-500 tabular-nums"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {formatTime(elapsedTime)}
+          </motion.span>
+        )}
       </div>
     </motion.div>
-  )
-}
-
-function Dot({ delay }: { delay: number }) {
-  return (
-    <motion.div
-      className={`${DOT_SIZE} rounded-full bg-gradient-to-r from-primary to-primary/60`}
-      animate={ANIMATION}
-      transition={{
-        ...TRANSITION,
-        delay,
-      }}
-    />
   )
 }

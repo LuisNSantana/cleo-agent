@@ -710,6 +710,25 @@ export class ExecutionManager {
         }
       }
       
+      // ✅ FIX: Strip <thinking> and <reflection> blocks from final content
+      // These are model internal reasoning and should not be shown to users
+      if (content) {
+        const stripped = content
+          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+          .replace(/<reflection>[\s\S]*?<\/reflection>/gi, '')
+          .replace(/^\s*<thinking>[\s\S]*$/gi, '') // Unclosed thinking at start
+          .trim()
+        
+        // Only use stripped if it has substantial content
+        if (stripped.length > 20) {
+          content = stripped
+        } else if (content.includes('<thinking>')) {
+          // Was only thinking block - use contextual fallback
+          console.warn('⚠️ [EXECUTION] Content was only thinking blocks, applying fallback')
+          content = 'Lo siento, no pude completar la tarea en modo profundo. Por favor, intenta reformular tu solicitud o usa el modo "Rápido" para respuestas directas.'
+        }
+      }
+      
       console.log('📤 [EXECUTION] Final extracted content:', content.substring(0, 200))
 
       const executionResult: ExecutionResult = {
