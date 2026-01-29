@@ -265,7 +265,7 @@ export async function GET(
 
     const { error: dbError } = await (supabase as any)
       .from("user_service_connections")
-      .upsert(connectionData)
+      .upsert(connectionData, { onConflict: 'user_id,service_id' })
 
     if (dbError) {
       console.error("Error storing connection:", dbError)
