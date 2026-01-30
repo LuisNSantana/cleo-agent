@@ -40,7 +40,7 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
 // - Uncensored: Dolphin Mistral Venice
 // - Hidden Gems: MiMo-V2-Flash, Devstral 2, Llama 3.3 70B, GLM 4.7, Gemini 2.0 Flash Thinking
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-fast', 'grok-4-1-fast-reasoning']),
+  ...pickById(grokModels, ['grok-4-1-fast-reasoning']),
   ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
   // Include Gemini 3 Flash and Claude Haiku 4.5 from smarterModels
   ...pickById(smarterModels, [
@@ -58,6 +58,10 @@ let STATIC_MODELS: ModelConfig[] = [
     'openrouter:deepseek/deepseek-v3.2',             // DeepSeek V3.2 - value king
     'openrouter:z-ai/glm-4.7',                        // Enhanced agentic, strong coding
     'openrouter:openai/gpt-oss-120b',                 // GPT-OSS-120B - open source power
+    // 🌟 New Model Additions
+    'openrouter:moonshotai/kimi-k2.5',                // Kimi K2.5 - visual coding, agent swarm
+    'openrouter:minimax/minimax-m2.1',                // MiniMax M2.1 - coding/agentic, 1M context
+    'openrouter:qwen/qwen3-max',                      // Qwen3 Max - reasoning, 100+ languages
   ])
 ]
 

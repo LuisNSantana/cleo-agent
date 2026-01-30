@@ -1952,6 +1952,120 @@ export const openrouterModels: ModelConfig[] = [
         baseURL: 'https://openrouter.ai/api/v1',
       }).chat("openai/gpt-oss-120b"),
   },
+  // Moonshot AI: Kimi K2.5 - Native multimodal model with visual coding capability
+  {
+    id: "openrouter:moonshotai/kimi-k2.5",
+    name: "Kimi K2.5",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Kimi",
+    baseProviderId: "moonshotai",
+    description:
+      "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with ~15T mixed visual and text tokens, it excels in general reasoning, visual coding, and agentic tool-calling.",
+    tags: ["moonshot", "kimi", "multimodal", "vision", "coding", "agent", "tool-calling", "openrouter"],
+    contextWindow: 131072, // 128K context
+    inputCost: 0.50,
+    outputCost: 2.00,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/moonshotai/kimi-k2.5",
+    apiDocs: "https://openrouter.ai/moonshotai/kimi-k2.5",
+    modelPage: "https://huggingface.co/moonshotai/Kimi-K2.5",
+    releasedAt: "2025-01-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("moonshotai/kimi-k2.5"),
+  },
+  // MiniMax: MiniMax M2.1 - Lightweight model optimized for coding and agentic workflows
+  {
+    id: "openrouter:minimax/minimax-m2.1",
+    name: "MiniMax M2.1",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "MiniMax",
+    baseProviderId: "minimax",
+    description:
+      "MiniMax-M2.1 is a lightweight, state-of-the-art LLM optimized for coding, agentic workflows, and modern application development. With only 10B activated parameters, it delivers major capability with exceptional latency and cost efficiency. Leading multilingual coding performance with 49.4% on Multi-SWE-Bench.",
+    tags: ["minimax", "coding", "agent", "lightweight", "fast", "multilingual", "tool-calling", "openrouter"],
+    contextWindow: 1000000, // 1M context
+    inputCost: 0.10,
+    outputCost: 0.40,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: true,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/minimax/minimax-m2.1",
+    apiDocs: "https://openrouter.ai/minimax/minimax-m2.1",
+    modelPage: "https://huggingface.co/MiniMaxAI/MiniMax-M2.1",
+    releasedAt: "2025-01-01",
+    icon: "openrouter",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("minimax/minimax-m2.1"),
+  },
+  // Qwen: Qwen3 Max - Advanced reasoning with 100+ language support
+  {
+    id: "openrouter:qwen/qwen3-max",
+    name: "Qwen3 Max",
+    provider: "OpenRouter",
+    providerId: "openrouter",
+    modelFamily: "Qwen",
+    baseProviderId: "qwen",
+    description:
+      "Qwen3-Max is an updated release with major improvements in reasoning, instruction following, multilingual support (100+ languages), and long-tail knowledge. Higher accuracy in math, coding, logic, and science. Optimized for RAG and tool calling.",
+    tags: ["qwen", "reasoning", "multilingual", "coding", "math", "tool-calling", "rag", "openrouter"],
+    contextWindow: 131072, // 128K context
+    inputCost: 0.50,
+    outputCost: 2.00,
+    priceUnit: "per 1M tokens",
+    vision: false,
+    tools: true,
+    audio: false,
+    reasoning: true,
+    webSearch: false,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://openrouter.ai/qwen/qwen3-max",
+    apiDocs: "https://openrouter.ai/qwen/qwen3-max",
+    modelPage: "https://qwenlm.github.io/",
+    releasedAt: "2025-01-01",
+    icon: "qwen",
+    apiSdk: (apiKey?: string) =>
+      createOpenRouter({
+        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
+        headers: {
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+          'X-Title': process.env.OPENROUTER_APP_TITLE || 'Cleo Agent',
+        },
+        baseURL: 'https://openrouter.ai/api/v1',
+      }).chat("qwen/qwen3-max"),
+  },
 ]
 
 

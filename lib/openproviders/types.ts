@@ -160,6 +160,9 @@ export type OpenRouterModel =
   | "openrouter:nvidia/nemotron-nano-9b-v2:free"
   | "openrouter:qwen/qwen3-next-80b-a3b-thinking"
   | "openrouter:meta-llama/llama-3.1-405b-instruct"
+  | "openrouter:moonshotai/kimi-k2.5"
+  | "openrouter:minimax/minimax-m2.1"
+  | "openrouter:qwen/qwen3-max"
 
 // Static Ollama models for type safety
 export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"
