@@ -341,9 +341,9 @@ export function ChatInput({
                   isAuthenticated={isUserAuthenticated}
                 />
               )}
-              {/* Voice button - hidden on smallest screens to prioritize send button */}
+              {/* Voice button - visible on all screen sizes */}
               {onVoiceModeAction && (
-                <div className="hidden sm:block flex-shrink-0">
+                <div className="flex-shrink-0">
                   <ButtonVoice
                     onClick={onVoiceModeAction}
                     isAuthenticated={isUserAuthenticated}
