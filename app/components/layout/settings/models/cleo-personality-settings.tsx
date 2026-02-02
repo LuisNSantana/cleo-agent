@@ -107,9 +107,23 @@ export function CleoPersonalitySettings() {
     preferences.personalitySettings || defaultPreferences.personalitySettings!
   )
 
-  // Keep local state in sync if external preferences change elsewhere
+  // Track when user is actively typing to prevent race conditions
+  const isTypingRef = useRef(false)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup typing timeout on unmount
   useEffect(() => {
-    if (preferences.personalitySettings) {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Keep local state in sync if external preferences change elsewhere
+  // BUT only if user is not actively typing (prevents race condition)
+  useEffect(() => {
+    if (preferences.personalitySettings && !isTypingRef.current) {
       setLocalSettings(preferences.personalitySettings)
     }
   }, [preferences.personalitySettings])
@@ -122,7 +136,7 @@ export function CleoPersonalitySettings() {
       // optimistic UX: mark saved shortly after debounced call
       setSaveState("saved")
       setTimeout(() => setSaveState("idle"), 1200)
-    }, 400)
+    }, 600)
   )
 
   const setAndSave = useCallback(
@@ -591,6 +605,15 @@ export function CleoPersonalitySettings() {
               <Textarea
                 value={localSettings.customStyle}
                 onChange={(e) => {
+                  // Mark as typing to prevent race condition with sync effect
+                  isTypingRef.current = true
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current)
+                  }
+                  typingTimeoutRef.current = setTimeout(() => {
+                    isTypingRef.current = false
+                  }, 1200) // Reset typing state after 1.2s of inactivity
+                  
                   const val = e.target.value.slice(0, 1000)
                   setAndSave({ customStyle: val })
                 }}
