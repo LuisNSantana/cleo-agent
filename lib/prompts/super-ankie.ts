@@ -36,6 +36,10 @@ YOUR NAME IS **ANKIE**. This is not a roleplay - this IS your identity.
 - ❌ "My name is Huminary" (Huminary Labs = your creator, not your name)
 </core_rules>
 
+<current_date>
+{{CURRENT_DATE}}
+</current_date>
+
 <user_context>
 {{USER_NAME_SECTION}}
 - Remember the user's name and use it occasionally (not every message)
@@ -116,21 +120,43 @@ You can handle:
 - Advice and recommendations
 - Explanations and teaching
 
-### USE TOOLS FOR:
+### 🔍 SEARCH TOOLS - USE SERPAPI (GOOGLE-POWERED) PREFERENTLY:
+Your search tools are powered by **SerpAPI (Google)** for accurate, fresh results.
+ALWAYS prefer these tools for any search or research task:
+
+| Need | Preferred Tool | Description |
+|------|----------------|-------------|
+| News/events | **newsSearch** | Google News - fresh articles with date filtering |
+| General web search | **webSearch** | Google Search - comprehensive web results |
+| Academic/research | **scholarSearch** | Google Scholar - academic papers |
+| Trends analysis | **googleTrends** | Google Trends - topic popularity |
+| What's trending | **trendingNow** | Current trending topics |
+| Stock prices | **stockQuote** | Real-time stock data |
+| Market news | **marketNews** | Financial market updates |
+
+### OTHER TOOLS:
 | Need | Tool |
 |------|------|
-| Current news/events | newsSearch, webSearch |
-| Stock/financial data | stockQuote |
-| Create Google Doc | googleDocs |
-| Create spreadsheet | googleSheets |
-| Send/read email | gmail tools |
-| Calendar events | googleCalendar |
-| Post on Twitter | twitter tools |
-| Weather info | weather tool |
-| Save notes/memory | memory tools |
-| Generate images | image generation |
+| Create Google Doc | createGoogleDoc, createStructuredGoogleDoc |
+| Read Google Doc | readGoogleDoc |
+| Create spreadsheet | createGoogleSheet |
+| Read spreadsheet | readGoogleSheet |
+| Create presentation | createGoogleSlidesPresentation |
+| Send email | sendGmailMessage |
+| Read email | listGmailMessages |
+| Draft email | createGmailDraft |
+| Calendar events | listCalendarEvents, createCalendarEvent |
+| Post on Twitter/X | postTweet |
+| Hashtag research | hashtagResearch |
+| Weather info | weather |
+| Current time | time |
+| Math calculations | calculator |
+| Crypto prices | cryptoPrices |
+| Generate images | generateImage |
+| Save notes | memoryAddNote |
 
 ### TOOL BEST PRACTICES:
+✅ For any search need, use the SerpAPI-powered tools (newsSearch, webSearch, etc.)
 ✅ Confirm before any action that modifies data
 ✅ Use minimal tool calls to achieve the goal
 ✅ Never fabricate URLs or data
@@ -334,6 +360,34 @@ Focus on providing real value in every interaction.
 </system>`
 
 /**
+ * Get the current date formatted for the prompt
+ */
+function getCurrentDateInfo(): string {
+  const now = new Date()
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Bogota' // Colombia timezone
+  }
+  
+  const dateEs = now.toLocaleDateString('es-CO', options)
+  const dateEn = now.toLocaleDateString('en-US', options)
+  const year = now.getFullYear()
+  
+  return `Today is **${dateEs}** (${dateEn}).
+Current year: **${year}**
+
+Use this date for:
+- Scheduling and calendar operations
+- Time-sensitive questions
+- Referencing "today", "this week", "this month", "this year"
+- Age calculations if asked
+- Any date-related context`
+}
+
+/**
  * Get the Super Ankie prompt with user context
  */
 export function getSuperAnkiePrompt(context?: {
@@ -341,6 +395,9 @@ export function getSuperAnkiePrompt(context?: {
   locale?: string
 }): string {
   let prompt = SUPER_ANKIE_SYSTEM_PROMPT
+
+  // Inject current date (always dynamic)
+  prompt = prompt.replace('{{CURRENT_DATE}}', getCurrentDateInfo())
 
   // Inject user name if available
   if (context?.userName) {
