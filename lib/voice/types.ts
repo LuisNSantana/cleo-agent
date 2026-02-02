@@ -8,12 +8,16 @@ export type VoiceQuality = 'standard' | 'hd'
 export type VoiceSessionStatus = 'active' | 'completed' | 'error' | 'cancelled'
 
 export type VoiceModel = 
-  | 'gpt-4o-realtime-preview'
-  | 'gpt-4o-mini-realtime-preview'
+  | 'gpt-realtime-2025-12-15'       // Latest GA model (recommended)
+  | 'gpt-realtime-mini-2025-12-15'  // Cost-effective mini model
+  | 'gpt-4o-realtime-preview'       // Legacy
+  | 'gpt-4o-mini-realtime-preview'  // Legacy mini
   | 'deepgram-nova-3'
   | 'deepgram-enhanced'
 
 export type OpenAIVoice = 
+  | 'cedar'   // NEW 2025 - Warm and professional
+  | 'marin'   // NEW 2025 - Friendly and expressive
   | 'alloy'
   | 'echo'
   | 'fable'

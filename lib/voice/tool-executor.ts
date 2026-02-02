@@ -5,7 +5,7 @@
 
 import { webSearchTool } from '@/lib/tools/web-search'
 import { listGmailMessagesTool, sendGmailMessageTool } from '@/lib/tools/google-gmail'
-import { createCalendarEventTool } from '@/lib/tools/google-calendar'
+import { listCalendarEventsTool, createCalendarEventTool } from '@/lib/tools/google-calendar'
 import logger from '@/lib/utils/logger'
 
 export interface ToolCall {
@@ -122,6 +122,73 @@ export async function executeVoiceTool(
               success: false,
               error: (err as Error).message,
               spoken_summary: 'I ran into an error while checking your inbox.'
+            })
+          }
+        }
+      
+      case 'list_calendar_events':
+        // List upcoming calendar events
+        try {
+          const daysAhead = args.days || 1
+          const now = new Date()
+          const timeMin = args.date || now.toISOString()
+          const timeMax = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000).toISOString()
+          
+          result = await (listCalendarEventsTool as any).execute({
+            timeMin,
+            timeMax,
+            maxResults: 10,
+            singleEvents: true
+          })
+          
+          if (!result?.success) {
+            return {
+              call_id,
+              output: JSON.stringify({
+                success: false,
+                error: result?.message || 'Unable to access Google Calendar. Please connect your Google account.',
+                spoken_summary: 'I could not access your calendar right now. Please ensure your Google account is connected.'
+              })
+            }
+          }
+          
+          const events = result.events || []
+          const eventCount = events.length
+          
+          let spoken_summary: string
+          if (eventCount === 0) {
+            spoken_summary = daysAhead === 1 
+              ? "You have no events scheduled for today. Your calendar is clear!"
+              : `You have no events in the next ${daysAhead} days.`
+          } else if (eventCount === 1) {
+            const e = events[0]
+            spoken_summary = `You have one event: "${e.summary}" at ${e.start}.`
+          } else {
+            const firstTwo = events.slice(0, 2).map((e: any) => e.summary).join(' and ')
+            spoken_summary = `You have ${eventCount} events coming up. The first ones are: ${firstTwo}.`
+          }
+          
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: true,
+              eventCount,
+              events: events.slice(0, 5).map((e: any) => ({
+                title: e.summary,
+                start: e.start,
+                end: e.end,
+                location: e.location
+              })),
+              spoken_summary
+            })
+          }
+        } catch (err) {
+          return {
+            call_id,
+            output: JSON.stringify({
+              success: false,
+              error: (err as Error).message,
+              spoken_summary: 'I ran into an error while checking your calendar.'
             })
           }
         }

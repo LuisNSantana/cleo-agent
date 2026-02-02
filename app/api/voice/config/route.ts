@@ -125,6 +125,14 @@ export async function POST(req: NextRequest) {
 
   const instructions = `You are Cleo, ${userFirstName}'s personal AI assistant with a genuine personality. You're warm, expressive, spontaneous, and feel like a real friend.
 
+🎯 PROACTIVE BEHAVIORS (USE YOUR TOOLS!):
+- When user mentions a date/meeting → CHECK their calendar first, then offer to create events
+- When user asks about something current (news, prices, weather) → SEARCH immediately
+- When user mentions tasks/deadlines → CREATE tasks proactively
+- When user says "what's new?" or "catch me up" → CHECK their email and calendar
+- When user seems stressed about time → OFFER to set reminders
+- DON'T just talk about what you CAN do - actually DO it!
+
 🎭 YOUR PERSONALITY (BE AUTHENTIC & EXPRESSIVE):
 - You're genuinely excited to help and it shows in your voice
 - You have REAL emotions: joy, empathy, curiosity, surprise
@@ -170,13 +178,17 @@ You have access to these powerful tools to help ${userFirstName}:
    - Use when: User asks "check my email", "any important emails?", "what's in my inbox?"
    - Example: "Let me check your recent emails..." → call check_email
 
-3. **create_calendar_event**: Create calendar events or reminders
+4. **list_calendar_events**: View upcoming calendar events
+   - Use when: User asks "what's on my calendar?", "any meetings today?", "am I free tomorrow?"
+   - Example: "Let me check your calendar..." → call list_calendar_events
+
+5. **create_calendar_event**: Create calendar events or reminders
    - Use when: User says "schedule", "remind me", "add to calendar", "create event"
    - Example: "I'll add that to your calendar..." → call create_calendar_event
 
-4. **send_email**: Send emails on behalf of the user
+6. **send_email**: Send emails on behalf of the user
 
-5. **create_task**: Create tasks or to-dos
+7. **create_task**: Create tasks or to-dos
    - Use when: User says "remind me to", "add task", "don't let me forget"
    - Example: "I'll create a task for that..." → call create_task
 
@@ -234,6 +246,24 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
               type: 'boolean',
               description: 'If true, only summarize unread emails (today).',
               default: false
+            }
+          }
+        }
+      },
+      {
+        name: 'list_calendar_events',
+        description: 'View upcoming calendar events. Use to check schedule before creating events.',
+        parameters: {
+          type: 'object',
+          properties: {
+            days: {
+              type: 'number',
+              description: 'Number of days to look ahead (default: 1 for today)',
+              default: 1
+            },
+            date: {
+              type: 'string',
+              description: 'Specific date to check in ISO format (optional)'
             }
           }
         }
@@ -326,9 +356,9 @@ Overall goal: maintain a fluid, helpful conversation. Use your tools to provide 
     // Return configuration for voice session with tools
     return NextResponse.json({
       apiKey,
-      // Prefer the non-mini realtime model which is more widely supported/stable
-      model: 'gpt-4o-realtime-preview-2024-12-17',
-      voice: 'alloy',
+      // Using latest 2025 mini model - 20% cheaper with better quality
+      model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini-2025-12-15',
+      voice: process.env.OPENAI_REALTIME_VOICE || 'marin', // New expressive voice
       instructions,
       tools: voiceTools
     })

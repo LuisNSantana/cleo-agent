@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Session configuration
-    const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-mini-realtime-preview-2024-12-17'
-    const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy'
+    // Session configuration - using latest 2025 models
+    const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini-2025-12-15'
+    const voice = process.env.OPENAI_REALTIME_VOICE || 'marin'
 
     const sessionConfig: Record<string, unknown> = {
       model,
