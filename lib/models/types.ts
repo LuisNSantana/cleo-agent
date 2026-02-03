@@ -1,6 +1,6 @@
 import { LanguageModel } from "ai"
 
-type ModelCategory = "standard" | "free" | "uncensored"
+type ModelCategory = "standard" | "free" | "uncensored" | "premium"
 
 type ModelConfig = {
   id: string // "gpt-4.1-nano" // same from AI SDKs

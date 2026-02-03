@@ -4,7 +4,7 @@ import { ModelConfig } from "./types"
 import { grokModels } from "./data/grok"
 import { openrouterModels } from "./data/openrouter"
 import { openaiModels } from "./data/openai.clean"
-import { smarterModels } from "./data/optimized-tiers"
+import { optimizedModels } from "./data/optimized-tiers"
 
 /**
  * Unified model list with multiple tiers
@@ -34,34 +34,24 @@ function dedupeById(list: ModelConfig[]): ModelConfig[] {
   return out
 }
 
+
+
+// ... (pickById and dedupeById functions remain)
+
 // Final list for USER-FACING model selector:
-// - Standard: Faster (grok-4-fast), Smarter (gpt-5.1), Gemini 3 Flash, Claude Haiku 4.5
-// - Free: GLM 4.5 Air, Trinity Mini
-// - Uncensored: Dolphin Mistral Venice
-// - Hidden Gems: MiMo-V2-Flash, Devstral 2, Llama 3.3 70B, GLM 4.7, Gemini 2.0 Flash Thinking
+// Includes Optimized Tiers (Grok/GPTs) + Requested OpenRouter Models
 let STATIC_MODELS: ModelConfig[] = [
-  ...pickById(grokModels, ['grok-4-1-fast-reasoning']),
-  ...pickById(openaiModels, ['gpt-5.1-2025-11-13']),
-  // Include Gemini 3 Flash and Claude Haiku 4.5 from smarterModels
-  ...pickById(smarterModels, [
-    'openrouter:google/gemini-3-flash-preview',
-    'openrouter:anthropic/claude-haiku-4.5',
-  ]),
-  // Free and uncensored models from OpenRouter
+  ...optimizedModels,
+  // Detailed Request: Restore specifically these OpenRouter models
   ...pickById(openrouterModels, [
-    'openrouter:z-ai/glm-4.5-air:free',
-    'openrouter:arcee-ai/trinity-mini:free',
-    'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-    // 🔥 Hidden Gems - Strategic unique models
-    'openrouter:xiaomi/mimo-v2-flash:free',           // Xiaomi's hidden gem, #1 SWE-bench
-    'openrouter:mistralai/devstral-2512:free',        // Best agentic coding, 256K context
-    'openrouter:deepseek/deepseek-v3.2',             // DeepSeek V3.2 - value king
-    'openrouter:z-ai/glm-4.7',                        // Enhanced agentic, strong coding
-    'openrouter:openai/gpt-oss-120b',                 // GPT-OSS-120B - open source power
-    // 🌟 New Model Additions
-    'openrouter:moonshotai/kimi-k2.5',                // Kimi K2.5 - visual coding, agent swarm
-    'openrouter:minimax/minimax-m2.1',                // MiniMax M2.1 - coding/agentic, 1M context
-    'openrouter:qwen/qwen3-max',                      // Qwen3 Max - reasoning, 100+ languages
+    'openrouter:anthropic/claude-haiku-4.5',
+    'openrouter:anthropic/claude-sonnet-4.5',
+    'openrouter:google/gemini-3-flash-preview',
+    'openrouter:deepseek/deepseek-v3.2',
+    'openrouter:minimax/minimax-m2.1',
+    'openrouter:moonshotai/kimi-k2.5',
+    'openrouter:z-ai/glm-4.7', // Often paired with these as a high quality agent model
+    'openrouter:arcee-ai/trinity-large-preview:free'
   ])
 ]
 
