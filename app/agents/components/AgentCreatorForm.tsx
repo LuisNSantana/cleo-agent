@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Sparkles } from 'lucide-react'
 import { useClientAgentStore } from '@/lib/agents/client-store'
 import { AgentConfig, AgentRole } from '@/lib/agents/types'
+import { AvatarGenerator } from './AvatarGenerator'
 
 export function AgentCreatorForm() {
   const addAgent = useClientAgentStore(state => state.addAgent)
@@ -27,7 +28,8 @@ export function AgentCreatorForm() {
     tools: [],
     prompt: '',
     color: '#64748B',
-    icon: '🤖'
+    icon: '🤖',
+    avatar: '' // DiceBear avatar URL
   })
 
   const [stopInput, setStopInput] = useState('')
@@ -103,6 +105,7 @@ export function AgentCreatorForm() {
       prompt: form.prompt || '',
       color: form.color || '#64748B',
       icon: form.icon || '🤖',
+      avatar: form.avatar || '', // Include avatar URL
       objective: form.objective,
       customInstructions: form.customInstructions,
       memoryEnabled: form.memoryEnabled,
@@ -352,35 +355,31 @@ export function AgentCreatorForm() {
             <Label className="text-sm font-medium">Color</Label>
             <Input type="color" value={form.color} onChange={(e) => setForm(prev => ({ ...prev, color: e.target.value }))} className="h-10 w-16 p-1 border rounded" />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Icono</Label>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Selector</span>
-            </div>
-            <div className="grid grid-cols-8 gap-2">
-              {['🤖','🧠','🔬','🛠️','📊','🔎','📚','🧪','🛰️','⚙️','📝','💡','🕵️','🧩','🐍','🦾'].map((ico) => (
-                <button
-                  key={ico}
-                  type="button"
-                  onClick={() => setForm(prev => ({ ...prev, icon: ico }))}
-                  className={`h-8 w-8 rounded-md border flex items-center justify-center text-base transition-colors ${form.icon === ico ? 'border-blue-500 bg-blue-50' : 'hover:bg-muted'}`}
-                  title={ico}
-                >
-                  {ico}
-                </button>
-              ))}
-            </div>
-            <div className="pt-2">
-              <Label className="text-xs text-muted-foreground">Icono personalizado</Label>
-              <Input value={form.icon} onChange={(e) => setForm(prev => ({ ...prev, icon: e.target.value }))} placeholder="Ej: 🤖" className="h-9 mt-1" />
-            </div>
-          </div>
+          
+          {/* Avatar Generator - NEW */}
+          <AvatarGenerator
+            agentName={form.name || 'agent'}
+            currentAvatar={form.avatar}
+            onAvatarChange={(avatarUrl, style) => setForm(prev => ({ ...prev, avatar: avatarUrl }))}
+          />
         </div>
 
         {/* Preview */}
         <div className="border rounded-lg p-4 bg-muted/30">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-xl shadow-sm" style={{ backgroundColor: form.color }}>{form.icon}</div>
+            {/* Avatar/Icon Preview */}
+            {form.avatar ? (
+              <div className="w-14 h-14 rounded-xl overflow-hidden border-2 shadow-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={form.avatar}
+                  alt={form.name || 'Agent'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl shadow-md" style={{ backgroundColor: form.color }}>{form.icon}</div>
+            )}
             <div className="flex-1">
               <div className="font-medium">{form.name || 'Nombre del agente'}</div>
               <div className="text-sm text-muted-foreground line-clamp-2">{form.description || 'Descripción del agente'}</div>
@@ -403,7 +402,7 @@ export function AgentCreatorForm() {
             <Sparkles className="size-5" />
             Crear Agente
           </Button>
-          <Button variant="outline" onClick={() => setForm({ name: '', description: '', role: 'specialist', model: 'langchain:balanced-local', temperature: 0.7, maxTokens: 4096, tools: [], prompt: '', color: '#64748B', icon: '🤖' })}>Limpiar</Button>
+          <Button variant="outline" onClick={() => setForm({ name: '', description: '', role: 'specialist', model: 'langchain:balanced-local', temperature: 0.7, maxTokens: 4096, tools: [], prompt: '', color: '#64748B', icon: '🤖', avatar: '' })}>Limpiar</Button>
         </div>
       </CardContent>
     </Card>
