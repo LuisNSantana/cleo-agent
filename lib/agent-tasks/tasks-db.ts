@@ -148,6 +148,8 @@ export async function createAgentTask(
 
     const builtinIdByName: Record<string, string> = {
       'cleo': 'cleo-supervisor',
+      'ankie': 'cleo-supervisor',       // ✅ Explicit map for Ankie
+      'super ankie': 'cleo-supervisor', // ✅ Explicit map for "Super Ankie"
       'emma': 'emma-ecommerce',
       'ami': 'ami-creative',  // Keep consistent with existing tasks in DB
       'peter': 'peter-financial',

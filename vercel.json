@@ -15,11 +15,15 @@
     "app/api/*/*/*/*/route.ts": { 
       "maxDuration": 300,
       "memory": 1024
+    },
+    "app/api/cron/agent-tasks/route.ts": {
+      "maxDuration": 300,
+      "memory": 1024
     }
   },
   "crons": [
     {
-      "path": "/api/agent-tasks/scheduler/process",
+      "path": "/api/cron/agent-tasks",
       "schedule": "* * * * *"
     }
   ]
