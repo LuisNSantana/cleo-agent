@@ -251,6 +251,53 @@ export async function convertUserMultimodalMessages(messages: CoreMessage[], mod
         return { ...msg, content: filteredContent }
       }
 
+
+      
+
+      
+      // Sanitize assistant messages to remove internal/custom parts that break AI SDK validation
+      // when switching models (e.g. 'step-start', 'reasoning', 'execution-step')
+      if (msg.role === 'assistant') {
+        let partsToProcess: any[] = []
+        
+        // Frontend/Legacy AI SDK might send parts in 'parts' or 'content'
+        if (Array.isArray(msg.content)) {
+          partsToProcess = msg.content
+        } else if (Array.isArray(msg.parts)) {
+          partsToProcess = msg.parts
+        }
+
+        if (partsToProcess.length > 0) {
+          const validParts = partsToProcess.filter((part: any) => 
+            part.type === 'text' || 
+            part.type === 'tool-call'
+          )
+          
+          // If we filtered everything (e.g. only had reasoning/steps), return a safe fallback
+          if (validParts.length === 0) {
+            // Check if there was text content in the message object itself as fallback
+            if (typeof msg.content === 'string' && msg.content.trim().length > 0) {
+              return { ...msg, parts: undefined }
+            }
+             // Try to recover text from reasoning or steps if they are the only content
+             const recoveredText = partsToProcess
+               .filter((p: any) => p.type === 'text' || p.type === 'reasoning')
+               .map((p: any) => p.text)
+               .join('\n\n')
+               
+             if (recoveredText) {
+               return { ...msg, content: recoveredText, parts: undefined }
+             }
+             
+             // Ultimate fallback to satisfy schema
+            return { ...msg, content: " ", parts: undefined }
+          }
+          
+          return { ...msg, content: validParts, parts: undefined }
+        }
+      }
+      
+      // Fallback for system or other roles
       return msg
     })
   )
