@@ -120,8 +120,8 @@ export function Chat() {
   // 🎯 PROFUNDO MODE: Only allow Smarter and Faster models for multi-agent delegation
   // These models have reliable tool-calling needed for the delegation system
   const PROFUNDO_MODELS = useMemo(() => ({
-    faster: 'openrouter:openai/gpt-oss-120b',
-    smarter: 'gpt-5.1-2025-11-13'
+    faster: 'grok-4-1-fast-reasoning',
+    smarter: 'openrouter:anthropic/claude-sonnet-4.5'  // Best quality-price ratio with excellent tool calling
   }), [])
 
   // When in Profundo mode, force model to be either Faster or Smarter
