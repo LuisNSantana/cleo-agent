@@ -419,12 +419,7 @@ export function MessageAssistant({
         ))} */}
 
         {contentNullOrEmpty ? (
-          status === 'streaming' && pipelineSteps.length === 0 ? (
-            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader />
-              <span>Escribiendo…</span>
-            </div>
-          ) : null
+          status === 'streaming' && pipelineSteps.length === 0 ? null : null
         ) : (
           <AssistantMessageWithFiles 
             content={cleanedContent} 

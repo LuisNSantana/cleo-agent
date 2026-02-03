@@ -160,7 +160,7 @@ export function Conversation({
       <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 mx-auto flex w-full flex-col justify-center">
         <div className="h-app-header bg-transparent flex w-full mask-b-from-4% mask-b-to-100% lg:hidden" />
       </div>
-      <ChatContainerRoot className="relative w-full">
+      <ChatContainerRoot className="relative w-full h-full">
         <ConversationContent
           messages={messages}
           status={status}
@@ -313,10 +313,7 @@ function ConversationContent({
             </div>
           )} */}
 
-          {/* Show TypingIndicator when streaming but no content yet */}
-          {status === "streaming" && messages.length > 0 && messages[messages.length - 1].role === "assistant" && currentMessageSteps.length === 0 && (
-            <TypingIndicator />
-          )}
+
 
           {/* ❌ REMOVED: ApprovalMessage (duplicate form gris claro)
               ✅ KEPT: ConfirmationPanel (form oscuro con editable inputs) in chat.tsx

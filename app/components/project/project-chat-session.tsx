@@ -290,7 +290,7 @@ export function ProjectChatSession({
       className={cn("flex flex-col h-full relative overflow-hidden", className)}
       style={{ ['--chat-input-height' as any]: `${inputHeight}px` }}
     >
-      <div className="flex-1 overflow-y-auto w-full">
+      <div className="flex-1 overflow-hidden w-full relative">
          <Conversation {...conversationProps} />
       </div>
 
