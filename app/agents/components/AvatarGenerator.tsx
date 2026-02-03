@@ -4,7 +4,14 @@ import React, { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { Shuffle, Sparkles, User, Bot, Palette, Shapes } from 'lucide-react'
+import { Shuffle, Sparkles, User, Bot, Palette, Shapes, Check, ChevronDown } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 // DiceBear avatar styles - free and instant
 const AVATAR_STYLES = [
@@ -29,7 +36,7 @@ interface AvatarGeneratorProps {
 
 /**
  * DiceBear-based avatar generator for Agent Creator
- * Free, instant, deterministic avatars
+ * Minimalist version optimized for mobile/desktop
  */
 export function AvatarGenerator({
   agentName,
@@ -39,8 +46,7 @@ export function AvatarGenerator({
 }: AvatarGeneratorProps) {
   const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>('adventurer')
   const [seed, setSeed] = useState(agentName || 'agent')
-  const [isGenerating, setIsGenerating] = useState(false)
-
+  
   // Generate DiceBear URL
   const avatarUrl = useMemo(() => {
     const safeSeed = encodeURIComponent(seed || 'agent')
@@ -62,26 +68,13 @@ export function AvatarGenerator({
     onAvatarChange(newUrl, selectedStyle)
   }
 
-  // Use agent name as seed
-  const handleUseAgentName = () => {
-    setSeed(agentName || 'agent')
-    const newUrl = `https://api.dicebear.com/9.x/${selectedStyle}/svg?seed=${encodeURIComponent(agentName || 'agent')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`
-    onAvatarChange(newUrl, selectedStyle)
-  }
-
   return (
-    <div className={cn("space-y-4", className)}>
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Avatar del Agente</Label>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-          🎨 Nuevo
-        </span>
-      </div>
-
-      {/* Avatar Preview */}
-      <div className="flex items-center gap-4">
-        <div className="relative group">
-          <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-border shadow-md bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+    <div className={cn("flex flex-col gap-3", className)}>
+      {/* Compact Main Row */}
+      <div className="flex items-start gap-4 p-3 rounded-xl border bg-muted/20">
+        {/* Avatar Preview */}
+        <div className="relative group shrink-0">
+          <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-background shadow-sm bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={currentAvatar || avatarUrl}
@@ -91,85 +84,49 @@ export function AvatarGenerator({
           </div>
           <button
             onClick={handleRandomize}
-            className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-white dark:bg-zinc-800 border shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
-            title="Generar nuevo"
+            className="absolute -bottom-1 -right-1 p-1 rounded-full bg-background border shadow-sm hover:bg-muted transition-colors"
+            title="Generar variante"
           >
-            <Shuffle className="w-3.5 h-3.5" />
+            <Shuffle className="w-3 h-3 text-muted-foreground" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Avatares únicos generados automáticamente. Cambia el estilo o haz clic en 🔀 para uno nuevo.
-          </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleUseAgentName}
-              className="h-7 text-xs"
-            >
-              Usar nombre
-            </Button>
+        {/* Controls */}
+        <div className="flex-1 space-y-3 pt-0.5">
+           <div className="flex items-center justify-between">
+             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estilo del Avatar</Label>
+             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">Auto-generated</span>
+           </div>
+           
+           <div className="flex gap-2 w-full">
+            <Select value={selectedStyle} onValueChange={(val) => handleStyleChange(val as AvatarStyle)}>
+              <SelectTrigger className="h-8 text-xs w-[140px] bg-background">
+                <SelectValue placeholder="Estilo" />
+              </SelectTrigger>
+              <SelectContent>
+                {AVATAR_STYLES.map(style => (
+                  <SelectItem key={style.id} value={style.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <style.icon className="w-3 h-3 opacity-70" />
+                      <span>{style.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               size="sm"
               variant="outline"
               onClick={handleRandomize}
-              className="h-7 text-xs"
+              className="h-8 flex-1 text-xs px-2"
+              title="Generar nueva variante visual"
             >
-              <Shuffle className="w-3 h-3 mr-1" />
-              Aleatorio
+              <Shuffle className="w-3 h-3 mr-1.5 opacity-70" />
+              Variar
             </Button>
-          </div>
+           </div>
         </div>
-      </div>
-
-      {/* Style Selector */}
-      <div className="grid grid-cols-4 gap-2">
-        {AVATAR_STYLES.map((style) => {
-          const Icon = style.icon
-          const isSelected = selectedStyle === style.id
-          const previewUrl = `https://api.dicebear.com/9.x/${style.id}/svg?seed=${encodeURIComponent(seed)}&size=40&backgroundColor=b6e3f4`
-
-          return (
-            <button
-              key={style.id}
-              onClick={() => handleStyleChange(style.id)}
-              className={cn(
-                "relative flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
-                isSelected
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500/50"
-                  : "border-border hover:border-blue-300 hover:bg-muted/50"
-              )}
-              title={style.description}
-            >
-              <div className="w-8 h-8 rounded-md overflow-hidden bg-white dark:bg-zinc-800">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={previewUrl}
-                  alt={style.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <span className="text-[10px] font-medium truncate w-full text-center">
-                {style.name}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* AI Generation (Future) */}
-      <div className="pt-2 border-t border-dashed">
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled
-          className="w-full h-8 text-xs text-muted-foreground gap-1.5"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          Generar con IA (Próximamente)
-        </Button>
       </div>
     </div>
   )

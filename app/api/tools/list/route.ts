@@ -40,11 +40,26 @@ function inferConnectionRequirement(name: string, category: string): string | un
 
 export async function GET(_req: NextRequest) {
   try {
+    // Known/predefined delegation tool targets (exclude dynamic UUID-based ones)
+    const KNOWN_DELEGATION_TARGETS = new Set([
+      'toby', 'ami', 'peter', 'emma', 'apu', 'wex', 'astra', 'iris', 'nora',
+      'cleo', 'notion_agent', 'jenn', 'khipu'
+    ])
+    
     // Dynamic snapshot (tools can be extended at runtime via delegation). Enumerate entries.
     const entries: Array<{ name: string; description: string; category: string; requiresConnection?: string }> = []
     for (const [name, def] of Object.entries(tools as Record<string, any>)) {
       // Skip internal credential helpers from listing (add-notion-credentials etc.)
       if (/credentials|test-connection|list-notion-credentials/.test(name)) continue
+      
+      // Filter delegation tools: only include known/predefined agents, not dynamic UUIDs
+      if (name.startsWith('delegate_to_')) {
+        const targetName = name.replace('delegate_to_', '').toLowerCase()
+        // Skip if it looks like a UUID (contains many numbers/dashes) or not in known list
+        if (/[0-9a-f]{8,}|_[0-9a-f]{4,}/i.test(targetName)) continue
+        if (!KNOWN_DELEGATION_TARGETS.has(targetName.replace(/_/g, ''))) continue
+      }
+      
       const description: string = (def && typeof def.description === 'string') ? def.description : 'Tool sin descripción.'
       const category = inferCategory(name, description)
       const requiresConnection = inferConnectionRequirement(name, category)

@@ -14,6 +14,7 @@ import { normalizeModelId } from '@/lib/openproviders/provider-map'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
 import { motion } from 'framer-motion'
+import { AvatarGenerator } from '@/app/agents/components/AvatarGenerator' // Import AvatarGenerator
 
 // Dynamic tool metadata fetched from API. Each entry mapped into a simplified UI model.
 interface FetchedToolMeta { name: string; description: string; category: string; requiresConnection?: string }
@@ -65,13 +66,16 @@ const CATEGORY_ICONS: Record<string, any> = {
   general: Wrench
 }
 
-// Restricted model list for Quick Agent Creator
-// Only allow: gpt-4o-mini, gpt-5, grok-4-1-fast-reasoning, gemini-2.5-flash-lite (OpenRouter)
-const MODEL_OPTIONS = [
-  'gpt-4o-mini',
-  'gpt-5',
-  'grok-4-1-fast-reasoning',
-  'google/gemini-2.5-flash-lite', // available via OpenRouter
+// Expanded model list for Quick Agent Creator with descriptive labels
+const MODEL_OPTIONS: Array<{ id: string; name: string; speed: string; quality: string; icon: string }> = [
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', speed: '⚡ Ultra Fast', quality: '★★★☆', icon: '🟢' },
+  { id: 'gpt-4.1', name: 'GPT-4.1', speed: '🚀 Fast', quality: '★★★★', icon: '🔵' },
+  { id: 'gpt-5', name: 'GPT-5', speed: '⏱️ Moderate', quality: '★★★★★', icon: '🟣' },
+  { id: 'grok-4-1-fast-reasoning', name: 'Grok 4', speed: '⚡ Fast', quality: '★★★★', icon: '🔴' },
+  { id: 'openrouter:anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', speed: '🚀 Fast', quality: '★★★★★', icon: '🟠' },
+  { id: 'openrouter:google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', speed: '⚡ Ultra Fast', quality: '★★★★', icon: '🔷' },
+  { id: 'openrouter:qwen/qwen3-next-80b-a3b-instruct', name: 'Qwen 3 Next', speed: '⚡ Fast', quality: '★★★★☆', icon: '🌌' },
+  { id: 'openrouter:deepseek/deepseek-r1', name: 'DeepSeek R1', speed: '🚀 Fast', quality: '★★★★★', icon: '🐋' },
 ]
 
 const TEMPLATE_OPTIONS = [
@@ -92,7 +96,8 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [model, setModel] = useState('gpt-4o-mini')
+  const [model, setModel] = useState('grok-4-1-fast-reasoning')
+  const [avatar, setAvatar] = useState('') // New avatar state
   const [template, setTemplate] = useState('basic')
   const [selectedTools, setSelectedTools] = useState<string[]>(['webSearch', 'complete_task', 'get_current_date_time'])
   const [loadingTools, setLoadingTools] = useState(false)
@@ -219,7 +224,10 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
         model: normalizeModelId(model),
         tools: selectedTools,
         prompt: previewPrompt,
-        color,
+        color, // We use the state color, but AvatarGenerator doesn't update color state yet.
+        // If AvatarGenerator could provide color, we'd use it. For now, we can just use the random color generated or keep default.
+        avatar: avatar, // Send the generated avatar URL
+        active: true,
         quickTemplate: template !== 'basic' ? template : undefined,
       }
       const res = await fetchClient('/api/agents/quick-create', {
@@ -277,25 +285,79 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           </div>
 
           {step === 1 && (
-            <div className="space-y-5">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Nombre del agente</label>
-                <Input 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  placeholder="Ej: Atlas, Aria, Max..." 
-                  autoFocus 
-                  className="h-12 text-base sm:h-10 sm:text-sm"
+            <div className="space-y-6">
+              {/* Avatar Generator Integration */}
+              <div className="mb-4">
+                <AvatarGenerator
+                  agentName={name || 'agent'}
+                  currentAvatar={avatar}
+                  onAvatarChange={(url) => setAvatar(url)}
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Modelo de IA</label>
-                <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger className="h-12 sm:h-10"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MODEL_OPTIONS.map(m => <SelectItem key={m} value={m} className="py-3 sm:py-2">{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-semibold mb-2 block/70">Nombre del Agente</label>
+                  <Input 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    placeholder="Ej: Atlas, Aria, Max..." 
+                    autoFocus 
+                    className="h-12 text-lg bg-muted/20 border-border/60 focus:border-primary/50 transition-all font-medium"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
+                    El nombre influirá en la personalidad y el avatar generado.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold mb-2 block flex items-center justify-between">
+                    <span>Modelo de IA</span>
+                    <Badge variant="outline" className="text-[10px] font-normal py-0 h-5 px-1.5 gap-1">
+                      <Sparkle size={10} weight="fill" className="text-amber-400" />
+                      Recomendado
+                    </Badge>
+                  </label>
+                  <Select value={model} onValueChange={setModel}>
+                    <SelectTrigger className="h-14 bg-muted/20 border-border/60">
+                      <SelectValue placeholder="Select a model">
+                         {(() => {
+                           const m = MODEL_OPTIONS.find(opt => opt.id === model)
+                           if (!m) return model
+                           return (
+                             <div className="flex items-center gap-3 text-left">
+                               <span className="text-xl filter drop-shadow-sm">{m.icon}</span>
+                               <div className="flex flex-col gap-0.5">
+                                 <span className="font-semibold text-sm leading-none">{m.name}</span>
+                                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground leading-none opacity-80">
+                                   <span>{m.speed}</span> • <span>Quality: {m.quality}</span>
+                                 </div>
+                               </div>
+                             </div>
+                           )
+                         })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {MODEL_OPTIONS.map((m) => (
+                        <SelectItem key={m.id} value={m.id} className="py-3 px-2 focus:bg-primary/5 cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">{m.icon}</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="font-semibold text-sm leading-none">{m.name}</span>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                <Badge variant="secondary" className="h-4 px-1 rounded-[4px] text-[9px] font-normal bg-muted/50 border-0">
+                                  {m.speed}
+                                </Badge>
+                                <span className="text-amber-400/80 tracking-tighter text-[9px]">{m.quality}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
@@ -483,9 +545,23 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
                   <Sparkle size={16} weight="duotone" className="text-primary" />
                   <span className="text-xs font-semibold">Preview final</span>
                 </div>
-                <div className="text-sm font-semibold mb-1">{name || 'Sin nombre'}</div>
-                <div className="text-xs mb-3 opacity-80">
-                  <span className="font-medium">Modelo:</span> {model} · <span className="font-medium">Tools:</span> {selectedTools.length ? selectedTools.length : 'Ninguno'}
+                <div className="flex items-center gap-3 mb-4">
+                  {avatar ? (
+                    <div className="w-12 h-12 rounded-xl overflow-hidden border bg-background shadow-sm shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={avatar} alt="Agent" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-xl shrink-0">🤖</div>
+                  )}
+                  <div>
+                    <div className="text-sm font-bold leading-tight">{name || 'Sin nombre'}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                      <span className="flex items-center gap-1 opacity-80">{model}</span>
+                      <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground"></span>
+                      <span className="opacity-80">{selectedTools.length} tools</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="text-[11px] whitespace-pre-wrap leading-relaxed h-40 overflow-y-auto border-t pt-2 font-mono bg-background/60 rounded-md p-2">
                   {previewPrompt}

@@ -548,11 +548,11 @@ export const instagramGetAccountInfoTool = tool({
 })
 
 // Export all Instagram tools
-export const instagramTools = [
-  instagramPublishPostTool,
-  instagramPublishCarouselTool,
-  instagramGetAccountInsightsTool,
-  instagramGetMediaInsightsTool,
-  instagramGetRecentMediaTool,
-  instagramGetAccountInfoTool,
-]
+export const instagramTools = {
+  instagramPublishPost: instagramPublishPostTool,
+  instagramPublishCarousel: instagramPublishCarouselTool,
+  instagramGetAccountInsights: instagramGetAccountInsightsTool,
+  instagramGetMediaInsights: instagramGetMediaInsightsTool,
+  instagramGetRecentMedia: instagramGetRecentMediaTool,
+  instagramGetAccountInfo: instagramGetAccountInfoTool,
+}

@@ -487,11 +487,11 @@ export const facebookGetPageInfoTool = tool({
 })
 
 // Export all Facebook tools
-export const facebookTools = [
-  facebookPublishPostTool,
-  facebookPublishPhotoTool,
-  facebookSchedulePostTool,
-  facebookGetPageInsightsTool,
-  facebookGetRecentPostsTool,
-  facebookGetPageInfoTool,
-]
+export const facebookTools = {
+  facebookPublishPost: facebookPublishPostTool,
+  facebookPublishPhoto: facebookPublishPhotoTool,
+  facebookSchedulePost: facebookSchedulePostTool,
+  facebookGetPageInsights: facebookGetPageInsightsTool,
+  facebookGetRecentPosts: facebookGetRecentPostsTool,
+  facebookGetPageInfo: facebookGetPageInfoTool,
+}

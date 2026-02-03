@@ -59,7 +59,7 @@ export const FREE_MODELS_IDS = [
 // IMPORTANT: This must be present in `lib/models/index.ts` (STATIC_MODELS), otherwise
 // the selector can't resolve it and will display "Select model".
 // "Faster" tier maps to `grok-4-fast` (xAI direct; internally routes to Grok 4.1 Fast Reasoning).
-export const MODEL_DEFAULT = "grok-4-fast"
+export const MODEL_DEFAULT = "grok-4-1-fast-reasoning"
 
 // Default model for guests (must be available in `/api/models` non-auth list).
 export const MODEL_DEFAULT_GUEST = "grok-4-fast"
@@ -86,7 +86,7 @@ export const DISABLED_MODEL_IDS: string[] = [
   "openrouter:meta-llama/llama-4-scout:free",
   // Hide OpenRouter proxy of xAI models (we use xAI direct)
   "openrouter:x-ai/grok-4-fast",
-  "openrouter:x-ai/grok-4-1-fast-reasoning",
+  // "openrouter:x-ai/grok-4-1-fast-reasoning", // Enabled for use as Faster tier
   // Note: dolphin-mistral-24b-venice-edition:free is now shown in Uncensored section
   // Prefer Sky over Dusk in UI
   // "openrouter:openrouter/sonoma-dusk-alpha",

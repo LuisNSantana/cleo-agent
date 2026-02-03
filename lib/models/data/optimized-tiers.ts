@@ -24,35 +24,36 @@ import { ModelConfig } from "../types"
  */
 
 // FAST TIER - Optimized for speed and cost
+// FAST TIER - Optimized for speed and cost
 const fastModels: ModelConfig[] = [
   {
-    id: "openrouter:openai/gpt-oss-120b",
-    name: "Fast",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "GPT-OSS",
-    baseProviderId: "openrouter",
-    description: "OpenAI GPT-OSS 120B via OpenRouter (paid). Fast text model with tool-calling.",
-    inputCost: 0,
-    outputCost: 0,
-  priceUnit: "per 1M tokens",
-    tags: ["fast", "open-source", "cost-effective", "free"],
-    contextWindow: 32768, // per OpenRouter page as of 2025-09-15
-  vision: false, // text-only primary fast model
-  tools: true,
+    id: "grok-4-1-fast-reasoning",
+    name: "Grok 4.1 Fast",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description: "xAI's latest high-speed variant with 2M token context, optimized for fast inference while maintaining strong reasoning. Best quality/price ratio.",
+    inputCost: 3.0,
+    outputCost: 15.0,
+    priceUnit: "per 1M tokens",
+    tags: ["fast", "reasoning", "vision", "grok", "xai"],
+    contextWindow: 2000000, 
+    vision: true, 
+    tools: true,
     audio: false,
     reasoning: true,
-    openSource: true,
+    openSource: false,
     speed: "Fast",
     intelligence: "High",
-    website: "https://openrouter.ai",
+    website: "https://x.ai",
     icon: "faster",
     defaults: {
-      temperature: 0.4,
+      temperature: 0.6,
       topP: 0.9,
-      maxTokens: 8192, // optimize for larger generations while staying safe
+      maxTokens: 8192,
     },
-    apiSdk: (apiKey?: string) => openproviders("openrouter:openai/gpt-oss-120b", undefined, apiKey),
+    apiSdk: (apiKey?: string) => getXAIModel("grok-4-1-fast-reasoning", apiKey) as any,
   }
 ]
 
