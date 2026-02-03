@@ -62,6 +62,9 @@ export function AppSidebar() {
   const pathname = usePathname()
   const openSettings = useSettingsStore((state) => state.openSettings)
   const { t } = useI18n()
+  
+  // Lifted state for dialog - persists when sidebar closes
+  const [createAgentOpen, setCreateAgentOpen] = useState(false)
 
   const groupedChats = useMemo(() => {
     const result = groupChatsByDate(chats, "", {
@@ -171,6 +174,7 @@ export function AppSidebar() {
   }
 
   return (
+    <>
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-none">
       <SidebarHeader className="h-14 pl-3">
         <div className="flex justify-between">
@@ -200,6 +204,7 @@ export function AppSidebar() {
                 <CreateAgentMenuItem
                   isMobile={isMobile}
                   closeSidebar={() => setOpenMobile(false)}
+                  openDialog={() => setCreateAgentOpen(true)}
                 />
               </SidebarMenuItem>
             </SidebarMenu>
@@ -359,63 +364,46 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
+    
+    {/* Dialog rendered OUTSIDE Sidebar to persist when sidebar closes on mobile */}
+    <DialogCreateAgent isOpen={createAgentOpen} setIsOpenAction={setCreateAgentOpen} />
+    </>
   )
 }
 
-function CreateAgentMenuItem({ isMobile, closeSidebar }: { isMobile: boolean; closeSidebar: () => void }) {
-  const [open, setOpen] = useState(false)
+function CreateAgentMenuItem({ isMobile, closeSidebar, openDialog }: { isMobile: boolean; closeSidebar: () => void; openDialog: () => void }) {
   const { t } = useI18n()
   
   const handleOpenDialog = () => {
-    // IMPORTANT: Open dialog first, then close sidebar with delay
-    // This prevents the dialog from being unmounted on mobile
-    setOpen(true)
+    // Open dialog first, then close sidebar
+    openDialog()
     if (isMobile) {
-      // Use requestAnimationFrame + timeout to ensure dialog mounts before sidebar closes
+      // Small delay to ensure dialog opens before sidebar closes
       requestAnimationFrame(() => {
-        setTimeout(closeSidebar, 150)
+        setTimeout(closeSidebar, 100)
       })
     }
   }
   
   return (
-    <>
-      <SidebarMenuButton 
-        tooltip={t.sidebar.newAgent}
-        onClick={handleOpenDialog}
-      >
-        <div className="flex items-center gap-3 w-full relative">
-          <PlusCircle className="size-[18px]" weight="duotone" />
-          <span className="text-[13.5px]">{t.sidebar.newAgent}</span>
-          {/* Subtle floating badge with shimmer effect */}
-          <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 relative overflow-hidden">
-            {t.badges.new}
-            {/* Shimmer overlay */}
-            <span 
-              className="absolute inset-0 -translate-x-full animate-[shimmer_3s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent"
-              style={{
-                animation: 'shimmer 3s ease-in-out infinite'
-              }}
-            />
-          </span>
-        </div>
-      </SidebarMenuButton>
-      <DialogCreateAgent isOpen={open} setIsOpenAction={setOpen} />
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-            opacity: 0;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-        }
-      `}</style>
-    </>
+    <SidebarMenuButton 
+      tooltip={t.sidebar.newAgent}
+      onClick={handleOpenDialog}
+    >
+      <div className="flex items-center gap-3 w-full relative">
+        <PlusCircle className="size-[18px]" weight="duotone" />
+        <span className="text-[13.5px]">{t.sidebar.newAgent}</span>
+        {/* Subtle floating badge with shimmer effect */}
+        <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 relative overflow-hidden">
+          {t.badges.new}
+          <span 
+            className="absolute inset-0 -translate-x-full animate-[shimmer_3s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </span>
+      </div>
+    </SidebarMenuButton>
   )
 }
+
+// Shimmer keyframes - add to global styles or use CSS-in-JS
+// @keyframes shimmer { 0% { transform: translateX(-100%); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
