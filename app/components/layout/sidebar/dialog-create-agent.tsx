@@ -248,30 +248,52 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(v) => { if (!v) setIsOpenAction(false) }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Crear agente personalizado</DialogTitle>
-          <DialogDescription>Despliega un agente en menos de 2 minutos. 4 pasos rápidos.</DialogDescription>
-        </DialogHeader>
-        <div className="mt-2">
-          <div className="flex items-center gap-2 mb-4 text-xs">
+      {/* Mobile: fullscreen drawer | Desktop: centered modal */}
+      <DialogContent className="
+        w-full h-[100dvh] max-w-full 
+        sm:h-auto sm:max-h-[85vh] sm:max-w-2xl 
+        rounded-none sm:rounded-2xl 
+        p-0 sm:p-6 
+        flex flex-col
+        data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-0
+      ">
+        {/* Mobile header with drag indicator */}
+        <div className="sm:hidden w-full flex flex-col items-center pt-3 pb-2 border-b border-border/40">
+          <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mb-3" />
+        </div>
+        
+        <div className="flex-1 overflow-y-auto px-4 sm:px-0 pt-4 sm:pt-0">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg sm:text-xl">Crear agente personalizado</DialogTitle>
+            <DialogDescription className="text-sm">Despliega un agente en menos de 2 minutos. 4 pasos rápidos.</DialogDescription>
+          </DialogHeader>
+          
+          {/* Progress bar */}
+          <div className="flex items-center gap-2 mb-6">
             {[1,2,3,4].map(n => (
-              <div key={n} className={`flex-1 h-1 rounded-full ${n <= step ? 'bg-primary' : 'bg-muted'}`} />
+              <div key={n} className={`flex-1 h-1.5 rounded-full transition-colors ${n <= step ? 'bg-primary' : 'bg-muted'}`} />
             ))}
+            <span className="ml-2 text-xs text-muted-foreground font-medium">{step}/4</span>
           </div>
 
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="text-xs font-medium mb-1 block">Nombre</label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Atlas" autoFocus />
+                <label className="text-sm font-medium mb-2 block">Nombre del agente</label>
+                <Input 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="Ej: Atlas, Aria, Max..." 
+                  autoFocus 
+                  className="h-12 text-base sm:h-10 sm:text-sm"
+                />
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block">Modelo</label>
+                <label className="text-sm font-medium mb-2 block">Modelo de IA</label>
                 <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-12 sm:h-10"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {MODEL_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {MODEL_OPTIONS.map(m => <SelectItem key={m} value={m} className="py-3 sm:py-2">{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -279,23 +301,33 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           )}
 
           {step === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="text-xs font-medium mb-1 block">Descripción / Rol</label>
-                <Textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Qué hace y para qué sirve" />
+                <label className="text-sm font-medium mb-2 block">Descripción / Rol</label>
+                <Textarea 
+                  rows={4} 
+                  value={description} 
+                  onChange={e => setDescription(e.target.value)} 
+                  placeholder="Describe qué hace este agente y para qué sirve..." 
+                  className="text-base sm:text-sm resize-none"
+                />
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block">Plantilla rápida</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="text-sm font-medium mb-2 block">Plantilla rápida</label>
+                <div className="grid grid-cols-2 gap-3">
                   {TEMPLATE_OPTIONS.map(tpl => (
                     <button
                       key={tpl.id}
                       type="button"
                       onClick={() => setTemplate(tpl.id)}
-                      className={`rounded-md border px-2 py-2 text-left text-xs hover:bg-muted transition ${template === tpl.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+                      className={`rounded-xl border px-3 py-4 sm:py-3 text-left transition-all active:scale-[0.98] ${
+                        template === tpl.id 
+                          ? 'border-primary bg-primary/10 shadow-sm' 
+                          : 'border-border hover:bg-muted hover:border-border/80'
+                      }`}
                     >
-                      <div className="font-medium mb-0.5">{tpl.label}</div>
-                      <div className="opacity-70 text-[11px] leading-tight">{tpl.desc}</div>
+                      <div className="font-semibold text-sm mb-1">{tpl.label}</div>
+                      <div className="text-muted-foreground text-xs leading-snug">{tpl.desc}</div>
                     </button>
                   ))}
                 </div>
@@ -304,26 +336,27 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           )}
 
           {step === 3 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="text-xs font-medium mb-2 block">Tools opcionales</label>
+                <label className="text-sm font-medium mb-2 block">Herramientas disponibles</label>
                 
-                {/* Search filter */}
-                <div className="mb-3">
+                {/* Search filter - larger on mobile */}
+                <div className="mb-4">
                   <Input 
                     type="text" 
-                    placeholder="Buscar tools..." 
+                    placeholder="Buscar herramientas..." 
                     value={toolSearchQuery}
                     onChange={(e) => setToolSearchQuery(e.target.value)}
-                    className="h-9 text-xs"
+                    className="h-11 text-base sm:h-9 sm:text-sm"
                   />
                 </div>
                 
-                {loadingTools && <div className="text-xs opacity-60 mb-2">Cargando tools...</div>}
+                {loadingTools && <div className="text-sm opacity-60 mb-2">Cargando herramientas...</div>}
                 {!loadingTools && allTools.length === 0 && (
-                  <div className="text-xs opacity-70">No se encontró ningún tool.</div>
+                  <div className="text-sm opacity-70">No se encontró ninguna herramienta.</div>
                 )}
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 border rounded-md p-3 bg-muted/20">
+                {/* Tool categories - increased height for mobile scrolling */}
+                <div className="space-y-3 max-h-[45vh] sm:max-h-80 overflow-y-auto -mx-1 px-1 border rounded-xl p-3 sm:p-4 bg-muted/10">
                   {Object.entries(
                     allTools
                       .filter(tool => {
@@ -407,33 +440,38 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
                         (acc[t.category] ||= []).push(t); return acc
                       }, {})
                   ).length === 0 && (
-                    <div className="text-xs opacity-60 text-center py-4">
-                      No se encontraron tools que coincidan con "{toolSearchQuery}"
+                  <div className="text-sm opacity-60 text-center py-6">
+                      No se encontraron herramientas que coincidan
                     </div>
                   )}
                 </div>
                 {checkingConnections && (
-                  <div className="text-xs mt-2 opacity-60">Verificando conexiones...</div>
+                  <div className="text-sm mt-2 opacity-60">Verificando conexiones...</div>
                 )}
               </div>
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium block">Prompt personalizado (opcional)</label>
-                  <Button type="button" size="sm" variant="outline" onClick={generatePrompt}>
-                    <MagicWand className="mr-1" size={14} /> {t.sidebar.generatePrompt}
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <label className="text-sm font-medium">Prompt personalizado</label>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={generatePrompt}
+                    className="h-9 px-3"
+                  >
+                    <MagicWand className="mr-1.5" size={16} /> Generar
                   </Button>
                 </div>
                 <Textarea 
                   value={customPrompt} 
                   onChange={e => setCustomPrompt(e.target.value)} 
                   placeholder="Genera el prompt automáticamente o edítalo a tu gusto" 
-                  className="min-h-[140px] max-h-[140px] resize-none overflow-y-auto font-mono text-xs leading-relaxed"
+                  className="min-h-[120px] sm:min-h-[140px] max-h-[140px] resize-none overflow-y-auto font-mono text-sm leading-relaxed"
                 />
-                <p className="text-[10px] opacity-60 mt-1.5">Usa scroll para leer el prompt completo</p>
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block">Color</label>
-                <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-9 w-20 p-1" />
+                <label className="text-sm font-medium mb-2 block">Color del agente</label>
+                <Input type="color" value={color} onChange={e => setColor(e.target.value)} className="h-11 w-24 p-1.5 rounded-lg" />
               </div>
             </div>
           )}
@@ -464,33 +502,47 @@ export function DialogCreateAgent({ isOpen, setIsOpenAction }: DialogCreateAgent
           )}
         </div>
 
-        <DialogFooter className="mt-6 flex items-center justify-between">
-          <div className="flex gap-2">
-            {step > 1 && (
-              <Button type="button" variant="ghost" size="sm" onClick={handleBack}>Atrás</Button>
+        {/* Fixed footer for mobile - sticky navigation buttons */}
+        <div className="border-t border-border/40 bg-background/95 backdrop-blur-sm px-4 sm:px-0 py-4 mt-auto">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex gap-2">
+              {step > 1 && (
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="default"
+                  onClick={handleBack}
+                  className="h-11 px-4 sm:h-9 sm:px-3"
+                >
+                  Atrás
+                </Button>
+              )}
+            </div>
+            {step < 4 && (
+              <Button
+                type="button"
+                size="default"
+                disabled={(step===1 && !canContinueStep1) || (step===2 && !canContinueStep2) || (step===3 && !canContinueStep3)}
+                onClick={handleNext}
+                className="h-11 px-6 sm:h-9 sm:px-4"
+              >
+                Siguiente <ArrowRight className="ml-1.5" size={16} />
+              </Button>
+            )}
+            {step === 4 && (
+              <Button
+                type="button"
+                size="default"
+                disabled={quickCreateMutation.isPending || !name.trim()}
+                onClick={() => quickCreateMutation.mutate()}
+                className="h-11 px-6 sm:h-9 sm:px-4"
+              >
+                {quickCreateMutation.isPending ? 'Creando...' : 'Desplegar'} 
+                {quickCreateMutation.isSuccess && <CheckCircle size={16} className="ml-1" />}
+              </Button>
             )}
           </div>
-          {step < 4 && (
-            <Button
-              type="button"
-              size="sm"
-              disabled={(step===1 && !canContinueStep1) || (step===2 && !canContinueStep2) || (step===3 && !canContinueStep3)}
-              onClick={handleNext}
-            >
-              Siguiente <ArrowRight className="ml-1" size={14} />
-            </Button>
-          )}
-          {step === 4 && (
-            <Button
-              type="button"
-              size="sm"
-              disabled={quickCreateMutation.isPending || !name.trim()}
-              onClick={() => quickCreateMutation.mutate()}
-            >
-              {quickCreateMutation.isPending ? 'Creando...' : 'Desplegar'} {quickCreateMutation.isSuccess && <CheckCircle size={14} className="ml-1" />}
-            </Button>
-          )}
-        </DialogFooter>
+        </div>
       </DialogContent>
       {/* Simple connect drawer */}
       {showConnectDrawer && (

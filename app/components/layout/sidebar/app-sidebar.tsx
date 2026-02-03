@@ -366,14 +366,23 @@ function CreateAgentMenuItem({ isMobile, closeSidebar }: { isMobile: boolean; cl
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
   
+  const handleOpenDialog = () => {
+    // IMPORTANT: Open dialog first, then close sidebar with delay
+    // This prevents the dialog from being unmounted on mobile
+    setOpen(true)
+    if (isMobile) {
+      // Use requestAnimationFrame + timeout to ensure dialog mounts before sidebar closes
+      requestAnimationFrame(() => {
+        setTimeout(closeSidebar, 150)
+      })
+    }
+  }
+  
   return (
     <>
       <SidebarMenuButton 
         tooltip={t.sidebar.newAgent}
-        onClick={() => {
-          setOpen(true)
-          if (isMobile) closeSidebar()
-        }}
+        onClick={handleOpenDialog}
       >
         <div className="flex items-center gap-3 w-full relative">
           <PlusCircle className="size-[18px]" weight="duotone" />
