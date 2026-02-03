@@ -1266,6 +1266,7 @@ export async function POST(req: Request) {
         // Shared state for polling (accessible from both start and cancel)
         let pollInterval: ReturnType<typeof setInterval> | null = null
         let streamClosed = false
+        let isSaved = false // Track if message has been saved to DB
         let interruptListener: ((data: any) => void) | null = null
         let reasoningListener: ((data: any) => void) | null = null
         let streamingListener: ((data: any) => void) | null = null
@@ -2055,6 +2056,7 @@ export async function POST(req: Request) {
                         outputTokens: 0,
                         responseTimeMs: Math.max(0, Date.now() - startedAt)
                       })
+                      isSaved = true // Mark as saved to prevent duplicate/partial saves on close
                     } catch (err) {
                       console.error('❌ Failed to persist assistant message:', err)
                     }
@@ -2075,8 +2077,47 @@ export async function POST(req: Request) {
             // Start polling with initial fast interval
             pollInterval = setInterval(pollLogic, pollMs)
           },
-          cancel() {
+          async cancel() {
             stopPolling()
+            console.log('⚠️ [STREAM] Client disconnected/cancelled')
+            
+            // CRITICAL: Save partial content on disconnect if not already saved
+            if (!isSaved && supabase && (streamedContent || persistedParts.length > 0)) {
+               try {
+                  console.log('💾 [STREAM] Saving partial content on disconnect...')
+                  // Determine best available content
+                  const finalText = streamedContent || 'Response interrupted by user disconnect'
+                  const fullMessage = [
+                    { type: 'text', text: finalText },
+                    ...persistedParts,
+                    { 
+                      type: 'execution-step', 
+                      step: {
+                        id: `interrupt-${Date.now()}`,
+                        action: 'completing',
+                        agent: 'system',
+                        content: 'Generation interrupted by user',
+                        metadata: { synthetic: true, warning: true }
+                      }
+                    }
+                  ]
+                  
+                  await storeAssistantMessage({
+                    supabase,
+                    chatId,
+                    messages: [{ role: 'assistant', content: fullMessage }] as any,
+                    message_group_id,
+                    model: 'agents:cleo-supervised',
+                    userId: realUserId!,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    responseTimeMs: Math.max(0, Date.now() - startedAt)
+                  })
+                  console.log('✅ [STREAM] Partial content saved.')
+               } catch (e) {
+                 console.error('❌ [STREAM] Failed to save partial content:', e)
+               }
+            }
           }
         })
 

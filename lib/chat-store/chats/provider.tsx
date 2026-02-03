@@ -82,19 +82,21 @@ export function ChatsProvider({
   }
 
   const updateTitle = async (id: string, title: string) => {
-    const prev = [...chats]
-    const updatedChatWithNewTitle = prev.map((c) =>
-      c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c
-    )
-    const sorted = updatedChatWithNewTitle.sort(
-      (a, b) => +new Date(b.updated_at || "") - +new Date(a.updated_at || "")
-    )
-    setChats(sorted)
+    setChats((currentChats) => {
+      const updatedChatWithNewTitle = currentChats.map((c) =>
+        c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c
+      )
+      const sorted = updatedChatWithNewTitle.sort(
+        (a, b) => +new Date(b.updated_at || "") - +new Date(a.updated_at || "")
+      )
+      return sorted
+    })
+
     try {
       await updateChatTitle(id, title)
     } catch {
-      setChats(prev)
-      toast({ title: "Failed to update title", status: "error" })
+      // Re-fetch or revert if needed, but for now just toast error to avoid UI jumping
+      toast({ title: "Failed to update title in DB", status: "error" })
     }
   }
 
@@ -136,7 +138,7 @@ export function ChatsProvider({
       user_id: userId,
       public: true,
       updated_at: new Date().toISOString(),
-      project_id: null,
+      project_id: projectId || null,
     }
     setChats((prev) => [optimisticChat, ...prev])
 
@@ -182,14 +184,15 @@ export function ChatsProvider({
   }
 
   const bumpChat = async (id: string) => {
-    const prev = [...chats]
-    const updatedChatWithNewUpdatedAt = prev.map((c) =>
-      c.id === id ? { ...c, updated_at: new Date().toISOString() } : c
-    )
-    const sorted = updatedChatWithNewUpdatedAt.sort(
-      (a, b) => +new Date(b.updated_at || "") - +new Date(a.updated_at || "")
-    )
-    setChats(sorted)
+    setChats((currentChats) => {
+      const updatedChatWithNewUpdatedAt = currentChats.map((c) =>
+        c.id === id ? { ...c, updated_at: new Date().toISOString() } : c
+      )
+      const sorted = updatedChatWithNewUpdatedAt.sort(
+        (a, b) => +new Date(b.updated_at || "") - +new Date(a.updated_at || "")
+      )
+      return sorted
+    })
   }
 
   return (

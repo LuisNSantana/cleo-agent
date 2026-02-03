@@ -12,7 +12,7 @@ import { useMessages } from "@/lib/chat-store/messages/provider"
 import type { MessageAISDK } from "@/lib/chat-store/messages/api"
 import { MESSAGE_MAX_LENGTH, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { Attachment } from "@/lib/file-handling"
-import { getProjectSystemPrompt } from "@/lib/prompts/project"
+import { getProjectSystemPrompt, getEnhancedProjectSystemPrompt } from "@/lib/prompts/project"
 // API_ROUTE_CHAT no longer used with useChat v5
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,12 @@ import { useCallback, useMemo, useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, validateFile } from "@/lib/file-handling"
 import type { Chat } from "@/lib/chat-store/types"
+import { getMessagesFromDb, getCachedMessages } from "@/lib/chat-store/messages/api"
+import { ProjectChatSession } from "@/app/components/project/project-chat-session"
+
+import { ProjectContextPanel } from "@/app/components/project/project-context-panel"
+import { Settings, Maximize2, Minimize2, FileText, PanelRightOpen, PanelRightClose } from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 type Project = {
   id: string
@@ -70,7 +76,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const [enableSearch, setEnableSearch] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const { user } = useUser();
-  const { createNewChat, bumpChat } = useChats();
+  const { createNewChat, bumpChat, deleteChat } = useChats();
   const { cacheAndAddMessage } = useMessages();
   const pathname = usePathname();
   const router = useRouter();
@@ -103,8 +109,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   })
 
   // Local editable fields for project meta
-  const [desc, setDesc] = useState<string>("")
-  const [notes, setNotes] = useState<string>("")
   const [savingMeta, setSavingMeta] = useState(false)
   const [name, setName] = useState<string>("")
   const [editingName, setEditingName] = useState(false)
@@ -114,8 +118,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   useEffect(() => {
     if (project && !project._auth_failed && !project._error) {
       setName(project.name || "")
-      setDesc(project.description || "")
-      setNotes(project.notes || "")
     }
   }, [project?.id, project?._auth_failed, project?._error])
 
@@ -127,24 +129,6 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     }
   }, [user?.id, project?._auth_failed, refetchProject])
 
-  const saveProjectMeta = useCallback(async () => {
-    if (!project) return
-    try {
-      setSavingMeta(true)
-      const res = await fetch(`/api/projects/${project.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: desc, notes }),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      toast({ title: 'Proyecto actualizado', status: 'success' })
-    } catch (e: any) {
-      toast({ title: 'No se pudo actualizar el proyecto', status: 'error' })
-    } finally {
-      setSavingMeta(false)
-    }
-  }, [project, desc, notes])
-
   const saveProjectName = useCallback(async () => {
     if (!project) return
     try {
@@ -152,7 +136,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       const res = await fetch(`/api/projects/${project.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: desc, notes }),
+        body: JSON.stringify({ name, description: project.description, notes: project.notes }),
       })
       if (!res.ok) throw new Error(await res.text())
       toast({ title: 'Nombre actualizado', status: 'success' })
@@ -162,7 +146,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     } finally {
       setSavingName(false)
     }
-  }, [project, name, desc, notes])
+  }, [project, name])
 
   // ---------- Project Documents List ----------
   type ProjectDoc = {
@@ -214,7 +198,26 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const { chats: allChats } = useChats()
 
   // Filter chats for this project
-  const chats = allChats.filter((chat: Chat) => chat.project_id === projectId)
+  const chats = useMemo(() => 
+    allChats
+      .filter((chat: Chat) => chat.project_id === projectId)
+      .sort((a, b) => {
+        const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+        const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+        return dateB - dateA
+      }), 
+    [allChats, projectId]
+  )
+
+  // Auto-select latest chat on load if none selected
+  useEffect(() => {
+    if (!currentChatId && chats.length > 0) {
+      // Find most recent
+      const latest = chats[0]
+      console.log(`[ProjectView] Auto-selecting latest chat: ${latest.id}`)
+      setCurrentChatId(latest.id)
+    }
+  }, [chats, currentChatId])
 
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
 
@@ -233,290 +236,41 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     })
   }, [])
 
-  const chatHelpers = useChat({
-    // Use a stable id to avoid resetting the hook between first and subsequent messages
-    id: `project-${projectId}`,
-    onFinish: (message: any) => cacheAndAddMessage(convertToMessageAISDK(message)),
-    onError: handleError,
-  })
-  const messages = (chatHelpers as any).messages as any[]
-  // In project context we manage a local input to avoid relying on chatHelpers.setInput (which may be undefined)
-  const [localInput, setLocalInput] = useState<string>("")
-  const status = (chatHelpers as any).status as any
-  const reload = (chatHelpers as any).reload as (options?: any) => void
-  const stop = (chatHelpers as any).stop as () => void
-  const setMessages = (chatHelpers as any).setMessages as (updater: any) => void
-  const setInputMaybe = (chatHelpers as any).setInput as
-    | ((value: string | ((prev: string) => string)) => void)
-    | undefined
-
-  const { selectedModel, handleModelChange } = useModel({
-    currentChat: null,
-    user,
-    updateChatModel: () => Promise.resolve(),
-    chatId: null,
-  })
-
-  // Override selected model with grok-4-fast-reasoning for project context (smartest multimodal model with reasoning)
-  const projectModel = 'grok-4-fast-reasoning'
-
-  // Simplified ensureChatExists for authenticated project context
-  const ensureChatExists = useCallback(
-    async (userId: string) => {
-      // If we already have a current chat ID, return it
-      if (currentChatId) {
-        return currentChatId
-      }
-
-      // Create a new chat if none exists yet (even if there are optimistic messages)
-      try {
-        const newChat = await createNewChat(
-          userId,
-          localInput,
-          projectModel, // Use grok-4-fast for project chats
-          true, // Always authenticated in this context
-          SYSTEM_PROMPT_DEFAULT,
-          projectId
-        )
-
-        if (!newChat) return null
-
-        setCurrentChatId(newChat.id)
-        
-        // DON'T redirect here - let the submit handler redirect after the message is sent
-        // router.push(`/c/${newChat.id}`)
-        
-        return newChat.id
-      } catch (err: unknown) {
-        let errorMessage = "Something went wrong."
-        try {
-          const errorObj = err as { message?: string }
-          if (errorObj.message) {
-            const parsed = JSON.parse(errorObj.message)
-            errorMessage = parsed.error || errorMessage
-          }
-        } catch {
-          const errorObj = err as { message?: string }
-          errorMessage = errorObj.message || errorMessage
-        }
-        toast({
-          title: errorMessage,
-          status: "error",
-        })
-        return null
-      }
-    },
-    [
-      currentChatId,
-      createNewChat,
-      localInput,
-      projectModel,
-      projectId,
-      router,
-    ]
-  )
-
-  const { handleDelete, handleEdit } = useChatOperations({
-    isAuthenticated: true, // Always authenticated in project context
-    chatId: null,
-    messages,
-    selectedModel: projectModel, // Use project model for operations
-    systemPrompt: SYSTEM_PROMPT_DEFAULT,
-    createNewChat,
-    setHasDialogAuth: () => {}, // Not used in project context
-    setMessages,
-    setInput: () => {},
-  })
-
-  // Simple input change handler for project context (no draft saving needed)
-  const handleInputChange = useCallback(
-    (value: string) => {
-      setLocalInput(value)
-      // Best-effort: if chatHelpers exposes setInput, keep it in sync
-      if (typeof setInputMaybe === 'function') {
-        try { setInputMaybe(value) } catch {}
-      }
-    },
-    [setInputMaybe]
-  )
-
-  const submit = useCallback(async () => {
-    setIsSubmitting(true)
-
-    if (!user?.id) {
-      setIsSubmitting(false)
-      return
-    }
-
-    // At this point user is guaranteed
-    const uid = user.id as string
-
-    const textToSend = localInput
-    
-    if (!textToSend.trim()) {
-      setIsSubmitting(false)
-      return
-    }
-
-    const submittedFiles = [...files]
-    setFiles([])
-
+  // ... inside ProjectView
+  // Handle "New Chat" Action
+  const handleNewChat = useCallback(async () => {
+    if (!user?.id) return
     try {
-      const ensuredChatId = await ensureChatExists(uid)
-      if (!ensuredChatId) {
-        setIsSubmitting(false)
-        return
+      const newChat = await createNewChat(
+        user.id,
+        "New Project Chat", // Initial title
+        'grok-4-fast-reasoning',
+        true,
+        SYSTEM_PROMPT_DEFAULT,
+        projectId
+      )
+      if (newChat) {
+        setCurrentChatId(newChat.id)
       }
-
-      if (textToSend.length > MESSAGE_MAX_LENGTH) {
-        toast({
-          title: `The message you submitted was too long, please submit something shorter. (Max ${MESSAGE_MAX_LENGTH} characters)`,
-          status: "error",
-        })
-        setIsSubmitting(false)
-        return
-      }
-
-      let attachments: Attachment[] | null = []
-      if (submittedFiles.length > 0) {
-        attachments = await handleFileUploads(uid, ensuredChatId)
-        if (attachments === null) {
-          setIsSubmitting(false)
-          return
-        }
-      }
-
-      // Clear input before sending
-      setLocalInput("")
-      if (typeof setInputMaybe === 'function') {
-        try { setInputMaybe("") } catch {}
-      }
-
-      // Add user message to UI immediately
-      const userMessage: MessageAISDK = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: textToSend,
-        parts: [{ type: 'text', text: textToSend }],
-        createdAt: new Date(),
-        experimental_attachments: attachments && attachments.length > 0 ? attachments : undefined,
-      }
-      setMessages((prev: any[]) => [...prev, userMessage])
-
-      // Call chat API directly with streaming
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          chatId: ensuredChatId,
-          userId: uid,
-          model: projectModel,
-          isAuthenticated: true,
-          systemPrompt: getProjectSystemPrompt(
-            project?.name || "Project",
-            project?.description || undefined
-          ),
-          projectId: projectId,
-          enableSearch: true, // Always enable search for project chats
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`)
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let assistantMessage = ''
-      let assistantMessageId = `assistant-${Date.now()}`
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk.split('\n')
-
-          for (const line of lines) {
-            if (line.startsWith('0:')) {
-              try {
-                const jsonStr = line.substring(2)
-                const parsed = JSON.parse(jsonStr)
-                if (parsed && typeof parsed === 'string') {
-                  assistantMessage += parsed
-                  // Update message in UI
-                  setMessages((prev: any[]) => {
-                    const withoutLast = prev.filter((m: any) => m.id !== assistantMessageId)
-                    return [...withoutLast, {
-                      id: assistantMessageId,
-                      role: 'assistant',
-                      content: assistantMessage,
-                      createdAt: new Date(),
-                    }]
-                  })
-                }
-              } catch (e) {
-                // Ignore parse errors in streaming chunks
-              }
-            }
-          }
-        }
-      }
-
-      // Cache final message
-      if (assistantMessage) {
-        cacheAndAddMessage({
-          id: assistantMessageId,
-          role: 'assistant',
-          content: assistantMessage,
-          parts: [{ type: 'text', text: assistantMessage }],
-          createdAt: new Date(),
-        })
-      }
-
-      // Bump existing chats to top (non-blocking, after submit)
-      if (messages.length > 0) {
-        bumpChat(ensuredChatId)
-      }
-
-      // Redirect to the chat view after the message is complete
-      // This ensures the message is sent and the response is received before navigating
-      router.push(`/c/${ensuredChatId}`)
-      
-    } catch (error: any) {
-      console.error('Failed to send message in project:', error)
-      toast({ 
-        title: "Failed to send message", 
-        description: error?.message || "Please try again",
-        status: "error" 
-      })
-    } finally {
-      setIsSubmitting(false)
+    } catch (e) {
+      console.error("Failed to create new chat", e)
+      toast({ title: "Failed to create chat", status: "error" })
     }
-  }, [
-    user,
-    files,
-    localInput,
-    setFiles,
-    ensureChatExists,
-    handleFileUploads,
-    setLocalInput,
-    setInputMaybe,
-    setMessages,
-    messages,
-    projectModel,
-    enableSearch,
-    cacheAndAddMessage,
-    bumpChat,
-    router,
-    project,
-    projectId,
-  ])
+  }, [user?.id, createNewChat, projectId])
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
 
   // Header CTA: hidden file input change handler (auto-upload)
   const [isUploadingDocs, setIsUploadingDocs] = useState(false)
@@ -612,83 +366,53 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     }
   }, [uploadProjectDocuments, projectId])
 
-  const handleReload = useCallback(async () => {
-    if (!user?.id) {
-      return
+  const handleDeleteChat = useCallback(async (chatIdToDelete: string) => {
+    if (!user?.id) return
+    
+    const isCurrent = currentChatId === chatIdToDelete
+    
+    try {
+      await deleteChat(chatIdToDelete)
+      toast({ title: "Chat eliminado", status: "success" })
+      
+      if (isCurrent) {
+        setCurrentChatId(null)
+      }
+    } catch (e) {
+      console.error("Failed to delete chat", e)
+      toast({ title: "Error al eliminar chat", status: "error" })
     }
+  }, [deleteChat, currentChatId, user?.id])
 
-    const options = {
-      body: {
-        chatId: null,
-        userId: user.id,
-        model: selectedModel,
-        isAuthenticated: true,
-        systemPrompt: SYSTEM_PROMPT_DEFAULT,
-      },
+  // Only show onboarding if no chat is selected
+  const showOnboarding = !currentChatId
+
+  // Update saveProjectMeta to accept arguments for auto-save
+  const saveProjectMeta = useCallback(async (newDescription?: string, newNotes?: string) => {
+    if (!project) return
+    try {
+      setSavingMeta(true)
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: project.name, 
+          description: newDescription !== undefined ? newDescription : project.description, 
+          notes: newNotes !== undefined ? newNotes : project.notes 
+        }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      // Refetch to update local state
+      refetchProject()
+    } catch (e: any) {
+      toast({ title: 'No se pudo actualizar el proyecto', status: 'error' })
+      throw e
+    } finally {
+      setSavingMeta(false)
     }
+  }, [project, refetchProject])
 
-    reload(options)
-  }, [user, selectedModel, reload])
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
-  // Memoize the conversation props to prevent unnecessary rerenders
-  const conversationProps = useMemo(
-    () => ({
-      messages,
-      status,
-      onDelete: handleDelete,
-      onEdit: handleEdit,
-      onReload: handleReload,
-      userId: user?.id, // For image generation
-    }),
-    [messages, status, handleDelete, handleEdit, handleReload, user?.id]
-  )
-
-  // Memoize the chat input props
-  const chatInputProps = useMemo(
-    () => ({
-      value: localInput, // Changed from 'input' to 'value'
-      onValueChangeAction: handleInputChange,
-      onSendAction: submit,
-      isSubmitting,
-      files,
-      onFileUploadAction: handleFileUpload,
-      onFileRemoveAction: handleFileRemove,
-      onSuggestionAction: (suggestion: string) => setLocalInput(suggestion), // Add suggestion handler
-      hasSuggestions: false,
-      onSelectModelAction: handleModelChange,
-      selectedModel: projectModel, // Use projectModel instead of selectedModel
-      isUserAuthenticated: isAuthenticated,
-      stopAction: stop,
-      status,
-      setEnableSearchAction: setEnableSearch,
-      enableSearch,
-    }),
-    [
-      localInput,
-      handleInputChange,
-      submit,
-      isSubmitting,
-      files,
-      handleFileUpload,
-      handleFileRemove,
-      handleModelChange,
-      projectModel, // Use projectModel dependency
-      isAuthenticated,
-      stop,
-      status,
-      setEnableSearch,
-      enableSearch,
-    ]
-  )  // Always show onboarding when on project page, regardless of messages
-  const showOnboarding = pathname === `/p/${projectId}`
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false)
 
   // Early return for critical loading/error states
   if (projectLoading && !project) {
@@ -718,284 +442,170 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     )
   }
 
+  // Calculate main content width based on panel state
+  // On mobile, panels are stacked or toggled
+  
   return (
     <div
-      className={cn(
-        "relative flex min-h-screen w-full flex-col items-center overflow-x-hidden bg-[--background] pt-[calc(var(--spacing-app-header)+28px)] md:pt-[calc(var(--spacing-app-header)+8px)]",
-        showOnboarding && chats.length === 0
-          ? "justify-center"
-          : showOnboarding && chats.length > 0
-            ? "justify-start md:pt-24"
-            : "justify-end"
-      )}
+      className="flex h-screen w-full overflow-hidden bg-[--background] pt-[calc(var(--spacing-app-header))]"
       data-project-view={projectId}
-      data-pathname={pathname}
-      data-testid={`project-view-${projectId}`}
     >
-      {/* Project Overview Panel */}
-      <div className="w-full max-w-3xl p-4">
-  <div className="radius-lg bg-[--background] border divider-subtle p-4 mb-4">
-          {/* Project header inside the card */}
-          <div className="mb-2 md:mb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                {editingName ? (
-                  <>
-                    <input
-                      className="w-[min(60vw,420px)] radius-md bg-transparent border divider-subtle px-2 py-1 text-base md:text-lg"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveProjectName()
-                        if (e.key === 'Escape') { setEditingName(false); setName(project?.name || name) }
-                      }}
-                      autoFocus
-                    />
-                    <button
-                      className="inline-flex items-center justify-center rounded-md border divider-subtle p-1.5 text-xs hover:bg-white/5 disabled:opacity-50"
-                      onClick={saveProjectName}
-                      disabled={savingName}
-                      aria-label="Guardar nombre"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      className="inline-flex items-center justify-center rounded-md border divider-subtle p-1.5 text-xs hover:bg-white/5"
-                      onClick={() => { setEditingName(false); setName(project?.name || name) }}
-                      aria-label="Cancelar"
-                    >
-                      <X size={16} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h1 className="truncate text-xl md:text-2xl font-semibold">
-                      {name || 'Proyecto'}
-                      {project?._auth_failed && (
-                        <span className="ml-2 text-xs text-yellow-500 font-normal">(Reautenticando...)</span>
-                      )}
-                      {project?._error && (
-                        <span className="ml-2 text-xs text-red-400 font-normal">(Error de carga)</span>
-                      )}
-                    </h1>
-                    <button
-                      className="inline-flex items-center justify-center rounded-md border divider-subtle p-1.5 text-xs hover:bg-white/5"
-                      onClick={() => setEditingName(true)}
-                      aria-label="Editar nombre"
-                      title="Editar nombre"
-                    >
-                      <PencilSimple size={16} />
-                    </button>
-                  </>
-                )}
+      {/* Main Chat Area */}
+      <div className="flex flex-1 flex-col min-w-0 h-full relative">
+        {/* Project Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-background/50 backdrop-blur-sm z-10 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+             {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-[200px] rounded-md bg-muted px-2 py-1 text-base"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveProjectName()
+                      if (e.key === 'Escape') { setEditingName(false); setName(project?.name || name) }
+                    }}
+                    autoFocus
+                  />
+                  <button onClick={saveProjectName} className="p-1 hover:bg-muted rounded"><Check size={16} /></button>
+                  <button onClick={() => { setEditingName(false); setName(project?.name || name) }} className="p-1 hover:bg-muted rounded"><X size={16} /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                   <h1 className="text-lg font-medium truncate">
+                    {project?.name}
+                  </h1>
+                  <button 
+                    onClick={() => setEditingName(true)} 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground"
+                    title="Edit Name"
+                  >
+                    <PencilSimple size={14} />
+                  </button>
+                </div>
+              )}
+              
+              <div className="hidden md:flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {projectDocs.length} docs
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <span className="inline-flex items-center gap-1 rounded-full border divider-subtle bg-[--surface-1] px-2 py-0.5">{projectDocs?.length || 0} docs</span>
-                <span className="inline-flex items-center gap-1 rounded-full border divider-subtle bg-[--surface-1] px-2 py-0.5">Scope: proyecto</span>
-              </div>
-            </div>
-            <div className="shrink-0 self-start md:self-auto">
-              <button
-                className="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm shadow-sm hover:opacity-90 transition"
-                onClick={() => {
-                  const fileInput = document.querySelector<HTMLInputElement>(`#project-file-input-${projectId}`)
-                  fileInput?.click()
-                }}
-              >
-                Añadir documento
-              </button>
-              {/* Hidden input for CTA */}
-              <input
-                id={`project-file-input-${projectId}`}
-                type="file"
-                multiple
-                className="sr-only hidden"
-                onChange={onHeaderFileChange}
-              />
-            </div>
           </div>
-
-          <div className="grid gap-3">
-            <label className="grid gap-1">
-              <span className="text-sm text-muted-foreground">Descripción</span>
-              <textarea
-                className="min-h-[80px] w-full radius-md bg-transparent border divider-subtle p-2"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                placeholder="Describe el objetivo, alcance y contexto de este proyecto"
-              />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm text-muted-foreground">Notas</span>
-              <textarea
-                className="min-h-[80px] w-full radius-md bg-transparent border divider-subtle p-2"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Pega resúmenes, decisiones, enlaces, etc."
-              />
-            </label>
-            <div className="flex gap-2">
-              <button
-                className="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-2 disabled:opacity-50 shadow-sm hover:opacity-90 transition"
-                onClick={saveProjectMeta}
-                disabled={savingMeta}
-              >
-                {savingMeta ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
-          </div>
+          
+          
+          {/* Mobile toggle moved to absolute position for Sheet trigger */}
         </div>
 
-        {/* Quick add documents - reuse chat file upload hooks */}
-  <div className="radius-lg bg-[--background] border divider-subtle p-4 mb-6">
-          <h3 className="text-base font-medium mb-2">Añadir documentos al proyecto</h3>
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              className="rounded-md border divider-subtle px-3 py-2 text-sm hover:bg-white/5 transition"
-              onClick={() => {
-                const fileInput = document.querySelector<HTMLInputElement>(`#project-file-input-${projectId}`)
-                fileInput?.click()
-              }}
-            >
-              Elegir archivos
-            </button>
-            <button
-              className="rounded-md bg-primary text-primary-foreground px-3 py-2 disabled:opacity-50 shadow-sm hover:opacity-90 transition"
-              onClick={async () => {
-                if (files.length === 0) return
-                await uploadProjectDocuments(files)
-              }}
-              disabled={files.length === 0}
-            >
-              Subir ahora
-            </button>
-          </div>
-          {files.length > 0 && (
-            <div className="mt-2 text-sm text-muted-foreground">{files.length} archivos listos para subir</div>
-          )}
-        </div>
-
-        {/* Documents list */}
-  <div className="radius-lg bg-[--background] border divider-subtle p-4">
-          <h3 className="text-base font-medium mb-3">Documentos del proyecto</h3>
-          {projectDocs.length === 0 && pendingProjectDocs.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Aún no hay documentos. Sube algunos arriba para alimentar el contexto del proyecto.</div>
-          ) : (
-            <ul className="divide-y">
-              {pendingProjectDocs.map(p => (
-                <li key={p.id} className="py-3 flex items-center justify-between gap-3 opacity-80">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full border divider-subtle bg-[--surface-1] px-2 py-0.5">
-                        {p.status === 'uploading' ? 'Subiendo…' : p.status === 'processing' ? 'Analizando…' : 'Error'}
-                      </span>
-                      {isUploadingDocs && <span className="text-muted-foreground">(en curso)</span>}
+        {/* Chat Conversation Area */}
+        <div className="flex-1 overflow-hidden relative flex flex-col">
+          <div className="flex-1 overflow-hidden w-full">
+            <AnimatePresence initial={false} mode="popLayout">
+              {showOnboarding ? (
+                <motion.div
+                  key="onboarding"
+                  className="h-full flex flex-col items-center justify-center p-8 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <div className="max-w-md space-y-4">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ChatCircleIcon className="text-primary" size={32} />
+                    </div>
+                    <h2 className="text-2xl font-semibold">Welcome to {project?.name}</h2>
+                    <p className="text-muted-foreground">
+                      This is your dedicated workspace. Upload documents, take notes, and chat with AI about your project.
+                    </p>
+                    
+                    {/* Quick Start Actions */}
+                    <div className="grid grid-cols-2 gap-3 mt-8">
+                       <button 
+                        onClick={() => document.querySelector<HTMLInputElement>(`#project-file-input-${projectId}`)?.click()}
+                        className="flex flex-col items-center gap-2 p-4 rounded-xl border hover:bg-muted/50 transition-colors"
+                      >
+                         <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
+                           <FileText size={20} />
+                         </div>
+                         <span className="text-sm font-medium">Add Documents</span>
+                       </button>
+                       <button 
+                        onClick={handleNewChat}
+                        className="flex flex-col items-center gap-2 p-4 rounded-xl border hover:bg-muted/50 transition-colors"
+                      >
+                         <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg">
+                           <ChatCircleIcon size={20} />
+                         </div>
+                         <span className="text-sm font-medium">Start Chatting</span>
+                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      className="rounded-md border divider-subtle px-2 py-1 text-sm opacity-50 cursor-not-allowed"
-                      disabled
-                    >
-                      Reindexar
-                    </button>
-                    <button
-                      className="rounded-md border divider-subtle px-2 py-1 text-sm text-red-400 opacity-50 cursor-not-allowed"
-                      disabled
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </li>
-              ))}
-              {projectDocs.map(doc => (
-                <li key={doc.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{doc.title || doc.filename}</div>
-                    <div className="text-xs text-muted-foreground">Actualizado {formatDate(doc.updated_at)}</div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      className="rounded-md border divider-subtle px-2 py-1 text-sm hover:bg-white/5"
-                      onClick={() => handleReindexDoc(doc.id)}
-                    >
-                      Reindexar
-                    </button>
-                    <button
-                      className="rounded-md border divider-subtle px-2 py-1 text-sm text-red-400 hover:bg-red-500/10"
-                      onClick={() => handleDeleteDoc(doc.id)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-      <AnimatePresence initial={false} mode="popLayout">
-        {showOnboarding ? (
-          <motion.div
-            key="onboarding"
-            className="relative mx-auto max-w-[50rem] md:relative"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            layout="position"
-            layoutId="onboarding"
-            transition={{
-              layout: {
-                duration: 0,
-              },
-            }}
-          >
-            <div className="mb-6 flex items-center justify-center gap-2">
-              <ChatCircleIcon className="text-muted-foreground" size={24} />
-              <h1 className="text-center text-3xl font-medium tracking-tight">
-                {project?.name || ""}
-              </h1>
-            </div>
-          </motion.div>
-        ) : (
-          <Conversation key="conversation" {...conversationProps} />
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        className={cn(
-          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
-        )}
-        layout="position"
-        layoutId="chat-input-container"
-        transition={{
-          layout: {
-            duration: messages.length === 1 ? 0.3 : 0,
-          },
-        }}
-      >
-  <ChatInput {...chatInputProps} hideModelSelector />
-      </motion.div>
-
-      {showOnboarding && chats.length > 0 ? (
-        <div className="mx-auto w-full max-w-3xl px-4 pt-6 pb-20">
-          <h2 className="text-muted-foreground mb-3 text-sm font-medium">
-            Recent chats
-          </h2>
-          <div className="space-y-2">
-            {chats.map((chat: Chat) => (
-              <ProjectChatItem key={chat.id} chat={chat} formatDate={formatDate} />
-            ))}
+                </motion.div>
+              ) : (
+                <ProjectChatSession 
+                  key={currentChatId} // Crucial: Re-mounts session on chat switch
+                  chatId={currentChatId!}
+                  projectId={projectId}
+                  projectName={project?.name || "Project"}
+                  projectDescription={project?.description || undefined}
+                  projectNotes={project?.notes || undefined}
+                  projectDocs={projectDocs}
+                  className="flex-1 h-full"
+                />
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      ) : showOnboarding && chats.length === 0 ? (
-        <div className="mx-auto w-full max-w-3xl px-4 pt-6 pb-20">
-          <h2 className="text-muted-foreground mb-3 text-sm font-medium">
-            No chats yet
-          </h2>
-        </div>
-      ) : null}
+      </div>
+
+      {/* Desktop Context Panel (Hidden on Mobile) */}
+      <div className="hidden md:block h-full shrink-0 border-l">
+        <ProjectContextPanel 
+          project={project!}
+          documents={projectDocs}
+          chats={chats}
+          selectedChatId={currentChatId}
+          onSelectChat={(id) => setCurrentChatId(id)}
+          onNewChat={handleNewChat}
+          pendingDocuments={pendingProjectDocs}
+          onUpload={uploadProjectDocuments}
+          onReindex={handleReindexDoc}
+          onDelete={handleDeleteDoc}
+          onDeleteChat={handleDeleteChat}
+          onSaveMeta={saveProjectMeta}
+          isCollapsed={isRightPanelCollapsed}
+          onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+          className="h-full border-none"
+        />
+      </div>
+
+      {/* Mobile Context Panel (Sheet) */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <button 
+           className="md:hidden absolute top-3 right-4 z-20 p-2 hover:bg-muted rounded-md bg-background/80 backdrop-blur-sm border shadow-sm"
+          >
+            <PanelRightOpen size={18} />
+          </button>
+        </SheetTrigger>
+        <SheetContent side="right" className="p-0 w-[85%] sm:w-[400px]">
+           <ProjectContextPanel 
+            project={project!}
+            documents={projectDocs}
+            chats={chats}
+            selectedChatId={currentChatId}
+            onSelectChat={(id) => setCurrentChatId(id)}
+            onNewChat={handleNewChat}
+            pendingDocuments={pendingProjectDocs}
+            onUpload={uploadProjectDocuments}
+            onReindex={handleReindexDoc}
+            onDelete={handleDeleteDoc}
+            onDeleteChat={handleDeleteChat}
+            onSaveMeta={saveProjectMeta}
+            isCollapsed={false} // Always expanded in sheet
+            className="h-full border-none w-full"
+          />
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

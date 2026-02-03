@@ -35,8 +35,12 @@ export async function getMessagesFromDb(
     .eq("chat_id", chatId)
     .order("created_at", { ascending: true })
 
-  if (!data || error) {
-    console.error("Failed to fetch messages:", error)
+  if (error) {
+    console.error("Failed to fetch messages:", JSON.stringify(error, null, 2))
+    return []
+  }
+
+  if (!data) {
     return []
   }
 
