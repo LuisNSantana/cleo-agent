@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { updateAgentTask } from '@/lib/agent-tasks/tasks-db';
-import { createTaskNotification } from '@/lib/agent-tasks/notifications';
+import { executeAgentTask } from '@/lib/agent-tasks/task-executor';
+import { updateAgentTaskAdmin } from '@/lib/agent-tasks/tasks-db';
 
-// POST - Execute a specific task (for testing/manual execution)
+/**
+ * POST - Execute a task immediately (manual execution)
+ * 
+ * This endpoint triggers immediate execution of a task using the real agent executor.
+ * Unlike scheduled tasks, this runs synchronously and returns the result.
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -29,114 +34,54 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-      if (taskError || !taskData) {
-        return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 });
-      }
+    if (taskError || !taskData) {
+      return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 });
+    }
 
-    const task = taskData as any; // Type assertion for now
+    const task = taskData as any;
 
-    // Update task status to running
-    await updateAgentTask(task_id, { status: 'running' });
+    // Check if task is already running
+    if (task.status === 'running') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Task is already running' 
+      }, { status: 409 });
+    }
 
-    // Simulate task execution (replace with actual agent logic)
-    const executionResult = await simulateTaskExecution(task);
+    console.log(`🚀 Manual execution requested for task: ${task.title} (${task_id})`);
 
-    // Update task with result
-    const updateData = {
-      status: executionResult.success ? 'completed' : 'failed',
-      result_data: executionResult.result,
-      error_message: executionResult.error,
-      execution_time_ms: executionResult.executionTime
-    };
-
-    await updateAgentTask(task_id, updateData as any);
-
-    // Create completion notification
-    await createTaskNotification({
-      user_id: user.id,
-      task_id: task.task_id,
-      agent_id: task.agent_id,
-      agent_name: task.agent_name,
-      agent_avatar: task.agent_avatar,
-      notification_type: executionResult.success ? 'task_completed' : 'task_failed',
-      title: executionResult.success ? 
-        `✅ Task Completed: ${task.title}` : 
-        `❌ Task Failed: ${task.title}`,
-      message: executionResult.success ?
-        `Your task "${task.title}" has been completed successfully by ${task.agent_name}. ${executionResult.summary || ''}` :
-        `Your task "${task.title}" failed during execution. Error: ${executionResult.error}`,
-      priority: executionResult.success ? 'medium' : 'high',
-      task_result: executionResult.result,
-      error_details: executionResult.error,
-      metadata: {
-        execution_time_ms: executionResult.executionTime,
-        task_type: task.task_type,
-        agent_id: task.agent_id
-      }
+    // Update task status to 'pending' to indicate it's queued for execution
+    await updateAgentTaskAdmin(task_id, { 
+      status: 'pending',
+      error_message: null 
     });
 
+    // Execute the task using the real agent executor
+    // This uses Super Ankie (or configured agent) to process the task
+    const executionResult = await executeAgentTask(task);
+
+    console.log(`✅ Task execution completed:`, {
+      task_id,
+      success: executionResult.success,
+      duration_ms: executionResult.execution_metadata?.duration_ms
+    });
+
+    // Return the result
     return NextResponse.json({
-      success: true,
-      message: 'Task executed successfully',
-      result: executionResult
+      success: executionResult.success,
+      message: executionResult.success 
+        ? 'Task executed successfully' 
+        : 'Task execution failed',
+      result: executionResult.result,
+      error: executionResult.error,
+      execution_metadata: executionResult.execution_metadata
     });
 
   } catch (error) {
     console.error('❌ Error executing task:', error);
     return NextResponse.json({
       success: false,
-      error: 'Internal server error'
+      error: error instanceof Error ? error.message : 'Internal server error'
     }, { status: 500 });
-  }
-}
-
-// Simulate task execution (replace with actual agent logic)
-async function simulateTaskExecution(task: any): Promise<{
-  success: boolean;
-  result?: any;
-  error?: string;
-  executionTime: number;
-  summary?: string;
-}> {
-  const startTime = Date.now();
-  
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-  
-  const executionTime = Date.now() - startTime;
-  
-  // 80% success rate for demo
-  const success = Math.random() > 0.2;
-  
-  if (success) {
-    return {
-      success: true,
-      result: {
-        status: 'completed',
-        output: `Task "${task.title}" executed successfully`,
-        data: {
-          processed_items: Math.floor(Math.random() * 100) + 1,
-          agent_used: task.agent_name,
-          timestamp: new Date().toISOString(),
-          task_type: task.task_type
-        }
-      },
-      executionTime,
-      summary: `Processed ${Math.floor(Math.random() * 100) + 1} items successfully.`
-    };
-  } else {
-    const errors = [
-      'Network timeout while connecting to external service',
-      'Invalid configuration parameters provided',
-      'Rate limit exceeded on external API',
-      'Authentication failed for external resource',
-      'Data validation error in input parameters'
-    ];
-    
-    return {
-      success: false,
-      error: errors[Math.floor(Math.random() * errors.length)],
-      executionTime
-    };
   }
 }
