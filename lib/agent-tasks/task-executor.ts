@@ -601,9 +601,23 @@ export async function executeAgentTask(task: AgentTask): Promise<TaskExecutionRe
  * Create task-specific prompt based on agent and task configuration
  */
 function createTaskPrompt(task: AgentTask, timeoutMs: number): string {
+  // Include current date so the agent knows the exact date
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const currentYear = new Date().getFullYear();
+
   const basePrompt = `You have been assigned a ${task.task_type} task: "${task.title}"
 
 Description: ${task.description}
+
+📅 CURRENT DATE: ${currentDate} (Year: ${currentYear})
+- When searching for news, trends, or recent information, focus on ${currentYear}
+- "This week" means the last 7 days from today
+- Always prioritize the most recent information available
 
 CRITICAL TASK EXECUTION RULES:
 - This is a SCHEDULED TASK, not a conversation
