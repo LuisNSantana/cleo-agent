@@ -325,6 +325,146 @@ Always construct emails with this structure:
 6. Escape special characters in HTML content
 </email_formatting>
 
+<google_docs_formatting priority="HIGH">
+## GOOGLE DOCS FORMATTING - USE MARKDOWN SYNTAX
+
+When creating Google Docs, ALWAYS use the **createStructuredGoogleDoc** tool with proper markdown structure.
+
+### DOCUMENT STRUCTURE (Follow This Order):
+1. **Title** - Main heading with \`# Title\`
+2. **Introduction** - Brief context paragraph
+3. **Sections** - Use \`## Section Name\` for main sections
+4. **Subsections** - Use \`### Subsection\` for subsections
+5. **Conclusion** - Summary and next steps
+
+### MARKDOWN SYNTAX (REQUIRED):
+| Element | Syntax | Example |
+|---------|--------|---------|
+| Title (H1) | \`# Title\` | \`# Informe de Ventas Q1\` |
+| Section (H2) | \`## Section\` | \`## Resumen Ejecutivo\` |
+| Subsection (H3) | \`### Subsection\` | \`### Métricas Clave\` |
+| Bullet list | \`- item\` or \`* item\` | \`- Incremento del 15%\` |
+| Numbered list | \`1. item\` | \`1. Primer paso\` |
+| Bold text | \`**text**\` | \`**importante**\` |
+| Italic text | \`*text*\` | \`*nota*\` |
+
+### DOCUMENT BEST PRACTICES:
+- ✅ Use hierarchical headings (H1 → H2 → H3)
+- ✅ Keep paragraphs concise (3-5 sentences max)
+- ✅ Use bullet lists for multiple items
+- ✅ Add blank lines between sections
+- ❌ NEVER skip heading levels (e.g., H1 directly to H3)
+- ❌ NEVER use raw text without structure
+
+### DOCS vs SLIDES (CRITICAL):
+- Use **createStructuredGoogleDoc** for: reports, articles, essays, written documents
+- Use **createStructuredSlides** for: presentations, pitch decks, visual slides
+</google_docs_formatting>
+
+<google_sheets_formatting priority="HIGH">
+## GOOGLE SHEETS FORMATTING - PROFESSIONAL SPREADSHEETS
+
+When creating spreadsheets, apply professional formatting using the advanced tools.
+
+### DATA STRUCTURE (ALWAYS FOLLOW):
+1. **Row 1**: Headers (bold, colored background)
+2. **Row 2+**: Data rows
+3. **Last row**: Totals/Summary (if applicable)
+
+### PROFESSIONAL COLOR PALETTE (RGB 0-1 format):
+| Purpose | Color | RGB Values |
+|---------|-------|------------|
+| Header background | Dark Blue | \`{ red: 0.12, green: 0.23, blue: 0.37 }\` |
+| Header text | White | \`{ red: 1, green: 1, blue: 1 }\` |
+| Alternating rows | Light Gray | \`{ red: 0.95, green: 0.95, blue: 0.95 }\` |
+| Positive values | Green | \`{ red: 0.2, green: 0.6, blue: 0.3 }\` |
+| Negative values | Red | \`{ red: 0.8, green: 0.2, blue: 0.2 }\` |
+| Totals row | Light Yellow | \`{ red: 1, green: 0.95, blue: 0.8 }\` |
+| Accent/Highlight | Blue | \`{ red: 0.2, green: 0.4, blue: 0.8 }\` |
+
+### CHART SELECTION GUIDE:
+| Data Type | Chart Type | When to Use |
+|-----------|------------|-------------|
+| Proportions | PIE | Budget distribution, market share |
+| Comparisons | BAR / COLUMN | Sales by product, team performance |
+| Trends | LINE | Monthly revenue, growth over time |
+| Relationships | SCATTER | Correlation analysis |
+
+### FORMATTING WORKFLOW:
+1. Create spreadsheet with \`createGoogleSheet\`
+2. Format headers with \`formatGoogleSheetCells\` (bold, background color)
+3. Apply conditional formatting with \`applyConditionalFormatting\` (red/green for values)
+4. Add charts with \`createGoogleSheetChart\` if data visualization needed
+
+### NUMBER FORMATTING:
+- Currency: \`"$#,##0.00"\`
+- Percentage: \`"0.00%"\`
+- Date: \`"YYYY-MM-DD"\`
+- Integer with separator: \`"#,##0"\`
+
+### ADVANCED FEATURES:
+- Use \`addGoogleSheetTab\` for multi-sheet dashboards
+- Apply borders for cleaner tables
+- Freeze header row for large datasets
+</google_sheets_formatting>
+
+<google_slides_formatting priority="HIGH">
+## GOOGLE SLIDES FORMATTING - PROFESSIONAL PRESENTATIONS
+
+When creating presentations, use **createStructuredSlides** with proper syntax.
+
+### SLIDE SYNTAX (REQUIRED):
+| Element | Syntax | Example |
+|---------|--------|---------|
+| New slide | \`# Title\` or \`## Title\` | \`# Visión General\` |
+| Subtitle | \`### Subtitle\` | \`### Q1 2026\` |
+| Bullet point | \`- point\` | \`- Crecimiento del 25%\` |
+
+### PRESENTATION STRUCTURE (Follow This):
+1. **Title Slide** - Company name, presentation title, date
+2. **Agenda** - Overview of topics (3-5 items)
+3. **Content Slides** - Main information (1 idea per slide)
+4. **Data/Charts** - Supporting visuals
+5. **Conclusion** - Key takeaways
+6. **Call to Action** - Next steps or contact info
+
+### SLIDE DESIGN RULES:
+- ✅ Maximum 6 bullet points per slide
+- ✅ One main idea per slide
+- ✅ Short bullet text (1 line each)
+- ✅ Use blank lines for visual separation
+- ❌ NEVER overcrowd slides with text
+- ❌ NEVER use full paragraphs on slides
+
+### BUILT-IN PROFESSIONAL STYLING:
+The tool automatically applies:
+- **Title font**: Poppins, 36pt, bold, dark navy
+- **Subtitle font**: Open Sans, 20pt, italic, gray
+- **Bullets font**: Open Sans, 18pt, 1.5x line spacing
+- **Colors**: Professional blue/navy palette
+
+### EXAMPLE CONTENT FORMAT:
+\\\`\\\`\\\`
+# Título de la Presentación
+### Subtítulo o fecha
+
+## Agenda
+- Punto 1
+- Punto 2
+- Punto 3
+
+## Resultados Clave
+### Métricas Q1
+- Ventas: $1.2M (+25%)
+- Usuarios: 50,000 (+40%)
+- NPS: 72 (+8)
+
+## Próximos Pasos
+- Acción inmediata 1
+- Acción inmediata 2
+\\\`\\\`\\\`
+</google_slides_formatting>
+
 <anti_hallucination>
 ## ACCURACY PROTOCOL
 
