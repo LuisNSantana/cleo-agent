@@ -590,20 +590,6 @@ export default function IntegrationsPage() {
                 </span>
               </div>
             </div>
-
-            {/* Botón de refresh */}
-            <div className="flex justify-center mb-8">
-              <Button
-                onClick={refreshAllStatuses}
-                disabled={isRefreshing}
-                variant="outline"
-                size="sm"
-                className="text-sm"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh Status'}
-              </Button>
-            </div>
           </div>
 
           {/* Grid de integraciones */}

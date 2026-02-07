@@ -183,6 +183,11 @@ async function makeTwitterRequest(endpoint: string, options: RequestInit = {}) {
   throw new Error('Cannot perform write operation: OAuth 1.0a credentials required for posting tweets')
 }
 
+/**
+ * Upload media to Twitter using v2 API with chunked upload
+ * Process: INIT → APPEND (chunks) → FINALIZE
+ * Falls back to v1.1 if v2 fails (for older accounts)
+ */
 async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> {
   // Enforce user-linked credentials for write (media upload)
   const userId = getCurrentUserId?.()
@@ -206,14 +211,212 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
   }
 
   const mediaBuffer = await mediaResponse.arrayBuffer()
+  const mediaBytes = new Uint8Array(mediaBuffer)
+  const totalBytes = mediaBytes.length
+  
+  // Determine media type from content-type header or URL
+  const contentType = mediaResponse.headers.get('content-type') || 'image/jpeg'
+  const isVideo = contentType.startsWith('video/')
+  const mediaCategory = isVideo ? 'tweet_video' : 'tweet_image'
+  
+  // Try v2 chunked upload first, fallback to v1.1 if needed
+  try {
+    return await uploadMediaV2Chunked(credentials, mediaBytes, totalBytes, contentType, mediaCategory, altText)
+  } catch (v2Error) {
+    console.warn('Twitter v2 media upload failed, attempting v1.1 fallback:', v2Error)
+    
+    // Fallback to v1.1 for older accounts or if v2 is unavailable
+    return await uploadMediaV1Fallback(credentials, mediaBuffer, altText)
+  }
+}
+
+/**
+ * Twitter API v2 chunked media upload
+ * Three-step process: INIT → APPEND → FINALIZE
+ */
+async function uploadMediaV2Chunked(
+  credentials: any,
+  mediaBytes: Uint8Array,
+  totalBytes: number,
+  contentType: string,
+  mediaCategory: string,
+  altText?: string
+): Promise<string> {
+  const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks (Twitter max)
+  
+  // Step 1: INIT - Initialize the upload
+  const initUrl = 'https://upload.twitter.com/1.1/media/upload.json'
+  const initParams: Record<string, string> = {
+    command: 'INIT',
+    total_bytes: totalBytes.toString(),
+    media_type: contentType,
+    media_category: mediaCategory
+  }
+  
+  const initAuthHeader = buildOAuth1Header('POST', initUrl, credentials, initParams)
+  const initResponse = await fetch(initUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': initAuthHeader,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams(initParams)
+  })
+  
+  if (!initResponse.ok) {
+    const errorData = await initResponse.json().catch(() => ({}))
+    throw new Error(`Media upload INIT failed: ${errorData.errors?.[0]?.message || initResponse.statusText}`)
+  }
+  
+  const initResult = await initResponse.json()
+  const mediaId = initResult.media_id_string
+  
+  if (!mediaId) {
+    throw new Error('No media_id returned from INIT')
+  }
+  
+  // Step 2: APPEND - Upload chunks
+  let segmentIndex = 0
+  for (let offset = 0; offset < totalBytes; offset += CHUNK_SIZE) {
+    const chunk = mediaBytes.slice(offset, Math.min(offset + CHUNK_SIZE, totalBytes))
+    const chunkBase64 = Buffer.from(chunk).toString('base64')
+    
+    const appendParams: Record<string, string> = {
+      command: 'APPEND',
+      media_id: mediaId,
+      segment_index: segmentIndex.toString(),
+      media_data: chunkBase64
+    }
+    
+    const appendAuthHeader = buildOAuth1Header('POST', initUrl, credentials, appendParams)
+    const appendResponse = await fetch(initUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': appendAuthHeader,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(appendParams)
+    })
+    
+    if (!appendResponse.ok) {
+      const errorData = await appendResponse.json().catch(() => ({}))
+      throw new Error(`Media upload APPEND failed at segment ${segmentIndex}: ${errorData.errors?.[0]?.message || appendResponse.statusText}`)
+    }
+    
+    segmentIndex++
+  }
+  
+  // Step 3: FINALIZE - Complete the upload
+  const finalizeParams: Record<string, string> = {
+    command: 'FINALIZE',
+    media_id: mediaId
+  }
+  
+  const finalizeAuthHeader = buildOAuth1Header('POST', initUrl, credentials, finalizeParams)
+  const finalizeResponse = await fetch(initUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': finalizeAuthHeader,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams(finalizeParams)
+  })
+  
+  if (!finalizeResponse.ok) {
+    const errorData = await finalizeResponse.json().catch(() => ({}))
+    throw new Error(`Media upload FINALIZE failed: ${errorData.errors?.[0]?.message || finalizeResponse.statusText}`)
+  }
+  
+  const finalizeResult = await finalizeResponse.json()
+  
+  // For videos, wait for processing to complete
+  if (finalizeResult.processing_info) {
+    await waitForMediaProcessing(credentials, mediaId, initUrl)
+  }
+  
+  // Add alt text if provided
+  if (altText) {
+    const metadataUrl = 'https://upload.twitter.com/1.1/media/metadata/create.json'
+    const metadataAuthHeader = buildOAuth1Header('POST', metadataUrl, credentials, {})
+    
+    await fetch(metadataUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': metadataAuthHeader,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        media_id: mediaId,
+        alt_text: { text: altText.substring(0, 1000) } // Twitter alt text limit
+      })
+    })
+  }
+  
+  return mediaId
+}
+
+/**
+ * Wait for Twitter to process video/GIF media
+ */
+async function waitForMediaProcessing(credentials: any, mediaId: string, baseUrl: string): Promise<void> {
+  const maxWaitMs = 120000 // 2 minutes max
+  const pollIntervalMs = 5000 // Poll every 5 seconds
+  const startTime = Date.now()
+  
+  while (Date.now() - startTime < maxWaitMs) {
+    const statusParams: Record<string, string> = {
+      command: 'STATUS',
+      media_id: mediaId
+    }
+    
+    const statusAuthHeader = buildOAuth1Header('GET', baseUrl, credentials, statusParams)
+    const statusResponse = await fetch(`${baseUrl}?${new URLSearchParams(statusParams)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': statusAuthHeader
+      }
+    })
+    
+    if (statusResponse.ok) {
+      const statusResult = await statusResponse.json()
+      const processingInfo = statusResult.processing_info
+      
+      if (!processingInfo) {
+        return // Processing complete
+      }
+      
+      if (processingInfo.state === 'succeeded') {
+        return
+      }
+      
+      if (processingInfo.state === 'failed') {
+        throw new Error(`Media processing failed: ${processingInfo.error?.message || 'Unknown error'}`)
+      }
+      
+      // Wait before next poll
+      const waitTime = processingInfo.check_after_secs 
+        ? processingInfo.check_after_secs * 1000 
+        : pollIntervalMs
+      await new Promise(resolve => setTimeout(resolve, Math.min(waitTime, pollIntervalMs)))
+    } else {
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs))
+    }
+  }
+  
+  throw new Error('Media processing timed out after 2 minutes')
+}
+
+/**
+ * Fallback to v1.1 simple upload for smaller images (< 5MB)
+ * This may stop working as Twitter phases out v1.1
+ */
+async function uploadMediaV1Fallback(credentials: any, mediaBuffer: ArrayBuffer, altText?: string): Promise<string> {
   const mediaBase64 = Buffer.from(mediaBuffer).toString('base64')
   
-  // Generate OAuth 1.0a signature for v1.1 media upload endpoint
   const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json'
-  const bodyParams = { media_data: mediaBase64 }
-  const authHeader = generateOAuth1Signature('POST', uploadUrl, credentials, bodyParams)
+  const bodyParams: Record<string, string> = { media_data: mediaBase64 }
+  const authHeader = buildOAuth1Header('POST', uploadUrl, credentials, bodyParams)
 
-  // Upload to Twitter (v1.1 endpoint for media upload)
   const uploadResponse = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
@@ -225,16 +428,16 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
 
   if (!uploadResponse.ok) {
     const errorData = await uploadResponse.json().catch(() => ({}))
-    throw new Error(`Failed to upload media to Twitter: ${errorData.errors?.[0]?.message || uploadResponse.statusText}`)
+    throw new Error(`Failed to upload media to Twitter (v1.1 fallback): ${errorData.errors?.[0]?.message || uploadResponse.statusText}`)
   }
 
   const uploadResult = await uploadResponse.json()
   const mediaId = uploadResult.media_id_string
 
   // Add alt text if provided
-  if (altText) {
+  if (altText && mediaId) {
     const metadataUrl = 'https://upload.twitter.com/1.1/media/metadata/create.json'
-    const metadataAuthHeader = generateOAuth1Signature('POST', metadataUrl, credentials)
+    const metadataAuthHeader = buildOAuth1Header('POST', metadataUrl, credentials, {})
     
     await fetch(metadataUrl, {
       method: 'POST',
@@ -244,7 +447,7 @@ async function uploadMedia(mediaUrl: string, altText?: string): Promise<string> 
       },
       body: JSON.stringify({
         media_id: mediaId,
-        alt_text: { text: altText }
+        alt_text: { text: altText.substring(0, 1000) }
       })
     })
   }

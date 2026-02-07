@@ -360,9 +360,10 @@ export const hashtagResearchTool = tool({
       .filter(word => word.length > 2)
       .map(word => `#${word.charAt(0).toUpperCase() + word.slice(1)}`)
 
-    // Simulate trending analysis
+    // Simulate trending analysis - use dynamic year
+    const currentYear = new Date().getFullYear()
     const trendingHashtags = [
-      '#TechTrends2024',
+      `#TechTrends${currentYear}`,
       '#Innovation',
       '#DigitalTransformation',
       '#SocialMedia',
@@ -415,9 +416,11 @@ export const twitterTrendsAnalysisTool = tool({
     // This would use serpNewsSearch to find trending topics
     // Simulating trend analysis for now
     
+    // Use dynamic year for trending hashtags
+    const currentYear = new Date().getFullYear()
     const trends = [
       {
-        hashtag: '#AI2024',
+        hashtag: `#AI${currentYear}`,
         volume: 'High',
         growth: '+150%',
         category: 'technology',
