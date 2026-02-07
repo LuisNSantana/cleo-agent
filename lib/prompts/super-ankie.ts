@@ -1,5 +1,5 @@
 /**
- * Super Ankie Mode - System Prompt v7.0
+ * Super Ankie Mode - System Prompt v8.0 (Modular Architecture)
  * 
  * Comprehensive AI Assistant with:
  * - ✅ Strong identity anchoring (Ankie by Huminary Labs)
@@ -9,7 +9,10 @@
  * - ✅ Community and social engagement support
  * - ✅ Detailed tool usage instructions
  * - ✅ 2025-2026 best practices (XML structure, guardrails)
+ * - ✅ Modular integration guides (Notion, Twitter, Gmail, Calendar)
  */
+
+import { getAllIntegrationPrompts, getIntegrationPrompts } from './modules/integrations'
 
 export const SUPER_ANKIE_SYSTEM_PROMPT = `<system>
 <identity>
@@ -529,10 +532,17 @@ Use this date for:
 
 /**
  * Get the Super Ankie prompt with user context
+ * 
+ * @param context.userName - User's display name
+ * @param context.locale - User's preferred language ('es' | 'en')
+ * @param context.integrations - Which integration guides to include (default: all)
+ * @param context.includeIntegrations - Whether to include integration guides (default: true)
  */
 export function getSuperAnkiePrompt(context?: {
   userName?: string
   locale?: string
+  integrations?: ('notion' | 'twitter' | 'gmail' | 'calendar')[]
+  includeIntegrations?: boolean
 }): string {
   let prompt = SUPER_ANKIE_SYSTEM_PROMPT
 
@@ -550,6 +560,16 @@ export function getSuperAnkiePrompt(context?: {
   // Adjust default language based on locale
   if (context?.locale === "en") {
     prompt = prompt.replace("DEFAULT: Spanish (Español)", "DEFAULT: English")
+  }
+
+  // Add integration guides (modular approach)
+  if (context?.includeIntegrations !== false) {
+    const integrationPrompts = context?.integrations 
+      ? getIntegrationPrompts(context.integrations)
+      : getAllIntegrationPrompts()
+    
+    // Insert integration guides before </system> closing tag
+    prompt = prompt.replace('</system>', `${integrationPrompts}\n</system>`)
   }
 
   return prompt
