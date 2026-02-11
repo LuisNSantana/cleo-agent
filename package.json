@@ -45,7 +45,7 @@
     "@ai-sdk/xai": "^2.0.2",
     "@google/generative-ai": "^0.24.1",
     "@langchain/anthropic": "^0.3.26",
-    "@langchain/community": "^0.3.53",
+    "@langchain/community": "^1.1.14",
     "@langchain/core": "^0.3.72",
     "@langchain/groq": "^0.2.3",
     "@langchain/langgraph": "^0.4.6",
