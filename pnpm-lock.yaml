@@ -59,7 +59,7 @@ importers:
         version: 0.3.26(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))
       '@langchain/community':
         specifier: ^0.3.53
-        version: 0.3.53(537f7e3f0c92947f27e7838ea8df217e)
+        version: 0.3.53(372f6f922a7fdc4a8d3b811acefa7dfb)
       '@langchain/core':
         specifier: ^0.3.72
         version: 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76))
@@ -253,8 +253,8 @@ importers:
         specifier: ^9.5.1
         version: 9.5.1
       dompurify:
-        specifier: ^3.2.6
-        version: 3.2.6
+        specifier: ^3.3.1
+        version: 3.3.1
       eslint-plugin-react-hooks:
         specifier: ^7.0.1
         version: 7.0.1(eslint@9.32.0(jiti@2.5.1))
@@ -290,7 +290,7 @@ importers:
         version: 9.3.22
       langchain:
         specifier: ^0.3.31
-        version: 0.3.31(f24361bbcdf8b7298099178d008845d8)
+        version: 0.3.31(8a46acf5ba23a22e2c0a8588aa009f66)
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -915,8 +915,8 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@browserbasehq/sdk@2.6.0':
-    resolution: {integrity: sha512-83iXP5D7xMm8Wyn66TUaUrgoByCmAJuoMoZQI3sGg3JAiMlTfnCIMqyVBoNSaItaPIkaCnrsj6LiusmXV2X9YA==}
+  '@browserbasehq/sdk@2.7.0':
+    resolution: {integrity: sha512-1iwuj3fChplMq+S66M9tGb9ZXA4e7Vi8MjqQQ6/T6rzoAWLGfDnEAPbgTOU479o+Mi3of5/6YXk1oIHKTw0NBw==}
 
   '@browserbasehq/stagehand@1.14.0':
     resolution: {integrity: sha512-Hi/EzgMFWz+FKyepxHTrqfTPjpsuBS4zRy3e9sbMpBgLPv+9c0R+YZEvS7Bw4mTS66QtvvURRT6zgDGFotthVQ==}
@@ -4190,8 +4190,8 @@ packages:
     resolution: {integrity: sha512-Xm7bpRXnDSX2YE2YFfBk2FnF0ep6tmG7xPh8iHee8MIcrgq762Nkce856dYtJYLkuIoYZvGfTs/PbZhideTcEg==}
     engines: {node: '>=4'}
 
-  axios@1.13.2:
-    resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
+  axios@1.13.6:
+    resolution: {integrity: sha512-ChTCHMouEe2kn713WHbQGcuYrr6fXTBiu460OTwWrWob16g1bXn4vtz07Ope7ewMozJAnEquLk5lWQWtBig9DQ==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -4743,8 +4743,8 @@ packages:
     resolution: {integrity: sha512-ABDI7JEirFD2+bHhOBlsGZxaG1UgZb2M/QMKhLSDGgVNhxDesTCDcP+qoDnDGjZ4EOXTRfUjUgwHVuZ6VSTfWQ==}
     engines: {node: '>=10'}
 
-  dompurify@3.2.6:
-    resolution: {integrity: sha512-/2GogDQlohXPZe6D6NOgQvXLPSYBqIWMnZ8zzOhn09REE4eyAzb+Hed3jhoM9OkuaJ8P6ZGTTVWQKAi8ieIzfQ==}
+  dompurify@3.3.1:
+    resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
 
   dotenv@16.4.7:
     resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
@@ -5269,11 +5269,12 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   globals@14.0.0:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
@@ -7248,8 +7249,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.7.3:
-    resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
+  semver@7.7.4:
+    resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -7531,6 +7532,7 @@ packages:
   tar@7.4.3:
     resolution: {integrity: sha512-5S7Va8hKfV7W5U6g3aYxXmlPoZVAwUMy9AOKyF2fVuZa2UD3qZjg578OrLRt8PcNN1PleVaL/5/yYATNL0ICUw==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   test-exclude@6.0.0:
     resolution: {integrity: sha512-cAGWPIyOHU6zlmg88jwm7VRyXnMN7iV68OGAbYDk/Mh/xC/pzVPlQtY6ngoIH/5/tciuhGfvESU8GrHrcxD56w==}
@@ -7942,6 +7944,18 @@ packages:
 
   ws@8.18.3:
     resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
+  ws@8.19.0:
+    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -8784,7 +8798,7 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@browserbasehq/sdk@2.6.0':
+  '@browserbasehq/sdk@2.7.0':
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -8799,12 +8813,12 @@ snapshots:
   '@browserbasehq/stagehand@1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@17.2.3)(openai@5.12.2(ws@8.18.3)(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@anthropic-ai/sdk': 0.27.3
-      '@browserbasehq/sdk': 2.6.0
+      '@browserbasehq/sdk': 2.7.0
       '@playwright/test': 1.55.0
       deepmerge: 4.3.1
       dotenv: 17.2.3
       openai: 5.12.2(ws@8.18.3)(zod@3.25.76)
-      ws: 8.18.3
+      ws: 8.19.0
       zod: 3.25.76
       zod-to-json-schema: 3.25.1(zod@3.25.76)
     transitivePeerDependencies:
@@ -9358,7 +9372,7 @@ snapshots:
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76))
       fast-xml-parser: 4.5.3
 
-  '@langchain/community@0.3.53(537f7e3f0c92947f27e7838ea8df217e)':
+  '@langchain/community@0.3.53(372f6f922a7fdc4a8d3b811acefa7dfb)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@17.2.3)(openai@5.12.2(ws@8.18.3)(zod@3.25.76))(zod@3.25.76)
       '@ibm-cloud/watsonx-ai': 1.6.10
@@ -9370,7 +9384,7 @@ snapshots:
       flat: 5.0.2
       ibm-cloud-sdk-core: 5.4.2
       js-yaml: 4.1.0
-      langchain: 0.3.31(f24361bbcdf8b7298099178d008845d8)
+      langchain: 0.3.31(8a46acf5ba23a22e2c0a8588aa009f66)
       langsmith: 0.3.62(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76))
       openai: 5.12.2(ws@8.18.3)(zod@3.25.76)
       uuid: 10.0.0
@@ -9378,7 +9392,7 @@ snapshots:
     optionalDependencies:
       '@aws-crypto/sha256-js': 5.2.0
       '@aws-sdk/credential-provider-node': 3.888.0
-      '@browserbasehq/sdk': 2.6.0
+      '@browserbasehq/sdk': 2.7.0
       '@smithy/util-utf8': 2.3.0
       '@supabase/supabase-js': 2.53.0
       '@upstash/redis': 1.35.5
@@ -12035,7 +12049,7 @@ snapshots:
 
   axe-core@4.10.3: {}
 
-  axios@1.13.2(debug@4.4.3):
+  axios@1.13.6(debug@4.4.3):
     dependencies:
       follow-redirects: 1.15.11(debug@4.4.3)
       form-data: 4.0.5
@@ -12613,7 +12627,7 @@ snapshots:
       xml: 1.0.1
       xml-js: 1.6.11
 
-  dompurify@3.2.6:
+  dompurify@3.3.1:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -13541,7 +13555,7 @@ snapshots:
       '@types/debug': 4.1.12
       '@types/node': 18.19.130
       '@types/tough-cookie': 4.0.5
-      axios: 1.13.2(debug@4.4.3)
+      axios: 1.13.6(debug@4.4.3)
       camelcase: 6.3.0
       debug: 4.4.3
       dotenv: 16.6.1
@@ -13551,7 +13565,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.13.2)
+      retry-axios: 2.6.0(axios@1.13.6)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -14211,7 +14225,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.7.3
+      semver: 7.7.4
 
   jspdf@4.0.0:
     dependencies:
@@ -14221,7 +14235,7 @@ snapshots:
     optionalDependencies:
       canvg: 3.0.11
       core-js: 3.47.0
-      dompurify: 3.2.6
+      dompurify: 3.3.1
       html2canvas: 1.4.1
 
   jsx-ast-utils@3.3.5:
@@ -14260,7 +14274,7 @@ snapshots:
 
   konva@9.3.22: {}
 
-  langchain@0.3.31(f24361bbcdf8b7298099178d008845d8):
+  langchain@0.3.31(8a46acf5ba23a22e2c0a8588aa009f66):
     dependencies:
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76))
       '@langchain/openai': 0.6.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
@@ -14279,7 +14293,7 @@ snapshots:
       '@langchain/groq': 0.2.3(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))
       '@langchain/mistralai': 0.2.1(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))
       '@langchain/xai': 1.0.0(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
-      axios: 1.13.2(debug@4.4.3)
+      axios: 1.13.6(debug@4.4.3)
       handlebars: 4.7.8
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -15727,9 +15741,9 @@ snapshots:
       path-parse: 1.0.7
       supports-preserve-symlinks-flag: 1.0.0
 
-  retry-axios@2.6.0(axios@1.13.2):
+  retry-axios@2.6.0(axios@1.13.6):
     dependencies:
-      axios: 1.13.2(debug@4.4.3)
+      axios: 1.13.6(debug@4.4.3)
 
   retry@0.13.1: {}
 
@@ -15806,7 +15820,7 @@ snapshots:
 
   semver@7.7.2: {}
 
-  semver@7.7.3: {}
+  semver@7.7.4: {}
 
   send@1.2.0:
     dependencies:
@@ -16652,6 +16666,8 @@ snapshots:
   ws@7.5.10: {}
 
   ws@8.18.3: {}
+
+  ws@8.19.0: {}
 
   xml-js@1.6.11:
     dependencies:
