@@ -113,7 +113,7 @@
     "dompurify": "^3.2.6",
     "eslint-plugin-react-hooks": "^7.0.1",
     "exa-js": "^1.8.27",
-    "file-type": "^21.0.0",
+    "file-type": "^21.3.2",
     "framer-motion": "^12.23.12",
     "groq-sdk": "^0.30.0",
     "html2canvas": "^1.4.1",
